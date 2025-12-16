@@ -1,7 +1,6 @@
 <?php
 session_start();
 
-// Check if user is logged in, redirect to login if not
 if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
     header('Location: login.php');
     exit;
@@ -12,7 +11,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard</title>
+    <title>Track Complaint - Alertara</title>
     <link rel="icon" type="image/x-icon" href="images/favicon.ico">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="css/theme.css">
@@ -26,7 +25,6 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             min-height: 100vh;
         }
         
-        /* Sidebar Navigation */
         .sidebar {
             width: 320px;
             background: var(--tertiary-color);
@@ -53,10 +51,6 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
         }
         
         .sidebar.collapsed {
-            overflow: visible;
-        }
-        
-        .sidebar.collapsed {
             width: 80px;
         }
         
@@ -69,70 +63,6 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             justify-content: center;
             position: relative;
             min-height: 160px;
-        }
-        
-        .burger-btn {
-            position: absolute;
-            top: 1rem;
-            right: 1rem;
-            background: rgba(255, 255, 255, 0.1);
-            border: none;
-            color: #fff;
-            width: 36px;
-            height: 36px;
-            border-radius: 6px;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: all 0.2s ease;
-            z-index: 10;
-        }
-        
-        .burger-btn:hover {
-            background: rgba(255, 255, 255, 0.2);
-            transform: scale(1.05);
-        }
-        
-        .burger-btn span {
-            display: block;
-            width: 18px;
-            height: 2px;
-            background: #fff;
-            position: relative;
-            transition: all 0.3s ease;
-        }
-        
-        .burger-btn span::before,
-        .burger-btn span::after {
-            content: '';
-            position: absolute;
-            width: 18px;
-            height: 2px;
-            background: #fff;
-            transition: all 0.3s ease;
-        }
-        
-        .burger-btn span::before {
-            top: -6px;
-        }
-        
-        .burger-btn span::after {
-            bottom: -6px;
-        }
-        
-        .sidebar.collapsed .burger-btn span {
-            background: #fff;
-        }
-        
-        .sidebar.collapsed .burger-btn span::before {
-            top: -6px;
-            transform: rotate(0deg);
-        }
-        
-        .sidebar.collapsed .burger-btn span::after {
-            bottom: -6px;
-            transform: rotate(0deg);
         }
         
         .logo-container {
@@ -166,18 +96,6 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             width: 70px;
         }
         
-        .sidebar-header img {
-            display: block;
-        }
-        
-        .sidebar-header h2 {
-            margin: 0;
-            font-size: 1.25rem;
-            font-weight: 600;
-            color: #fff;
-            text-align: center;
-        }
-        
         .sidebar-nav {
             padding: 0.5rem 0;
             overflow: visible;
@@ -191,23 +109,17 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             overflow: visible;
             display: flex !important;
             flex-direction: column;
-            padding: 0.5rem 0;
-            position: relative;
         }
         
         .nav-module {
             margin-bottom: 0.125rem;
             display: block !important;
             visibility: visible !important;
-            position: relative;
         }
         
         .sidebar.collapsed .nav-module {
             display: block !important;
             visibility: visible !important;
-            margin-bottom: 0.25rem;
-            position: relative;
-            height: auto;
         }
         
         .nav-module-header {
@@ -227,7 +139,6 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             gap: 0.75rem;
             line-height: 1.4;
         }
-        
         
         .sidebar.collapsed .nav-module-header {
             padding: 0.75rem;
@@ -359,8 +270,6 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             position: relative;
         }
         
-        
-        
         .sidebar.collapsed .nav-submodule {
             padding: 0.75rem;
             justify-content: center;
@@ -411,7 +320,6 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             display: none;
         }
         
-        /* Tooltip for collapsed sidebar */
         .sidebar.collapsed .nav-module-header::after,
         .sidebar.collapsed .nav-submodule::after {
             content: attr(data-tooltip);
@@ -459,33 +367,6 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             opacity: 1;
         }
         
-        .nav-submodule:hover {
-            background: rgba(255, 255, 255, 0.05);
-            color: #fff;
-            padding-left: 4rem;
-        }
-        
-        .sidebar.collapsed .nav-submodule:hover {
-            padding-left: 1rem;
-        }
-        
-        .nav-submodule.active {
-            background: rgba(76, 138, 137, 0.25);
-            color: #4c8a89;
-            border-left: 3px solid #4c8a89;
-            font-weight: 500;
-        }
-        
-        .sidebar.collapsed .nav-submodule.active {
-            border-left: none;
-            border-top: 3px solid #4c8a89;
-        }
-        
-        /* Improved collapsed sidebar styling */
-        .sidebar.collapsed {
-            width: 80px;
-        }
-        
         .sidebar.collapsed .nav-module {
             margin-bottom: 0.25rem;
             display: block !important;
@@ -530,17 +411,28 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             transform: none;
         }
         
-        .sidebar.collapsed .nav-module-header * {
-            visibility: visible !important;
+        .nav-submodule:hover {
+            background: rgba(255, 255, 255, 0.05);
+            color: #fff;
+            padding-left: 4rem;
         }
         
-        .sidebar.collapsed .nav-module-icon {
-            display: flex !important;
-            visibility: visible !important;
-            opacity: 1 !important;
+        .sidebar.collapsed .nav-submodule:hover {
+            padding-left: 1rem;
         }
         
-        /* Main Content Area */
+        .nav-submodule.active {
+            background: rgba(76, 138, 137, 0.25);
+            color: #4c8a89;
+            border-left: 3px solid #4c8a89;
+            font-weight: 500;
+        }
+        
+        .sidebar.collapsed .nav-submodule.active {
+            border-left: none;
+            border-top: 3px solid #4c8a89;
+        }
+        
         .main-wrapper {
             margin-left: 320px;
             flex: 1;
@@ -568,14 +460,15 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
         
         .top-header-content {
             flex: 1;
-            padding-bottom: 0;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
         }
         
         .user-info {
             display: flex;
             align-items: center;
             gap: 1rem;
-            padding-bottom: 0;
             margin-left: 2rem;
         }
         
@@ -601,13 +494,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
         .content-area {
             padding: 2rem;
             flex: 1;
-            background: #ffffff;
-        }
-        
-        .top-header-content {
-            display: flex;
-            align-items: center;
-            gap: 1rem;
+            background: #f5f5f5;
         }
         
         .content-burger-btn {
@@ -673,17 +560,144 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             margin-top: 1.5rem;
         }
         
-        .page-content h2 {
-            font-size: 1.5rem;
-            font-weight: 600;
-            color: var(--tertiary-color);
-            margin: 0 0 0.75rem 0;
+        .search-box {
+            margin-bottom: 1.5rem;
+            position: relative;
         }
         
-        .page-content p {
-            color: var(--text-secondary);
-            margin: 0;
-            line-height: 1.6;
+        .search-box input {
+            width: 100%;
+            padding: 0.75rem 1rem 0.75rem 2.5rem;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            font-size: 0.95rem;
+            transition: all 0.2s ease;
+        }
+        
+        .search-box input:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(76, 138, 137, 0.1);
+        }
+        
+        .search-box::before {
+            content: "🔍";
+            position: absolute;
+            left: 0.75rem;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 1rem;
+        }
+        
+        .table-container {
+            overflow-x: auto;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: var(--card-bg);
+        }
+        
+        thead {
+            background: var(--tertiary-color);
+            color: #fff;
+        }
+        
+        th {
+            padding: 1rem;
+            text-align: left;
+            font-weight: 600;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        td {
+            padding: 1rem;
+            border-bottom: 1px solid var(--border-color);
+            color: var(--text-color);
+        }
+        
+        tbody tr:hover {
+            background: #f9f9f9;
+        }
+        
+        tbody tr:last-child td {
+            border-bottom: none;
+        }
+        
+        .status-badge {
+            padding: 0.25rem 0.75rem;
+            border-radius: 12px;
+            font-size: 0.85rem;
+            font-weight: 500;
+            display: inline-block;
+        }
+        
+        .status-pending {
+            background: #fff3cd;
+            color: #856404;
+        }
+        
+        .status-processing {
+            background: #cfe2ff;
+            color: #084298;
+        }
+        
+        .status-resolved {
+            background: #d1e7dd;
+            color: #0f5132;
+        }
+        
+        .status-rejected {
+            background: #f8d7da;
+            color: #842029;
+        }
+        
+        .priority-badge {
+            padding: 0.25rem 0.75rem;
+            border-radius: 12px;
+            font-size: 0.85rem;
+            font-weight: 500;
+            display: inline-block;
+        }
+        
+        .priority-low {
+            background: #e7f3ff;
+            color: #0066cc;
+        }
+        
+        .priority-medium {
+            background: #fff4e6;
+            color: #cc6600;
+        }
+        
+        .priority-high {
+            background: #ffe6e6;
+            color: #cc0000;
+        }
+        
+        .priority-urgent {
+            background: #ff0000;
+            color: #fff;
+        }
+        
+        .btn-view {
+            padding: 0.5rem 1rem;
+            background: var(--primary-color);
+            color: #fff;
+            border: none;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        
+        .btn-view:hover {
+            background: #4ca8a6;
         }
         
         @media (max-width: 768px) {
@@ -723,7 +737,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             </div>
         </div>
         <nav class="sidebar-nav">
-            <div class="nav-module active">
+            <div class="nav-module">
                 <div class="nav-module-header" onclick="toggleModule(this)" data-tooltip="Neighborhood Watch Coordination">
                     <span class="nav-module-icon"><i class="fas fa-users"></i></span>
                     <span class="nav-module-header-text">Neighborhood Watch Coordination</span>
@@ -759,7 +773,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                 </div>
             </div>
             
-            <div class="nav-module">
+            <div class="nav-module active">
                 <div class="nav-module-header" onclick="toggleModule(this)" data-tooltip="Community Complaint Logging and Resolution">
                     <span class="nav-module-icon"><i class="fas fa-file-alt"></i></span>
                     <span class="nav-module-header-text">Community Complaint Logging and Resolution</span>
@@ -770,7 +784,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                         <span class="nav-submodule-icon"><i class="fas fa-edit"></i></span>
                         <span class="nav-submodule-text">Submit Complaint</span>
                     </a>
-                    <a href="track-complaint.php" class="nav-submodule" data-tooltip="Track Complaint">
+                    <a href="track-complaint.php" class="nav-submodule active" data-tooltip="Track Complaint">
                         <span class="nav-submodule-icon"><i class="fas fa-search"></i></span>
                         <span class="nav-submodule-text">Track Complaint</span>
                     </a>
@@ -858,7 +872,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                 <button class="content-burger-btn" onclick="toggleSidebar()" aria-label="Toggle sidebar">
                     <span></span>
                 </button>
-                <h1 class="page-title">Dashboard</h1>
+                <h1 class="page-title">Track Complaint</h1>
             </div>
             <div class="user-info">
                 <span>Welcome, <?php echo htmlspecialchars($_SESSION['username'] ?? 'Admin'); ?></span>
@@ -868,14 +882,59 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
         
         <main class="content-area">
             <div class="page-content">
-                <h2>Welcome to Alertara QC Dashboard</h2>
-                <p>Select a module from the sidebar to get started.</p>
+                <div class="search-box">
+                    <input type="text" id="searchInput" placeholder="Search by complaint ID, complainant name, or contact number..." onkeyup="filterComplaints()">
+                </div>
+                
+                <div class="table-container">
+                    <table id="complaintsTable">
+                        <thead>
+                            <tr>
+                                <th>Complaint ID</th>
+                                <th>Complainant</th>
+                                <th>Type</th>
+                                <th>Date</th>
+                                <th>Priority</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="complaintsTableBody">
+                            <tr>
+                                <td>COMP-2024-001</td>
+                                <td>Juan Dela Cruz</td>
+                                <td>Noise</td>
+                                <td>2024-01-15</td>
+                                <td><span class="priority-badge priority-high">High</span></td>
+                                <td><span class="status-badge status-processing">Processing</span></td>
+                                <td><button class="btn-view" onclick="viewComplaint('COMP-2024-001')">View</button></td>
+                            </tr>
+                            <tr>
+                                <td>COMP-2024-002</td>
+                                <td>Maria Santos</td>
+                                <td>Vandalism</td>
+                                <td>2024-01-14</td>
+                                <td><span class="priority-badge priority-urgent">Urgent</span></td>
+                                <td><span class="status-badge status-resolved">Resolved</span></td>
+                                <td><button class="btn-view" onclick="viewComplaint('COMP-2024-002')">View</button></td>
+                            </tr>
+                            <tr>
+                                <td>COMP-2024-003</td>
+                                <td>Roberto Cruz</td>
+                                <td>Safety</td>
+                                <td>2024-01-13</td>
+                                <td><span class="priority-badge priority-medium">Medium</span></td>
+                                <td><span class="status-badge status-pending">Pending</span></td>
+                                <td><button class="btn-view" onclick="viewComplaint('COMP-2024-003')">View</button></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </main>
     </div>
     
     <script>
-        // Load sidebar state from localStorage
         document.addEventListener('DOMContentLoaded', function() {
             const sidebar = document.getElementById('sidebar');
             const savedState = localStorage.getItem('sidebarCollapsed');
@@ -897,7 +956,6 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                 document.body.classList.add('sidebar-collapsed');
             }
             
-            // Save state to localStorage
             localStorage.setItem('sidebarCollapsed', !isCollapsed);
         }
         
@@ -907,20 +965,16 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             const isActive = module.classList.contains('active');
             const isCollapsed = sidebar.classList.contains('collapsed');
             
-            // When collapsed, expand sidebar and navigate to first submodule
             if (isCollapsed) {
-                // Expand the sidebar
                 sidebar.classList.remove('collapsed');
                 document.body.classList.remove('sidebar-collapsed');
                 localStorage.setItem('sidebarCollapsed', 'false');
                 
-                // Activate the clicked module
                 document.querySelectorAll('.nav-module').forEach(m => {
                     m.classList.remove('active');
                 });
                 module.classList.add('active');
                 
-                // Navigate to first submodule
                 const firstSubmodule = module.querySelector('.nav-submodule');
                 if (firstSubmodule && firstSubmodule.href && firstSubmodule.href !== '#') {
                     window.location.href = firstSubmodule.href;
@@ -928,16 +982,34 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                 return;
             }
             
-            // Normal behavior when expanded
-            // Close all modules
             document.querySelectorAll('.nav-module').forEach(m => {
                 m.classList.remove('active');
             });
             
-            // Open clicked module if it wasn't active
             if (!isActive) {
                 module.classList.add('active');
             }
+        }
+        
+        function filterComplaints() {
+            const input = document.getElementById('searchInput');
+            const filter = input.value.toLowerCase();
+            const table = document.getElementById('complaintsTableBody');
+            const rows = table.getElementsByTagName('tr');
+            
+            for (let i = 0; i < rows.length; i++) {
+                const row = rows[i];
+                const text = row.textContent || row.innerText;
+                if (text.toLowerCase().indexOf(filter) > -1) {
+                    row.style.display = '';
+                } else {
+                    row.style.display = 'none';
+                }
+            }
+        }
+        
+        function viewComplaint(id) {
+            alert('Viewing complaint: ' + id + ' (Full details modal to be implemented)');
         }
     </script>
 </body>
