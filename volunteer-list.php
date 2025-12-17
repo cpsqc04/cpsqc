@@ -87,10 +87,13 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
         .content-burger-btn span::after { bottom: -7px; }
         .page-title { font-size: 2rem; font-weight: 700; color: var(--tertiary-color); margin: 0; }
         .page-content { background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 12px; padding: 2rem; box-shadow: 0 2px 8px var(--shadow); margin-top: 1.5rem; }
-        .search-box { margin-bottom: 1.5rem; position: relative; }
+        .toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; gap: 1rem; flex-wrap: wrap; }
+        .search-box { flex: 1; min-width: 250px; position: relative; }
         .search-box input { width: 100%; padding: 0.75rem 1rem 0.75rem 2.5rem; border: 1px solid var(--border-color); border-radius: 8px; font-size: 0.95rem; transition: all 0.2s ease; }
         .search-box input:focus { outline: none; border-color: var(--primary-color); box-shadow: 0 0 0 3px rgba(76, 138, 137, 0.1); }
         .search-box::before { content: "🔍"; position: absolute; left: 0.75rem; top: 50%; transform: translateY(-50%); font-size: 1rem; }
+        .btn-add { padding: 0.75rem 1.5rem; background: var(--primary-color); color: #fff; border: none; border-radius: 8px; font-size: 0.95rem; font-weight: 500; cursor: pointer; transition: all 0.2s ease; display: flex; align-items: center; gap: 0.5rem; }
+        .btn-add:hover { background: #4ca8a6; transform: translateY(-1px); box-shadow: 0 4px 8px rgba(76, 138, 137, 0.2); }
         .table-container { overflow-x: auto; border-radius: 8px; border: 1px solid var(--border-color); }
         table { width: 100%; border-collapse: collapse; background: var(--card-bg); }
         thead { background: var(--tertiary-color); color: #fff; }
@@ -101,9 +104,48 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
         .status-badge { padding: 0.25rem 0.75rem; border-radius: 12px; font-size: 0.85rem; font-weight: 500; display: inline-block; }
         .status-pending { background: #fff3cd; color: #856404; }
         .status-resolved { background: #d1e7dd; color: #0f5132; }
-        .btn-view { padding: 0.5rem 1rem; background: var(--primary-color); color: #fff; border: none; border-radius: 6px; font-size: 0.85rem; cursor: pointer; transition: all 0.2s ease; }
+        .action-buttons { display: flex; gap: 0.5rem; }
+        .btn-view, .btn-edit, .btn-delete { padding: 0.5rem 1rem; background: var(--primary-color); color: #fff; border: none; border-radius: 6px; font-size: 0.85rem; cursor: pointer; transition: all 0.2s ease; }
         .btn-view:hover { background: #4ca8a6; }
-        @media (max-width: 768px) { .sidebar { width: 320px; transform: translateX(-100%); transition: transform 0.3s ease; } .sidebar.mobile-open { transform: translateX(0); } .sidebar.collapsed { width: 80px; transform: translateX(0); } .main-wrapper { margin-left: 0; } body.sidebar-collapsed .main-wrapper { margin-left: 80px; } }
+        .btn-edit { background: #ff9800; }
+        .btn-edit:hover { background: #f57c00; }
+        .btn-delete { background: #dc3545; }
+        .btn-delete:hover { background: #c82333; }
+        /* Modal Styles */
+        .modal { display: none; position: fixed; z-index: 2000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.5); backdrop-filter: blur(4px); }
+        .modal.active { display: flex; align-items: center; justify-content: center; }
+        .modal-content { background: var(--card-bg); border-radius: 12px; padding: 2rem; max-width: 600px; width: 90%; max-height: 90vh; overflow-y: auto; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2); }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; padding-bottom: 1rem; border-bottom: 1px solid var(--border-color); }
+        .modal-header h2 { margin: 0; color: var(--tertiary-color); font-size: 1.5rem; }
+        .close-modal { background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--text-secondary); transition: color 0.2s ease; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; border-radius: 6px; }
+        .close-modal:hover { color: var(--text-color); background: rgba(0, 0, 0, 0.05); }
+        .form-group { margin-bottom: 1.25rem; }
+        .form-group label { display: block; margin-bottom: 0.5rem; color: var(--text-color); font-weight: 500; font-size: 0.9rem; }
+        .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 8px; font-size: 0.95rem; font-family: var(--font-family); transition: all 0.2s ease; box-sizing: border-box; }
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus { outline: none; border-color: var(--primary-color); box-shadow: 0 0 0 3px rgba(76, 138, 137, 0.1); }
+        .form-group textarea { resize: vertical; min-height: 80px; }
+        .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+        .form-actions { display: flex; gap: 1rem; justify-content: flex-end; margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid var(--border-color); }
+        .file-upload { position: relative; display: inline-block; width: 100%; }
+        .file-upload input[type="file"] { position: absolute; opacity: 0; width: 100%; height: 100%; cursor: pointer; }
+        .file-upload-label { display: flex; align-items: center; justify-content: center; padding: 1rem; border: 2px dashed var(--border-color); border-radius: 8px; cursor: pointer; transition: all 0.2s ease; background: #f9f9f9; }
+        .file-upload-label:hover { border-color: var(--primary-color); background: rgba(76, 138, 137, 0.05); }
+        .file-preview { margin-top: 0.5rem; display: none; }
+        .file-preview img { max-width: 100%; max-height: 200px; border-radius: 8px; border: 1px solid var(--border-color); }
+        .id-photo-preview { width: 100px; height: 100px; object-fit: cover; border-radius: 8px; border: 2px solid var(--border-color); cursor: pointer; }
+        .btn-cancel, .btn-submit { padding: 0.75rem 1.5rem; border: none; border-radius: 8px; font-size: 0.95rem; font-weight: 500; cursor: pointer; transition: all 0.2s ease; }
+        .btn-cancel { background: #e5e5e5; color: var(--text-color); }
+        .btn-cancel:hover { background: #d5d5d5; }
+        .btn-submit { background: var(--primary-color); color: #fff; }
+        .btn-submit:hover { background: #4ca8a6; }
+        /* View Modal Styles */
+        .complaint-details { display: flex; flex-direction: column; gap: 1.25rem; }
+        .detail-row { display: flex; flex-direction: column; gap: 0.5rem; }
+        .detail-label { font-weight: 600; color: var(--text-color); font-size: 0.9rem; }
+        .detail-value { color: var(--text-secondary); font-size: 0.95rem; line-height: 1.6; }
+        .detail-row.inline { flex-direction: row; align-items: center; gap: 1rem; }
+        .detail-row.inline .detail-label { min-width: 120px; }
+        @media (max-width: 768px) { .sidebar { width: 320px; transform: translateX(-100%); transition: transform 0.3s ease; } .sidebar.mobile-open { transform: translateX(0); } .sidebar.collapsed { width: 80px; transform: translateX(0); } .main-wrapper { margin-left: 0; } body.sidebar-collapsed .main-wrapper { margin-left: 80px; } .toolbar { flex-direction: column; } .search-box { width: 100%; } .form-row { grid-template-columns: 1fr; } }
     </style>
 </head>
 <body>
@@ -140,13 +182,17 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                     <span class="arrow">▶</span>
                 </div>
                 <div class="nav-submodules">
-                    <a href="#" class="nav-submodule" data-tooltip="Live View">
+                    <a href="live-view.php" class="nav-submodule" data-tooltip="Live View">
                         <span class="nav-submodule-icon"><i class="fas fa-circle" style="color: #ff4444;"></i></span>
                         <span class="nav-submodule-text">Live View</span>
                     </a>
-                    <a href="#" class="nav-submodule" data-tooltip="Playback">
+                    <a href="playback.php" class="nav-submodule" data-tooltip="Playback">
                         <span class="nav-submodule-icon"><i class="fas fa-play"></i></span>
                         <span class="nav-submodule-text">Playback</span>
+                    </a>
+                    <a href="camera-management.php" class="nav-submodule" data-tooltip="Camera Management">
+                        <span class="nav-submodule-icon"><i class="fas fa-camera"></i></span>
+                        <span class="nav-submodule-text">Camera Management</span>
                     </a>
                 </div>
             </div>
@@ -252,8 +298,14 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
         </header>
         <main class="content-area">
             <div class="page-content">
-                <div class="search-box">
-                    <input type="text" id="searchInput" placeholder="Search volunteers by name, contact, or skills..." onkeyup="filterVolunteers()">
+                <div class="toolbar">
+                    <div class="search-box">
+                        <input type="text" id="searchInput" placeholder="Search volunteers by name, contact, or skills..." onkeyup="filterVolunteers()">
+                    </div>
+                    <button class="btn-add" onclick="openAddVolunteerModal()">
+                        <span>+</span>
+                        <span>Add Volunteer</span>
+                    </button>
                 </div>
                 <div class="table-container">
                     <table id="volunteersTable">
@@ -261,6 +313,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                             <tr>
                                 <th>Name</th>
                                 <th>Contact</th>
+                                <th>Category</th>
                                 <th>Skills</th>
                                 <th>Availability</th>
                                 <th>Status</th>
@@ -268,29 +321,50 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                             </tr>
                         </thead>
                         <tbody id="volunteersTableBody">
-                            <tr>
-                                <td>John Doe</td>
+                            <tr data-volunteer-id="1">
+                                <td>Maria Rizal</td>
                                 <td>0912-345-6789</td>
+                                <td>First Aid & Medical</td>
                                 <td>First Aid, CPR</td>
                                 <td>Weekends</td>
                                 <td><span class="status-badge status-resolved">Active</span></td>
-                                <td><button class="btn-view" onclick="viewVolunteer('1')">View</button></td>
+                                <td>
+                                    <div class="action-buttons">
+                                        <button class="btn-view" onclick="viewVolunteer('1')">View</button>
+                                        <button class="btn-edit" onclick="editVolunteer('1')">Edit</button>
+                                        <button class="btn-delete" onclick="deleteVolunteer('1')">Delete</button>
+                                    </div>
+                                </td>
                             </tr>
-                            <tr>
-                                <td>Jane Smith</td>
+                            <tr data-volunteer-id="2">
+                                <td>Juan Aquino</td>
                                 <td>0917-890-1234</td>
+                                <td>Event Management</td>
                                 <td>Event Management</td>
                                 <td>Evenings</td>
                                 <td><span class="status-badge status-resolved">Active</span></td>
-                                <td><button class="btn-view" onclick="viewVolunteer('2')">View</button></td>
+                                <td>
+                                    <div class="action-buttons">
+                                        <button class="btn-view" onclick="viewVolunteer('2')">View</button>
+                                        <button class="btn-edit" onclick="editVolunteer('2')">Edit</button>
+                                        <button class="btn-delete" onclick="deleteVolunteer('2')">Delete</button>
+                                    </div>
+                                </td>
                             </tr>
-                            <tr>
-                                <td>Mike Johnson</td>
+                            <tr data-volunteer-id="3">
+                                <td>Roberto Magsaysay</td>
                                 <td>0918-567-8901</td>
-                                <td>Security, Patrol</td>
+                                <td>Community Outreach</td>
+                                <td>Community Outreach, Communication</td>
                                 <td>Flexible</td>
                                 <td><span class="status-badge status-pending">Pending</span></td>
-                                <td><button class="btn-view" onclick="viewVolunteer('3')">View</button></td>
+                                <td>
+                                    <div class="action-buttons">
+                                        <button class="btn-view" onclick="viewVolunteer('3')">View</button>
+                                        <button class="btn-edit" onclick="editVolunteer('3')">Edit</button>
+                                        <button class="btn-delete" onclick="deleteVolunteer('3')">Delete</button>
+                                    </div>
+                                </td>
                             </tr>
                         </tbody>
                     </table>
@@ -298,6 +372,217 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             </div>
         </main>
     </div>
+    
+    <!-- Add Volunteer Modal -->
+    <div id="addVolunteerModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Add New Volunteer</h2>
+                <button class="close-modal" onclick="closeAddVolunteerModal()">&times;</button>
+            </div>
+            <form id="addVolunteerForm" onsubmit="saveVolunteer(event)">
+                <input type="hidden" id="addVolunteerId" value="">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="volunteerName">Full Name *</label>
+                        <input type="text" id="volunteerName" name="volunteerName" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="volunteerContact">Contact Number *</label>
+                        <input type="tel" id="volunteerContact" name="volunteerContact" required>
+                    </div>
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="volunteerEmail">Email Address</label>
+                        <input type="email" id="volunteerEmail" name="volunteerEmail">
+                    </div>
+                    <div class="form-group">
+                        <label for="volunteerAddress">Address *</label>
+                        <input type="text" id="volunteerAddress" name="volunteerAddress" required>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="volunteerCategory">Volunteer Category *</label>
+                    <select id="volunteerCategory" name="volunteerCategory" required>
+                        <option value="">Select Category</option>
+                        <option value="First Aid & Medical">First Aid & Medical</option>
+                        <option value="Event Management">Event Management</option>
+                        <option value="Community Outreach">Community Outreach</option>
+                        <option value="Education & Training">Education & Training</option>
+                        <option value="Administrative Support">Administrative Support</option>
+                        <option value="Food & Nutrition">Food & Nutrition</option>
+                        <option value="Environmental">Environmental</option>
+                        <option value="Other">Other</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="volunteerSkills">Skills *</label>
+                    <textarea id="volunteerSkills" name="volunteerSkills" required placeholder="e.g., First Aid, CPR, Event Management, Communication"></textarea>
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="volunteerAvailability">Availability *</label>
+                        <select id="volunteerAvailability" name="volunteerAvailability" required>
+                            <option value="">Select Availability</option>
+                            <option value="Weekdays">Weekdays</option>
+                            <option value="Weekends">Weekends</option>
+                            <option value="Evenings">Evenings</option>
+                            <option value="Flexible">Flexible</option>
+                            <option value="On Call">On Call</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="volunteerStatus">Status *</label>
+                        <select id="volunteerStatus" name="volunteerStatus" required>
+                            <option value="">Select Status</option>
+                            <option value="Active">Active</option>
+                            <option value="Pending">Pending</option>
+                            <option value="Inactive">Inactive</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="volunteerNotes">Additional Notes</label>
+                    <textarea id="volunteerNotes" name="volunteerNotes" placeholder="Any additional information about the volunteer..."></textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label for="volunteerPhotoId">Photo ID *</label>
+                    <div class="file-upload">
+                        <input type="file" id="volunteerPhotoId" name="volunteerPhotoId" accept="image/*" required onchange="previewImage(this, 'volunteerPhotoIdPreview')">
+                        <label for="volunteerPhotoId" class="file-upload-label">
+                            <span>🆔 Click to upload Photo ID</span>
+                        </label>
+                        <div class="file-preview" id="volunteerPhotoIdPreview"></div>
+                    </div>
+                </div>
+                
+                <div class="form-actions">
+                    <button type="button" class="btn-cancel" onclick="closeAddVolunteerModal()">Cancel</button>
+                    <button type="submit" class="btn-submit">Save Volunteer</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Edit Volunteer Modal -->
+    <div id="editVolunteerModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Edit Volunteer</h2>
+                <button class="close-modal" onclick="closeEditVolunteerModal()">&times;</button>
+            </div>
+            <form id="editVolunteerForm" onsubmit="updateVolunteer(event)">
+                <input type="hidden" id="editVolunteerId" name="volunteerId">
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="editVolunteerName">Full Name *</label>
+                        <input type="text" id="editVolunteerName" name="volunteerName" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="editVolunteerContact">Contact Number *</label>
+                        <input type="tel" id="editVolunteerContact" name="volunteerContact" required>
+                    </div>
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="editVolunteerEmail">Email Address</label>
+                        <input type="email" id="editVolunteerEmail" name="volunteerEmail">
+                    </div>
+                    <div class="form-group">
+                        <label for="editVolunteerAddress">Address *</label>
+                        <input type="text" id="editVolunteerAddress" name="volunteerAddress" required>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="editVolunteerCategory">Volunteer Category *</label>
+                    <select id="editVolunteerCategory" name="volunteerCategory" required>
+                        <option value="">Select Category</option>
+                        <option value="First Aid & Medical">First Aid & Medical</option>
+                        <option value="Event Management">Event Management</option>
+                        <option value="Community Outreach">Community Outreach</option>
+                        <option value="Education & Training">Education & Training</option>
+                        <option value="Administrative Support">Administrative Support</option>
+                        <option value="Food & Nutrition">Food & Nutrition</option>
+                        <option value="Environmental">Environmental</option>
+                        <option value="Other">Other</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="editVolunteerSkills">Skills *</label>
+                    <textarea id="editVolunteerSkills" name="volunteerSkills" required placeholder="e.g., First Aid, CPR, Event Management, Communication"></textarea>
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="editVolunteerAvailability">Availability *</label>
+                        <select id="editVolunteerAvailability" name="volunteerAvailability" required>
+                            <option value="">Select Availability</option>
+                            <option value="Weekdays">Weekdays</option>
+                            <option value="Weekends">Weekends</option>
+                            <option value="Evenings">Evenings</option>
+                            <option value="Flexible">Flexible</option>
+                            <option value="On Call">On Call</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="editVolunteerStatus">Status *</label>
+                        <select id="editVolunteerStatus" name="volunteerStatus" required>
+                            <option value="">Select Status</option>
+                            <option value="Active">Active</option>
+                            <option value="Pending">Pending</option>
+                            <option value="Inactive">Inactive</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="editVolunteerNotes">Additional Notes</label>
+                    <textarea id="editVolunteerNotes" name="volunteerNotes" placeholder="Any additional information about the volunteer..."></textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label for="editVolunteerPhotoId">Photo ID</label>
+                    <div class="file-upload">
+                        <input type="file" id="editVolunteerPhotoId" name="volunteerPhotoId" accept="image/*" onchange="previewImage(this, 'editVolunteerPhotoIdPreview')">
+                        <label for="editVolunteerPhotoId" class="file-upload-label">
+                            <span>🆔 Click to upload Photo ID (Optional - leave blank to keep existing)</span>
+                        </label>
+                        <div class="file-preview" id="editVolunteerPhotoIdPreview"></div>
+                    </div>
+                </div>
+                
+                <div class="form-actions">
+                    <button type="button" class="btn-cancel" onclick="closeEditVolunteerModal()">Cancel</button>
+                    <button type="submit" class="btn-submit">Update Volunteer</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- View Volunteer Modal -->
+    <div id="viewVolunteerModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Volunteer Details</h2>
+                <button class="close-modal" onclick="closeViewVolunteerModal()">&times;</button>
+            </div>
+            <div id="volunteerDetails" class="complaint-details">
+                <!-- Details will be populated by JavaScript -->
+            </div>
+        </div>
+    </div>
+    
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             const sidebar = document.getElementById('sidebar');
@@ -354,10 +639,411 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                 }
             }
         }
+        // Volunteer data storage
+        let volunteerData = {};
+        let nextVolunteerId = 4; // Starting from 4 since we have 3 sample volunteers
+        
+        // Initialize volunteer data from existing table rows
+        function initializeVolunteerData() {
+            const rows = document.querySelectorAll('#volunteersTableBody tr[data-volunteer-id]');
+            rows.forEach((row) => {
+                const id = row.getAttribute('data-volunteer-id');
+                const cells = row.querySelectorAll('td');
+                
+                volunteerData[id] = {
+                    id: id,
+                    name: cells[0].textContent.trim(),
+                    contact: cells[1].textContent.trim(),
+                    category: cells[2].textContent.trim(),
+                    skills: cells[3].textContent.trim(),
+                    availability: cells[4].textContent.trim(),
+                    status: cells[5].querySelector('.status-badge').textContent.trim(),
+                    email: id === '1' ? 'maria.rizal@email.com' : id === '2' ? 'juan.aquino@email.com' : 'roberto.magsaysay@email.com',
+                    address: id === '1' ? '123 Bonifacio Street, Barangay San Agustin, Quezon City' : id === '2' ? '456 Rizal Avenue, Barangay San Agustin, Quezon City' : '789 Luna Street, Barangay San Agustin, Quezon City',
+                    notes: id === '1' ? 'Certified First Aid and CPR instructor. Available for weekend training sessions.' : id === '2' ? 'Experienced in organizing community events and outreach programs.' : 'Experienced in community outreach and communication programs.',
+                    category: id === '1' ? 'First Aid & Medical' : id === '2' ? 'Event Management' : 'Community Outreach',
+                    photoId: null // Default to null, can be set when uploaded
+                };
+            });
+        }
+        
+        function previewImage(input, previewId) {
+            const preview = document.getElementById(previewId);
+            if (input.files && input.files[0]) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    preview.innerHTML = '<img src="' + e.target.result + '" alt="Photo ID Preview" class="id-photo-preview" onclick="viewPhoto(this.src)">';
+                    preview.style.display = 'block';
+                };
+                reader.readAsDataURL(input.files[0]);
+            }
+        }
+        
+        function viewPhoto(src) {
+            // Create a simple modal to view the photo
+            const modal = document.createElement('div');
+            modal.style.cssText = 'position: fixed; z-index: 3000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.8); display: flex; align-items: center; justify-content: center;';
+            modal.onclick = function() { document.body.removeChild(modal); };
+            
+            const img = document.createElement('img');
+            img.src = src;
+            img.style.cssText = 'max-width: 90%; max-height: 90%; border-radius: 8px;';
+            img.onclick = function(e) { e.stopPropagation(); };
+            
+            modal.appendChild(img);
+            document.body.appendChild(modal);
+        }
+        
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeVolunteerData();
+        });
+        
+        function openAddVolunteerModal() {
+            document.getElementById('addVolunteerModal').classList.add('active');
+        }
+        
+        function closeAddVolunteerModal() {
+            document.getElementById('addVolunteerModal').classList.remove('active');
+            document.getElementById('addVolunteerForm').reset();
+            document.getElementById('volunteerPhotoIdPreview').style.display = 'none';
+            document.getElementById('volunteerPhotoIdPreview').innerHTML = '';
+        }
+        
+        function saveVolunteer(event) {
+            event.preventDefault();
+            
+            const name = document.getElementById('volunteerName').value.trim();
+            const contact = document.getElementById('volunteerContact').value.trim();
+            const email = document.getElementById('volunteerEmail').value.trim();
+            const address = document.getElementById('volunteerAddress').value.trim();
+            const category = document.getElementById('volunteerCategory').value;
+            const skills = document.getElementById('volunteerSkills').value.trim();
+            const availability = document.getElementById('volunteerAvailability').value;
+            const status = document.getElementById('volunteerStatus').value;
+            const notes = document.getElementById('volunteerNotes').value.trim();
+            const photoFile = document.getElementById('volunteerPhotoId').files[0];
+            
+            const volunteerId = nextVolunteerId.toString();
+            
+            // Handle photo ID upload
+            let photoIdSrc = null;
+            if (photoFile) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    photoIdSrc = e.target.result;
+                    completeSave();
+                };
+                reader.readAsDataURL(photoFile);
+            } else {
+                alert('Photo ID is required!');
+                return;
+            }
+            
+            function completeSave() {
+                // Store volunteer data
+                volunteerData[volunteerId] = {
+                    id: volunteerId,
+                    name: name,
+                    contact: contact,
+                    email: email,
+                    address: address,
+                    category: category,
+                    skills: skills,
+                    availability: availability,
+                    status: status,
+                    notes: notes,
+                    photoId: photoIdSrc
+                };
+                
+                // Add new row to table
+                addTableRow(volunteerId);
+                nextVolunteerId++;
+                
+                alert('Volunteer added successfully!');
+                closeAddVolunteerModal();
+            }
+        }
+        
+        function addTableRow(id) {
+            const volunteer = volunteerData[id];
+            const tbody = document.getElementById('volunteersTableBody');
+            
+            const row = document.createElement('tr');
+            row.setAttribute('data-volunteer-id', id);
+            
+            // Determine status badge class
+            let statusClass = 'status-resolved';
+            if (volunteer.status === 'Pending') {
+                statusClass = 'status-pending';
+            } else if (volunteer.status === 'Inactive') {
+                statusClass = 'status-pending';
+            }
+            
+            row.innerHTML = `
+                <td>${volunteer.name}</td>
+                <td>${volunteer.contact}</td>
+                <td>${volunteer.category || 'Not specified'}</td>
+                <td>${volunteer.skills}</td>
+                <td>${volunteer.availability}</td>
+                <td><span class="status-badge ${statusClass}">${volunteer.status}</span></td>
+                <td>
+                    <div class="action-buttons">
+                        <button class="btn-view" onclick="viewVolunteer('${id}')">View</button>
+                        <button class="btn-edit" onclick="editVolunteer('${id}')">Edit</button>
+                        <button class="btn-delete" onclick="deleteVolunteer('${id}')">Delete</button>
+                    </div>
+                </td>
+            `;
+            
+            tbody.appendChild(row);
+        }
+        
         function viewVolunteer(id) {
-            alert('Viewing volunteer: ' + id + ' (Full details modal to be implemented)');
+            const volunteer = volunteerData[id];
+            if (!volunteer) {
+                alert('Volunteer not found!');
+                return;
+            }
+            
+            const modal = document.getElementById('viewVolunteerModal');
+            const detailsContainer = document.getElementById('volunteerDetails');
+            
+            // Determine status badge class
+            let statusClass = 'status-resolved';
+            if (volunteer.status === 'Pending') {
+                statusClass = 'status-pending';
+            } else if (volunteer.status === 'Inactive') {
+                statusClass = 'status-pending';
+            }
+            
+            let detailsHTML = `
+                <div class="detail-row inline">
+                    <span class="detail-label">Name:</span>
+                    <span class="detail-value"><strong>${volunteer.name}</strong></span>
+                </div>
+                
+                <div class="detail-row inline">
+                    <span class="detail-label">Status:</span>
+                    <span class="status-badge ${statusClass}">${volunteer.status}</span>
+                </div>
+                
+                <div class="detail-row">
+                    <span class="detail-label">Contact Number:</span>
+                    <span class="detail-value">${volunteer.contact}</span>
+                </div>
+                
+                ${volunteer.email ? `
+                <div class="detail-row">
+                    <span class="detail-label">Email Address:</span>
+                    <span class="detail-value">${volunteer.email}</span>
+                </div>
+                ` : ''}
+                
+                ${volunteer.address ? `
+                <div class="detail-row">
+                    <span class="detail-label">Address:</span>
+                    <span class="detail-value">${volunteer.address}</span>
+                </div>
+                ` : ''}
+                
+                <div class="detail-row">
+                    <span class="detail-label">Category:</span>
+                    <span class="detail-value">${volunteer.category || 'Not specified'}</span>
+                </div>
+                
+                <div class="detail-row">
+                    <span class="detail-label">Skills:</span>
+                    <span class="detail-value">${volunteer.skills}</span>
+                </div>
+                
+                <div class="detail-row">
+                    <span class="detail-label">Availability:</span>
+                    <span class="detail-value">${volunteer.availability}</span>
+                </div>
+                
+                ${volunteer.notes ? `
+                <div class="detail-row">
+                    <span class="detail-label">Notes:</span>
+                    <span class="detail-value">${volunteer.notes}</span>
+                </div>
+                ` : ''}
+                
+                ${volunteer.photoId ? `
+                <div class="detail-row">
+                    <span class="detail-label">Photo ID:</span>
+                    <div class="detail-value">
+                        <img src="${volunteer.photoId}" alt="Photo ID" class="id-photo-preview" onclick="viewPhoto(this.src)">
+                    </div>
+                </div>
+                ` : `
+                <div class="detail-row">
+                    <span class="detail-label">Photo ID:</span>
+                    <span class="detail-value" style="color: var(--text-secondary); font-style: italic;">No photo ID uploaded</span>
+                </div>
+                `}
+            `;
+            
+            detailsContainer.innerHTML = detailsHTML;
+            modal.classList.add('active');
+        }
+        
+        function closeViewVolunteerModal() {
+            document.getElementById('viewVolunteerModal').classList.remove('active');
+        }
+        
+        function editVolunteer(id) {
+            const volunteer = volunteerData[id];
+            if (!volunteer) {
+                alert('Volunteer not found!');
+                return;
+            }
+            
+            // Populate form fields
+            document.getElementById('editVolunteerId').value = volunteer.id;
+            document.getElementById('editVolunteerName').value = volunteer.name;
+            document.getElementById('editVolunteerContact').value = volunteer.contact;
+            document.getElementById('editVolunteerEmail').value = volunteer.email || '';
+            document.getElementById('editVolunteerAddress').value = volunteer.address || '';
+            document.getElementById('editVolunteerCategory').value = volunteer.category || '';
+            document.getElementById('editVolunteerSkills').value = volunteer.skills;
+            document.getElementById('editVolunteerAvailability').value = volunteer.availability;
+            document.getElementById('editVolunteerStatus').value = volunteer.status;
+            document.getElementById('editVolunteerNotes').value = volunteer.notes || '';
+            
+            // Show existing photo ID if available
+            const photoPreview = document.getElementById('editVolunteerPhotoIdPreview');
+            if (volunteer.photoId) {
+                photoPreview.innerHTML = '<img src="' + volunteer.photoId + '" alt="Photo ID Preview" class="id-photo-preview" onclick="viewPhoto(this.src)">';
+                photoPreview.style.display = 'block';
+            } else {
+                photoPreview.style.display = 'none';
+                photoPreview.innerHTML = '';
+            }
+            
+            // Open modal
+            document.getElementById('editVolunteerModal').classList.add('active');
+        }
+        
+        function closeEditVolunteerModal() {
+            document.getElementById('editVolunteerModal').classList.remove('active');
+            document.getElementById('editVolunteerForm').reset();
+            document.getElementById('editVolunteerPhotoIdPreview').style.display = 'none';
+            document.getElementById('editVolunteerPhotoIdPreview').innerHTML = '';
+        }
+        
+        function updateVolunteer(event) {
+            event.preventDefault();
+            
+            const volunteerId = document.getElementById('editVolunteerId').value;
+            const volunteer = volunteerData[volunteerId];
+            
+            if (!volunteer) {
+                alert('Volunteer not found!');
+                return;
+            }
+            
+            // Update volunteer data
+            volunteer.name = document.getElementById('editVolunteerName').value.trim();
+            volunteer.contact = document.getElementById('editVolunteerContact').value.trim();
+            volunteer.email = document.getElementById('editVolunteerEmail').value.trim();
+            volunteer.address = document.getElementById('editVolunteerAddress').value.trim();
+            volunteer.category = document.getElementById('editVolunteerCategory').value;
+            volunteer.skills = document.getElementById('editVolunteerSkills').value.trim();
+            volunteer.availability = document.getElementById('editVolunteerAvailability').value;
+            volunteer.status = document.getElementById('editVolunteerStatus').value;
+            volunteer.notes = document.getElementById('editVolunteerNotes').value.trim();
+            
+            // Handle photo ID upload if new file is selected
+            const photoFile = document.getElementById('editVolunteerPhotoId').files[0];
+            if (photoFile) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    volunteer.photoId = e.target.result;
+                    completeUpdate();
+                };
+                reader.readAsDataURL(photoFile);
+            } else {
+                // Keep existing photo ID if no new file uploaded
+                completeUpdate();
+            }
+            
+            function completeUpdate() {
+                // Update table row
+                updateVolunteerRow(volunteerId);
+                
+                alert('Volunteer updated successfully!');
+                closeEditVolunteerModal();
+            }
+        }
+        
+        function deleteVolunteer(id) {
+            if (confirm('Are you sure you want to delete this volunteer? This action cannot be undone.')) {
+                // Remove from data
+                delete volunteerData[id];
+                
+                // Remove row from table
+                const row = document.querySelector(`tr[data-volunteer-id="${id}"]`);
+                if (row) {
+                    row.remove();
+                }
+                
+                alert('Volunteer deleted successfully!');
+            }
+        }
+        
+        function updateVolunteerRow(id) {
+            const volunteer = volunteerData[id];
+            const row = document.querySelector(`tr[data-volunteer-id="${id}"]`);
+            
+            if (!row) return;
+            
+            const cells = row.querySelectorAll('td');
+            
+            // Update name
+            cells[0].textContent = volunteer.name;
+            
+            // Update contact
+            cells[1].textContent = volunteer.contact;
+            
+            // Update skills
+            cells[2].textContent = volunteer.skills;
+            
+            // Update availability
+            cells[3].textContent = volunteer.availability;
+            
+            // Update status badge
+            const statusBadge = cells[4].querySelector('.status-badge');
+            statusBadge.textContent = volunteer.status;
+            
+            // Determine status badge class
+            let statusClass = 'status-resolved';
+            if (volunteer.status === 'Pending') {
+                statusClass = 'status-pending';
+            } else if (volunteer.status === 'Inactive') {
+                statusClass = 'status-pending';
+            }
+            statusBadge.className = `status-badge ${statusClass}`;
+        }
+        
+        // Close modal when clicking outside
+        window.onclick = function(event) {
+            const addModal = document.getElementById('addVolunteerModal');
+            const editModal = document.getElementById('editVolunteerModal');
+            const viewModal = document.getElementById('viewVolunteerModal');
+            
+            if (event.target == addModal) {
+                closeAddVolunteerModal();
+            }
+            if (event.target == editModal) {
+                closeEditVolunteerModal();
+            }
+            if (event.target == viewModal) {
+                closeViewVolunteerModal();
+            }
         }
     </script>
 </body>
 </html>
+
 

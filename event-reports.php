@@ -15,6 +15,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
     <link rel="icon" type="image/x-icon" href="images/favicon.ico">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="css/theme.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <style>
         body { margin: 0; padding: 0; font-family: var(--font-family); background-color: var(--bg-color); display: flex; min-height: 100vh; }
         .sidebar { width: 320px; background: var(--tertiary-color); color: #fff; position: fixed; left: 0; top: 0; height: 100vh; overflow: hidden; box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1); z-index: 1000; transition: width 0.3s ease; display: flex; flex-direction: column; }
@@ -101,8 +102,24 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
         .status-badge { padding: 0.25rem 0.75rem; border-radius: 12px; font-size: 0.85rem; font-weight: 500; display: inline-block; }
         .status-pending { background: #fff3cd; color: #856404; }
         .status-resolved { background: #d1e7dd; color: #0f5132; }
-        .btn-view { padding: 0.5rem 1rem; background: var(--primary-color); color: #fff; border: none; border-radius: 6px; font-size: 0.85rem; cursor: pointer; transition: all 0.2s ease; }
+        .btn-view { padding: 0.5rem 1rem; background: var(--primary-color); color: #fff; border: none; border-radius: 6px; font-size: 0.85rem; cursor: pointer; transition: all 0.2s ease; margin-right: 0.5rem; }
         .btn-view:hover { background: #4ca8a6; }
+        .btn-export { padding: 0.5rem 1rem; background: #28a745; color: #fff; border: none; border-radius: 6px; font-size: 0.85rem; cursor: pointer; transition: all 0.2s ease; }
+        .btn-export:hover { background: #218838; }
+        .action-buttons { display: flex; gap: 0.5rem; align-items: center; }
+        .modal { display: none; position: fixed; z-index: 2000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.5); overflow: auto; }
+        .modal-content { background-color: var(--card-bg); margin: 5% auto; padding: 2rem; border: 1px solid var(--border-color); border-radius: 12px; width: 90%; max-width: 700px; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3); }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; padding-bottom: 1rem; border-bottom: 2px solid var(--border-color); }
+        .modal-header h2 { margin: 0; color: var(--tertiary-color); font-size: 1.5rem; }
+        .close { color: #aaa; font-size: 28px; font-weight: bold; cursor: pointer; transition: color 0.2s ease; }
+        .close:hover { color: var(--tertiary-color); }
+        .report-details { line-height: 1.8; }
+        .report-details p { margin-bottom: 1rem; }
+        .report-details strong { color: var(--tertiary-color); }
+        .form-actions { display: flex; justify-content: flex-end; gap: 1rem; margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid var(--border-color); }
+        .btn-cancel { padding: 0.75rem 1.5rem; background: #6c757d; color: #fff; border: none; border-radius: 8px; font-size: 0.95rem; cursor: pointer; transition: all 0.2s ease; }
+        .btn-cancel:hover { background: #5a6268; }
+        @media (max-width: 768px) { .sidebar { width: 320px; transform: translateX(-100%); transition: transform 0.3s ease; } .sidebar.mobile-open { transform: translateX(0); } .sidebar.collapsed { width: 80px; transform: translateX(0); } .main-wrapper { margin-left: 0; } body.sidebar-collapsed .main-wrapper { margin-left: 80px; } .modal-content { width: 95%; margin: 10% auto; padding: 1.5rem; } }
         @media (max-width: 768px) { .sidebar { width: 320px; transform: translateX(-100%); transition: transform 0.3s ease; } .sidebar.mobile-open { transform: translateX(0); } .sidebar.collapsed { width: 80px; transform: translateX(0); } .main-wrapper { margin-left: 0; } body.sidebar-collapsed .main-wrapper { margin-left: 80px; } }
     </style>
 </head>
@@ -140,13 +157,17 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                     <span class="arrow">▶</span>
                 </div>
                 <div class="nav-submodules">
-                    <a href="#" class="nav-submodule" data-tooltip="Live View">
+                    <a href="live-view.php" class="nav-submodule" data-tooltip="Live View">
                         <span class="nav-submodule-icon"><i class="fas fa-circle" style="color: #ff4444;"></i></span>
                         <span class="nav-submodule-text">Live View</span>
                     </a>
-                    <a href="#" class="nav-submodule" data-tooltip="Playback">
+                    <a href="playback.php" class="nav-submodule" data-tooltip="Playback">
                         <span class="nav-submodule-icon"><i class="fas fa-play"></i></span>
                         <span class="nav-submodule-text">Playback</span>
+                    </a>
+                    <a href="camera-management.php" class="nav-submodule" data-tooltip="Camera Management">
+                        <span class="nav-submodule-icon"><i class="fas fa-camera"></i></span>
+                        <span class="nav-submodule-text">Camera Management</span>
                     </a>
                 </div>
             </div>
@@ -268,29 +289,44 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                             </tr>
                         </thead>
                         <tbody id="reportsTableBody">
-                            <tr>
+                            <tr data-report-id="1">
                                 <td>Community Safety Awareness</td>
-                                <td>2024-01-15</td>
+                                <td>2025-01-15</td>
                                 <td>150</td>
-                                <td>Barangay Council</td>
+                                <td>Maria Santos</td>
                                 <td><span class="status-badge status-resolved">Completed</span></td>
-                                <td><button class="btn-view" onclick="viewReport('1')">View</button></td>
+                                <td>
+                                    <div class="action-buttons">
+                                        <button class="btn-view" onclick="viewReport('1')">View</button>
+                                        <button class="btn-export" onclick="exportReport('1')">Export</button>
+                                    </div>
+                                </td>
                             </tr>
-                            <tr>
+                            <tr data-report-id="2">
                                 <td>Neighborhood Meeting</td>
-                                <td>2024-01-10</td>
+                                <td>2025-01-10</td>
                                 <td>85</td>
-                                <td>Watch Coordinator</td>
+                                <td>Juan Dela Cruz</td>
                                 <td><span class="status-badge status-resolved">Completed</span></td>
-                                <td><button class="btn-view" onclick="viewReport('2')">View</button></td>
+                                <td>
+                                    <div class="action-buttons">
+                                        <button class="btn-view" onclick="viewReport('2')">View</button>
+                                        <button class="btn-export" onclick="exportReport('2')">Export</button>
+                                    </div>
+                                </td>
                             </tr>
-                            <tr>
+                            <tr data-report-id="3">
                                 <td>Safety Training Workshop</td>
-                                <td>2024-01-05</td>
+                                <td>2025-01-05</td>
                                 <td>120</td>
-                                <td>Training Team</td>
+                                <td>Roberto Reyes</td>
                                 <td><span class="status-badge status-resolved">Completed</span></td>
-                                <td><button class="btn-view" onclick="viewReport('3')">View</button></td>
+                                <td>
+                                    <div class="action-buttons">
+                                        <button class="btn-view" onclick="viewReport('3')">View</button>
+                                        <button class="btn-export" onclick="exportReport('3')">Export</button>
+                                    </div>
+                                </td>
                             </tr>
                         </tbody>
                     </table>
@@ -298,6 +334,23 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             </div>
         </main>
     </div>
+
+    <!-- View Report Modal -->
+    <div id="viewReportModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Event Report Details</h2>
+                <span class="close" onclick="closeViewReportModal()">&times;</span>
+            </div>
+            <div id="viewReportContent" class="report-details">
+                <!-- Content will be populated by JavaScript -->
+            </div>
+            <div class="form-actions">
+                <button type="button" class="btn-cancel" onclick="closeViewReportModal()">Close</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             const sidebar = document.getElementById('sidebar');
@@ -354,8 +407,260 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                 }
             }
         }
+        // Initialize event report data
+        let eventReportData = {
+            '1': {
+                id: '1',
+                eventName: 'Community Safety Awareness',
+                date: '2025-01-15',
+                attendance: '150',
+                organizer: 'Maria Santos',
+                status: 'Completed',
+                location: 'Barangay San Agustin Hall, Quezon City',
+                description: 'Community safety awareness event conducted to educate residents about safety measures and emergency procedures. The event was well-attended with 150 participants.'
+            },
+            '2': {
+                id: '2',
+                eventName: 'Neighborhood Meeting',
+                date: '2025-01-10',
+                attendance: '85',
+                organizer: 'Juan Dela Cruz',
+                status: 'Completed',
+                location: 'Barangay San Agustin Multi-Purpose Hall, Quezon City',
+                description: 'Monthly neighborhood meeting to discuss community concerns, upcoming events, and safety initiatives. 85 residents attended the meeting.'
+            },
+            '3': {
+                id: '3',
+                eventName: 'Safety Training Workshop',
+                date: '2025-01-05',
+                attendance: '120',
+                organizer: 'Roberto Reyes',
+                status: 'Completed',
+                location: 'Barangay San Agustin Community Center, Quezon City',
+                description: 'Safety training workshop covering first aid, emergency response, and community safety protocols. 120 participants completed the training.'
+            }
+        };
+
         function viewReport(id) {
-            alert('Viewing event report: ' + id + ' (Full details modal to be implemented)');
+            const report = eventReportData[id];
+            if (!report) {
+                alert('Report not found');
+                return;
+            }
+            
+            const content = `
+                <p><strong>Event Name:</strong> ${report.eventName}</p>
+                <p><strong>Date:</strong> ${report.date}</p>
+                <p><strong>Location:</strong> ${report.location}</p>
+                <p><strong>Attendance:</strong> ${report.attendance} participants</p>
+                <p><strong>Organizer:</strong> ${report.organizer}</p>
+                <p><strong>Status:</strong> ${report.status}</p>
+                <p><strong>Description:</strong><br>${report.description}</p>
+            `;
+            
+            document.getElementById('viewReportContent').innerHTML = content;
+            document.getElementById('viewReportModal').style.display = 'block';
+        }
+
+        function closeViewReportModal() {
+            document.getElementById('viewReportModal').style.display = 'none';
+        }
+
+        // Close modal when clicking outside
+        window.onclick = function(event) {
+            const modal = document.getElementById('viewReportModal');
+            if (event.target === modal) {
+                closeViewReportModal();
+            }
+        }
+
+        async function exportReport(id) {
+            const report = eventReportData[id];
+            if (!report) {
+                alert('Report not found');
+                return;
+            }
+
+            try {
+                // Check if JSZip is available
+                if (typeof JSZip === 'undefined') {
+                    alert('Export library not loaded. Please refresh the page.');
+                    return;
+                }
+
+                // Create DOCX file structure using JSZip
+                const zip = new JSZip();
+
+                // Create [Content_Types].xml
+                const contentTypes = '<' + '?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' +
+'<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">\n' +
+'    <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>\n' +
+'    <Default Extension="xml" ContentType="application/xml"/>\n' +
+'    <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>\n' +
+'    <Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>\n' +
+'</Types>';
+
+                // Create word/document.xml with the actual content
+                const escapeXml = (text) => {
+                    if (!text) return '';
+                    return String(text)
+                        .replace(/&/g, '&amp;')
+                        .replace(/</g, '&lt;')
+                        .replace(/>/g, '&gt;')
+                        .replace(/"/g, '&quot;')
+                        .replace(/'/g, '&apos;');
+                };
+
+                const documentXml = '<' + '?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' +
+'<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">\n' +
+'    <w:body>\n' +
+'        <w:p>\n' +
+'            <w:pPr>\n' +
+'                <w:jc w:val="center"/>\n' +
+'                <w:spacing w:after="400"/>\n' +
+'            </w:pPr>\n' +
+'            <w:r>\n' +
+'                <w:rPr>\n' +
+'                    <w:b/>\n' +
+'                    <w:sz w:val="32"/>\n' +
+'                </w:rPr>\n' +
+'                <w:t>EVENT REPORT</w:t>\n' +
+'            </w:r>\n' +
+'        </w:p>\n' +
+'        <w:p>\n' +
+'            <w:pPr>\n' +
+'                <w:jc w:val="center"/>\n' +
+'                <w:spacing w:after="600"/>\n' +
+'            </w:pPr>\n' +
+'            <w:r>\n' +
+'                <w:t>Barangay San Agustin, Quezon City</w:t>\n' +
+'            </w:r>\n' +
+'        </w:p>\n' +
+'        <w:p>\n' +
+'            <w:r>\n' +
+'                <w:rPr><w:b/></w:rPr>\n' +
+'                <w:t>Event Name:</w:t>\n' +
+'            </w:r>\n' +
+'            <w:r>\n' +
+'                <w:t> ' + escapeXml(report.eventName) + '</w:t>\n' +
+'            </w:r>\n' +
+'        </w:p>\n' +
+'        <w:p>\n' +
+'            <w:r>\n' +
+'                <w:rPr><w:b/></w:rPr>\n' +
+'                <w:t>Date:</w:t>\n' +
+'            </w:r>\n' +
+'            <w:r>\n' +
+'                <w:t> ' + escapeXml(report.date) + '</w:t>\n' +
+'            </w:r>\n' +
+'        </w:p>\n' +
+'        <w:p>\n' +
+'            <w:r>\n' +
+'                <w:rPr><w:b/></w:rPr>\n' +
+'                <w:t>Location:</w:t>\n' +
+'            </w:r>\n' +
+'            <w:r>\n' +
+'                <w:t> ' + escapeXml(report.location) + '</w:t>\n' +
+'            </w:r>\n' +
+'        </w:p>\n' +
+'        <w:p>\n' +
+'            <w:r>\n' +
+'                <w:rPr><w:b/></w:rPr>\n' +
+'                <w:t>Attendance:</w:t>\n' +
+'            </w:r>\n' +
+'            <w:r>\n' +
+'                <w:t> ' + escapeXml(report.attendance) + '</w:t>\n' +
+'            </w:r>\n' +
+'        </w:p>\n' +
+'        <w:p>\n' +
+'            <w:r>\n' +
+'                <w:rPr><w:b/></w:rPr>\n' +
+'                <w:t>Organizer:</w:t>\n' +
+'            </w:r>\n' +
+'            <w:r>\n' +
+'                <w:t> ' + escapeXml(report.organizer) + '</w:t>\n' +
+'            </w:r>\n' +
+'        </w:p>\n' +
+'        <w:p>\n' +
+'            <w:r>\n' +
+'                <w:rPr><w:b/></w:rPr>\n' +
+'                <w:t>Status:</w:t>\n' +
+'            </w:r>\n' +
+'            <w:r>\n' +
+'                <w:t> ' + escapeXml(report.status) + '</w:t>\n' +
+'            </w:r>\n' +
+'        </w:p>\n' +
+'        <w:p>\n' +
+'            <w:pPr>\n' +
+'                <w:spacing w:before="400"/>\n' +
+'            </w:pPr>\n' +
+'            <w:r>\n' +
+'                <w:rPr><w:b/></w:rPr>\n' +
+'                <w:t>Description:</w:t>\n' +
+'            </w:r>\n' +
+'        </w:p>\n' +
+'        <w:p>\n' +
+'            <w:r>\n' +
+'                <w:t>' + escapeXml(report.description) + '</w:t>\n' +
+'            </w:r>\n' +
+'        </w:p>\n' +
+'        <w:p>\n' +
+'            <w:pPr>\n' +
+'                <w:jc w:val="right"/>\n' +
+'                <w:spacing w:before="600"/>\n' +
+'            </w:pPr>\n' +
+'            <w:r>\n' +
+'                <w:t>Generated on: ' + escapeXml(new Date().toLocaleString()) + '</w:t>\n' +
+'            </w:r>\n' +
+'        </w:p>\n' +
+'    </w:body>\n' +
+'</w:document>';
+
+                // Create word/styles.xml
+                const stylesXml = '<' + '?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' +
+'<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">\n' +
+'    <w:style w:type="paragraph" w:styleId="Normal">\n' +
+'        <w:name w:val="Normal"/>\n' +
+'        <w:qFormat/>\n' +
+'    </w:style>\n' +
+'</w:styles>';
+
+                // Create _rels/.rels
+                const rels = '<' + '?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' +
+'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">\n' +
+'    <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>\n' +
+'</Relationships>';
+
+                // Create word/_rels/document.xml.rels
+                const wordRels = '<' + '?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' +
+'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">\n' +
+'    <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>\n' +
+'</Relationships>';
+
+                // Add files to zip
+                zip.file("[Content_Types].xml", contentTypes);
+                zip.file("word/document.xml", documentXml);
+                zip.file("word/styles.xml", stylesXml);
+                zip.file("_rels/.rels", rels);
+                zip.file("word/_rels/document.xml.rels", wordRels);
+
+                // Generate the DOCX file
+                const blob = await zip.generateAsync({ type: "blob", mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" });
+                const fileName = `event_report_${report.eventName.replace(/\s+/g, '_')}_${report.date}.docx`;
+                
+                const link = document.createElement("a");
+                link.href = URL.createObjectURL(blob);
+                link.download = fileName;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(link.href);
+                
+                alert(`Event report exported successfully as ${fileName}!`);
+            } catch (error) {
+                console.error('Error generating DOCX:', error);
+                alert('Error generating DOCX file. Please try again.');
+            }
         }
     </script>
 </body>

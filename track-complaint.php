@@ -685,7 +685,12 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             color: #fff;
         }
         
-        .btn-view {
+        .action-buttons {
+            display: flex;
+            gap: 0.5rem;
+        }
+        
+        .btn-view, .btn-edit {
             padding: 0.5rem 1rem;
             background: var(--primary-color);
             color: #fff;
@@ -697,6 +702,214 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
         }
         
         .btn-view:hover {
+            background: #4ca8a6;
+        }
+        
+        .btn-edit {
+            background: #ff9800;
+        }
+        
+        .btn-edit:hover {
+            background: #f57c00;
+        }
+        
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 2000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(4px);
+        }
+        
+        .modal.active {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .modal-content {
+            background: var(--card-bg);
+            border-radius: 12px;
+            padding: 2rem;
+            max-width: 700px;
+            width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+        }
+        
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        .modal-header h2 {
+            margin: 0;
+            color: var(--tertiary-color);
+            font-size: 1.5rem;
+        }
+        
+        .close-modal {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: var(--text-secondary);
+            transition: color 0.2s ease;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 6px;
+        }
+        
+        .close-modal:hover {
+            color: var(--text-color);
+            background: rgba(0, 0, 0, 0.05);
+        }
+        
+        .complaint-details {
+            display: flex;
+            flex-direction: column;
+            gap: 1.25rem;
+        }
+        
+        .detail-row {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+        
+        .detail-label {
+            font-weight: 600;
+            color: var(--text-color);
+            font-size: 0.9rem;
+        }
+        
+        .detail-value {
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+            line-height: 1.6;
+        }
+        
+        .detail-value.description {
+            background: #f9f9f9;
+            padding: 1rem;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            white-space: pre-wrap;
+        }
+        
+        .detail-row.inline {
+            flex-direction: row;
+            align-items: center;
+            gap: 1rem;
+        }
+        
+        .detail-row.inline .detail-label {
+            min-width: 120px;
+        }
+        
+        .attachment-preview {
+            margin-top: 0.5rem;
+        }
+        
+        .attachment-preview img {
+            max-width: 100%;
+            max-height: 300px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+        }
+        
+        .no-attachment {
+            color: var(--text-secondary);
+            font-style: italic;
+            font-size: 0.9rem;
+        }
+        
+        /* Edit Form Styles */
+        .form-group {
+            margin-bottom: 1.25rem;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: var(--text-color);
+            font-weight: 500;
+            font-size: 0.9rem;
+        }
+        
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            font-size: 0.95rem;
+            font-family: var(--font-family);
+            transition: all 0.2s ease;
+            box-sizing: border-box;
+        }
+        
+        .form-group input:focus,
+        .form-group select:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(76, 138, 137, 0.1);
+        }
+        
+        .form-group textarea {
+            resize: vertical;
+            min-height: 100px;
+        }
+        
+        .form-actions {
+            display: flex;
+            gap: 1rem;
+            justify-content: flex-end;
+            margin-top: 1.5rem;
+            padding-top: 1.5rem;
+            border-top: 1px solid var(--border-color);
+        }
+        
+        .btn-cancel, .btn-save {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        
+        .btn-cancel {
+            background: #e5e5e5;
+            color: var(--text-color);
+        }
+        
+        .btn-cancel:hover {
+            background: #d5d5d5;
+        }
+        
+        .btn-save {
+            background: var(--primary-color);
+            color: #fff;
+        }
+        
+        .btn-save:hover {
             background: #4ca8a6;
         }
         
@@ -762,13 +975,17 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                     <span class="arrow">▶</span>
                 </div>
                 <div class="nav-submodules">
-                    <a href="#" class="nav-submodule" data-tooltip="Live View">
+                    <a href="live-view.php" class="nav-submodule" data-tooltip="Live View">
                         <span class="nav-submodule-icon"><i class="fas fa-circle" style="color: #ff4444;"></i></span>
                         <span class="nav-submodule-text">Live View</span>
                     </a>
-                    <a href="#" class="nav-submodule" data-tooltip="Playback">
+                    <a href="playback.php" class="nav-submodule" data-tooltip="Playback">
                         <span class="nav-submodule-icon"><i class="fas fa-play"></i></span>
                         <span class="nav-submodule-text">Playback</span>
+                    </a>
+                    <a href="camera-management.php" class="nav-submodule" data-tooltip="Camera Management">
+                        <span class="nav-submodule-icon"><i class="fas fa-camera"></i></span>
+                        <span class="nav-submodule-text">Camera Management</span>
                     </a>
                 </div>
             </div>
@@ -900,38 +1117,147 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                             </tr>
                         </thead>
                         <tbody id="complaintsTableBody">
-                            <tr>
-                                <td>COMP-2024-001</td>
-                                <td>Juan Dela Cruz</td>
+                            <tr data-complaint-id="COMP-2025-001">
+                                <td>COMP-2025-001</td>
+                                <td>Juan Rizal</td>
                                 <td>Noise</td>
-                                <td>2024-01-15</td>
+                                <td>2025-01-15</td>
                                 <td><span class="priority-badge priority-high">High</span></td>
                                 <td><span class="status-badge status-processing">Processing</span></td>
-                                <td><button class="btn-view" onclick="viewComplaint('COMP-2024-001')">View</button></td>
+                                <td>
+                                    <div class="action-buttons">
+                                        <button class="btn-view" onclick="viewComplaint('COMP-2025-001')">View</button>
+                                        <button class="btn-edit" onclick="editComplaint('COMP-2025-001')">Edit</button>
+                                    </div>
+                                </td>
                             </tr>
-                            <tr>
-                                <td>COMP-2024-002</td>
-                                <td>Maria Santos</td>
+                            <tr data-complaint-id="COMP-2025-002">
+                                <td>COMP-2025-002</td>
+                                <td>Maria Aquino</td>
                                 <td>Vandalism</td>
-                                <td>2024-01-14</td>
+                                <td>2025-01-14</td>
                                 <td><span class="priority-badge priority-urgent">Urgent</span></td>
                                 <td><span class="status-badge status-resolved">Resolved</span></td>
-                                <td><button class="btn-view" onclick="viewComplaint('COMP-2024-002')">View</button></td>
+                                <td>
+                                    <div class="action-buttons">
+                                        <button class="btn-view" onclick="viewComplaint('COMP-2025-002')">View</button>
+                                        <button class="btn-edit" onclick="editComplaint('COMP-2025-002')">Edit</button>
+                                    </div>
+                                </td>
                             </tr>
-                            <tr>
-                                <td>COMP-2024-003</td>
-                                <td>Roberto Cruz</td>
+                            <tr data-complaint-id="COMP-2025-003">
+                                <td>COMP-2025-003</td>
+                                <td>Roberto Magsaysay</td>
                                 <td>Safety</td>
-                                <td>2024-01-13</td>
+                                <td>2025-01-13</td>
                                 <td><span class="priority-badge priority-medium">Medium</span></td>
                                 <td><span class="status-badge status-pending">Pending</span></td>
-                                <td><button class="btn-view" onclick="viewComplaint('COMP-2024-003')">View</button></td>
+                                <td>
+                                    <div class="action-buttons">
+                                        <button class="btn-view" onclick="viewComplaint('COMP-2025-003')">View</button>
+                                        <button class="btn-edit" onclick="editComplaint('COMP-2025-003')">Edit</button>
+                                    </div>
+                                </td>
                             </tr>
                         </tbody>
                     </table>
                 </div>
             </div>
         </main>
+    </div>
+    
+    <!-- Complaint Details Modal -->
+    <div id="complaintModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Complaint Details</h2>
+                <button class="close-modal" onclick="closeComplaintModal()">&times;</button>
+            </div>
+            <div class="complaint-details" id="complaintDetails">
+                <!-- Details will be populated by JavaScript -->
+            </div>
+        </div>
+    </div>
+    
+    <!-- Edit Complaint Modal -->
+    <div id="editComplaintModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Edit Complaint</h2>
+                <button class="close-modal" onclick="closeEditComplaintModal()">&times;</button>
+            </div>
+            <form id="editComplaintForm" onsubmit="saveComplaintEdit(event)">
+                <input type="hidden" id="editComplaintId" name="complaintId">
+                
+                <div class="form-group">
+                    <label for="editComplainant">Complainant Name *</label>
+                    <input type="text" id="editComplainant" name="complainant" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="editContact">Contact Number *</label>
+                    <input type="text" id="editContact" name="contact" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="editType">Complaint Type *</label>
+                    <select id="editType" name="type" required>
+                        <option value="">Select Type</option>
+                        <option value="Noise">Noise</option>
+                        <option value="Vandalism">Vandalism</option>
+                        <option value="Safety">Safety</option>
+                        <option value="Other">Other</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="editPriority">Priority *</label>
+                    <select id="editPriority" name="priority" required>
+                        <option value="">Select Priority</option>
+                        <option value="Low">Low</option>
+                        <option value="Medium">Medium</option>
+                        <option value="High">High</option>
+                        <option value="Urgent">Urgent</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="editStatus">Status *</label>
+                    <select id="editStatus" name="status" required>
+                        <option value="">Select Status</option>
+                        <option value="Pending">Pending</option>
+                        <option value="Processing">Processing</option>
+                        <option value="Resolved">Resolved</option>
+                        <option value="Rejected">Rejected</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="editLocation">Location *</label>
+                    <input type="text" id="editLocation" name="location" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="editDescription">Description *</label>
+                    <textarea id="editDescription" name="description" required></textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label for="editAssignedTo">Assigned To</label>
+                    <input type="text" id="editAssignedTo" name="assignedTo">
+                </div>
+                
+                <div class="form-group">
+                    <label for="editNotes">Notes</label>
+                    <textarea id="editNotes" name="notes"></textarea>
+                </div>
+                
+                <div class="form-actions">
+                    <button type="button" class="btn-cancel" onclick="closeEditComplaintModal()">Cancel</button>
+                    <button type="submit" class="btn-save">Save Changes</button>
+                </div>
+            </form>
+        </div>
     </div>
     
     <script>
@@ -1008,8 +1334,250 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             }
         }
         
+        // Complaint data storage
+        const complaintData = {
+            'COMP-2025-001': {
+                id: 'COMP-2025-001',
+                complainant: 'Juan Rizal',
+                contact: '0912-345-6789',
+                type: 'Noise',
+                date: '2025-01-15',
+                time: '10:30 AM',
+                priority: 'High',
+                status: 'Processing',
+                description: 'Excessive noise from neighboring property during late hours. Loud music and shouting heard from 10 PM to 2 AM. This has been ongoing for the past week and is disturbing the peace of the neighborhood.',
+                location: '123 Bonifacio Street, Barangay San Agustin, Quezon City',
+                attachment: null,
+                assignedTo: 'Officer Maria Aquino',
+                lastUpdated: '2025-01-15 2:30 PM',
+                notes: 'Initial investigation conducted. Spoke with property owner. Warning issued. Follow-up scheduled for next week.'
+            },
+            'COMP-2025-002': {
+                id: 'COMP-2025-002',
+                complainant: 'Maria Aquino',
+                contact: '0917-890-1234',
+                type: 'Vandalism',
+                date: '2025-01-14',
+                time: '8:15 AM',
+                priority: 'Urgent',
+                status: 'Resolved',
+                description: 'Graffiti found on the community center wall. Property damage includes spray paint on the main entrance and side walls. Estimated repair cost: PHP 5,000.',
+                location: 'Barangay San Agustin Hall, Quezon City',
+                attachment: null,
+                assignedTo: 'Officer Pedro Aguinaldo',
+                lastUpdated: '2025-01-14 4:00 PM',
+                notes: 'Graffiti removed. Security cameras reviewed. Suspect identified and case filed. Community center restored to original condition.'
+            },
+            'COMP-2025-003': {
+                id: 'COMP-2025-003',
+                complainant: 'Roberto Magsaysay',
+                contact: '0918-567-8901',
+                type: 'Safety',
+                date: '2025-01-13',
+                time: '3:45 PM',
+                priority: 'Medium',
+                status: 'Pending',
+                description: 'Broken streetlight on Rizal Street corner Quezon Avenue. Area is dark at night, posing safety concerns for pedestrians and motorists. Request immediate repair.',
+                location: 'Rizal Street corner Quezon Avenue, Barangay San Agustin, Quezon City',
+                attachment: null,
+                assignedTo: 'Pending Assignment',
+                lastUpdated: '2025-01-13 4:00 PM',
+                notes: 'Report forwarded to Quezon City Engineering Department. Awaiting response for repair schedule.'
+            }
+        };
+        
         function viewComplaint(id) {
-            alert('Viewing complaint: ' + id + ' (Full details modal to be implemented)');
+            const complaint = complaintData[id];
+            if (!complaint) {
+                alert('Complaint details not found for: ' + id);
+                return;
+            }
+            
+            const modal = document.getElementById('complaintModal');
+            const detailsContainer = document.getElementById('complaintDetails');
+            
+            // Build the details HTML
+            let detailsHTML = `
+                <div class="detail-row inline">
+                    <span class="detail-label">Complaint ID:</span>
+                    <span class="detail-value"><strong>${complaint.id}</strong></span>
+                </div>
+                
+                <div class="detail-row inline">
+                    <span class="detail-label">Status:</span>
+                    <span class="status-badge status-${complaint.status.toLowerCase()}">${complaint.status}</span>
+                </div>
+                
+                <div class="detail-row inline">
+                    <span class="detail-label">Priority:</span>
+                    <span class="priority-badge priority-${complaint.priority.toLowerCase()}">${complaint.priority}</span>
+                </div>
+                
+                <div class="detail-row">
+                    <span class="detail-label">Complainant Name:</span>
+                    <span class="detail-value">${complaint.complainant}</span>
+                </div>
+                
+                <div class="detail-row">
+                    <span class="detail-label">Contact Number:</span>
+                    <span class="detail-value">${complaint.contact}</span>
+                </div>
+                
+                <div class="detail-row">
+                    <span class="detail-label">Complaint Type:</span>
+                    <span class="detail-value">${complaint.type}</span>
+                </div>
+                
+                <div class="detail-row">
+                    <span class="detail-label">Date & Time:</span>
+                    <span class="detail-value">${complaint.date} at ${complaint.time}</span>
+                </div>
+                
+                <div class="detail-row">
+                    <span class="detail-label">Location:</span>
+                    <span class="detail-value">${complaint.location}</span>
+                </div>
+                
+                <div class="detail-row">
+                    <span class="detail-label">Description:</span>
+                    <div class="detail-value description">${complaint.description}</div>
+                </div>
+                
+                <div class="detail-row">
+                    <span class="detail-label">Assigned To:</span>
+                    <span class="detail-value">${complaint.assignedTo}</span>
+                </div>
+                
+                <div class="detail-row">
+                    <span class="detail-label">Last Updated:</span>
+                    <span class="detail-value">${complaint.lastUpdated}</span>
+                </div>
+                
+                <div class="detail-row">
+                    <span class="detail-label">Notes:</span>
+                    <div class="detail-value description">${complaint.notes}</div>
+                </div>
+                
+                <div class="detail-row">
+                    <span class="detail-label">Attachment:</span>
+                    <div class="detail-value">
+                        ${complaint.attachment ? 
+                            `<div class="attachment-preview"><img src="${complaint.attachment}" alt="Complaint Attachment"></div>` : 
+                            '<span class="no-attachment">No attachment provided</span>'
+                        }
+                    </div>
+                </div>
+            `;
+            
+            detailsContainer.innerHTML = detailsHTML;
+            modal.classList.add('active');
+        }
+        
+        function closeComplaintModal() {
+            document.getElementById('complaintModal').classList.remove('active');
+        }
+        
+        function editComplaint(id) {
+            const complaint = complaintData[id];
+            if (!complaint) {
+                alert('Complaint details not found for: ' + id);
+                return;
+            }
+            
+            // Populate form fields
+            document.getElementById('editComplaintId').value = complaint.id;
+            document.getElementById('editComplainant').value = complaint.complainant;
+            document.getElementById('editContact').value = complaint.contact;
+            document.getElementById('editType').value = complaint.type;
+            document.getElementById('editPriority').value = complaint.priority;
+            document.getElementById('editStatus').value = complaint.status;
+            document.getElementById('editLocation').value = complaint.location;
+            document.getElementById('editDescription').value = complaint.description;
+            document.getElementById('editAssignedTo').value = complaint.assignedTo;
+            document.getElementById('editNotes').value = complaint.notes;
+            
+            // Open modal
+            document.getElementById('editComplaintModal').classList.add('active');
+        }
+        
+        function closeEditComplaintModal() {
+            document.getElementById('editComplaintModal').classList.remove('active');
+            document.getElementById('editComplaintForm').reset();
+        }
+        
+        function saveComplaintEdit(event) {
+            event.preventDefault();
+            
+            const complaintId = document.getElementById('editComplaintId').value;
+            const complaint = complaintData[complaintId];
+            
+            if (!complaint) {
+                alert('Complaint not found!');
+                return;
+            }
+            
+            // Update complaint data
+            complaint.complainant = document.getElementById('editComplainant').value;
+            complaint.contact = document.getElementById('editContact').value;
+            complaint.type = document.getElementById('editType').value;
+            complaint.priority = document.getElementById('editPriority').value;
+            complaint.status = document.getElementById('editStatus').value;
+            complaint.location = document.getElementById('editLocation').value;
+            complaint.description = document.getElementById('editDescription').value;
+            complaint.assignedTo = document.getElementById('editAssignedTo').value;
+            complaint.notes = document.getElementById('editNotes').value;
+            complaint.lastUpdated = new Date().toLocaleString('en-US', { 
+                year: 'numeric', 
+                month: '2-digit', 
+                day: '2-digit', 
+                hour: '2-digit', 
+                minute: '2-digit',
+                hour12: true 
+            });
+            
+            // Update table row
+            updateComplaintRow(complaintId);
+            
+            alert('Complaint updated successfully!');
+            closeEditComplaintModal();
+        }
+        
+        function updateComplaintRow(id) {
+            const complaint = complaintData[id];
+            const row = document.querySelector(`tr[data-complaint-id="${id}"]`);
+            
+            if (!row) return;
+            
+            const cells = row.querySelectorAll('td');
+            
+            // Update complainant
+            cells[1].textContent = complaint.complainant;
+            
+            // Update type
+            cells[2].textContent = complaint.type;
+            
+            // Update priority badge
+            const priorityBadge = cells[4].querySelector('.priority-badge');
+            priorityBadge.textContent = complaint.priority;
+            priorityBadge.className = `priority-badge priority-${complaint.priority.toLowerCase()}`;
+            
+            // Update status badge
+            const statusBadge = cells[5].querySelector('.status-badge');
+            statusBadge.textContent = complaint.status;
+            statusBadge.className = `status-badge status-${complaint.status.toLowerCase()}`;
+        }
+        
+        // Close modal when clicking outside
+        window.onclick = function(event) {
+            const viewModal = document.getElementById('complaintModal');
+            const editModal = document.getElementById('editComplaintModal');
+            
+            if (event.target == viewModal) {
+                closeComplaintModal();
+            }
+            if (event.target == editModal) {
+                closeEditComplaintModal();
+            }
         }
     </script>
 </body>

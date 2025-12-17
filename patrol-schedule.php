@@ -87,7 +87,8 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
         .content-burger-btn span::after { bottom: -7px; }
         .page-title { font-size: 2rem; font-weight: 700; color: var(--tertiary-color); margin: 0; }
         .page-content { background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 12px; padding: 2rem; box-shadow: 0 2px 8px var(--shadow); margin-top: 1.5rem; }
-        .search-box { margin-bottom: 1.5rem; position: relative; }
+        .search-container { display: flex; gap: 1rem; margin-bottom: 1.5rem; align-items: center; }
+        .search-box { flex: 1; position: relative; }
         .search-box input { width: 100%; padding: 0.75rem 1rem 0.75rem 2.5rem; border: 1px solid var(--border-color); border-radius: 8px; font-size: 0.95rem; transition: all 0.2s ease; }
         .search-box input:focus { outline: none; border-color: var(--primary-color); box-shadow: 0 0 0 3px rgba(76, 138, 137, 0.1); }
         .search-box::before { content: "🔍"; position: absolute; left: 0.75rem; top: 50%; transform: translateY(-50%); font-size: 1rem; }
@@ -103,7 +104,33 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
         .status-resolved { background: #d1e7dd; color: #0f5132; }
         .btn-view { padding: 0.5rem 1rem; background: var(--primary-color); color: #fff; border: none; border-radius: 6px; font-size: 0.85rem; cursor: pointer; transition: all 0.2s ease; }
         .btn-view:hover { background: #4ca8a6; }
-        @media (max-width: 768px) { .sidebar { width: 320px; transform: translateX(-100%); transition: transform 0.3s ease; } .sidebar.mobile-open { transform: translateX(0); } .sidebar.collapsed { width: 80px; transform: translateX(0); } .main-wrapper { margin-left: 0; } body.sidebar-collapsed .main-wrapper { margin-left: 80px; } }
+        .btn-add { padding: 0.75rem 1.5rem; background: var(--primary-color); color: #fff; border: none; border-radius: 8px; font-size: 0.95rem; font-weight: 600; cursor: pointer; transition: all 0.2s ease; display: inline-flex; align-items: center; gap: 0.5rem; white-space: nowrap; flex-shrink: 0; }
+        .btn-add:hover { background: #4ca8a6; transform: translateY(-2px); box-shadow: 0 4px 8px rgba(76, 138, 137, 0.3); }
+        .btn-add i { font-size: 1rem; }
+        .btn-edit { padding: 0.5rem 1rem; background: #ffc107; color: #000; border: none; border-radius: 6px; font-size: 0.85rem; cursor: pointer; transition: all 0.2s ease; margin-right: 0.5rem; }
+        .btn-edit:hover { background: #e0a800; }
+        .btn-delete { padding: 0.5rem 1rem; background: #dc3545; color: #fff; border: none; border-radius: 6px; font-size: 0.85rem; cursor: pointer; transition: all 0.2s ease; }
+        .btn-delete:hover { background: #c82333; }
+        .action-buttons { display: flex; gap: 0.5rem; align-items: center; }
+        .modal { display: none; position: fixed; z-index: 2000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.5); overflow: auto; }
+        .modal-content { background-color: var(--card-bg); margin: 5% auto; padding: 2rem; border: 1px solid var(--border-color); border-radius: 12px; width: 90%; max-width: 600px; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3); }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; padding-bottom: 1rem; border-bottom: 2px solid var(--border-color); }
+        .modal-header h2 { margin: 0; color: var(--tertiary-color); font-size: 1.5rem; }
+        .close { color: #aaa; font-size: 28px; font-weight: bold; cursor: pointer; transition: color 0.2s ease; }
+        .close:hover { color: var(--tertiary-color); }
+        .form-group { margin-bottom: 1.25rem; }
+        .form-group label { display: block; margin-bottom: 0.5rem; color: var(--text-color); font-weight: 500; font-size: 0.95rem; }
+        .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 8px; font-size: 0.95rem; font-family: var(--font-family); transition: all 0.2s ease; box-sizing: border-box; }
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus { outline: none; border-color: var(--primary-color); box-shadow: 0 0 0 3px rgba(76, 138, 137, 0.1); }
+        .form-group textarea { resize: vertical; min-height: 100px; }
+        .form-actions { display: flex; justify-content: flex-end; gap: 1rem; margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid var(--border-color); }
+        .btn-cancel { padding: 0.75rem 1.5rem; background: #6c757d; color: #fff; border: none; border-radius: 8px; font-size: 0.95rem; cursor: pointer; transition: all 0.2s ease; }
+        .btn-cancel:hover { background: #5a6268; }
+        .btn-save { padding: 0.75rem 1.5rem; background: var(--primary-color); color: #fff; border: none; border-radius: 8px; font-size: 0.95rem; font-weight: 600; cursor: pointer; transition: all 0.2s ease; }
+        .btn-save:hover { background: #4ca8a6; }
+        .status-in-progress { background: #cfe2ff; color: #084298; }
+        .status-completed { background: #d1e7dd; color: #0f5132; }
+        @media (max-width: 768px) { .sidebar { width: 320px; transform: translateX(-100%); transition: transform 0.3s ease; } .sidebar.mobile-open { transform: translateX(0); } .sidebar.collapsed { width: 80px; transform: translateX(0); } .main-wrapper { margin-left: 0; } body.sidebar-collapsed .main-wrapper { margin-left: 80px; } .modal-content { width: 95%; margin: 10% auto; padding: 1.5rem; } .search-container { flex-direction: column; } .btn-add { width: 100%; justify-content: center; } }
     </style>
 </head>
 <body>
@@ -140,13 +167,17 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                     <span class="arrow">▶</span>
                 </div>
                 <div class="nav-submodules">
-                    <a href="#" class="nav-submodule" data-tooltip="Live View">
+                    <a href="live-view.php" class="nav-submodule" data-tooltip="Live View">
                         <span class="nav-submodule-icon"><i class="fas fa-circle" style="color: #ff4444;"></i></span>
                         <span class="nav-submodule-text">Live View</span>
                     </a>
-                    <a href="#" class="nav-submodule" data-tooltip="Playback">
+                    <a href="playback.php" class="nav-submodule" data-tooltip="Playback">
                         <span class="nav-submodule-icon"><i class="fas fa-play"></i></span>
                         <span class="nav-submodule-text">Playback</span>
+                    </a>
+                    <a href="camera-management.php" class="nav-submodule" data-tooltip="Camera Management">
+                        <span class="nav-submodule-icon"><i class="fas fa-camera"></i></span>
+                        <span class="nav-submodule-text">Camera Management</span>
                     </a>
                 </div>
             </div>
@@ -252,8 +283,13 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
         </header>
         <main class="content-area">
             <div class="page-content">
-                <div class="search-box">
-                    <input type="text" id="searchInput" placeholder="Search patrol schedules by date, route, or officer..." onkeyup="filterPatrols()">
+                <div class="search-container">
+                    <div class="search-box">
+                        <input type="text" id="searchInput" placeholder="Search patrol schedules by date, route, or officer..." onkeyup="filterPatrols()">
+                    </div>
+                    <button class="btn-add" onclick="openAssignPatrolModal()">
+                        <i class="fas fa-plus"></i> Assign Patrol
+                    </button>
                 </div>
                 <div class="table-container">
                     <table id="patrolsTable">
@@ -268,29 +304,47 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                             </tr>
                         </thead>
                         <tbody id="patrolsTableBody">
-                            <tr>
-                                <td>2024-01-20</td>
+                            <tr data-patrol-id="1">
+                                <td>2025-01-20</td>
                                 <td>08:00 - 16:00</td>
-                                <td>Route A - Main Street</td>
-                                <td>Officer Juan</td>
+                                <td>San Agustin Street to Quezon Avenue Extension</td>
+                                <td>Juan Dela Cruz</td>
                                 <td><span class="status-badge status-resolved">Scheduled</span></td>
-                                <td><button class="btn-view" onclick="viewPatrol('1')">View</button></td>
+                                <td>
+                                    <div class="action-buttons">
+                                        <button class="btn-view" onclick="viewPatrol('1')">View</button>
+                                        <button class="btn-edit" onclick="editPatrol('1')">Edit</button>
+                                        <button class="btn-delete" onclick="deletePatrol('1')">Delete</button>
+                                    </div>
+                                </td>
                             </tr>
-                            <tr>
-                                <td>2024-01-21</td>
+                            <tr data-patrol-id="2">
+                                <td>2025-01-21</td>
                                 <td>16:00 - 00:00</td>
-                                <td>Route B - Park Area</td>
-                                <td>Officer Maria</td>
+                                <td>Rizal Street to Luna Avenue</td>
+                                <td>Maria Santos</td>
                                 <td><span class="status-badge status-resolved">Scheduled</span></td>
-                                <td><button class="btn-view" onclick="viewPatrol('2')">View</button></td>
+                                <td>
+                                    <div class="action-buttons">
+                                        <button class="btn-view" onclick="viewPatrol('2')">View</button>
+                                        <button class="btn-edit" onclick="editPatrol('2')">Edit</button>
+                                        <button class="btn-delete" onclick="deletePatrol('2')">Delete</button>
+                                    </div>
+                                </td>
                             </tr>
-                            <tr>
-                                <td>2024-01-22</td>
+                            <tr data-patrol-id="3">
+                                <td>2025-01-22</td>
                                 <td>00:00 - 08:00</td>
-                                <td>Route C - Residential</td>
-                                <td>Officer Roberto</td>
+                                <td>Mabini Street corner Quezon Avenue</td>
+                                <td>Roberto Reyes</td>
                                 <td><span class="status-badge status-pending">Pending</span></td>
-                                <td><button class="btn-view" onclick="viewPatrol('3')">View</button></td>
+                                <td>
+                                    <div class="action-buttons">
+                                        <button class="btn-view" onclick="viewPatrol('3')">View</button>
+                                        <button class="btn-edit" onclick="editPatrol('3')">Edit</button>
+                                        <button class="btn-delete" onclick="deletePatrol('3')">Delete</button>
+                                    </div>
+                                </td>
                             </tr>
                         </tbody>
                     </table>
@@ -298,6 +352,162 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             </div>
         </main>
     </div>
+
+    <!-- Assign Patrol Modal -->
+    <div id="assignPatrolModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Assign Patrol</h2>
+                <span class="close" onclick="closeAssignPatrolModal()">&times;</span>
+            </div>
+            <form id="assignPatrolForm" onsubmit="savePatrol(event)">
+                <div class="form-group">
+                    <label for="patrolOfficer">Officer Name *</label>
+                    <select id="patrolOfficer" name="officer" required>
+                        <option value="">Select Officer</option>
+                        <option value="Juan Dela Cruz">Juan Dela Cruz</option>
+                        <option value="Maria Santos">Maria Santos</option>
+                        <option value="Roberto Reyes">Roberto Reyes</option>
+                        <option value="Ana Garcia">Ana Garcia</option>
+                        <option value="Carlos Torres">Carlos Torres</option>
+                        <option value="Liza Fernandez">Liza Fernandez</option>
+                        <option value="Michael Villanueva">Michael Villanueva</option>
+                        <option value="Grace Ramos">Grace Ramos</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="patrolDate">Date *</label>
+                    <input type="date" id="patrolDate" name="date" required>
+                </div>
+                <div class="form-group">
+                    <label for="patrolStartTime">Start Time *</label>
+                    <input type="time" id="patrolStartTime" name="startTime" required>
+                </div>
+                <div class="form-group">
+                    <label for="patrolEndTime">End Time *</label>
+                    <input type="time" id="patrolEndTime" name="endTime" required>
+                </div>
+                <div class="form-group">
+                    <label for="patrolRoute">Route *</label>
+                    <select id="patrolRoute" name="route" required>
+                        <option value="">Select Route</option>
+                        <option value="San Agustin Street to Quezon Avenue Extension">San Agustin Street to Quezon Avenue Extension</option>
+                        <option value="Rizal Street to Luna Avenue">Rizal Street to Luna Avenue</option>
+                        <option value="Mabini Street corner Quezon Avenue">Mabini Street corner Quezon Avenue</option>
+                        <option value="Bonifacio Street Area">Bonifacio Street Area</option>
+                        <option value="Aguinaldo Street to Commonwealth Avenue">Aguinaldo Street to Commonwealth Avenue</option>
+                        <option value="Commonwealth Avenue Extension">Commonwealth Avenue Extension</option>
+                        <option value="Barangay San Agustin Hall Perimeter">Barangay San Agustin Hall Perimeter</option>
+                        <option value="Multi-Purpose Hall to Quezon Avenue">Multi-Purpose Hall to Quezon Avenue</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="patrolStatus">Status *</label>
+                    <select id="patrolStatus" name="status" required>
+                        <option value="Scheduled">Scheduled</option>
+                        <option value="In Progress">In Progress</option>
+                        <option value="Completed">Completed</option>
+                        <option value="Pending">Pending</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="patrolNotes">Notes</label>
+                    <textarea id="patrolNotes" name="notes" placeholder="Additional notes or instructions..."></textarea>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn-cancel" onclick="closeAssignPatrolModal()">Cancel</button>
+                    <button type="submit" class="btn-save">Assign Patrol</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- View Patrol Modal -->
+    <div id="viewPatrolModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Patrol Details</h2>
+                <span class="close" onclick="closeViewPatrolModal()">&times;</span>
+            </div>
+            <div id="viewPatrolContent">
+                <!-- Content will be populated by JavaScript -->
+            </div>
+            <div class="form-actions">
+                <button type="button" class="btn-cancel" onclick="closeViewPatrolModal()">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Patrol Modal -->
+    <div id="editPatrolModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Edit Patrol</h2>
+                <span class="close" onclick="closeEditPatrolModal()">&times;</span>
+            </div>
+            <form id="editPatrolForm" onsubmit="updatePatrol(event)">
+                <input type="hidden" id="editPatrolId" name="id">
+                <div class="form-group">
+                    <label for="editPatrolOfficer">Officer Name *</label>
+                    <select id="editPatrolOfficer" name="officer" required>
+                        <option value="">Select Officer</option>
+                        <option value="Juan Dela Cruz">Juan Dela Cruz</option>
+                        <option value="Maria Santos">Maria Santos</option>
+                        <option value="Roberto Reyes">Roberto Reyes</option>
+                        <option value="Ana Garcia">Ana Garcia</option>
+                        <option value="Carlos Torres">Carlos Torres</option>
+                        <option value="Liza Fernandez">Liza Fernandez</option>
+                        <option value="Michael Villanueva">Michael Villanueva</option>
+                        <option value="Grace Ramos">Grace Ramos</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="editPatrolDate">Date *</label>
+                    <input type="date" id="editPatrolDate" name="date" required>
+                </div>
+                <div class="form-group">
+                    <label for="editPatrolStartTime">Start Time *</label>
+                    <input type="time" id="editPatrolStartTime" name="startTime" required>
+                </div>
+                <div class="form-group">
+                    <label for="editPatrolEndTime">End Time *</label>
+                    <input type="time" id="editPatrolEndTime" name="endTime" required>
+                </div>
+                <div class="form-group">
+                    <label for="editPatrolRoute">Route *</label>
+                    <select id="editPatrolRoute" name="route" required>
+                        <option value="">Select Route</option>
+                        <option value="San Agustin Street to Quezon Avenue Extension">San Agustin Street to Quezon Avenue Extension</option>
+                        <option value="Rizal Street to Luna Avenue">Rizal Street to Luna Avenue</option>
+                        <option value="Mabini Street corner Quezon Avenue">Mabini Street corner Quezon Avenue</option>
+                        <option value="Bonifacio Street Area">Bonifacio Street Area</option>
+                        <option value="Aguinaldo Street to Commonwealth Avenue">Aguinaldo Street to Commonwealth Avenue</option>
+                        <option value="Commonwealth Avenue Extension">Commonwealth Avenue Extension</option>
+                        <option value="Barangay San Agustin Hall Perimeter">Barangay San Agustin Hall Perimeter</option>
+                        <option value="Multi-Purpose Hall to Quezon Avenue">Multi-Purpose Hall to Quezon Avenue</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="editPatrolStatus">Status *</label>
+                    <select id="editPatrolStatus" name="status" required>
+                        <option value="Scheduled">Scheduled</option>
+                        <option value="In Progress">In Progress</option>
+                        <option value="Completed">Completed</option>
+                        <option value="Pending">Pending</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="editPatrolNotes">Notes</label>
+                    <textarea id="editPatrolNotes" name="notes" placeholder="Additional notes or instructions..."></textarea>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn-cancel" onclick="closeEditPatrolModal()">Cancel</button>
+                    <button type="submit" class="btn-save">Update Patrol</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             const sidebar = document.getElementById('sidebar');
@@ -354,9 +564,211 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                 }
             }
         }
-        function viewPatrol(id) {
-            alert('Viewing patrol: ' + id + ' (Full details modal to be implemented)');
+        // Initialize patrol data
+        let patrolData = {};
+        
+        function initializePatrolData() {
+            const tableBody = document.getElementById('patrolsTableBody');
+            const rows = tableBody.querySelectorAll('tr[data-patrol-id]');
+            
+            rows.forEach(row => {
+                const id = row.getAttribute('data-patrol-id');
+                const cells = row.querySelectorAll('td');
+                
+                const timeRange = cells[1].textContent.trim();
+                const [startTime, endTime] = timeRange.split(' - ');
+                
+                patrolData[id] = {
+                    id: id,
+                    date: cells[0].textContent.trim(),
+                    startTime: startTime,
+                    endTime: endTime,
+                    route: cells[2].textContent.trim(),
+                    officer: cells[3].textContent.trim(),
+                    status: cells[4].querySelector('.status-badge').textContent.trim(),
+                    notes: ''
+                };
+            });
         }
+
+        function openAssignPatrolModal() {
+            document.getElementById('assignPatrolModal').style.display = 'block';
+            document.getElementById('assignPatrolForm').reset();
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('patrolDate').setAttribute('min', today);
+        }
+
+        function closeAssignPatrolModal() {
+            document.getElementById('assignPatrolModal').style.display = 'none';
+        }
+
+        function openViewPatrolModal(id) {
+            const patrol = patrolData[id];
+            if (!patrol) return;
+            
+            const content = `
+                <div style="line-height: 1.8;">
+                    <p><strong>Officer:</strong> ${patrol.officer}</p>
+                    <p><strong>Date:</strong> ${patrol.date}</p>
+                    <p><strong>Time:</strong> ${patrol.startTime} - ${patrol.endTime}</p>
+                    <p><strong>Route:</strong> ${patrol.route}</p>
+                    <p><strong>Status:</strong> ${patrol.status}</p>
+                    ${patrol.notes ? `<p><strong>Notes:</strong> ${patrol.notes}</p>` : ''}
+                </div>
+            `;
+            
+            document.getElementById('viewPatrolContent').innerHTML = content;
+            document.getElementById('viewPatrolModal').style.display = 'block';
+        }
+
+        function closeViewPatrolModal() {
+            document.getElementById('viewPatrolModal').style.display = 'none';
+        }
+
+        function openEditPatrolModal(id) {
+            const patrol = patrolData[id];
+            if (!patrol) return;
+            
+            document.getElementById('editPatrolId').value = patrol.id;
+            document.getElementById('editPatrolOfficer').value = patrol.officer;
+            document.getElementById('editPatrolDate').value = patrol.date;
+            document.getElementById('editPatrolStartTime').value = patrol.startTime;
+            document.getElementById('editPatrolEndTime').value = patrol.endTime;
+            document.getElementById('editPatrolRoute').value = patrol.route;
+            document.getElementById('editPatrolStatus').value = patrol.status;
+            document.getElementById('editPatrolNotes').value = patrol.notes || '';
+            
+            document.getElementById('editPatrolModal').style.display = 'block';
+        }
+
+        function closeEditPatrolModal() {
+            document.getElementById('editPatrolModal').style.display = 'none';
+        }
+
+        function viewPatrol(id) {
+            openViewPatrolModal(id);
+        }
+
+        function editPatrol(id) {
+            openEditPatrolModal(id);
+        }
+
+        function deletePatrol(id) {
+            if (!confirm('Are you sure you want to delete this patrol assignment?')) {
+                return;
+            }
+            
+            const row = document.querySelector(`tr[data-patrol-id="${id}"]`);
+            if (row) {
+                row.remove();
+                delete patrolData[id];
+            }
+        }
+
+        function savePatrol(event) {
+            event.preventDefault();
+            
+            const formData = new FormData(event.target);
+            const id = Date.now().toString();
+            
+            const patrol = {
+                id: id,
+                date: formData.get('date'),
+                startTime: formData.get('startTime'),
+                endTime: formData.get('endTime'),
+                route: formData.get('route'),
+                officer: formData.get('officer'),
+                status: formData.get('status'),
+                notes: formData.get('notes') || ''
+            };
+            
+            patrolData[id] = patrol;
+            
+            const tableBody = document.getElementById('patrolsTableBody');
+            const row = document.createElement('tr');
+            row.setAttribute('data-patrol-id', id);
+            
+            const statusClass = patrol.status === 'Completed' ? 'status-resolved' : 
+                                patrol.status === 'In Progress' ? 'status-in-progress' : 
+                                patrol.status === 'Pending' ? 'status-pending' : 'status-resolved';
+            
+            row.innerHTML = `
+                <td>${patrol.date}</td>
+                <td>${patrol.startTime} - ${patrol.endTime}</td>
+                <td>${patrol.route}</td>
+                <td>${patrol.officer}</td>
+                <td><span class="status-badge ${statusClass}">${patrol.status}</span></td>
+                <td>
+                    <div class="action-buttons">
+                        <button class="btn-view" onclick="viewPatrol('${id}')">View</button>
+                        <button class="btn-edit" onclick="editPatrol('${id}')">Edit</button>
+                        <button class="btn-delete" onclick="deletePatrol('${id}')">Delete</button>
+                    </div>
+                </td>
+            `;
+            
+            tableBody.appendChild(row);
+            closeAssignPatrolModal();
+        }
+
+        function updatePatrol(event) {
+            event.preventDefault();
+            
+            const formData = new FormData(event.target);
+            const id = formData.get('id');
+            
+            const patrol = {
+                id: id,
+                date: formData.get('date'),
+                startTime: formData.get('startTime'),
+                endTime: formData.get('endTime'),
+                route: formData.get('route'),
+                officer: formData.get('officer'),
+                status: formData.get('status'),
+                notes: formData.get('notes') || ''
+            };
+            
+            patrolData[id] = patrol;
+            
+            const row = document.querySelector(`tr[data-patrol-id="${id}"]`);
+            if (row) {
+                const cells = row.querySelectorAll('td');
+                cells[0].textContent = patrol.date;
+                cells[1].textContent = `${patrol.startTime} - ${patrol.endTime}`;
+                cells[2].textContent = patrol.route;
+                cells[3].textContent = patrol.officer;
+                
+                const statusClass = patrol.status === 'Completed' ? 'status-resolved' : 
+                                    patrol.status === 'In Progress' ? 'status-in-progress' : 
+                                    patrol.status === 'Pending' ? 'status-pending' : 'status-resolved';
+                
+                cells[4].innerHTML = `<span class="status-badge ${statusClass}">${patrol.status}</span>`;
+            }
+            
+            closeEditPatrolModal();
+        }
+
+        // Close modals when clicking outside
+        window.onclick = function(event) {
+            const assignModal = document.getElementById('assignPatrolModal');
+            const viewModal = document.getElementById('viewPatrolModal');
+            const editModal = document.getElementById('editPatrolModal');
+            
+            if (event.target === assignModal) {
+                closeAssignPatrolModal();
+            }
+            if (event.target === viewModal) {
+                closeViewPatrolModal();
+            }
+            if (event.target === editModal) {
+                closeEditPatrolModal();
+            }
+        }
+
+        // Initialize data on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            initializePatrolData();
+        });
     </script>
 </body>
 </html>

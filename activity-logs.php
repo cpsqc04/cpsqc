@@ -944,13 +944,17 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                     <span class="arrow">▶</span>
                 </div>
                 <div class="nav-submodules">
-                    <a href="#" class="nav-submodule" data-tooltip="Live View">
+                    <a href="live-view.php" class="nav-submodule" data-tooltip="Live View">
                         <span class="nav-submodule-icon"><i class="fas fa-circle" style="color: #ff4444;"></i></span>
                         <span class="nav-submodule-text">Live View</span>
                     </a>
-                    <a href="#" class="nav-submodule" data-tooltip="Playback">
+                    <a href="playback.php" class="nav-submodule" data-tooltip="Playback">
                         <span class="nav-submodule-icon"><i class="fas fa-play"></i></span>
                         <span class="nav-submodule-text">Playback</span>
+                    </a>
+                    <a href="camera-management.php" class="nav-submodule" data-tooltip="Camera Management">
+                        <span class="nav-submodule-icon"><i class="fas fa-camera"></i></span>
+                        <span class="nav-submodule-text">Camera Management</span>
                     </a>
                 </div>
             </div>
@@ -1092,10 +1096,10 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                 <!-- Activity Logs List -->
                 <div class="logs-container" id="logsContainer">
                     <!-- Sample Activity Log Items -->
-                    <div class="log-item" data-type="patrol" data-date="2024-01-15">
+                    <div class="log-item" data-type="patrol" data-date="2025-01-15">
                         <div class="log-header">
-                            <h3 class="log-title">Evening Patrol - Barangay 1</h3>
-                            <span class="log-date">January 15, 2024 - 8:30 PM</span>
+                            <h3 class="log-title">Evening Patrol - San Agustin Street Area</h3>
+                            <span class="log-date">January 15, 2025 - 8:30 PM</span>
                         </div>
                         <div class="log-details">
                             <div class="log-detail-item">
@@ -1103,24 +1107,24 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                                 <span class="log-badge badge-patrol">Patrol</span>
                             </div>
                             <div class="log-detail-item">
-                                <strong>Members:</strong> Juan Dela Cruz, Maria Santos
+                                <strong>Members:</strong> Juan Rizal, Maria Aquino
                             </div>
                             <div class="log-detail-item">
-                                <strong>Location:</strong> Main Street to Oak Avenue
+                                <strong>Location:</strong> San Agustin Street to Quezon Avenue Extension, Barangay San Agustin, Quezon City
                             </div>
                             <div class="log-detail-item">
                                 <strong>Duration:</strong> 2 hours
                             </div>
                         </div>
                         <div class="log-description">
-                            Conducted routine evening patrol covering Main Street to Oak Avenue. No incidents reported. All areas were secure. Checked streetlights and reported one non-functional light near the community center.
+                            Conducted routine evening patrol covering San Agustin Street to Quezon Avenue Extension. No incidents reported. All areas were secure. Checked streetlights and reported one non-functional light near the Barangay Hall.
                         </div>
                     </div>
                     
-                    <div class="log-item" data-type="meeting" data-date="2024-01-14">
+                    <div class="log-item" data-type="meeting" data-date="2025-01-14">
                         <div class="log-header">
                             <h3 class="log-title">Monthly Coordination Meeting</h3>
-                            <span class="log-date">January 14, 2024 - 2:00 PM</span>
+                            <span class="log-date">January 14, 2025 - 2:00 PM</span>
                         </div>
                         <div class="log-details">
                             <div class="log-detail-item">
@@ -1131,21 +1135,21 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                                 <strong>Attendees:</strong> 15 members
                             </div>
                             <div class="log-detail-item">
-                                <strong>Location:</strong> Community Center
+                                <strong>Location:</strong> Barangay San Agustin Hall, Quezon City
                             </div>
                             <div class="log-detail-item">
                                 <strong>Duration:</strong> 1.5 hours
                             </div>
                         </div>
                         <div class="log-description">
-                            Monthly coordination meeting held at the community center. Discussed upcoming events, patrol schedules, and community safety concerns. New members were introduced and assigned to patrol groups.
+                            Monthly coordination meeting held at the Barangay San Agustin Hall. Discussed upcoming events, patrol schedules, and community safety concerns. New members were introduced and assigned to patrol groups.
                         </div>
                     </div>
                     
-                    <div class="log-item" data-type="incident" data-date="2024-01-13">
+                    <div class="log-item" data-type="incident" data-date="2025-01-13">
                         <div class="log-header">
                             <h3 class="log-title">Suspicious Activity Report</h3>
-                            <span class="log-date">January 13, 2024 - 11:15 PM</span>
+                            <span class="log-date">January 13, 2025 - 11:15 PM</span>
                         </div>
                         <div class="log-details">
                             <div class="log-detail-item">
@@ -1153,24 +1157,24 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                                 <span class="log-badge badge-incident">Incident</span>
                             </div>
                             <div class="log-detail-item">
-                                <strong>Reported by:</strong> Maria Santos
+                                <strong>Reported by:</strong> Maria Magsaysay
                             </div>
                             <div class="log-detail-item">
-                                <strong>Location:</strong> 456 Oak Avenue
+                                <strong>Location:</strong> 123 Bonifacio Street, Barangay San Agustin, Quezon City
                             </div>
                             <div class="log-detail-item">
                                 <strong>Status:</strong> Resolved
                             </div>
                         </div>
                         <div class="log-description">
-                            Member Maria Santos reported suspicious activity near Oak Avenue. Patrol team was dispatched immediately. Upon investigation, it was determined to be a false alarm - neighbors were moving furniture. Situation resolved peacefully.
+                            Member Maria Magsaysay reported suspicious activity near Bonifacio Street. Patrol team was dispatched immediately. Upon investigation, it was determined to be a false alarm - neighbors were moving furniture. Situation resolved peacefully.
                         </div>
                     </div>
                     
-                    <div class="log-item" data-type="training" data-date="2024-01-12">
+                    <div class="log-item" data-type="training" data-date="2025-01-12">
                         <div class="log-header">
                             <h3 class="log-title">First Aid Training Session</h3>
-                            <span class="log-date">January 12, 2024 - 9:00 AM</span>
+                            <span class="log-date">January 12, 2025 - 9:00 AM</span>
                         </div>
                         <div class="log-details">
                             <div class="log-detail-item">
@@ -1181,10 +1185,10 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                                 <strong>Participants:</strong> 20 members
                             </div>
                             <div class="log-detail-item">
-                                <strong>Location:</strong> Community Center
+                                <strong>Location:</strong> Barangay San Agustin Multi-Purpose Hall, Quezon City
                             </div>
                             <div class="log-detail-item">
-                                <strong>Instructor:</strong> Dr. Roberto Cruz
+                                <strong>Instructor:</strong> Dr. Roberto Roxas
                             </div>
                         </div>
                         <div class="log-description">
@@ -1192,10 +1196,10 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                         </div>
                     </div>
                     
-                    <div class="log-item" data-type="patrol" data-date="2024-01-11">
+                    <div class="log-item" data-type="patrol" data-date="2025-01-11">
                         <div class="log-header">
-                            <h3 class="log-title">Morning Patrol - Barangay 2</h3>
-                            <span class="log-date">January 11, 2024 - 6:00 AM</span>
+                            <h3 class="log-title">Morning Patrol - Rizal Street Area</h3>
+                            <span class="log-date">January 11, 2025 - 6:00 AM</span>
                         </div>
                         <div class="log-details">
                             <div class="log-detail-item">
@@ -1203,17 +1207,142 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                                 <span class="log-badge badge-patrol">Patrol</span>
                             </div>
                             <div class="log-detail-item">
-                                <strong>Members:</strong> Juan Dela Cruz, Pedro Reyes
+                                <strong>Members:</strong> Pedro Aguinaldo, Carlos Macapagal
                             </div>
                             <div class="log-detail-item">
-                                <strong>Location:</strong> Barangay 2 perimeter
+                                <strong>Location:</strong> Rizal Street to Luna Avenue, Barangay San Agustin, Quezon City
                             </div>
                             <div class="log-detail-item">
                                 <strong>Duration:</strong> 1.5 hours
                             </div>
                         </div>
                         <div class="log-description">
-                            Early morning patrol conducted around Barangay 2 perimeter. Checked all entry points and common areas. Everything was in order. Noted that garbage collection was completed on schedule.
+                            Early morning patrol conducted around Rizal Street to Luna Avenue. Checked all entry points and common areas. Everything was in order. Noted that garbage collection was completed on schedule.
+                        </div>
+                    </div>
+                    
+                    <div class="log-item" data-type="patrol" data-date="2025-01-10">
+                        <div class="log-header">
+                            <h3 class="log-title">Afternoon Patrol - Mabini Street</h3>
+                            <span class="log-date">January 10, 2025 - 3:00 PM</span>
+                        </div>
+                        <div class="log-details">
+                            <div class="log-detail-item">
+                                <strong>Type:</strong>
+                                <span class="log-badge badge-patrol">Patrol</span>
+                            </div>
+                            <div class="log-detail-item">
+                                <strong>Members:</strong> Ana Estrada, Jose Del Pilar
+                            </div>
+                            <div class="log-detail-item">
+                                <strong>Location:</strong> Mabini Street corner Quezon Avenue, Barangay San Agustin, Quezon City
+                            </div>
+                            <div class="log-detail-item">
+                                <strong>Duration:</strong> 2 hours
+                            </div>
+                        </div>
+                        <div class="log-description">
+                            Afternoon patrol along Mabini Street and Quezon Avenue. Monitored traffic flow and pedestrian safety. Assisted an elderly resident crossing the street. All areas secure.
+                        </div>
+                    </div>
+                    
+                    <div class="log-item" data-type="incident" data-date="2025-01-09">
+                        <div class="log-header">
+                            <h3 class="log-title">Noise Complaint Resolution</h3>
+                            <span class="log-date">January 9, 2025 - 9:30 PM</span>
+                        </div>
+                        <div class="log-details">
+                            <div class="log-detail-item">
+                                <strong>Type:</strong>
+                                <span class="log-badge badge-incident">Incident</span>
+                            </div>
+                            <div class="log-detail-item">
+                                <strong>Reported by:</strong> Roberto Marcos
+                            </div>
+                            <div class="log-detail-item">
+                                <strong>Location:</strong> 456 Aguinaldo Street, Barangay San Agustin, Quezon City
+                            </div>
+                            <div class="log-detail-item">
+                                <strong>Status:</strong> Resolved
+                            </div>
+                        </div>
+                        <div class="log-description">
+                            Noise complaint received from resident Roberto Marcos regarding loud music from neighboring property. Patrol team responded and spoke with both parties. Issue resolved amicably with agreement to observe quiet hours.
+                        </div>
+                    </div>
+                    
+                    <div class="log-item" data-type="meeting" data-date="2025-01-08">
+                        <div class="log-header">
+                            <h3 class="log-title">Safety Awareness Meeting</h3>
+                            <span class="log-date">January 8, 2025 - 7:00 PM</span>
+                        </div>
+                        <div class="log-details">
+                            <div class="log-detail-item">
+                                <strong>Type:</strong>
+                                <span class="log-badge badge-meeting">Meeting</span>
+                            </div>
+                            <div class="log-detail-item">
+                                <strong>Attendees:</strong> 25 members
+                            </div>
+                            <div class="log-detail-item">
+                                <strong>Location:</strong> Barangay San Agustin Hall, Quezon City
+                            </div>
+                            <div class="log-detail-item">
+                                <strong>Duration:</strong> 1 hour
+                            </div>
+                        </div>
+                        <div class="log-description">
+                            Safety awareness meeting conducted to discuss recent security concerns and preventive measures. Topics included home security tips, emergency contact numbers, and neighborhood watch protocols.
+                        </div>
+                    </div>
+                    
+                    <div class="log-item" data-type="patrol" data-date="2025-01-07">
+                        <div class="log-header">
+                            <h3 class="log-title">Night Patrol - Commonwealth Avenue Area</h3>
+                            <span class="log-date">January 7, 2025 - 10:00 PM</span>
+                        </div>
+                        <div class="log-details">
+                            <div class="log-detail-item">
+                                <strong>Type:</strong>
+                                <span class="log-badge badge-patrol">Patrol</span>
+                            </div>
+                            <div class="log-detail-item">
+                                <strong>Members:</strong> Lourdes Arroyo, Manuel Quezon
+                            </div>
+                            <div class="log-detail-item">
+                                <strong>Location:</strong> Commonwealth Avenue Extension, Barangay San Agustin, Quezon City
+                            </div>
+                            <div class="log-detail-item">
+                                <strong>Duration:</strong> 2.5 hours
+                            </div>
+                        </div>
+                        <div class="log-description">
+                            Night patrol along Commonwealth Avenue Extension. Checked commercial establishments and residential areas. All security measures in place. No incidents reported.
+                        </div>
+                    </div>
+                    
+                    <div class="log-item" data-type="training" data-date="2025-01-06">
+                        <div class="log-header">
+                            <h3 class="log-title">Emergency Response Training</h3>
+                            <span class="log-date">January 6, 2025 - 8:00 AM</span>
+                        </div>
+                        <div class="log-details">
+                            <div class="log-detail-item">
+                                <strong>Type:</strong>
+                                <span class="log-badge badge-training">Training</span>
+                            </div>
+                            <div class="log-detail-item">
+                                <strong>Participants:</strong> 18 members
+                            </div>
+                            <div class="log-detail-item">
+                                <strong>Location:</strong> Barangay San Agustin Multi-Purpose Hall, Quezon City
+                            </div>
+                            <div class="log-detail-item">
+                                <strong>Instructor:</strong> Capt. Maria Aquino
+                            </div>
+                        </div>
+                        <div class="log-description">
+                            Emergency response training session covering fire safety, earthquake preparedness, and evacuation procedures. Practical drills conducted. All participants demonstrated competency in emergency protocols.
                         </div>
                     </div>
                 </div>
@@ -1339,8 +1468,94 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
         }
         
         function exportLogs() {
-            alert('Exporting activity logs... (Functionality to be implemented)');
-            // Here you would typically generate a CSV or PDF export
+            // Get all visible log items
+            const logItems = document.querySelectorAll('.log-item:not([style*="display: none"])');
+            
+            if (logItems.length === 0) {
+                alert('No activity logs to export.');
+                return;
+            }
+            
+            // Prepare CSV headers
+            const headers = ['Date', 'Time', 'Type', 'Title', 'Members/Attendees', 'Location', 'Duration/Status', 'Description'];
+            const csvRows = [headers.join(',')];
+            
+            // Extract data from each log item
+            logItems.forEach(logItem => {
+                const row = [];
+                
+                // Get date and time
+                const dateElement = logItem.querySelector('.log-date');
+                const dateTimeText = dateElement ? dateElement.textContent.trim() : '';
+                const dateTimeParts = dateTimeText.split(' - ');
+                row.push(dateTimeParts[0] || ''); // Date
+                row.push(dateTimeParts[1] || ''); // Time
+                
+                // Get type
+                const badge = logItem.querySelector('.log-badge');
+                const type = badge ? badge.textContent.trim() : '';
+                row.push(type);
+                
+                // Get title
+                const titleElement = logItem.querySelector('.log-title');
+                const title = titleElement ? titleElement.textContent.trim() : '';
+                row.push(`"${title.replace(/"/g, '""')}"`); // Escape quotes in CSV
+                
+                // Get details (Members/Attendees, Location, Duration/Status)
+                const detailItems = logItem.querySelectorAll('.log-detail-item');
+                let membersAttendees = '';
+                let location = '';
+                let durationStatus = '';
+                
+                detailItems.forEach(detail => {
+                    const text = detail.textContent.trim();
+                    if (text.includes('Members:') || text.includes('Attendees:') || text.includes('Participants:')) {
+                        membersAttendees = text.replace(/^(Members|Attendees|Participants):\s*/i, '').trim();
+                    } else if (text.includes('Location:')) {
+                        location = text.replace(/^Location:\s*/i, '').trim();
+                    } else if (text.includes('Duration:') || text.includes('Status:')) {
+                        durationStatus = text.replace(/^(Duration|Status):\s*/i, '').trim();
+                    } else if (text.includes('Reported by:')) {
+                        membersAttendees = text.replace(/^Reported by:\s*/i, '').trim();
+                    } else if (text.includes('Instructor:')) {
+                        membersAttendees = text.replace(/^Instructor:\s*/i, '').trim();
+                    }
+                });
+                
+                row.push(`"${membersAttendees.replace(/"/g, '""')}"`);
+                row.push(`"${location.replace(/"/g, '""')}"`);
+                row.push(`"${durationStatus.replace(/"/g, '""')}"`);
+                
+                // Get description
+                const descElement = logItem.querySelector('.log-description');
+                const description = descElement ? descElement.textContent.trim() : '';
+                row.push(`"${description.replace(/"/g, '""')}"`);
+                
+                csvRows.push(row.join(','));
+            });
+            
+            // Create CSV content
+            const csvContent = csvRows.join('\n');
+            
+            // Create blob and download
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            const url = URL.createObjectURL(blob);
+            
+            // Generate filename with current date
+            const now = new Date();
+            const dateStr = now.toISOString().split('T')[0];
+            const filename = `activity_logs_${dateStr}.csv`;
+            
+            link.setAttribute('href', url);
+            link.setAttribute('download', filename);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            // Show success message
+            alert(`Successfully exported ${logItems.length} activity log(s) to ${filename}`);
         }
         
         function changePage(direction) {

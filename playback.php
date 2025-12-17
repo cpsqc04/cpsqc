@@ -11,7 +11,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Submit Tip - Alertara</title>
+    <title>Playback - CCTV Recordings</title>
     <link rel="icon" type="image/x-icon" href="images/favicon.ico">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="css/theme.css">
@@ -87,23 +87,45 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
         .content-burger-btn span::after { bottom: -7px; }
         .page-title { font-size: 2rem; font-weight: 700; color: var(--tertiary-color); margin: 0; }
         .page-content { background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 12px; padding: 2rem; box-shadow: 0 2px 8px var(--shadow); margin-top: 1.5rem; }
-        .search-box { margin-bottom: 1.5rem; position: relative; }
-        .search-box input { width: 100%; padding: 0.75rem 1rem 0.75rem 2.5rem; border: 1px solid var(--border-color); border-radius: 8px; font-size: 0.95rem; transition: all 0.2s ease; }
-        .search-box input:focus { outline: none; border-color: var(--primary-color); box-shadow: 0 0 0 3px rgba(76, 138, 137, 0.1); }
-        .search-box::before { content: "🔍"; position: absolute; left: 0.75rem; top: 50%; transform: translateY(-50%); font-size: 1rem; }
-        .table-container { overflow-x: auto; border-radius: 8px; border: 1px solid var(--border-color); }
-        table { width: 100%; border-collapse: collapse; background: var(--card-bg); }
-        thead { background: var(--tertiary-color); color: #fff; }
-        th { padding: 1rem; text-align: left; font-weight: 600; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.5px; }
-        td { padding: 1rem; border-bottom: 1px solid var(--border-color); color: var(--text-color); }
-        tbody tr:hover { background: #f9f9f9; }
-        tbody tr:last-child td { border-bottom: none; }
-        .status-badge { padding: 0.25rem 0.75rem; border-radius: 12px; font-size: 0.85rem; font-weight: 500; display: inline-block; }
-        .status-pending { background: #fff3cd; color: #856404; }
-        .status-resolved { background: #d1e7dd; color: #0f5132; }
-        .btn-view { padding: 0.5rem 1rem; background: var(--primary-color); color: #fff; border: none; border-radius: 6px; font-size: 0.85rem; cursor: pointer; transition: all 0.2s ease; }
-        .btn-view:hover { background: #4ca8a6; }
-        @media (max-width: 768px) { .sidebar { width: 320px; transform: translateX(-100%); transition: transform 0.3s ease; } .sidebar.mobile-open { transform: translateX(0); } .sidebar.collapsed { width: 80px; transform: translateX(0); } .main-wrapper { margin-left: 0; } body.sidebar-collapsed .main-wrapper { margin-left: 80px; } }
+        .playback-container { display: flex; flex-direction: column; gap: 1.5rem; }
+        .video-wrapper { display: none; }
+        .video-wrapper.active { display: block; }
+        .playback-controls-panel { display: flex; gap: 1.5rem; flex-wrap: wrap; }
+        .control-group { flex: 1; min-width: 200px; }
+        .control-group label { display: block; margin-bottom: 0.5rem; color: var(--text-color); font-weight: 500; font-size: 0.95rem; }
+        .control-group select, .control-group input { width: 100%; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 8px; font-size: 0.95rem; font-family: var(--font-family); transition: all 0.2s ease; box-sizing: border-box; }
+        .control-group select:focus, .control-group input:focus { outline: none; border-color: var(--primary-color); box-shadow: 0 0 0 3px rgba(76, 138, 137, 0.1); }
+        .btn-search { padding: 0.75rem 1.5rem; background: var(--primary-color); color: #fff; border: none; border-radius: 8px; font-size: 0.95rem; font-weight: 600; cursor: pointer; transition: all 0.2s ease; align-self: flex-end; margin-top: 1.75rem; }
+        .btn-search:hover { background: #4ca8a6; transform: translateY(-2px); box-shadow: 0 4px 8px rgba(76, 138, 137, 0.3); }
+        .video-player-container { background: #000; border-radius: 12px; position: relative; overflow: hidden; aspect-ratio: 16/9; display: none; }
+        .video-player-container.active { display: block; }
+        .video-placeholder { width: 100%; height: 100%; background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%); display: flex; flex-direction: column; align-items: center; justify-content: center; color: #fff; position: relative; }
+        .video-placeholder::before { content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(255, 255, 255, 0.03) 2px, rgba(255, 255, 255, 0.03) 4px); }
+        .video-info { position: absolute; top: 1rem; left: 1rem; background: rgba(0, 0, 0, 0.7); padding: 0.75rem 1rem; border-radius: 8px; color: #fff; z-index: 10; }
+        .video-info p { margin: 0.25rem 0; font-size: 0.9rem; }
+        .playback-controls { background: rgba(0, 0, 0, 0.9); padding: 1rem; border-radius: 8px; display: none; align-items: center; gap: 1rem; margin-top: 0; }
+        .playback-controls.active { display: flex; }
+        .playback-controls button { background: transparent; border: none; color: #fff; font-size: 1.5rem; cursor: pointer; padding: 0.5rem; transition: all 0.2s ease; }
+        .playback-controls button:hover { color: var(--primary-color); }
+        .playback-controls button:disabled { opacity: 0.5; cursor: not-allowed; }
+        .progress-container { flex: 1; position: relative; }
+        .progress-bar { width: 100%; height: 6px; background: rgba(255, 255, 255, 0.3); border-radius: 3px; cursor: pointer; position: relative; }
+        .progress-fill { height: 100%; background: var(--primary-color); border-radius: 3px; width: 0%; transition: width 0.1s ease; }
+        .time-display { color: #fff; font-size: 0.9rem; font-family: 'Courier New', monospace; min-width: 100px; text-align: center; }
+        .recordings-list { margin-top: 1.5rem; }
+        .recordings-list h3 { margin: 0 0 1rem 0; color: var(--tertiary-color); font-size: 1.25rem; font-weight: 600; }
+        .recordings-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 1rem; }
+        .recording-card { background: #f9f9f9; border: 1px solid var(--border-color); border-radius: 8px; padding: 1rem; cursor: pointer; transition: all 0.2s ease; }
+        .recording-card:hover { box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1); transform: translateY(-2px); }
+        .recording-card.active { border-color: var(--primary-color); background: #f0f9f9; }
+        .recording-thumbnail { width: 100%; height: 120px; background: linear-gradient(135deg, #e0e0e0 0%, #d0d0d0 100%); border-radius: 6px; margin-bottom: 0.75rem; display: flex; align-items: center; justify-content: center; color: #999; font-size: 2rem; position: relative; overflow: hidden; }
+        .recording-thumbnail::before { content: ''; position: absolute; top: 0; left: -100%; width: 100%; height: 100%; background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent); animation: scan 3s infinite; }
+        @keyframes scan { 0% { left: -100%; } 100% { left: 100%; } }
+        .recording-info { font-size: 0.9rem; }
+        .recording-info p { margin: 0.25rem 0; }
+        .recording-info strong { color: var(--tertiary-color); }
+        .recording-duration { color: #666; font-size: 0.85rem; }
+        @media (max-width: 768px) { .sidebar { width: 320px; transform: translateX(-100%); transition: transform 0.3s ease; } .sidebar.mobile-open { transform: translateX(0); } .sidebar.collapsed { width: 80px; transform: translateX(0); } .main-wrapper { margin-left: 0; } body.sidebar-collapsed .main-wrapper { margin-left: 80px; } .playback-controls-panel { flex-direction: column; } .recordings-grid { grid-template-columns: 1fr; } }
     </style>
 </head>
 <body>
@@ -133,7 +155,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                     </a>
                 </div>
             </div>
-            <div class="nav-module">
+            <div class="nav-module active">
                 <div class="nav-module-header" onclick="toggleModule(this)" data-tooltip="CCTV Surveillance System Management">
                     <span class="nav-module-icon"><i class="fas fa-video"></i></span>
                     <span class="nav-module-header-text">CCTV Surveillance System Management</span>
@@ -144,7 +166,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                         <span class="nav-submodule-icon"><i class="fas fa-circle" style="color: #ff4444;"></i></span>
                         <span class="nav-submodule-text">Live View</span>
                     </a>
-                    <a href="playback.php" class="nav-submodule" data-tooltip="Playback">
+                    <a href="playback.php" class="nav-submodule active" data-tooltip="Playback">
                         <span class="nav-submodule-icon"><i class="fas fa-play"></i></span>
                         <span class="nav-submodule-text">Playback</span>
                     </a>
@@ -171,14 +193,14 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                     </a>
                 </div>
             </div>
-            <div class="nav-module active">
+            <div class="nav-module">
                 <div class="nav-module-header" onclick="toggleModule(this)" data-tooltip="Volunteer Registry and Scheduling">
                     <span class="nav-module-icon"><i class="fas fa-handshake"></i></span>
                     <span class="nav-module-header-text">Volunteer Registry and Scheduling</span>
                     <span class="arrow">▶</span>
                 </div>
                 <div class="nav-submodules">
-                    <a href="volunteer-list.php" class="nav-submodule active" data-tooltip="Volunteer List">
+                    <a href="volunteer-list.php" class="nav-submodule" data-tooltip="Volunteer List">
                         <span class="nav-submodule-icon"><i class="fas fa-user"></i></span>
                         <span class="nav-submodule-text">Volunteer List</span>
                     </a>
@@ -222,14 +244,14 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                     </a>
                 </div>
             </div>
-            <div class="nav-module active">
+            <div class="nav-module">
                 <div class="nav-module-header" onclick="toggleModule(this)" data-tooltip="Anonymous Tip Line System">
                     <span class="nav-module-icon"><i class="fas fa-comments"></i></span>
                     <span class="nav-module-header-text">Anonymous Tip Line System</span>
                     <span class="arrow">▶</span>
                 </div>
                 <div class="nav-submodules">
-                    <a href="submit-tip.php" class="nav-submodule active" data-tooltip="Submit Tip">
+                    <a href="submit-tip.php" class="nav-submodule" data-tooltip="Submit Tip">
                         <span class="nav-submodule-icon"><i class="fas fa-envelope"></i></span>
                         <span class="nav-submodule-text">Submit Tip</span>
                     </a>
@@ -247,7 +269,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                 <button class="content-burger-btn" onclick="toggleSidebar()" aria-label="Toggle sidebar">
                     <span></span>
                 </button>
-                <h1 class="page-title">Submit Tip</h1>
+                <h1 class="page-title">Playback - CCTV Recordings</h1>
             </div>
             <div class="user-info">
                 <span>Welcome, <?php echo htmlspecialchars($_SESSION['username'] ?? 'Admin'); ?></span>
@@ -256,28 +278,75 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
         </header>
         <main class="content-area">
             <div class="page-content">
-                <div style="max-width: 600px;">
-                    <form id="tipForm" onsubmit="submitTip(event)">
-                        <div style="margin-bottom: 1.5rem;">
-                            <label style="display: block; margin-bottom: 0.5rem; font-weight: 500;">Tip Category *</label>
-                            <select id="tipCategory" required style="width: 100%; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 8px;">
-                                <option value="">Select Category</option>
-                                <option value="safety">Safety Concern</option>
-                                <option value="suspicious">Suspicious Activity</option>
-                                <option value="vandalism">Vandalism</option>
-                                <option value="other">Other</option>
+                <div class="playback-container">
+                    <!-- Search Controls -->
+                    <div class="playback-controls-panel">
+                        <div class="control-group">
+                            <label for="cameraSelect">Camera</label>
+                            <select id="cameraSelect">
+                                <option value="">All Cameras</option>
+                                <option value="CAM-001">CAM-001 - Main Entrance</option>
+                                <option value="CAM-002">CAM-002 - Barangay Hall</option>
+                                <option value="CAM-003">CAM-003 - Community Center</option>
                             </select>
                         </div>
-                        <div style="margin-bottom: 1.5rem;">
-                            <label style="display: block; margin-bottom: 0.5rem; font-weight: 500;">Tip Details *</label>
-                            <textarea id="tipDetails" required style="width: 100%; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 8px; min-height: 150px;" placeholder="Provide detailed information about your tip..."></textarea>
+                        <div class="control-group">
+                            <label for="dateSelect">Date</label>
+                            <input type="date" id="dateSelect" value="<?php echo date('Y-m-d'); ?>">
                         </div>
-                        <div style="margin-bottom: 1.5rem;">
-                            <label style="display: block; margin-bottom: 0.5rem; font-weight: 500;">Location (Optional)</label>
-                            <input type="text" id="tipLocation" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 8px;" placeholder="Enter location if applicable">
+                        <div class="control-group">
+                            <label for="startTime">Start Time</label>
+                            <input type="time" id="startTime" value="00:00">
                         </div>
-                        <button type="submit" style="padding: 0.75rem 2rem; background: var(--primary-color); color: #fff; border: none; border-radius: 8px; font-size: 1rem; cursor: pointer; width: 100%;">Submit Anonymous Tip</button>
-                    </form>
+                        <div class="control-group">
+                            <label for="endTime">End Time</label>
+                            <input type="time" id="endTime" value="23:59">
+                        </div>
+                        <button class="btn-search" onclick="searchRecordings()">
+                            <i class="fas fa-search"></i> Search
+                        </button>
+                    </div>
+
+                    <!-- Video Player -->
+                    <div class="video-player-container" id="videoPlayerContainer">
+                        <div class="video-placeholder" id="videoPlaceholder">
+                            <div class="video-info" id="videoInfo">
+                                <p><strong>Camera:</strong> <span id="currentCamera">-</span></p>
+                                <p><strong>Date:</strong> <span id="currentDate">-</span></p>
+                                <p><strong>Time:</strong> <span id="currentTime">-</span></p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="playback-controls" id="playbackControls">
+                        <button onclick="togglePlayPause()" id="playPauseBtn">
+                            <i class="fas fa-play" id="playPauseIcon"></i>
+                        </button>
+                        <button onclick="skipBackward()">
+                            <i class="fas fa-backward"></i>
+                        </button>
+                        <button onclick="skipForward()">
+                            <i class="fas fa-forward"></i>
+                        </button>
+                        <div class="progress-container">
+                            <div class="progress-bar" onclick="seekTo(event)" id="progressBar">
+                                <div class="progress-fill" id="progressFill"></div>
+                            </div>
+                        </div>
+                        <div class="time-display">
+                            <span id="currentTimeDisplay">00:00</span> / <span id="totalTimeDisplay">00:00</span>
+                        </div>
+                        <button onclick="toggleFullscreen()">
+                            <i class="fas fa-expand"></i>
+                        </button>
+                    </div>
+
+                    <!-- Recordings List -->
+                    <div class="recordings-list">
+                        <h3>Available Recordings</h3>
+                        <div class="recordings-grid" id="recordingsGrid">
+                            <!-- Recordings will be populated here -->
+                        </div>
+                    </div>
                 </div>
             </div>
         </main>
@@ -290,6 +359,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                 sidebar.classList.add('collapsed');
                 document.body.classList.add('sidebar-collapsed');
             }
+            initializeRecordings();
         });
         function toggleSidebar() {
             const sidebar = document.getElementById('sidebar');
@@ -323,10 +393,259 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             document.querySelectorAll('.nav-module').forEach(m => { m.classList.remove('active'); });
             if (!isActive) { module.classList.add('active'); }
         }
-        function submitTip(event) {
-            event.preventDefault();
-            alert('Tip submitted successfully! (This is a demo - backend integration needed)');
-            document.getElementById('tipForm').reset();
+
+        let recordings = [];
+        let currentRecording = null;
+        let isPlaying = false;
+        let currentTime = 0;
+        let totalTime = 0;
+        let playbackInterval = null;
+
+        function initializeRecordings() {
+            recordings = [
+                {
+                    id: 1,
+                    camera: 'CAM-001',
+                    cameraName: 'Main Entrance',
+                    date: '2025-01-15',
+                    startTime: '08:00:00',
+                    endTime: '08:30:00',
+                    duration: '30:00',
+                    location: 'Susano Road, Barangay San Agustin, Quezon City'
+                },
+                {
+                    id: 2,
+                    camera: 'CAM-002',
+                    cameraName: 'Barangay Hall',
+                    date: '2025-01-15',
+                    startTime: '14:30:00',
+                    endTime: '15:00:00',
+                    duration: '30:00',
+                    location: 'Paraiso St., Barangay San Agustin, Quezon City'
+                },
+                {
+                    id: 3,
+                    camera: 'CAM-001',
+                    cameraName: 'Main Entrance',
+                    date: '2025-01-15',
+                    startTime: '18:00:00',
+                    endTime: '18:45:00',
+                    duration: '45:00',
+                    location: 'Susano Road, Barangay San Agustin, Quezon City'
+                },
+                {
+                    id: 4,
+                    camera: 'CAM-003',
+                    cameraName: 'Community Center',
+                    date: '2025-01-14',
+                    startTime: '10:00:00',
+                    endTime: '10:20:00',
+                    duration: '20:00',
+                    location: 'Clemente St., Barangay San Agustin, Quezon City'
+                },
+                {
+                    id: 5,
+                    camera: 'CAM-002',
+                    cameraName: 'Barangay Hall',
+                    date: '2025-01-14',
+                    startTime: '16:00:00',
+                    endTime: '17:00:00',
+                    duration: '60:00',
+                    location: 'Paraiso St., Barangay San Agustin, Quezon City'
+                },
+                {
+                    id: 6,
+                    camera: 'CAM-001',
+                    cameraName: 'Main Entrance',
+                    date: '2025-01-13',
+                    startTime: '12:00:00',
+                    endTime: '12:30:00',
+                    duration: '30:00',
+                    location: 'Susano Road, Barangay San Agustin, Quezon City'
+                }
+            ];
+            displayRecordings();
+        }
+
+        function displayRecordings() {
+            const grid = document.getElementById('recordingsGrid');
+            grid.innerHTML = '';
+            
+            recordings.forEach(recording => {
+                const card = document.createElement('div');
+                card.className = 'recording-card';
+                card.onclick = (e) => selectRecording(recording, e);
+                
+                card.innerHTML = `
+                    <div class="recording-thumbnail">📹</div>
+                    <div class="recording-info">
+                        <p><strong>${recording.camera}</strong> - ${recording.cameraName}</p>
+                        <p>${recording.date} ${recording.startTime} - ${recording.endTime}</p>
+                        <p class="recording-duration">Duration: ${recording.duration}</p>
+                        <p style="font-size: 0.8rem; color: #666;">${recording.location}</p>
+                    </div>
+                `;
+                
+                grid.appendChild(card);
+            });
+        }
+
+        function selectRecording(recording, event) {
+            currentRecording = recording;
+            document.querySelectorAll('.recording-card').forEach(card => {
+                card.classList.remove('active');
+            });
+            event.currentTarget.classList.add('active');
+            
+            document.getElementById('currentCamera').textContent = `${recording.camera} - ${recording.cameraName}`;
+            document.getElementById('currentDate').textContent = recording.date;
+            document.getElementById('currentTime').textContent = `${recording.startTime} - ${recording.endTime}`;
+            
+            const [hours, minutes, seconds] = recording.duration.split(':').map(Number);
+            totalTime = hours * 3600 + minutes * 60 + seconds;
+            currentTime = 0;
+            
+            document.getElementById('totalTimeDisplay').textContent = formatTime(totalTime);
+            document.getElementById('currentTimeDisplay').textContent = '00:00';
+            document.getElementById('progressFill').style.width = '0%';
+            
+            document.getElementById('videoPlayerContainer').classList.add('active');
+            document.getElementById('videoInfo').style.display = 'block';
+            document.getElementById('playbackControls').classList.add('active');
+            
+            pausePlayback();
+        }
+
+        function togglePlayPause() {
+            if (!currentRecording) return;
+            
+            isPlaying = !isPlaying;
+            const icon = document.getElementById('playPauseIcon');
+            
+            if (isPlaying) {
+                icon.classList.remove('fa-play');
+                icon.classList.add('fa-pause');
+                playbackInterval = setInterval(() => {
+                    currentTime += 1;
+                    updateProgress();
+                    if (currentTime >= totalTime) {
+                        pausePlayback();
+                    }
+                }, 1000);
+            } else {
+                pausePlayback();
+            }
+        }
+
+        function pausePlayback() {
+            isPlaying = false;
+            const icon = document.getElementById('playPauseIcon');
+            icon.classList.remove('fa-pause');
+            icon.classList.add('fa-play');
+            if (playbackInterval) {
+                clearInterval(playbackInterval);
+                playbackInterval = null;
+            }
+        }
+
+        function skipBackward() {
+            if (!currentRecording) return;
+            currentTime = Math.max(0, currentTime - 10);
+            updateProgress();
+        }
+
+        function skipForward() {
+            if (!currentRecording) return;
+            currentTime = Math.min(totalTime, currentTime + 10);
+            updateProgress();
+        }
+
+        function seekTo(event) {
+            if (!currentRecording) return;
+            const progressBar = document.getElementById('progressBar');
+            const rect = progressBar.getBoundingClientRect();
+            const x = event.clientX - rect.left;
+            const percentage = x / rect.width;
+            currentTime = Math.floor(totalTime * percentage);
+            updateProgress();
+        }
+
+        function updateProgress() {
+            const percentage = (currentTime / totalTime) * 100;
+            document.getElementById('progressFill').style.width = percentage + '%';
+            document.getElementById('currentTimeDisplay').textContent = formatTime(currentTime);
+        }
+
+        function formatTime(seconds) {
+            const hours = Math.floor(seconds / 3600);
+            const minutes = Math.floor((seconds % 3600) / 60);
+            const secs = seconds % 60;
+            if (hours > 0) {
+                return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+            }
+            return `${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        }
+
+        function toggleFullscreen() {
+            const container = document.querySelector('.video-player-container');
+            if (!document.fullscreenElement) {
+                container.requestFullscreen().catch(err => {
+                    alert('Error attempting to enable fullscreen');
+                });
+            } else {
+                document.exitFullscreen();
+            }
+        }
+
+        function searchRecordings() {
+            const camera = document.getElementById('cameraSelect').value;
+            const date = document.getElementById('dateSelect').value;
+            const startTime = document.getElementById('startTime').value;
+            const endTime = document.getElementById('endTime').value;
+            
+            let filtered = recordings;
+            
+            if (camera) {
+                filtered = filtered.filter(r => r.camera === camera);
+            }
+            
+            if (date) {
+                filtered = filtered.filter(r => r.date === date);
+            }
+            
+            if (startTime && endTime) {
+                filtered = filtered.filter(r => {
+                    const recStart = r.startTime.split(':').slice(0, 2).join(':');
+                    const recEnd = r.endTime.split(':').slice(0, 2).join(':');
+                    return recStart >= startTime && recEnd <= endTime;
+                });
+            }
+            
+            const grid = document.getElementById('recordingsGrid');
+            grid.innerHTML = '';
+            
+            if (filtered.length === 0) {
+                grid.innerHTML = '<p style="grid-column: 1 / -1; text-align: center; color: #999; padding: 2rem;">No recordings found matching your criteria.</p>';
+                return;
+            }
+            
+            filtered.forEach(recording => {
+                const card = document.createElement('div');
+                card.className = 'recording-card';
+                card.onclick = (e) => selectRecording(recording, e);
+                
+                card.innerHTML = `
+                    <div class="recording-thumbnail">📹</div>
+                    <div class="recording-info">
+                        <p><strong>${recording.camera}</strong> - ${recording.cameraName}</p>
+                        <p>${recording.date} ${recording.startTime} - ${recording.endTime}</p>
+                        <p class="recording-duration">Duration: ${recording.duration}</p>
+                        <p style="font-size: 0.8rem; color: #666;">${recording.location}</p>
+                    </div>
+                `;
+                
+                grid.appendChild(card);
+            });
         }
     </script>
 </body>

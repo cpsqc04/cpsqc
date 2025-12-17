@@ -87,10 +87,14 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
         .content-burger-btn span::after { bottom: -7px; }
         .page-title { font-size: 2rem; font-weight: 700; color: var(--tertiary-color); margin: 0; }
         .page-content { background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 12px; padding: 2rem; box-shadow: 0 2px 8px var(--shadow); margin-top: 1.5rem; }
-        .search-box { margin-bottom: 1.5rem; position: relative; }
+        .search-container { display: flex; gap: 1rem; margin-bottom: 1.5rem; align-items: center; }
+        .search-box { flex: 1; position: relative; }
         .search-box input { width: 100%; padding: 0.75rem 1rem 0.75rem 2.5rem; border: 1px solid var(--border-color); border-radius: 8px; font-size: 0.95rem; transition: all 0.2s ease; }
         .search-box input:focus { outline: none; border-color: var(--primary-color); box-shadow: 0 0 0 3px rgba(76, 138, 137, 0.1); }
         .search-box::before { content: "🔍"; position: absolute; left: 0.75rem; top: 50%; transform: translateY(-50%); font-size: 1rem; }
+        .btn-add { padding: 0.75rem 1.5rem; background: var(--primary-color); color: #fff; border: none; border-radius: 8px; font-size: 0.95rem; font-weight: 600; cursor: pointer; transition: all 0.2s ease; display: inline-flex; align-items: center; gap: 0.5rem; white-space: nowrap; flex-shrink: 0; }
+        .btn-add:hover { background: #4ca8a6; transform: translateY(-2px); box-shadow: 0 4px 8px rgba(76, 138, 137, 0.3); }
+        .btn-add i { font-size: 1rem; }
         .table-container { overflow-x: auto; border-radius: 8px; border: 1px solid var(--border-color); }
         table { width: 100%; border-collapse: collapse; background: var(--card-bg); }
         thead { background: var(--tertiary-color); color: #fff; }
@@ -101,9 +105,28 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
         .status-badge { padding: 0.25rem 0.75rem; border-radius: 12px; font-size: 0.85rem; font-weight: 500; display: inline-block; }
         .status-pending { background: #fff3cd; color: #856404; }
         .status-resolved { background: #d1e7dd; color: #0f5132; }
-        .btn-view { padding: 0.5rem 1rem; background: var(--primary-color); color: #fff; border: none; border-radius: 6px; font-size: 0.85rem; cursor: pointer; transition: all 0.2s ease; }
+        .btn-view { padding: 0.5rem 1rem; background: var(--primary-color); color: #fff; border: none; border-radius: 6px; font-size: 0.85rem; cursor: pointer; transition: all 0.2s ease; margin-right: 0.5rem; }
         .btn-view:hover { background: #4ca8a6; }
-        @media (max-width: 768px) { .sidebar { width: 320px; transform: translateX(-100%); transition: transform 0.3s ease; } .sidebar.mobile-open { transform: translateX(0); } .sidebar.collapsed { width: 80px; transform: translateX(0); } .main-wrapper { margin-left: 0; } body.sidebar-collapsed .main-wrapper { margin-left: 80px; } }
+        .btn-edit { padding: 0.5rem 1rem; background: #ffc107; color: #000; border: none; border-radius: 6px; font-size: 0.85rem; cursor: pointer; transition: all 0.2s ease; }
+        .btn-edit:hover { background: #e0a800; }
+        .action-buttons { display: flex; gap: 0.5rem; align-items: center; }
+        .modal { display: none; position: fixed; z-index: 2000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.5); overflow: auto; }
+        .modal-content { background-color: var(--card-bg); margin: 5% auto; padding: 2rem; border: 1px solid var(--border-color); border-radius: 12px; width: 90%; max-width: 600px; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3); }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; padding-bottom: 1rem; border-bottom: 2px solid var(--border-color); }
+        .modal-header h2 { margin: 0; color: var(--tertiary-color); font-size: 1.5rem; }
+        .close { color: #aaa; font-size: 28px; font-weight: bold; cursor: pointer; transition: color 0.2s ease; }
+        .close:hover { color: var(--tertiary-color); }
+        .form-group { margin-bottom: 1.25rem; }
+        .form-group label { display: block; margin-bottom: 0.5rem; color: var(--text-color); font-weight: 500; font-size: 0.95rem; }
+        .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 8px; font-size: 0.95rem; font-family: var(--font-family); transition: all 0.2s ease; box-sizing: border-box; }
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus { outline: none; border-color: var(--primary-color); box-shadow: 0 0 0 3px rgba(76, 138, 137, 0.1); }
+        .form-group textarea { resize: vertical; min-height: 100px; }
+        .form-actions { display: flex; justify-content: flex-end; gap: 1rem; margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid var(--border-color); }
+        .btn-cancel { padding: 0.75rem 1.5rem; background: #6c757d; color: #fff; border: none; border-radius: 8px; font-size: 0.95rem; cursor: pointer; transition: all 0.2s ease; }
+        .btn-cancel:hover { background: #5a6268; }
+        .btn-save { padding: 0.75rem 1.5rem; background: var(--primary-color); color: #fff; border: none; border-radius: 8px; font-size: 0.95rem; font-weight: 600; cursor: pointer; transition: all 0.2s ease; }
+        .btn-save:hover { background: #4ca8a6; }
+        @media (max-width: 768px) { .sidebar { width: 320px; transform: translateX(-100%); transition: transform 0.3s ease; } .sidebar.mobile-open { transform: translateX(0); } .sidebar.collapsed { width: 80px; transform: translateX(0); } .main-wrapper { margin-left: 0; } body.sidebar-collapsed .main-wrapper { margin-left: 80px; } .modal-content { width: 95%; margin: 10% auto; padding: 1.5rem; } .search-container { flex-direction: column; } .btn-add { width: 100%; justify-content: center; } }
     </style>
 </head>
 <body>
@@ -140,13 +163,17 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                     <span class="arrow">▶</span>
                 </div>
                 <div class="nav-submodules">
-                    <a href="#" class="nav-submodule" data-tooltip="Live View">
+                    <a href="live-view.php" class="nav-submodule" data-tooltip="Live View">
                         <span class="nav-submodule-icon"><i class="fas fa-circle" style="color: #ff4444;"></i></span>
                         <span class="nav-submodule-text">Live View</span>
                     </a>
-                    <a href="#" class="nav-submodule" data-tooltip="Playback">
+                    <a href="playback.php" class="nav-submodule" data-tooltip="Playback">
                         <span class="nav-submodule-icon"><i class="fas fa-play"></i></span>
                         <span class="nav-submodule-text">Playback</span>
+                    </a>
+                    <a href="camera-management.php" class="nav-submodule" data-tooltip="Camera Management">
+                        <span class="nav-submodule-icon"><i class="fas fa-camera"></i></span>
+                        <span class="nav-submodule-text">Camera Management</span>
                     </a>
                 </div>
             </div>
@@ -167,14 +194,14 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                     </a>
                 </div>
             </div>
-            <div class="nav-module active">
+            <div class="nav-module">
                 <div class="nav-module-header" onclick="toggleModule(this)" data-tooltip="Volunteer Registry and Scheduling">
                     <span class="nav-module-icon"><i class="fas fa-handshake"></i></span>
                     <span class="nav-module-header-text">Volunteer Registry and Scheduling</span>
                     <span class="arrow">▶</span>
                 </div>
                 <div class="nav-submodules">
-                    <a href="volunteer-list.php" class="nav-submodule active" data-tooltip="Volunteer List">
+                    <a href="volunteer-list.php" class="nav-submodule" data-tooltip="Volunteer List">
                         <span class="nav-submodule-icon"><i class="fas fa-user"></i></span>
                         <span class="nav-submodule-text">Volunteer List</span>
                     </a>
@@ -252,8 +279,13 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
         </header>
         <main class="content-area">
             <div class="page-content">
-                <div class="search-box">
-                    <input type="text" id="searchInput" placeholder="Search events by name, date, or type..." onkeyup="filterEvents()">
+                <div class="search-container">
+                    <div class="search-box">
+                        <input type="text" id="searchInput" placeholder="Search events by name, date, or type..." onkeyup="filterEvents()">
+                    </div>
+                    <button class="btn-add" onclick="openAddEventModal()">
+                        <i class="fas fa-plus"></i> Add Event
+                    </button>
                 </div>
                 <div class="table-container">
                     <table id="eventsTable">
@@ -263,34 +295,53 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                                 <th>Date</th>
                                 <th>Location</th>
                                 <th>Type</th>
+                                <th>Organizer</th>
                                 <th>Status</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody id="eventsTableBody">
-                            <tr>
+                            <tr data-event-id="1">
                                 <td>Community Safety Awareness</td>
-                                <td>2024-01-25</td>
-                                <td>Barangay Hall</td>
+                                <td>2025-01-25</td>
+                                <td>Barangay San Agustin Hall</td>
                                 <td>Awareness</td>
+                                <td>Maria Santos</td>
                                 <td><span class="status-badge status-resolved">Scheduled</span></td>
-                                <td><button class="btn-view" onclick="viewEvent('1')">View</button></td>
+                                <td>
+                                    <div class="action-buttons">
+                                        <button class="btn-view" onclick="viewEvent('1')">View</button>
+                                        <button class="btn-edit" onclick="editEvent('1')">Edit</button>
+                                    </div>
+                                </td>
                             </tr>
-                            <tr>
+                            <tr data-event-id="2">
                                 <td>Neighborhood Meeting</td>
-                                <td>2024-01-28</td>
-                                <td>Community Center</td>
+                                <td>2025-01-28</td>
+                                <td>Barangay San Agustin Multi-Purpose Hall</td>
                                 <td>Meeting</td>
+                                <td>Juan Dela Cruz</td>
                                 <td><span class="status-badge status-resolved">Scheduled</span></td>
-                                <td><button class="btn-view" onclick="viewEvent('2')">View</button></td>
+                                <td>
+                                    <div class="action-buttons">
+                                        <button class="btn-view" onclick="viewEvent('2')">View</button>
+                                        <button class="btn-edit" onclick="editEvent('2')">Edit</button>
+                                    </div>
+                                </td>
                             </tr>
-                            <tr>
+                            <tr data-event-id="3">
                                 <td>Safety Training Workshop</td>
-                                <td>2024-02-01</td>
-                                <td>School Gym</td>
+                                <td>2025-02-01</td>
+                                <td>Barangay San Agustin Community Center</td>
                                 <td>Training</td>
+                                <td>Roberto Reyes</td>
                                 <td><span class="status-badge status-pending">Pending</span></td>
-                                <td><button class="btn-view" onclick="viewEvent('3')">View</button></td>
+                                <td>
+                                    <div class="action-buttons">
+                                        <button class="btn-view" onclick="viewEvent('3')">View</button>
+                                        <button class="btn-edit" onclick="editEvent('3')">Edit</button>
+                                    </div>
+                                </td>
                             </tr>
                         </tbody>
                     </table>
@@ -298,6 +349,122 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             </div>
         </main>
     </div>
+
+    <!-- Add Event Modal -->
+    <div id="addEventModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Add Event</h2>
+                <span class="close" onclick="closeAddEventModal()">&times;</span>
+            </div>
+            <form id="addEventForm" onsubmit="saveEvent(event)">
+                <div class="form-group">
+                    <label for="eventName">Event Name *</label>
+                    <input type="text" id="eventName" name="eventName" required>
+                </div>
+                <div class="form-group">
+                    <label for="eventDate">Date *</label>
+                    <input type="date" id="eventDate" name="eventDate" required>
+                </div>
+                <div class="form-group">
+                    <label for="eventLocation">Location *</label>
+                    <input type="text" id="eventLocation" name="eventLocation" placeholder="Barangay San Agustin, Quezon City" required>
+                </div>
+                <div class="form-group">
+                    <label for="eventType">Type *</label>
+                    <select id="eventType" name="eventType" required>
+                        <option value="">Select Type</option>
+                        <option value="Awareness">Awareness</option>
+                        <option value="Meeting">Meeting</option>
+                        <option value="Training">Training</option>
+                        <option value="Workshop">Workshop</option>
+                        <option value="Seminar">Seminar</option>
+                        <option value="Community Event">Community Event</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="eventOrganizer">Organizer *</label>
+                    <input type="text" id="eventOrganizer" name="eventOrganizer" required>
+                </div>
+                <div class="form-group">
+                    <label for="eventStatus">Status *</label>
+                    <select id="eventStatus" name="eventStatus" required>
+                        <option value="Scheduled">Scheduled</option>
+                        <option value="Pending">Pending</option>
+                        <option value="Completed">Completed</option>
+                        <option value="Cancelled">Cancelled</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="eventDescription">Description</label>
+                    <textarea id="eventDescription" name="eventDescription" placeholder="Event description..."></textarea>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn-cancel" onclick="closeAddEventModal()">Cancel</button>
+                    <button type="submit" class="btn-save">Add Event</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Edit Event Modal -->
+    <div id="editEventModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Edit Event</h2>
+                <span class="close" onclick="closeEditEventModal()">&times;</span>
+            </div>
+            <form id="editEventForm" onsubmit="updateEvent(event)">
+                <input type="hidden" id="editEventId" name="id">
+                <div class="form-group">
+                    <label for="editEventName">Event Name *</label>
+                    <input type="text" id="editEventName" name="eventName" required>
+                </div>
+                <div class="form-group">
+                    <label for="editEventDate">Date *</label>
+                    <input type="date" id="editEventDate" name="eventDate" required>
+                </div>
+                <div class="form-group">
+                    <label for="editEventLocation">Location *</label>
+                    <input type="text" id="editEventLocation" name="eventLocation" placeholder="Barangay San Agustin, Quezon City" required>
+                </div>
+                <div class="form-group">
+                    <label for="editEventType">Type *</label>
+                    <select id="editEventType" name="eventType" required>
+                        <option value="">Select Type</option>
+                        <option value="Awareness">Awareness</option>
+                        <option value="Meeting">Meeting</option>
+                        <option value="Training">Training</option>
+                        <option value="Workshop">Workshop</option>
+                        <option value="Seminar">Seminar</option>
+                        <option value="Community Event">Community Event</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="editEventOrganizer">Organizer *</label>
+                    <input type="text" id="editEventOrganizer" name="eventOrganizer" required>
+                </div>
+                <div class="form-group">
+                    <label for="editEventStatus">Status *</label>
+                    <select id="editEventStatus" name="eventStatus" required>
+                        <option value="Scheduled">Scheduled</option>
+                        <option value="Pending">Pending</option>
+                        <option value="Completed">Completed</option>
+                        <option value="Cancelled">Cancelled</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="editEventDescription">Description</label>
+                    <textarea id="editEventDescription" name="eventDescription" placeholder="Event description..."></textarea>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn-cancel" onclick="closeEditEventModal()">Cancel</button>
+                    <button type="submit" class="btn-save">Update Event</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             const sidebar = document.getElementById('sidebar');
@@ -306,6 +473,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                 sidebar.classList.add('collapsed');
                 document.body.classList.add('sidebar-collapsed');
             }
+            initializeEventData();
         });
         function toggleSidebar() {
             const sidebar = document.getElementById('sidebar');
@@ -354,9 +522,162 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                 }
             }
         }
+        function openAddEventModal() {
+            document.getElementById('addEventModal').style.display = 'block';
+            document.getElementById('addEventForm').reset();
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('eventDate').setAttribute('min', today);
+        }
+
+        function closeAddEventModal() {
+            document.getElementById('addEventModal').style.display = 'none';
+        }
+
+        // Initialize event data
+        let eventData = {};
+        
+        function initializeEventData() {
+            const tableBody = document.getElementById('eventsTableBody');
+            const rows = tableBody.querySelectorAll('tr[data-event-id]');
+            
+            rows.forEach(row => {
+                const id = row.getAttribute('data-event-id');
+                const cells = row.querySelectorAll('td');
+                
+                eventData[id] = {
+                    id: id,
+                    name: cells[0].textContent.trim(),
+                    date: cells[1].textContent.trim(),
+                    location: cells[2].textContent.trim(),
+                    type: cells[3].textContent.trim(),
+                    organizer: cells[4].textContent.trim(),
+                    status: cells[5].querySelector('.status-badge').textContent.trim(),
+                    description: ''
+                };
+            });
+        }
+
+        function saveEvent(event) {
+            event.preventDefault();
+            
+            const formData = new FormData(event.target);
+            const id = Date.now().toString();
+            
+            const newEventData = {
+                id: id,
+                name: formData.get('eventName'),
+                date: formData.get('eventDate'),
+                location: formData.get('eventLocation'),
+                type: formData.get('eventType'),
+                organizer: formData.get('eventOrganizer'),
+                status: formData.get('eventStatus'),
+                description: formData.get('eventDescription') || ''
+            };
+            
+            eventData[id] = newEventData;
+            
+            const tableBody = document.getElementById('eventsTableBody');
+            const row = document.createElement('tr');
+            row.setAttribute('data-event-id', id);
+            
+            const statusClass = newEventData.status === 'Completed' ? 'status-resolved' : 
+                                newEventData.status === 'Pending' ? 'status-pending' : 
+                                'status-resolved';
+            
+            row.innerHTML = `
+                <td>${newEventData.name}</td>
+                <td>${newEventData.date}</td>
+                <td>${newEventData.location}</td>
+                <td>${newEventData.type}</td>
+                <td>${newEventData.organizer}</td>
+                <td><span class="status-badge ${statusClass}">${newEventData.status}</span></td>
+                <td>
+                    <div class="action-buttons">
+                        <button class="btn-view" onclick="viewEvent('${id}')">View</button>
+                        <button class="btn-edit" onclick="editEvent('${id}')">Edit</button>
+                    </div>
+                </td>
+            `;
+            
+            tableBody.appendChild(row);
+            closeAddEventModal();
+        }
+
+        function editEvent(id) {
+            const event = eventData[id];
+            if (!event) return;
+            
+            document.getElementById('editEventId').value = event.id;
+            document.getElementById('editEventName').value = event.name;
+            document.getElementById('editEventDate').value = event.date;
+            document.getElementById('editEventLocation').value = event.location;
+            document.getElementById('editEventType').value = event.type;
+            document.getElementById('editEventOrganizer').value = event.organizer;
+            document.getElementById('editEventStatus').value = event.status;
+            document.getElementById('editEventDescription').value = event.description || '';
+            
+            document.getElementById('editEventModal').style.display = 'block';
+        }
+
+        function closeEditEventModal() {
+            document.getElementById('editEventModal').style.display = 'none';
+        }
+
+        function updateEvent(event) {
+            event.preventDefault();
+            
+            const formData = new FormData(event.target);
+            const id = formData.get('id');
+            
+            const updatedEventData = {
+                id: id,
+                name: formData.get('eventName'),
+                date: formData.get('eventDate'),
+                location: formData.get('eventLocation'),
+                type: formData.get('eventType'),
+                organizer: formData.get('eventOrganizer'),
+                status: formData.get('eventStatus'),
+                description: formData.get('eventDescription') || ''
+            };
+            
+            eventData[id] = updatedEventData;
+            
+            const row = document.querySelector(`tr[data-event-id="${id}"]`);
+            if (row) {
+                const cells = row.querySelectorAll('td');
+                cells[0].textContent = updatedEventData.name;
+                cells[1].textContent = updatedEventData.date;
+                cells[2].textContent = updatedEventData.location;
+                cells[3].textContent = updatedEventData.type;
+                cells[4].textContent = updatedEventData.organizer;
+                
+                const statusClass = updatedEventData.status === 'Completed' ? 'status-resolved' : 
+                                    updatedEventData.status === 'Pending' ? 'status-pending' : 
+                                    'status-resolved';
+                
+                cells[5].innerHTML = `<span class="status-badge ${statusClass}">${updatedEventData.status}</span>`;
+            }
+            
+            closeEditEventModal();
+        }
+
         function viewEvent(id) {
             alert('Viewing event: ' + id + ' (Full details modal to be implemented)');
         }
+
+        // Close modal when clicking outside
+        window.onclick = function(event) {
+            const addModal = document.getElementById('addEventModal');
+            const editModal = document.getElementById('editEventModal');
+            
+            if (event.target === addModal) {
+                closeAddEventModal();
+            }
+            if (event.target === editModal) {
+                closeEditEventModal();
+            }
+        }
+
     </script>
 </body>
 </html>

@@ -686,6 +686,212 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             line-height: 1.6;
         }
         
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+        
+        .stat-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 1.5rem;
+            box-shadow: 0 2px 8px var(--shadow);
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        
+        .stat-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+        
+        .stat-card-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 1rem;
+        }
+        
+        .stat-card-icon {
+            width: 50px;
+            height: 50px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            color: #fff;
+        }
+        
+        .stat-card-icon.members { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+        .stat-card-icon.complaints { background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); }
+        .stat-card-icon.volunteers { background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); }
+        .stat-card-icon.events { background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); }
+        .stat-card-icon.tips { background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); }
+        .stat-card-icon.cameras { background: linear-gradient(135deg, #30cfd0 0%, #330867 100%); }
+        
+        .stat-card-value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--tertiary-color);
+            margin: 0;
+        }
+        
+        .stat-card-label {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            margin: 0.5rem 0 0 0;
+        }
+        
+        .stat-card-change {
+            font-size: 0.85rem;
+            margin-top: 0.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+        }
+        
+        .stat-card-change.positive {
+            color: #10b981;
+        }
+        
+        .stat-card-change.negative {
+            color: #ef4444;
+        }
+        
+        .dashboard-section {
+            margin-bottom: 2rem;
+        }
+        
+        .dashboard-section h3 {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--tertiary-color);
+            margin: 0 0 1rem 0;
+        }
+        
+        .activity-list {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 1.5rem;
+            box-shadow: 0 2px 8px var(--shadow);
+        }
+        
+        .activity-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 1rem;
+            padding: 1rem 0;
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        .activity-item:last-child {
+            border-bottom: none;
+        }
+        
+        .activity-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.1rem;
+            flex-shrink: 0;
+        }
+        
+        .activity-icon.complaint { background: #fee2e2; color: #dc2626; }
+        .activity-icon.tip { background: #fef3c7; color: #d97706; }
+        .activity-icon.event { background: #dbeafe; color: #2563eb; }
+        .activity-icon.patrol { background: #d1fae5; color: #059669; }
+        .activity-icon.member { background: #e9d5ff; color: #7c3aed; }
+        
+        .activity-content {
+            flex: 1;
+        }
+        
+        .activity-title {
+            font-weight: 600;
+            color: var(--text-color);
+            margin: 0 0 0.25rem 0;
+            font-size: 0.95rem;
+        }
+        
+        .activity-details {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            margin: 0;
+        }
+        
+        .activity-time {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            margin-top: 0.25rem;
+        }
+        
+        .quick-links {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 1rem;
+        }
+        
+        @media (max-width: 1200px) {
+            .quick-links {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+        
+        @media (max-width: 768px) {
+            .quick-links {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+        
+        .quick-link-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 1.5rem;
+            text-decoration: none;
+            color: var(--text-color);
+            transition: all 0.3s ease;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            box-shadow: 0 2px 8px var(--shadow);
+        }
+        
+        .quick-link-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            border-color: var(--primary-color);
+        }
+        
+        .quick-link-icon {
+            width: 60px;
+            height: 60px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.75rem;
+            margin-bottom: 1rem;
+            background: linear-gradient(135deg, var(--primary-color) 0%, #4ca8a6 100%);
+            color: #fff;
+        }
+        
+        .quick-link-title {
+            font-weight: 600;
+            color: var(--tertiary-color);
+            margin: 0;
+            font-size: 1rem;
+        }
+        
         @media (max-width: 768px) {
             .sidebar {
                 width: 320px;
@@ -748,13 +954,17 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                     <span class="arrow">▶</span>
                 </div>
                 <div class="nav-submodules">
-                    <a href="#" class="nav-submodule" data-tooltip="Live View">
+                    <a href="live-view.php" class="nav-submodule" data-tooltip="Live View">
                         <span class="nav-submodule-icon"><i class="fas fa-circle" style="color: #ff4444;"></i></span>
                         <span class="nav-submodule-text">Live View</span>
                     </a>
-                    <a href="#" class="nav-submodule" data-tooltip="Playback">
+                    <a href="playback.php" class="nav-submodule" data-tooltip="Playback">
                         <span class="nav-submodule-icon"><i class="fas fa-play"></i></span>
                         <span class="nav-submodule-text">Playback</span>
+                    </a>
+                    <a href="camera-management.php" class="nav-submodule" data-tooltip="Camera Management">
+                        <span class="nav-submodule-icon"><i class="fas fa-camera"></i></span>
+                        <span class="nav-submodule-text">Camera Management</span>
                     </a>
                 </div>
             </div>
@@ -868,8 +1078,204 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
         
         <main class="content-area">
             <div class="page-content">
-                <h2>Welcome to Alertara QC Dashboard</h2>
-                <p>Select a module from the sidebar to get started.</p>
+                <h2>Overview</h2>
+                <p style="margin-bottom: 2rem; color: var(--text-secondary);">Welcome back! Here's what's happening in Barangay San Agustin, Quezon City.</p>
+                
+                <!-- Statistics Cards -->
+                <div class="dashboard-grid">
+                    <div class="stat-card" onclick="window.location.href='member-list.php'">
+                        <div class="stat-card-header">
+                            <div class="stat-card-icon members">
+                                <i class="fas fa-users"></i>
+                            </div>
+                        </div>
+                        <h3 class="stat-card-value" id="totalMembers">156</h3>
+                        <p class="stat-card-label">Total Members</p>
+                        <div class="stat-card-change positive">
+                            <i class="fas fa-arrow-up"></i>
+                            <span>+12 this month</span>
+                        </div>
+                    </div>
+                    
+                    <div class="stat-card" onclick="window.location.href='track-complaint.php'">
+                        <div class="stat-card-header">
+                            <div class="stat-card-icon complaints">
+                                <i class="fas fa-file-alt"></i>
+                            </div>
+                        </div>
+                        <h3 class="stat-card-value" id="totalComplaints">42</h3>
+                        <p class="stat-card-label">Active Complaints</p>
+                        <div class="stat-card-change positive">
+                            <i class="fas fa-arrow-down"></i>
+                            <span>8 resolved this week</span>
+                        </div>
+                    </div>
+                    
+                    <div class="stat-card" onclick="window.location.href='volunteer-list.php'">
+                        <div class="stat-card-header">
+                            <div class="stat-card-icon volunteers">
+                                <i class="fas fa-handshake"></i>
+                            </div>
+                        </div>
+                        <h3 class="stat-card-value" id="totalVolunteers">89</h3>
+                        <p class="stat-card-label">Active Volunteers</p>
+                        <div class="stat-card-change positive">
+                            <i class="fas fa-arrow-up"></i>
+                            <span>+5 this month</span>
+                        </div>
+                    </div>
+                    
+                    <div class="stat-card" onclick="window.location.href='event-list.php'">
+                        <div class="stat-card-header">
+                            <div class="stat-card-icon events">
+                                <i class="fas fa-bullhorn"></i>
+                            </div>
+                        </div>
+                        <h3 class="stat-card-value" id="totalEvents">18</h3>
+                        <p class="stat-card-label">Upcoming Events</p>
+                        <div class="stat-card-change positive">
+                            <i class="fas fa-calendar"></i>
+                            <span>3 this week</span>
+                        </div>
+                    </div>
+                    
+                    <div class="stat-card" onclick="window.location.href='review-tip.php'">
+                        <div class="stat-card-header">
+                            <div class="stat-card-icon tips">
+                                <i class="fas fa-comments"></i>
+                            </div>
+                        </div>
+                        <h3 class="stat-card-value" id="totalTips">24</h3>
+                        <p class="stat-card-label">Pending Tips</p>
+                        <div class="stat-card-change positive">
+                            <i class="fas fa-arrow-up"></i>
+                            <span>+6 this week</span>
+                        </div>
+                    </div>
+                    
+                    <div class="stat-card" onclick="window.location.href='camera-management.php'">
+                        <div class="stat-card-header">
+                            <div class="stat-card-icon cameras">
+                                <i class="fas fa-video"></i>
+                            </div>
+                        </div>
+                        <h3 class="stat-card-value" id="totalCameras">3</h3>
+                        <p class="stat-card-label">Active Cameras</p>
+                        <div class="stat-card-change positive">
+                            <i class="fas fa-check-circle"></i>
+                            <span>All online</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Recent Activity -->
+                <div class="dashboard-section">
+                    <h3>Recent Activity</h3>
+                    <div class="activity-list">
+                        <div class="activity-item">
+                            <div class="activity-icon complaint">
+                                <i class="fas fa-file-alt"></i>
+                            </div>
+                            <div class="activity-content">
+                                <p class="activity-title">New Complaint Submitted</p>
+                                <p class="activity-details">Complaint #COMP-2025-042 - Noise disturbance reported at Susano Road</p>
+                                <p class="activity-time">2 hours ago</p>
+                            </div>
+                        </div>
+                        
+                        <div class="activity-item">
+                            <div class="activity-icon tip">
+                                <i class="fas fa-comments"></i>
+                            </div>
+                            <div class="activity-content">
+                                <p class="activity-title">New Tip Received</p>
+                                <p class="activity-details">Tip #TIP-2025-024 - Suspicious activity at Paraiso St.</p>
+                                <p class="activity-time">4 hours ago</p>
+                            </div>
+                        </div>
+                        
+                        <div class="activity-item">
+                            <div class="activity-icon event">
+                                <i class="fas fa-bullhorn"></i>
+                            </div>
+                            <div class="activity-content">
+                                <p class="activity-title">Community Meeting Scheduled</p>
+                                <p class="activity-details">Barangay Assembly - January 20, 2025 at Community Center</p>
+                                <p class="activity-time">1 day ago</p>
+                            </div>
+                        </div>
+                        
+                        <div class="activity-item">
+                            <div class="activity-icon patrol">
+                                <i class="fas fa-walking"></i>
+                            </div>
+                            <div class="activity-content">
+                                <p class="activity-title">Patrol Completed</p>
+                                <p class="activity-details">Officer Rizal completed patrol route - Susano Road to Clemente St.</p>
+                                <p class="activity-time">1 day ago</p>
+                            </div>
+                        </div>
+                        
+                        <div class="activity-item">
+                            <div class="activity-icon member">
+                                <i class="fas fa-user-plus"></i>
+                            </div>
+                            <div class="activity-content">
+                                <p class="activity-title">New Member Registered</p>
+                                <p class="activity-details">Maria Santos joined the Neighborhood Watch program</p>
+                                <p class="activity-time">2 days ago</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Quick Links -->
+                <div class="dashboard-section">
+                    <h3>Quick Actions</h3>
+                    <div class="quick-links">
+                        <a href="submit-complaint.php" class="quick-link-card">
+                            <div class="quick-link-icon">
+                                <i class="fas fa-edit"></i>
+                            </div>
+                            <h4 class="quick-link-title">Submit Complaint</h4>
+                        </a>
+                        
+                        <a href="submit-tip.php" class="quick-link-card">
+                            <div class="quick-link-icon">
+                                <i class="fas fa-envelope"></i>
+                            </div>
+                            <h4 class="quick-link-title">Submit Tip</h4>
+                        </a>
+                        
+                        <a href="live-view.php" class="quick-link-card">
+                            <div class="quick-link-icon">
+                                <i class="fas fa-video"></i>
+                            </div>
+                            <h4 class="quick-link-title">Live CCTV View</h4>
+                        </a>
+                        
+                        <a href="patrol-schedule.php" class="quick-link-card">
+                            <div class="quick-link-icon">
+                                <i class="fas fa-calendar-alt"></i>
+                            </div>
+                            <h4 class="quick-link-title">Schedule Patrol</h4>
+                        </a>
+                        
+                        <a href="event-list.php" class="quick-link-card">
+                            <div class="quick-link-icon">
+                                <i class="fas fa-list"></i>
+                            </div>
+                            <h4 class="quick-link-title">View Events</h4>
+                        </a>
+                        
+                        <a href="activity-logs.php" class="quick-link-card">
+                            <div class="quick-link-icon">
+                                <i class="fas fa-chart-bar"></i>
+                            </div>
+                            <h4 class="quick-link-title">Activity Logs</h4>
+                        </a>
+                    </div>
+                </div>
             </div>
         </main>
     </div>

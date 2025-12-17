@@ -87,10 +87,13 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
         .content-burger-btn span::after { bottom: -7px; }
         .page-title { font-size: 2rem; font-weight: 700; color: var(--tertiary-color); margin: 0; }
         .page-content { background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 12px; padding: 2rem; box-shadow: 0 2px 8px var(--shadow); margin-top: 1.5rem; }
-        .search-box { margin-bottom: 1.5rem; position: relative; }
+        .toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; gap: 1rem; flex-wrap: wrap; }
+        .search-box { flex: 1; min-width: 250px; position: relative; }
         .search-box input { width: 100%; padding: 0.75rem 1rem 0.75rem 2.5rem; border: 1px solid var(--border-color); border-radius: 8px; font-size: 0.95rem; transition: all 0.2s ease; }
         .search-box input:focus { outline: none; border-color: var(--primary-color); box-shadow: 0 0 0 3px rgba(76, 138, 137, 0.1); }
         .search-box::before { content: "🔍"; position: absolute; left: 0.75rem; top: 50%; transform: translateY(-50%); font-size: 1rem; }
+        .btn-add { padding: 0.75rem 1.5rem; background: var(--primary-color); color: #fff; border: none; border-radius: 8px; font-size: 0.95rem; font-weight: 500; cursor: pointer; transition: all 0.2s ease; display: flex; align-items: center; gap: 0.5rem; }
+        .btn-add:hover { background: #4ca8a6; transform: translateY(-1px); box-shadow: 0 4px 8px rgba(76, 138, 137, 0.2); }
         .table-container { overflow-x: auto; border-radius: 8px; border: 1px solid var(--border-color); }
         table { width: 100%; border-collapse: collapse; background: var(--card-bg); }
         thead { background: var(--tertiary-color); color: #fff; }
@@ -101,9 +104,40 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
         .status-badge { padding: 0.25rem 0.75rem; border-radius: 12px; font-size: 0.85rem; font-weight: 500; display: inline-block; }
         .status-pending { background: #fff3cd; color: #856404; }
         .status-resolved { background: #d1e7dd; color: #0f5132; }
-        .btn-view { padding: 0.5rem 1rem; background: var(--primary-color); color: #fff; border: none; border-radius: 6px; font-size: 0.85rem; cursor: pointer; transition: all 0.2s ease; }
+        .action-buttons { display: flex; gap: 0.5rem; }
+        .btn-view, .btn-edit, .btn-delete { padding: 0.5rem 1rem; background: var(--primary-color); color: #fff; border: none; border-radius: 6px; font-size: 0.85rem; cursor: pointer; transition: all 0.2s ease; }
         .btn-view:hover { background: #4ca8a6; }
-        @media (max-width: 768px) { .sidebar { width: 320px; transform: translateX(-100%); transition: transform 0.3s ease; } .sidebar.mobile-open { transform: translateX(0); } .sidebar.collapsed { width: 80px; transform: translateX(0); } .main-wrapper { margin-left: 0; } body.sidebar-collapsed .main-wrapper { margin-left: 80px; } }
+        .btn-edit { background: #ff9800; }
+        .btn-edit:hover { background: #f57c00; }
+        .btn-delete { background: #dc3545; }
+        .btn-delete:hover { background: #c82333; }
+        /* Modal Styles */
+        .modal { display: none; position: fixed; z-index: 2000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.5); backdrop-filter: blur(4px); }
+        .modal.active { display: flex; align-items: center; justify-content: center; }
+        .modal-content { background: var(--card-bg); border-radius: 12px; padding: 2rem; max-width: 600px; width: 90%; max-height: 90vh; overflow-y: auto; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2); }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; padding-bottom: 1rem; border-bottom: 1px solid var(--border-color); }
+        .modal-header h2 { margin: 0; color: var(--tertiary-color); font-size: 1.5rem; }
+        .close-modal { background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--text-secondary); transition: color 0.2s ease; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; border-radius: 6px; }
+        .close-modal:hover { color: var(--text-color); background: rgba(0, 0, 0, 0.05); }
+        .form-group { margin-bottom: 1.25rem; }
+        .form-group label { display: block; margin-bottom: 0.5rem; color: var(--text-color); font-weight: 500; font-size: 0.9rem; }
+        .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 8px; font-size: 0.95rem; font-family: var(--font-family); transition: all 0.2s ease; box-sizing: border-box; }
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus { outline: none; border-color: var(--primary-color); box-shadow: 0 0 0 3px rgba(76, 138, 137, 0.1); }
+        .form-group textarea { resize: vertical; min-height: 80px; }
+        .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+        .form-actions { display: flex; gap: 1rem; justify-content: flex-end; margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid var(--border-color); }
+        .btn-cancel, .btn-submit { padding: 0.75rem 1.5rem; border: none; border-radius: 8px; font-size: 0.95rem; font-weight: 500; cursor: pointer; transition: all 0.2s ease; }
+        .btn-cancel { background: #e5e5e5; color: var(--text-color); }
+        .btn-cancel:hover { background: #d5d5d5; }
+        .btn-submit { background: var(--primary-color); color: #fff; }
+        .btn-submit:hover { background: #4ca8a6; }
+        .complaint-details { display: flex; flex-direction: column; gap: 1.25rem; }
+        .detail-row { display: flex; flex-direction: column; gap: 0.5rem; }
+        .detail-label { font-weight: 600; color: var(--text-color); font-size: 0.9rem; }
+        .detail-value { color: var(--text-secondary); font-size: 0.95rem; line-height: 1.6; }
+        .detail-row.inline { flex-direction: row; align-items: center; gap: 1rem; }
+        .detail-row.inline .detail-label { min-width: 120px; }
+        @media (max-width: 768px) { .sidebar { width: 320px; transform: translateX(-100%); transition: transform 0.3s ease; } .sidebar.mobile-open { transform: translateX(0); } .sidebar.collapsed { width: 80px; transform: translateX(0); } .main-wrapper { margin-left: 0; } body.sidebar-collapsed .main-wrapper { margin-left: 80px; } .toolbar { flex-direction: column; } .search-box { width: 100%; } .form-row { grid-template-columns: 1fr; } }
     </style>
 </head>
 <body>
@@ -140,13 +174,17 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                     <span class="arrow">▶</span>
                 </div>
                 <div class="nav-submodules">
-                    <a href="#" class="nav-submodule" data-tooltip="Live View">
+                    <a href="live-view.php" class="nav-submodule" data-tooltip="Live View">
                         <span class="nav-submodule-icon"><i class="fas fa-circle" style="color: #ff4444;"></i></span>
                         <span class="nav-submodule-text">Live View</span>
                     </a>
-                    <a href="#" class="nav-submodule" data-tooltip="Playback">
+                    <a href="playback.php" class="nav-submodule" data-tooltip="Playback">
                         <span class="nav-submodule-icon"><i class="fas fa-play"></i></span>
                         <span class="nav-submodule-text">Playback</span>
+                    </a>
+                    <a href="camera-management.php" class="nav-submodule" data-tooltip="Camera Management">
+                        <span class="nav-submodule-icon"><i class="fas fa-camera"></i></span>
+                        <span class="nav-submodule-text">Camera Management</span>
                     </a>
                 </div>
             </div>
@@ -252,8 +290,14 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
         </header>
         <main class="content-area">
             <div class="page-content">
+                <div class="toolbar">
                 <div class="search-box">
-                    <input type="text" id="searchInput" placeholder="Search schedules by volunteer name, date, or activity..." onkeyup="filterSchedules()">
+                        <input type="text" id="searchInput" placeholder="Search schedules by volunteer name, date, or activity..." onkeyup="filterSchedules()">
+                    </div>
+                    <button class="btn-add" onclick="openAssignScheduleModal()">
+                        <span>+</span>
+                        <span>Assign Schedule</span>
+                    </button>
                 </div>
                 <div class="table-container">
                     <table id="schedulesTable">
@@ -263,34 +307,56 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                                 <th>Date</th>
                                 <th>Time</th>
                                 <th>Activity</th>
+                                <th>Location</th>
                                 <th>Status</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody id="schedulesTableBody">
-                            <tr>
-                                <td>John Doe</td>
-                                <td>2024-01-20</td>
-                                <td>09:00 - 17:00</td>
-                                <td>Community Patrol</td>
+                            <tr data-schedule-id="1">
+                                <td>Maria Rizal</td>
+                                <td>2025-01-20</td>
+                                <td>09:00 - 12:00</td>
+                                <td>First Aid Training</td>
+                                <td>Barangay San Agustin Hall, Quezon City</td>
                                 <td><span class="status-badge status-resolved">Scheduled</span></td>
-                                <td><button class="btn-view" onclick="viewSchedule('1')">View</button></td>
+                                <td>
+                                    <div class="action-buttons">
+                                        <button class="btn-view" onclick="viewSchedule('1')">View</button>
+                                        <button class="btn-edit" onclick="editSchedule('1')">Edit</button>
+                                        <button class="btn-delete" onclick="deleteSchedule('1')">Delete</button>
+                                    </div>
+                                </td>
                             </tr>
-                            <tr>
-                                <td>Jane Smith</td>
-                                <td>2024-01-21</td>
+                            <tr data-schedule-id="2">
+                                <td>Juan Aquino</td>
+                                <td>2025-01-21</td>
                                 <td>14:00 - 18:00</td>
-                                <td>Event Setup</td>
+                                <td>Community Event Setup</td>
+                                <td>Barangay San Agustin Multi-Purpose Hall, Quezon City</td>
                                 <td><span class="status-badge status-resolved">Scheduled</span></td>
-                                <td><button class="btn-view" onclick="viewSchedule('2')">View</button></td>
+                                <td>
+                                    <div class="action-buttons">
+                                        <button class="btn-view" onclick="viewSchedule('2')">View</button>
+                                        <button class="btn-edit" onclick="editSchedule('2')">Edit</button>
+                                        <button class="btn-delete" onclick="deleteSchedule('2')">Delete</button>
+                                    </div>
+                                </td>
                             </tr>
-                            <tr>
-                                <td>Mike Johnson</td>
-                                <td>2024-01-22</td>
-                                <td>08:00 - 12:00</td>
-                                <td>Security Duty</td>
+                            <tr data-schedule-id="3">
+                                <td>Roberto Magsaysay</td>
+                                <td>2025-01-22</td>
+                                <td>10:00 - 14:00</td>
+                                <td>Community Outreach</td>
+                                <td>Rizal Street, Barangay San Agustin, Quezon City</td>
                                 <td><span class="status-badge status-pending">Pending</span></td>
-                                <td><button class="btn-view" onclick="viewSchedule('3')">View</button></td>
+                                <td>
+                                    <div class="action-buttons">
+                                        <button class="btn-view" onclick="viewSchedule('3')">View</button>
+                                        <button class="btn-edit" onclick="editSchedule('3')">Edit</button>
+                                        <button class="btn-delete" onclick="deleteSchedule('3')">Delete</button>
+                                    </div>
+                                </td>
                             </tr>
                         </tbody>
                     </table>
@@ -298,6 +364,160 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             </div>
         </main>
     </div>
+    
+    <!-- Assign Schedule Modal -->
+    <div id="assignScheduleModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Assign Schedule</h2>
+                <button class="close-modal" onclick="closeAssignScheduleModal()">&times;</button>
+            </div>
+            <form id="assignScheduleForm" onsubmit="saveSchedule(event)">
+                <div class="form-group">
+                    <label for="scheduleVolunteer">Volunteer *</label>
+                    <select id="scheduleVolunteer" name="volunteer" required>
+                        <option value="">Select Volunteer</option>
+                        <option value="Maria Rizal">Maria Rizal</option>
+                        <option value="Juan Aquino">Juan Aquino</option>
+                        <option value="Roberto Magsaysay">Roberto Magsaysay</option>
+                    </select>
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="scheduleDate">Date *</label>
+                        <input type="date" id="scheduleDate" name="date" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="scheduleTime">Time *</label>
+                        <input type="time" id="scheduleTime" name="time" required>
+                    </div>
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="scheduleEndTime">End Time *</label>
+                        <input type="time" id="scheduleEndTime" name="endTime" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="scheduleStatus">Status *</label>
+                        <select id="scheduleStatus" name="status" required>
+                            <option value="">Select Status</option>
+                            <option value="Scheduled">Scheduled</option>
+                            <option value="Pending">Pending</option>
+                            <option value="Completed">Completed</option>
+                            <option value="Cancelled">Cancelled</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="scheduleActivity">Activity *</label>
+                    <input type="text" id="scheduleActivity" name="activity" required placeholder="e.g., First Aid Training, Community Event Setup">
+                </div>
+                
+                <div class="form-group">
+                    <label for="scheduleLocation">Location *</label>
+                    <input type="text" id="scheduleLocation" name="location" required placeholder="e.g., Barangay San Agustin Hall, Quezon City">
+                </div>
+                
+                <div class="form-group">
+                    <label for="scheduleNotes">Notes</label>
+                    <textarea id="scheduleNotes" name="notes" placeholder="Additional information about the schedule..."></textarea>
+                </div>
+                
+                <div class="form-actions">
+                    <button type="button" class="btn-cancel" onclick="closeAssignScheduleModal()">Cancel</button>
+                    <button type="submit" class="btn-submit">Assign Schedule</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Edit Schedule Modal -->
+    <div id="editScheduleModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Edit Schedule</h2>
+                <button class="close-modal" onclick="closeEditScheduleModal()">&times;</button>
+            </div>
+            <form id="editScheduleForm" onsubmit="updateSchedule(event)">
+                <input type="hidden" id="editScheduleId" name="scheduleId">
+                
+                <div class="form-group">
+                    <label for="editScheduleVolunteer">Volunteer *</label>
+                    <select id="editScheduleVolunteer" name="volunteer" required>
+                        <option value="">Select Volunteer</option>
+                        <option value="Maria Rizal">Maria Rizal</option>
+                        <option value="Juan Aquino">Juan Aquino</option>
+                        <option value="Roberto Magsaysay">Roberto Magsaysay</option>
+                    </select>
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="editScheduleDate">Date *</label>
+                        <input type="date" id="editScheduleDate" name="date" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="editScheduleTime">Time *</label>
+                        <input type="time" id="editScheduleTime" name="time" required>
+                    </div>
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="editScheduleEndTime">End Time *</label>
+                        <input type="time" id="editScheduleEndTime" name="endTime" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="editScheduleStatus">Status *</label>
+                        <select id="editScheduleStatus" name="status" required>
+                            <option value="">Select Status</option>
+                            <option value="Scheduled">Scheduled</option>
+                            <option value="Pending">Pending</option>
+                            <option value="Completed">Completed</option>
+                            <option value="Cancelled">Cancelled</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="editScheduleActivity">Activity *</label>
+                    <input type="text" id="editScheduleActivity" name="activity" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="editScheduleLocation">Location *</label>
+                    <input type="text" id="editScheduleLocation" name="location" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="editScheduleNotes">Notes</label>
+                    <textarea id="editScheduleNotes" name="notes"></textarea>
+                </div>
+                
+                <div class="form-actions">
+                    <button type="button" class="btn-cancel" onclick="closeEditScheduleModal()">Cancel</button>
+                    <button type="submit" class="btn-submit">Update Schedule</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- View Schedule Modal -->
+    <div id="viewScheduleModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Schedule Details</h2>
+                <button class="close-modal" onclick="closeViewScheduleModal()">&times;</button>
+            </div>
+            <div id="scheduleDetails" class="complaint-details">
+                <!-- Details will be populated by JavaScript -->
+            </div>
+        </div>
+    </div>
+    
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             const sidebar = document.getElementById('sidebar');
@@ -354,8 +574,306 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                 }
             }
         }
+        // Schedule data storage
+        let scheduleData = {};
+        let nextScheduleId = 4;
+        
+        // Initialize schedule data from existing table rows
+        function initializeScheduleData() {
+            const rows = document.querySelectorAll('#schedulesTableBody tr[data-schedule-id]');
+            rows.forEach((row) => {
+                const id = row.getAttribute('data-schedule-id');
+                const cells = row.querySelectorAll('td');
+                
+                scheduleData[id] = {
+                    id: id,
+                    volunteer: cells[0].textContent.trim(),
+                    date: cells[1].textContent.trim(),
+                    time: cells[2].textContent.trim(),
+                    activity: cells[3].textContent.trim(),
+                    location: cells[4].textContent.trim(),
+                    status: cells[5].querySelector('.status-badge').textContent.trim(),
+                    notes: id === '1' ? 'First aid training session for community members. Materials and equipment prepared.' : id === '2' ? 'Setting up for community outreach event. Tables, chairs, and decorations needed.' : 'Community outreach program. Distribution of information materials.'
+                };
+            });
+        }
+        
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeScheduleData();
+        });
+        
+        function openAssignScheduleModal() {
+            document.getElementById('assignScheduleModal').classList.add('active');
+        }
+        
+        function closeAssignScheduleModal() {
+            document.getElementById('assignScheduleModal').classList.remove('active');
+            document.getElementById('assignScheduleForm').reset();
+        }
+        
+        function saveSchedule(event) {
+            event.preventDefault();
+            
+            const volunteer = document.getElementById('scheduleVolunteer').value;
+            const date = document.getElementById('scheduleDate').value;
+            const time = document.getElementById('scheduleTime').value;
+            const endTime = document.getElementById('scheduleEndTime').value;
+            const activity = document.getElementById('scheduleActivity').value.trim();
+            const location = document.getElementById('scheduleLocation').value.trim();
+            const status = document.getElementById('scheduleStatus').value;
+            const notes = document.getElementById('scheduleNotes').value.trim();
+            
+            const scheduleId = nextScheduleId.toString();
+            const timeRange = time + ' - ' + endTime;
+            
+            // Store schedule data
+            scheduleData[scheduleId] = {
+                id: scheduleId,
+                volunteer: volunteer,
+                date: date,
+                time: timeRange,
+                activity: activity,
+                location: location,
+                status: status,
+                notes: notes
+            };
+            
+            // Add new row to table
+            addScheduleRow(scheduleId);
+            nextScheduleId++;
+            
+            alert('Schedule assigned successfully!');
+            closeAssignScheduleModal();
+        }
+        
+        function addScheduleRow(id) {
+            const schedule = scheduleData[id];
+            const tbody = document.getElementById('schedulesTableBody');
+            
+            const row = document.createElement('tr');
+            row.setAttribute('data-schedule-id', id);
+            
+            // Determine status badge class
+            let statusClass = 'status-resolved';
+            if (schedule.status === 'Pending') {
+                statusClass = 'status-pending';
+            } else if (schedule.status === 'Cancelled') {
+                statusClass = 'status-pending';
+            }
+            
+            row.innerHTML = `
+                <td>${schedule.volunteer}</td>
+                <td>${schedule.date}</td>
+                <td>${schedule.time}</td>
+                <td>${schedule.activity}</td>
+                <td>${schedule.location}</td>
+                <td><span class="status-badge ${statusClass}">${schedule.status}</span></td>
+                <td>
+                    <div class="action-buttons">
+                        <button class="btn-view" onclick="viewSchedule('${id}')">View</button>
+                        <button class="btn-edit" onclick="editSchedule('${id}')">Edit</button>
+                        <button class="btn-delete" onclick="deleteSchedule('${id}')">Delete</button>
+                    </div>
+                </td>
+            `;
+            
+            tbody.appendChild(row);
+        }
+        
         function viewSchedule(id) {
-            alert('Viewing schedule: ' + id + ' (Full details modal to be implemented)');
+            const schedule = scheduleData[id];
+            if (!schedule) {
+                alert('Schedule not found!');
+                return;
+            }
+            
+            const modal = document.getElementById('viewScheduleModal');
+            const detailsContainer = document.getElementById('scheduleDetails');
+            
+            // Determine status badge class
+            let statusClass = 'status-resolved';
+            if (schedule.status === 'Pending') {
+                statusClass = 'status-pending';
+            } else if (schedule.status === 'Cancelled') {
+                statusClass = 'status-pending';
+            }
+            
+            let detailsHTML = `
+                <div class="detail-row inline">
+                    <span class="detail-label">Volunteer:</span>
+                    <span class="detail-value"><strong>${schedule.volunteer}</strong></span>
+                </div>
+                
+                <div class="detail-row inline">
+                    <span class="detail-label">Status:</span>
+                    <span class="status-badge ${statusClass}">${schedule.status}</span>
+                </div>
+                
+                <div class="detail-row">
+                    <span class="detail-label">Date:</span>
+                    <span class="detail-value">${schedule.date}</span>
+                </div>
+                
+                <div class="detail-row">
+                    <span class="detail-label">Time:</span>
+                    <span class="detail-value">${schedule.time}</span>
+                </div>
+                
+                <div class="detail-row">
+                    <span class="detail-label">Activity:</span>
+                    <span class="detail-value">${schedule.activity}</span>
+                </div>
+                
+                <div class="detail-row">
+                    <span class="detail-label">Location:</span>
+                    <span class="detail-value">${schedule.location}</span>
+                </div>
+                
+                ${schedule.notes ? `
+                <div class="detail-row">
+                    <span class="detail-label">Notes:</span>
+                    <span class="detail-value">${schedule.notes}</span>
+                </div>
+                ` : ''}
+            `;
+            
+            detailsContainer.innerHTML = detailsHTML;
+            modal.classList.add('active');
+        }
+        
+        function closeViewScheduleModal() {
+            document.getElementById('viewScheduleModal').classList.remove('active');
+        }
+        
+        function editSchedule(id) {
+            const schedule = scheduleData[id];
+            if (!schedule) {
+                alert('Schedule not found!');
+                return;
+            }
+            
+            // Parse time range
+            const timeParts = schedule.time.split(' - ');
+            const startTime = timeParts[0];
+            const endTime = timeParts[1] || '';
+            
+            // Populate form fields
+            document.getElementById('editScheduleId').value = schedule.id;
+            document.getElementById('editScheduleVolunteer').value = schedule.volunteer;
+            document.getElementById('editScheduleDate').value = schedule.date;
+            document.getElementById('editScheduleTime').value = startTime;
+            document.getElementById('editScheduleEndTime').value = endTime;
+            document.getElementById('editScheduleActivity').value = schedule.activity;
+            document.getElementById('editScheduleLocation').value = schedule.location;
+            document.getElementById('editScheduleStatus').value = schedule.status;
+            document.getElementById('editScheduleNotes').value = schedule.notes || '';
+            
+            // Open modal
+            document.getElementById('editScheduleModal').classList.add('active');
+        }
+        
+        function closeEditScheduleModal() {
+            document.getElementById('editScheduleModal').classList.remove('active');
+            document.getElementById('editScheduleForm').reset();
+        }
+        
+        function updateSchedule(event) {
+            event.preventDefault();
+            
+            const scheduleId = document.getElementById('editScheduleId').value;
+            const schedule = scheduleData[scheduleId];
+            
+            if (!schedule) {
+                alert('Schedule not found!');
+                return;
+            }
+            
+            // Update schedule data
+            schedule.volunteer = document.getElementById('editScheduleVolunteer').value;
+            schedule.date = document.getElementById('editScheduleDate').value;
+            const startTime = document.getElementById('editScheduleTime').value;
+            const endTime = document.getElementById('editScheduleEndTime').value;
+            schedule.time = startTime + ' - ' + endTime;
+            schedule.activity = document.getElementById('editScheduleActivity').value.trim();
+            schedule.location = document.getElementById('editScheduleLocation').value.trim();
+            schedule.status = document.getElementById('editScheduleStatus').value;
+            schedule.notes = document.getElementById('editScheduleNotes').value.trim();
+            
+            // Update table row
+            updateScheduleRow(scheduleId);
+            
+            alert('Schedule updated successfully!');
+            closeEditScheduleModal();
+        }
+        
+        function updateScheduleRow(id) {
+            const schedule = scheduleData[id];
+            const row = document.querySelector(`tr[data-schedule-id="${id}"]`);
+            
+            if (!row) return;
+            
+            const cells = row.querySelectorAll('td');
+            
+            // Update volunteer
+            cells[0].textContent = schedule.volunteer;
+            
+            // Update date
+            cells[1].textContent = schedule.date;
+            
+            // Update time
+            cells[2].textContent = schedule.time;
+            
+            // Update activity
+            cells[3].textContent = schedule.activity;
+            
+            // Update location
+            cells[4].textContent = schedule.location;
+            
+            // Update status badge
+            const statusBadge = cells[5].querySelector('.status-badge');
+            statusBadge.textContent = schedule.status;
+            
+            // Determine status badge class
+            let statusClass = 'status-resolved';
+            if (schedule.status === 'Pending') {
+                statusClass = 'status-pending';
+            } else if (schedule.status === 'Cancelled') {
+                statusClass = 'status-pending';
+            }
+            statusBadge.className = `status-badge ${statusClass}`;
+        }
+        
+        function deleteSchedule(id) {
+            if (confirm('Are you sure you want to delete this schedule? This action cannot be undone.')) {
+                // Remove from data
+                delete scheduleData[id];
+                
+                // Remove row from table
+                const row = document.querySelector(`tr[data-schedule-id="${id}"]`);
+                if (row) {
+                    row.remove();
+                }
+                
+                alert('Schedule deleted successfully!');
+            }
+        }
+        
+        // Close modal when clicking outside
+        window.onclick = function(event) {
+            const assignModal = document.getElementById('assignScheduleModal');
+            const editModal = document.getElementById('editScheduleModal');
+            const viewModal = document.getElementById('viewScheduleModal');
+            
+            if (event.target == assignModal) {
+                closeAssignScheduleModal();
+            }
+            if (event.target == editModal) {
+                closeEditScheduleModal();
+            }
+            if (event.target == viewModal) {
+                closeViewScheduleModal();
+            }
         }
     </script>
 </body>

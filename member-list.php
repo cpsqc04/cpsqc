@@ -1057,13 +1057,17 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                     <span class="arrow">▶</span>
                 </div>
                 <div class="nav-submodules">
-                    <a href="#" class="nav-submodule" data-tooltip="Live View">
+                    <a href="live-view.php" class="nav-submodule" data-tooltip="Live View">
                         <span class="nav-submodule-icon"><i class="fas fa-circle" style="color: #ff4444;"></i></span>
                         <span class="nav-submodule-text">Live View</span>
                     </a>
-                    <a href="#" class="nav-submodule" data-tooltip="Playback">
+                    <a href="playback.php" class="nav-submodule" data-tooltip="Playback">
                         <span class="nav-submodule-icon"><i class="fas fa-play"></i></span>
                         <span class="nav-submodule-text">Playback</span>
+                    </a>
+                    <a href="camera-management.php" class="nav-submodule" data-tooltip="Camera Management">
+                        <span class="nav-submodule-icon"><i class="fas fa-camera"></i></span>
+                        <span class="nav-submodule-text">Camera Management</span>
                     </a>
                 </div>
             </div>
@@ -1204,7 +1208,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                         </thead>
                         <tbody id="membersTableBody">
                             <!-- Sample data - will be replaced with dynamic content -->
-                            <tr>
+                            <tr data-member-id="1">
                                 <td>
                                     <img src="images/tara.png" alt="Member Photo" class="member-photo" onclick="viewPhoto(this.src)">
                                 </td>
@@ -1222,7 +1226,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                                     </div>
                                 </td>
                             </tr>
-                            <tr>
+                            <tr data-member-id="2">
                                 <td>
                                     <div class="photo-placeholder">No Photo</div>
                                 </td>
@@ -1247,14 +1251,15 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
         </main>
     </div>
     
-    <!-- Add Member Modal -->
+    <!-- Add/Edit Member Modal -->
     <div id="addMemberModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h2>Add New Member</h2>
+                <h2 id="modalTitle">Add New Member</h2>
                 <button class="close-modal" onclick="closeAddMemberModal()">&times;</button>
             </div>
             <form id="addMemberForm" onsubmit="saveMember(event)">
+                <input type="hidden" id="memberId" name="memberId" value="">
                 <div class="form-group">
                     <label for="memberName">Full Name *</label>
                     <input type="text" id="memberName" name="memberName" required>
@@ -1292,9 +1297,9 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                 </div>
                 
                 <div class="form-group">
-                    <label for="validIdPhoto">Valid ID Photo *</label>
+                    <label for="validIdPhoto" id="validIdLabel">Valid ID Photo *</label>
                     <div class="file-upload">
-                        <input type="file" id="validIdPhoto" name="validIdPhoto" accept="image/*" required onchange="previewImage(this, 'validIdPhotoPreview')">
+                        <input type="file" id="validIdPhoto" name="validIdPhoto" accept="image/*" onchange="previewImage(this, 'validIdPhotoPreview')">
                         <label for="validIdPhoto" class="file-upload-label">
                             <span>🆔 Click to upload ID photo</span>
                         </label>
@@ -1304,7 +1309,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                 
                 <div class="form-actions">
                     <button type="button" class="btn-cancel" onclick="closeAddMemberModal()">Cancel</button>
-                    <button type="submit" class="btn-submit">Save Member</button>
+                    <button type="submit" class="btn-submit" id="submitButton">Save Member</button>
                 </div>
             </form>
         </div>
@@ -1384,7 +1389,48 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             }
         }
         
+        // Store member data
+        let memberData = {};
+        let nextMemberId = 3; // Starting from 3 since we have 2 sample members
+        
+        // Initialize member data from existing table rows
+        function initializeMemberData() {
+            const rows = document.querySelectorAll('#membersTableBody tr[data-member-id]');
+            rows.forEach(row => {
+                const id = row.getAttribute('data-member-id');
+                const cells = row.querySelectorAll('td');
+                const photoImg = cells[0].querySelector('img');
+                const idImg = cells[5].querySelector('img');
+                
+                memberData[id] = {
+                    id: id,
+                    name: cells[1].textContent.trim(),
+                    age: cells[2].textContent.trim(),
+                    address: cells[3].textContent.trim(),
+                    gender: cells[4].textContent.trim(),
+                    photo: photoImg ? photoImg.src : null,
+                    validId: idImg ? idImg.src : null,
+                    hasPhoto: !!photoImg,
+                    hasId: !!idImg
+                };
+            });
+        }
+        
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeMemberData();
+        });
+        
         function openAddMemberModal() {
+            document.getElementById('modalTitle').textContent = 'Add New Member';
+            document.getElementById('submitButton').textContent = 'Save Member';
+            document.getElementById('memberId').value = '';
+            document.getElementById('addMemberForm').reset();
+            document.getElementById('memberPhotoPreview').style.display = 'none';
+            document.getElementById('validIdPhotoPreview').style.display = 'none';
+            document.getElementById('memberPhoto').required = false;
+            document.getElementById('validIdPhoto').required = true;
+            document.getElementById('validIdLabel').textContent = 'Valid ID Photo *';
             document.getElementById('addMemberModal').classList.add('active');
         }
         
@@ -1393,6 +1439,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             document.getElementById('addMemberForm').reset();
             document.getElementById('memberPhotoPreview').style.display = 'none';
             document.getElementById('validIdPhotoPreview').style.display = 'none';
+            document.getElementById('memberId').value = '';
         }
         
         function previewImage(input, previewId) {
@@ -1435,28 +1482,263 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
         
         function saveMember(event) {
             event.preventDefault();
-            // Here you would typically send the data to a PHP backend
-            alert('Member saved successfully! (This is a demo - backend integration needed)');
-            closeAddMemberModal();
-            // Reload or update the table here
+            
+            const memberId = document.getElementById('memberId').value;
+            const name = document.getElementById('memberName').value;
+            const age = document.getElementById('memberAge').value;
+            const address = document.getElementById('memberAddress').value;
+            const gender = document.getElementById('memberGender').value;
+            const photoFile = document.getElementById('memberPhoto').files[0];
+            const idFile = document.getElementById('validIdPhoto').files[0];
+            
+            const isEdit = memberId !== '';
+            const currentId = isEdit ? memberId : nextMemberId.toString();
+            
+            // Handle photo uploads asynchronously
+            let photoSrc = null;
+            let idSrc = null;
+            let photoProcessed = false;
+            let idProcessed = false;
+            
+            function checkAndComplete() {
+                if (photoProcessed && idProcessed) {
+                    completeSave();
+                }
+            }
+            
+            // Process photo if provided
+            if (photoFile) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    photoSrc = e.target.result;
+                    photoProcessed = true;
+                    checkAndComplete();
+                };
+                reader.readAsDataURL(photoFile);
+            } else {
+                photoProcessed = true;
+                checkAndComplete();
+            }
+            
+            // Process ID photo if provided
+            if (idFile) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    idSrc = e.target.result;
+                    idProcessed = true;
+                    checkAndComplete();
+                };
+                reader.readAsDataURL(idFile);
+            } else {
+                idProcessed = true;
+                checkAndComplete();
+            }
+            
+            function completeSave() {
+                // Update member data
+                if (isEdit && memberData[currentId]) {
+                    // Edit existing member - preserve existing photos if no new ones uploaded
+                    memberData[currentId].name = name;
+                    memberData[currentId].age = age;
+                    memberData[currentId].address = address;
+                    memberData[currentId].gender = gender;
+                    // Only update photo if a new one was uploaded
+                    if (photoSrc) {
+                        memberData[currentId].photo = photoSrc;
+                        memberData[currentId].hasPhoto = true;
+                    }
+                    // Only update ID if a new one was uploaded, otherwise keep existing
+                    if (idSrc) {
+                        memberData[currentId].validId = idSrc;
+                        memberData[currentId].hasId = true;
+                    }
+                    // If no new ID uploaded, keep existing ID (already in memberData)
+                    
+                    // Update table row
+                    updateTableRow(currentId);
+                } else {
+                    // Add new member - require ID photo
+                    if (!idSrc) {
+                        alert('Valid ID photo is required for new members!');
+                        return;
+                    }
+                    
+                    memberData[currentId] = {
+                        id: currentId,
+                        name: name,
+                        age: age,
+                        address: address,
+                        gender: gender,
+                        photo: photoSrc,
+                        validId: idSrc,
+                        hasPhoto: !!photoSrc,
+                        hasId: !!idSrc
+                    };
+                    
+                    // Add new row to table
+                    addTableRow(currentId);
+                    nextMemberId++;
+                }
+                
+                alert('Member ' + (isEdit ? 'updated' : 'saved') + ' successfully!');
+                closeAddMemberModal();
+            }
         }
         
         function editMember(id) {
-            alert('Edit member ' + id + ' (Functionality to be implemented)');
+            const member = memberData[id];
+            if (!member) {
+                alert('Member not found!');
+                return;
+            }
+            
+            // Set modal title and button
+            document.getElementById('modalTitle').textContent = 'Edit Member';
+            document.getElementById('submitButton').textContent = 'Update Member';
+            document.getElementById('memberId').value = id;
+            
+            // Populate form fields
+            document.getElementById('memberName').value = member.name;
+            document.getElementById('memberAge').value = member.age;
+            document.getElementById('memberAddress').value = member.address;
+            document.getElementById('memberGender').value = member.gender;
+            
+            // Show existing photos if available
+            const photoPreview = document.getElementById('memberPhotoPreview');
+            const idPreview = document.getElementById('validIdPhotoPreview');
+            
+            if (member.photo) {
+                photoPreview.innerHTML = '<img src="' + member.photo + '" alt="Preview">';
+                photoPreview.style.display = 'block';
+            } else {
+                photoPreview.style.display = 'none';
+            }
+            
+            if (member.validId) {
+                idPreview.innerHTML = '<img src="' + member.validId + '" alt="Preview">';
+                idPreview.style.display = 'block';
+            } else {
+                idPreview.style.display = 'none';
+            }
+            
+            // Make photo optional for edit, but ID required if not already present
+            document.getElementById('memberPhoto').required = false;
+            const validIdInput = document.getElementById('validIdPhoto');
+            const validIdLabel = document.getElementById('validIdLabel');
+            validIdInput.required = !member.hasId;
+            if (member.hasId) {
+                validIdLabel.textContent = 'Valid ID Photo (Optional - leave blank to keep existing)';
+            } else {
+                validIdLabel.textContent = 'Valid ID Photo *';
+            }
+            
+            // Open modal
+            document.getElementById('addMemberModal').classList.add('active');
         }
         
         function deleteMember(id) {
-            if (confirm('Are you sure you want to delete this member?')) {
-                alert('Member deleted (This is a demo - backend integration needed)');
-                // Remove row from table here
+            if (confirm('Are you sure you want to delete this member? This action cannot be undone.')) {
+                // Remove from data
+                delete memberData[id];
+                
+                // Remove row from table
+                const row = document.querySelector(`tr[data-member-id="${id}"]`);
+                if (row) {
+                    row.remove();
+                }
+                
+                alert('Member deleted successfully!');
             }
+        }
+        
+        function updateTableRow(id) {
+            const member = memberData[id];
+            const row = document.querySelector(`tr[data-member-id="${id}"]`);
+            if (!row) return;
+            
+            const cells = row.querySelectorAll('td');
+            
+            // Update name
+            cells[1].textContent = member.name;
+            
+            // Update age
+            cells[2].textContent = member.age;
+            
+            // Update address
+            cells[3].textContent = member.address;
+            
+            // Update gender
+            cells[4].textContent = member.gender;
+            
+            // Update photo
+            if (member.photo) {
+                if (cells[0].querySelector('img')) {
+                    cells[0].querySelector('img').src = member.photo;
+                } else {
+                    cells[0].innerHTML = `<img src="${member.photo}" alt="Member Photo" class="member-photo" onclick="viewPhoto(this.src)">`;
+                }
+            } else {
+                cells[0].innerHTML = '<div class="photo-placeholder">No Photo</div>';
+            }
+            
+            // Update ID photo
+            if (member.validId) {
+                if (cells[5].querySelector('img')) {
+                    cells[5].querySelector('img').src = member.validId;
+                } else {
+                    cells[5].innerHTML = `<img src="${member.validId}" alt="ID Photo" class="id-photo" onclick="viewPhoto(this.src)">`;
+                }
+            } else {
+                cells[5].innerHTML = '<div class="photo-placeholder">No ID</div>';
+            }
+        }
+        
+        function addTableRow(id) {
+            const member = memberData[id];
+            const tbody = document.getElementById('membersTableBody');
+            
+            const row = document.createElement('tr');
+            row.setAttribute('data-member-id', id);
+            
+            // Photo cell
+            let photoCell = '<div class="photo-placeholder">No Photo</div>';
+            if (member.photo) {
+                photoCell = `<img src="${member.photo}" alt="Member Photo" class="member-photo" onclick="viewPhoto(this.src)">`;
+            }
+            
+            // ID photo cell
+            let idCell = '<div class="photo-placeholder">No ID</div>';
+            if (member.validId) {
+                idCell = `<img src="${member.validId}" alt="ID Photo" class="id-photo" onclick="viewPhoto(this.src)">`;
+            }
+            
+            row.innerHTML = `
+                <td>${photoCell}</td>
+                <td>${member.name}</td>
+                <td>${member.age}</td>
+                <td>${member.address}</td>
+                <td>${member.gender}</td>
+                <td>${idCell}</td>
+                <td>
+                    <div class="action-buttons">
+                        <button class="btn-edit" onclick="editMember(${id})">Edit</button>
+                        <button class="btn-delete" onclick="deleteMember(${id})">Delete</button>
+                    </div>
+                </td>
+            `;
+            
+            tbody.appendChild(row);
         }
         
         // Close modal when clicking outside
         window.onclick = function(event) {
-            const modal = document.getElementById('addMemberModal');
-            if (event.target == modal) {
+            const addModal = document.getElementById('addMemberModal');
+            const photoModal = document.getElementById('photoModal');
+            if (event.target == addModal) {
                 closeAddMemberModal();
+            }
+            if (event.target == photoModal) {
+                closePhotoModal();
             }
         }
     </script>

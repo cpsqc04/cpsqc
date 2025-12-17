@@ -15,6 +15,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
     <link rel="icon" type="image/x-icon" href="images/favicon.ico">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="css/theme.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <style>
         body { margin: 0; padding: 0; font-family: var(--font-family); background-color: var(--bg-color); display: flex; min-height: 100vh; }
         .sidebar { width: 320px; background: var(--tertiary-color); color: #fff; position: fixed; left: 0; top: 0; height: 100vh; overflow: hidden; box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1); z-index: 1000; transition: width 0.3s ease; display: flex; flex-direction: column; }
@@ -101,9 +102,27 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
         .status-badge { padding: 0.25rem 0.75rem; border-radius: 12px; font-size: 0.85rem; font-weight: 500; display: inline-block; }
         .status-pending { background: #fff3cd; color: #856404; }
         .status-resolved { background: #d1e7dd; color: #0f5132; }
-        .btn-view { padding: 0.5rem 1rem; background: var(--primary-color); color: #fff; border: none; border-radius: 6px; font-size: 0.85rem; cursor: pointer; transition: all 0.2s ease; }
+        .btn-view { padding: 0.5rem 1rem; background: var(--primary-color); color: #fff; border: none; border-radius: 6px; font-size: 0.85rem; cursor: pointer; transition: all 0.2s ease; margin-right: 0.5rem; }
         .btn-view:hover { background: #4ca8a6; }
-        @media (max-width: 768px) { .sidebar { width: 320px; transform: translateX(-100%); transition: transform 0.3s ease; } .sidebar.mobile-open { transform: translateX(0); } .sidebar.collapsed { width: 80px; transform: translateX(0); } .main-wrapper { margin-left: 0; } body.sidebar-collapsed .main-wrapper { margin-left: 80px; } }
+        .btn-export { padding: 0.5rem 1rem; background: #28a745; color: #fff; border: none; border-radius: 6px; font-size: 0.85rem; cursor: pointer; transition: all 0.2s ease; }
+        .btn-export:hover { background: #218838; }
+        .action-buttons { display: flex; gap: 0.5rem; align-items: center; }
+        .status-in-progress { background: #cfe2ff; color: #084298; }
+        .status-completed { background: #d1e7dd; color: #0f5132; }
+        .status-scheduled { background: #fff3cd; color: #856404; }
+        .modal { display: none; position: fixed; z-index: 2000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.5); overflow: auto; }
+        .modal-content { background-color: var(--card-bg); margin: 5% auto; padding: 2rem; border: 1px solid var(--border-color); border-radius: 12px; width: 90%; max-width: 700px; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3); }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; padding-bottom: 1rem; border-bottom: 2px solid var(--border-color); }
+        .modal-header h2 { margin: 0; color: var(--tertiary-color); font-size: 1.5rem; }
+        .close { color: #aaa; font-size: 28px; font-weight: bold; cursor: pointer; transition: color 0.2s ease; }
+        .close:hover { color: var(--tertiary-color); }
+        .log-details { line-height: 1.8; }
+        .log-details p { margin-bottom: 1rem; }
+        .log-details strong { color: var(--tertiary-color); }
+        .form-actions { display: flex; justify-content: flex-end; gap: 1rem; margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid var(--border-color); }
+        .btn-cancel { padding: 0.75rem 1.5rem; background: #6c757d; color: #fff; border: none; border-radius: 8px; font-size: 0.95rem; cursor: pointer; transition: all 0.2s ease; }
+        .btn-cancel:hover { background: #5a6268; }
+        @media (max-width: 768px) { .sidebar { width: 320px; transform: translateX(-100%); transition: transform 0.3s ease; } .sidebar.mobile-open { transform: translateX(0); } .sidebar.collapsed { width: 80px; transform: translateX(0); } .main-wrapper { margin-left: 0; } body.sidebar-collapsed .main-wrapper { margin-left: 80px; } .modal-content { width: 95%; margin: 10% auto; padding: 1.5rem; } }
     </style>
 </head>
 <body>
@@ -140,13 +159,17 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                     <span class="arrow">▶</span>
                 </div>
                 <div class="nav-submodules">
-                    <a href="#" class="nav-submodule" data-tooltip="Live View">
+                    <a href="live-view.php" class="nav-submodule" data-tooltip="Live View">
                         <span class="nav-submodule-icon"><i class="fas fa-circle" style="color: #ff4444;"></i></span>
                         <span class="nav-submodule-text">Live View</span>
                     </a>
-                    <a href="#" class="nav-submodule" data-tooltip="Playback">
+                    <a href="playback.php" class="nav-submodule" data-tooltip="Playback">
                         <span class="nav-submodule-icon"><i class="fas fa-play"></i></span>
                         <span class="nav-submodule-text">Playback</span>
+                    </a>
+                    <a href="camera-management.php" class="nav-submodule" data-tooltip="Camera Management">
+                        <span class="nav-submodule-icon"><i class="fas fa-camera"></i></span>
+                        <span class="nav-submodule-text">Camera Management</span>
                     </a>
                 </div>
             </div>
@@ -167,14 +190,14 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                     </a>
                 </div>
             </div>
-            <div class="nav-module active">
+            <div class="nav-module">
                 <div class="nav-module-header" onclick="toggleModule(this)" data-tooltip="Volunteer Registry and Scheduling">
                     <span class="nav-module-icon"><i class="fas fa-handshake"></i></span>
                     <span class="nav-module-header-text">Volunteer Registry and Scheduling</span>
                     <span class="arrow">▶</span>
                 </div>
                 <div class="nav-submodules">
-                    <a href="volunteer-list.php" class="nav-submodule active" data-tooltip="Volunteer List">
+                    <a href="volunteer-list.php" class="nav-submodule" data-tooltip="Volunteer List">
                         <span class="nav-submodule-icon"><i class="fas fa-user"></i></span>
                         <span class="nav-submodule-text">Volunteer List</span>
                     </a>
@@ -184,7 +207,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                     </a>
                 </div>
             </div>
-            <div class="nav-module">
+            <div class="nav-module active">
                 <div class="nav-module-header" onclick="toggleModule(this)" data-tooltip="Patrol Scheduling and Monitoring">
                     <span class="nav-module-icon"><i class="fas fa-walking"></i></span>
                     <span class="nav-module-header-text">Patrol Scheduling and Monitoring</span>
@@ -268,29 +291,83 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                             </tr>
                         </thead>
                         <tbody id="logsTableBody">
-                            <tr>
-                                <td>2024-01-20 08:00</td>
-                                <td>Officer Juan</td>
-                                <td>Route A</td>
+                            <tr data-log-id="1">
+                                <td>2025-01-20 08:00</td>
+                                <td>Juan Dela Cruz</td>
+                                <td>San Agustin Street to Quezon Avenue Extension</td>
                                 <td>None</td>
-                                <td><span class="status-badge status-resolved">Completed</span></td>
-                                <td><button class="btn-view" onclick="viewLog('1')">View</button></td>
+                                <td><span class="status-badge status-completed">Completed</span></td>
+                                <td>
+                                    <div class="action-buttons">
+                                        <button class="btn-view" onclick="viewLog('1')">View</button>
+                                        <button class="btn-export" onclick="exportLog('1')">Export</button>
+                                    </div>
+                                </td>
                             </tr>
-                            <tr>
-                                <td>2024-01-19 16:00</td>
-                                <td>Officer Maria</td>
-                                <td>Route B</td>
-                                <td>Minor disturbance</td>
-                                <td><span class="status-badge status-resolved">Completed</span></td>
-                                <td><button class="btn-view" onclick="viewLog('2')">View</button></td>
+                            <tr data-log-id="2">
+                                <td>2025-01-19 16:00</td>
+                                <td>Maria Santos</td>
+                                <td>Rizal Street to Luna Avenue</td>
+                                <td>Minor disturbance reported</td>
+                                <td><span class="status-badge status-completed">Completed</span></td>
+                                <td>
+                                    <div class="action-buttons">
+                                        <button class="btn-view" onclick="viewLog('2')">View</button>
+                                        <button class="btn-export" onclick="exportLog('2')">Export</button>
+                                    </div>
+                                </td>
                             </tr>
-                            <tr>
-                                <td>2024-01-18 00:00</td>
-                                <td>Officer Roberto</td>
-                                <td>Route C</td>
+                            <tr data-log-id="3">
+                                <td>2025-01-18 00:00</td>
+                                <td>Roberto Reyes</td>
+                                <td>Mabini Street corner Quezon Avenue</td>
                                 <td>None</td>
-                                <td><span class="status-badge status-pending">In Progress</span></td>
-                                <td><button class="btn-view" onclick="viewLog('3')">View</button></td>
+                                <td><span class="status-badge status-in-progress">In Progress</span></td>
+                                <td>
+                                    <div class="action-buttons">
+                                        <button class="btn-view" onclick="viewLog('3')">View</button>
+                                        <button class="btn-export" onclick="exportLog('3')">Export</button>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr data-log-id="4">
+                                <td>2025-01-17 08:00</td>
+                                <td>Ana Garcia</td>
+                                <td>Bonifacio Street Area</td>
+                                <td>None</td>
+                                <td><span class="status-badge status-completed">Completed</span></td>
+                                <td>
+                                    <div class="action-buttons">
+                                        <button class="btn-view" onclick="viewLog('4')">View</button>
+                                        <button class="btn-export" onclick="exportLog('4')">Export</button>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr data-log-id="5">
+                                <td>2025-01-16 16:00</td>
+                                <td>Carlos Torres</td>
+                                <td>Commonwealth Avenue Extension</td>
+                                <td>Assisted elderly resident</td>
+                                <td><span class="status-badge status-completed">Completed</span></td>
+                                <td>
+                                    <div class="action-buttons">
+                                        <button class="btn-view" onclick="viewLog('5')">View</button>
+                                        <button class="btn-export" onclick="exportLog('5')">Export</button>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr data-log-id="6">
+                                <td>2025-01-15 00:00</td>
+                                <td>Liza Fernandez</td>
+                                <td>Aguinaldo Street to Commonwealth Avenue</td>
+                                <td>None</td>
+                                <td><span class="status-badge status-scheduled">Scheduled</span></td>
+                                <td>
+                                    <div class="action-buttons">
+                                        <button class="btn-view" onclick="viewLog('6')">View</button>
+                                        <button class="btn-export" onclick="exportLog('6')">Export</button>
+                                    </div>
+                                </td>
                             </tr>
                         </tbody>
                     </table>
@@ -298,6 +375,23 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             </div>
         </main>
     </div>
+
+    <!-- View Patrol Log Modal -->
+    <div id="viewLogModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Patrol Log Details</h2>
+                <span class="close" onclick="closeViewLogModal()">&times;</span>
+            </div>
+            <div id="viewLogContent" class="log-details">
+                <!-- Content will be populated by JavaScript -->
+            </div>
+            <div class="form-actions">
+                <button type="button" class="btn-cancel" onclick="closeViewLogModal()">Close</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             const sidebar = document.getElementById('sidebar');
@@ -354,8 +448,310 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                 }
             }
         }
+        // Initialize patrol log data
+        let patrolLogData = {
+            '1': {
+                id: '1',
+                date: '2025-01-20',
+                time: '08:00 - 16:00',
+                officer: 'Juan Dela Cruz',
+                route: 'San Agustin Street to Quezon Avenue Extension',
+                status: 'Completed',
+                incidents: 'None',
+                details: 'Routine morning patrol conducted along San Agustin Street to Quezon Avenue Extension. All areas were secure. Checked streetlights and reported one non-functional light near the Barangay Hall. No suspicious activities observed.',
+                location: 'Barangay San Agustin, Quezon City'
+            },
+            '2': {
+                id: '2',
+                date: '2025-01-19',
+                time: '16:00 - 00:00',
+                officer: 'Maria Santos',
+                route: 'Rizal Street to Luna Avenue',
+                status: 'Completed',
+                incidents: 'Minor disturbance reported',
+                details: 'Evening patrol along Rizal Street to Luna Avenue. Responded to a minor disturbance call near Luna Avenue. Upon investigation, it was determined to be a false alarm - neighbors were moving furniture. Situation resolved peacefully. All other areas were secure.',
+                location: 'Rizal Street to Luna Avenue, Barangay San Agustin, Quezon City'
+            },
+            '3': {
+                id: '3',
+                date: '2025-01-18',
+                time: '00:00 - 08:00',
+                officer: 'Roberto Reyes',
+                route: 'Mabini Street corner Quezon Avenue',
+                status: 'In Progress',
+                incidents: 'None',
+                details: 'Night patrol currently in progress along Mabini Street corner Quezon Avenue. Monitoring traffic flow and pedestrian safety. All security measures in place. Regular checkpoints established.',
+                location: 'Mabini Street corner Quezon Avenue, Barangay San Agustin, Quezon City'
+            },
+            '4': {
+                id: '4',
+                date: '2025-01-17',
+                time: '08:00 - 16:00',
+                officer: 'Ana Garcia',
+                route: 'Bonifacio Street Area',
+                status: 'Completed',
+                incidents: 'None',
+                details: 'Morning patrol conducted in Bonifacio Street Area. Checked all entry points and common areas. Everything was in order. Noted that garbage collection was completed on schedule. All residential areas were secure.',
+                location: 'Bonifacio Street Area, Barangay San Agustin, Quezon City'
+            },
+            '5': {
+                id: '5',
+                date: '2025-01-16',
+                time: '16:00 - 00:00',
+                officer: 'Carlos Torres',
+                route: 'Commonwealth Avenue Extension',
+                status: 'Completed',
+                incidents: 'Assisted elderly resident',
+                details: 'Afternoon patrol along Commonwealth Avenue Extension. Assisted an elderly resident crossing the street. Checked commercial establishments and residential areas. All security measures in place. No incidents reported.',
+                location: 'Commonwealth Avenue Extension, Barangay San Agustin, Quezon City'
+            },
+            '6': {
+                id: '6',
+                date: '2025-01-15',
+                time: '00:00 - 08:00',
+                officer: 'Liza Fernandez',
+                route: 'Aguinaldo Street to Commonwealth Avenue',
+                status: 'Scheduled',
+                incidents: 'None',
+                details: 'Night patrol scheduled for Aguinaldo Street to Commonwealth Avenue. Patrol assignment has been confirmed and officer is prepared for duty.',
+                location: 'Aguinaldo Street to Commonwealth Avenue, Barangay San Agustin, Quezon City'
+            }
+        };
+
         function viewLog(id) {
-            alert('Viewing patrol log: ' + id + ' (Full details modal to be implemented)');
+            const log = patrolLogData[id];
+            if (!log) {
+                alert('Log not found');
+                return;
+            }
+            
+            const statusClass = log.status === 'Completed' ? 'status-completed' : 
+                                log.status === 'In Progress' ? 'status-in-progress' : 
+                                'status-scheduled';
+            
+            const content = `
+                <p><strong>Date:</strong> ${log.date}</p>
+                <p><strong>Time:</strong> ${log.time}</p>
+                <p><strong>Officer:</strong> ${log.officer}</p>
+                <p><strong>Route:</strong> ${log.route}</p>
+                <p><strong>Location:</strong> ${log.location}</p>
+                <p><strong>Status:</strong> <span class="status-badge ${statusClass}">${log.status}</span></p>
+                <p><strong>Incidents:</strong> ${log.incidents}</p>
+                <p><strong>Details:</strong><br>${log.details}</p>
+            `;
+            
+            document.getElementById('viewLogContent').innerHTML = content;
+            document.getElementById('viewLogModal').style.display = 'block';
+        }
+
+        function closeViewLogModal() {
+            document.getElementById('viewLogModal').style.display = 'none';
+        }
+
+        // Close modal when clicking outside
+        window.onclick = function(event) {
+            const modal = document.getElementById('viewLogModal');
+            if (event.target === modal) {
+                closeViewLogModal();
+            }
+        }
+
+        async function exportLog(id) {
+            const log = patrolLogData[id];
+            if (!log) {
+                alert('Log not found');
+                return;
+            }
+
+            try {
+                // Check if JSZip is available
+                if (typeof JSZip === 'undefined') {
+                    alert('Export library not loaded. Please refresh the page.');
+                    return;
+                }
+
+                // Create DOCX file structure using JSZip
+                const zip = new JSZip();
+
+                // Create [Content_Types].xml
+                const contentTypes = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+    <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+    <Default Extension="xml" ContentType="application/xml"/>
+    <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+    <Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>
+</Types>`;
+
+                // Create word/document.xml with the actual content
+                const escapeXml = (text) => {
+                    if (!text) return '';
+                    return String(text)
+                        .replace(/&/g, '&amp;')
+                        .replace(/</g, '&lt;')
+                        .replace(/>/g, '&gt;')
+                        .replace(/"/g, '&quot;')
+                        .replace(/'/g, '&apos;');
+                };
+
+                const documentXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+    <w:body>
+        <w:p>
+            <w:pPr>
+                <w:jc w:val="center"/>
+                <w:spacing w:after="400"/>
+            </w:pPr>
+            <w:r>
+                <w:rPr>
+                    <w:b/>
+                    <w:sz w:val="32"/>
+                </w:rPr>
+                <w:t>PATROL LOG REPORT</w:t>
+            </w:r>
+        </w:p>
+        <w:p>
+            <w:pPr>
+                <w:jc w:val="center"/>
+                <w:spacing w:after="600"/>
+            </w:pPr>
+            <w:r>
+                <w:t>Barangay San Agustin, Quezon City</w:t>
+            </w:r>
+        </w:p>
+        <w:p>
+            <w:r>
+                <w:rPr><w:b/></w:rPr>
+                <w:t>Date:</w:t>
+            </w:r>
+            <w:r>
+                <w:t> ${escapeXml(log.date)}</w:t>
+            </w:r>
+        </w:p>
+        <w:p>
+            <w:r>
+                <w:rPr><w:b/></w:rPr>
+                <w:t>Time:</w:t>
+            </w:r>
+            <w:r>
+                <w:t> ${escapeXml(log.time)}</w:t>
+            </w:r>
+        </w:p>
+        <w:p>
+            <w:r>
+                <w:rPr><w:b/></w:rPr>
+                <w:t>Officer:</w:t>
+            </w:r>
+            <w:r>
+                <w:t> ${escapeXml(log.officer)}</w:t>
+            </w:r>
+        </w:p>
+        <w:p>
+            <w:r>
+                <w:rPr><w:b/></w:rPr>
+                <w:t>Route:</w:t>
+            </w:r>
+            <w:r>
+                <w:t> ${escapeXml(log.route)}</w:t>
+            </w:r>
+        </w:p>
+        <w:p>
+            <w:r>
+                <w:rPr><w:b/></w:rPr>
+                <w:t>Location:</w:t>
+            </w:r>
+            <w:r>
+                <w:t> ${escapeXml(log.location)}</w:t>
+            </w:r>
+        </w:p>
+        <w:p>
+            <w:r>
+                <w:rPr><w:b/></w:rPr>
+                <w:t>Status:</w:t>
+            </w:r>
+            <w:r>
+                <w:t> ${escapeXml(log.status)}</w:t>
+            </w:r>
+        </w:p>
+        <w:p>
+            <w:r>
+                <w:rPr><w:b/></w:rPr>
+                <w:t>Incidents:</w:t>
+            </w:r>
+            <w:r>
+                <w:t> ${escapeXml(log.incidents)}</w:t>
+            </w:r>
+        </w:p>
+        <w:p>
+            <w:pPr>
+                <w:spacing w:before="400"/>
+            </w:pPr>
+            <w:r>
+                <w:rPr><w:b/></w:rPr>
+                <w:t>Details:</w:t>
+            </w:r>
+        </w:p>
+        <w:p>
+            <w:r>
+                <w:t>${escapeXml(log.details)}</w:t>
+            </w:r>
+        </w:p>
+        <w:p>
+            <w:pPr>
+                <w:jc w:val="right"/>
+                <w:spacing w:before="600"/>
+            </w:pPr>
+            <w:r>
+                <w:t>Generated on: ${escapeXml(new Date().toLocaleString())}</w:t>
+            </w:r>
+        </w:p>
+    </w:body>
+</w:document>`;
+
+                // Create word/styles.xml
+                const stylesXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+    <w:style w:type="paragraph" w:styleId="Normal">
+        <w:name w:val="Normal"/>
+        <w:qFormat/>
+    </w:style>
+</w:styles>`;
+
+                // Create _rels/.rels
+                const rels = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+    <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+</Relationships>`;
+
+                // Create word/_rels/document.xml.rels
+                const wordRels = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+    <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
+</Relationships>`;
+
+                // Add files to zip
+                zip.file("[Content_Types].xml", contentTypes);
+                zip.file("word/document.xml", documentXml);
+                zip.file("word/styles.xml", stylesXml);
+                zip.file("_rels/.rels", rels);
+                zip.file("word/_rels/document.xml.rels", wordRels);
+
+                // Generate the DOCX file
+                const blob = await zip.generateAsync({ type: "blob", mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" });
+                const fileName = `patrol_log_${log.officer.replace(/\s+/g, '_')}_${log.date}.docx`;
+                
+                const link = document.createElement("a");
+                link.href = URL.createObjectURL(blob);
+                link.download = fileName;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(link.href);
+                
+                alert(`Patrol log exported successfully as ${fileName}!`);
+            } catch (error) {
+                console.error('Error generating DOCX:', error);
+                alert('Error generating DOCX file. Please try again.');
+            }
         }
     </script>
 </body>

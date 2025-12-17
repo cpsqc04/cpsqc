@@ -11,7 +11,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Submit Tip - Alertara</title>
+    <title>Live View - CCTV Monitoring</title>
     <link rel="icon" type="image/x-icon" href="images/favicon.ico">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="css/theme.css">
@@ -87,22 +87,44 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
         .content-burger-btn span::after { bottom: -7px; }
         .page-title { font-size: 2rem; font-weight: 700; color: var(--tertiary-color); margin: 0; }
         .page-content { background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 12px; padding: 2rem; box-shadow: 0 2px 8px var(--shadow); margin-top: 1.5rem; }
-        .search-box { margin-bottom: 1.5rem; position: relative; }
-        .search-box input { width: 100%; padding: 0.75rem 1rem 0.75rem 2.5rem; border: 1px solid var(--border-color); border-radius: 8px; font-size: 0.95rem; transition: all 0.2s ease; }
-        .search-box input:focus { outline: none; border-color: var(--primary-color); box-shadow: 0 0 0 3px rgba(76, 138, 137, 0.1); }
-        .search-box::before { content: "🔍"; position: absolute; left: 0.75rem; top: 50%; transform: translateY(-50%); font-size: 1rem; }
-        .table-container { overflow-x: auto; border-radius: 8px; border: 1px solid var(--border-color); }
-        table { width: 100%; border-collapse: collapse; background: var(--card-bg); }
-        thead { background: var(--tertiary-color); color: #fff; }
-        th { padding: 1rem; text-align: left; font-weight: 600; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.5px; }
-        td { padding: 1rem; border-bottom: 1px solid var(--border-color); color: var(--text-color); }
-        tbody tr:hover { background: #f9f9f9; }
-        tbody tr:last-child td { border-bottom: none; }
-        .status-badge { padding: 0.25rem 0.75rem; border-radius: 12px; font-size: 0.85rem; font-weight: 500; display: inline-block; }
-        .status-pending { background: #fff3cd; color: #856404; }
-        .status-resolved { background: #d1e7dd; color: #0f5132; }
-        .btn-view { padding: 0.5rem 1rem; background: var(--primary-color); color: #fff; border: none; border-radius: 6px; font-size: 0.85rem; cursor: pointer; transition: all 0.2s ease; }
-        .btn-view:hover { background: #4ca8a6; }
+        .live-view-container { display: flex; gap: 1.5rem; height: calc(100vh - 300px); min-height: 600px; }
+        .detected-objects-panel { width: 320px; background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 12px; padding: 1.5rem; overflow-y: auto; display: flex; flex-direction: column; flex-shrink: 0; }
+        .detected-objects-panel h3 { margin: 0 0 1.5rem 0; color: var(--tertiary-color); font-size: 1.25rem; font-weight: 600; }
+        .detected-objects-list { display: flex; flex-direction: column; gap: 1rem; }
+        .detected-object-card { background: #f9f9f9; border: 1px solid var(--border-color); border-radius: 8px; padding: 1rem; transition: all 0.2s ease; }
+        .detected-object-card:hover { box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1); transform: translateY(-2px); }
+        .object-image { width: 100%; height: 150px; object-fit: cover; border-radius: 6px; margin-bottom: 0.75rem; background: linear-gradient(135deg, #e0e0e0 0%, #d0d0d0 100%); display: flex; align-items: center; justify-content: center; color: #666; font-size: 3rem; border: 2px solid var(--border-color); position: relative; overflow: hidden; }
+        .object-image::before { content: ''; position: absolute; top: 0; left: -100%; width: 100%; height: 100%; background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent); animation: scan 3s infinite; }
+        @keyframes scan { 0% { left: -100%; } 100% { left: 100%; } }
+        .object-type-badge { display: inline-block; padding: 0.25rem 0.75rem; border-radius: 12px; font-size: 0.75rem; font-weight: 600; margin-bottom: 0.5rem; }
+        .badge-person { background: #cfe2ff; color: #084298; }
+        .badge-animal { background: #d1e7dd; color: #0f5132; }
+        .badge-vehicle { background: #fff3cd; color: #856404; }
+        .object-details { font-size: 0.9rem; line-height: 1.6; }
+        .object-details p { margin: 0.25rem 0; }
+        .object-details strong { color: var(--tertiary-color); }
+        .live-feed-container { flex: 1; background: #000; border-radius: 12px; position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center; }
+        .live-feed-placeholder { width: 100%; height: 100%; background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%); display: flex; flex-direction: column; align-items: center; justify-content: center; color: #fff; position: relative; }
+        .live-feed-placeholder::before { content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(255, 255, 255, 0.03) 2px, rgba(255, 255, 255, 0.03) 4px); }
+        .live-indicator { position: absolute; top: 1rem; left: 1rem; display: flex; align-items: center; gap: 0.5rem; background: rgba(239, 68, 68, 0.9); padding: 0.5rem 1rem; border-radius: 20px; z-index: 10; }
+        .live-dot { width: 10px; height: 10px; background: #fff; border-radius: 50%; animation: pulse 2s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+        .live-indicator span { color: #fff; font-weight: 600; font-size: 0.9rem; }
+        .camera-info { position: absolute; top: 1rem; right: 1rem; background: rgba(0, 0, 0, 0.7); padding: 0.75rem 1rem; border-radius: 8px; color: #fff; z-index: 10; }
+        .camera-info p { margin: 0.25rem 0; font-size: 0.9rem; }
+        .datetime-display { position: absolute; bottom: 1rem; left: 1rem; background: rgba(0, 0, 0, 0.7); padding: 0.75rem 1rem; border-radius: 8px; color: #fff; z-index: 10; font-family: 'Courier New', monospace; }
+        .datetime-display .date { font-size: 1rem; font-weight: 600; }
+        .datetime-display .time { font-size: 1.5rem; font-weight: 700; }
+        .road-simulation { position: absolute; bottom: 0; left: 0; right: 0; height: 40%; background: #333; border-top: 4px solid #ffd700; }
+        .road-simulation::before { content: ''; position: absolute; top: 50%; left: 0; right: 0; height: 2px; background: repeating-linear-gradient(90deg, #ffd700 0, #ffd700 20px, transparent 20px, transparent 40px); }
+        .vehicle-animation { position: absolute; bottom: 20%; width: 60px; height: 40px; background: #4a90e2; border-radius: 4px; animation: drive 10s linear infinite; }
+        @keyframes drive { 0% { left: -60px; } 100% { left: 100%; } }
+        .empty-state { text-align: center; padding: 2rem; color: #999; }
+        .empty-state i { font-size: 3rem; margin-bottom: 1rem; opacity: 0.5; }
+        @media (max-width: 1200px) {
+            .live-view-container { flex-direction: column; height: auto; }
+            .detected-objects-panel { width: 100%; max-height: 400px; }
+        }
         @media (max-width: 768px) { .sidebar { width: 320px; transform: translateX(-100%); transition: transform 0.3s ease; } .sidebar.mobile-open { transform: translateX(0); } .sidebar.collapsed { width: 80px; transform: translateX(0); } .main-wrapper { margin-left: 0; } body.sidebar-collapsed .main-wrapper { margin-left: 80px; } }
     </style>
 </head>
@@ -133,14 +155,14 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                     </a>
                 </div>
             </div>
-            <div class="nav-module">
+            <div class="nav-module active">
                 <div class="nav-module-header" onclick="toggleModule(this)" data-tooltip="CCTV Surveillance System Management">
                     <span class="nav-module-icon"><i class="fas fa-video"></i></span>
                     <span class="nav-module-header-text">CCTV Surveillance System Management</span>
                     <span class="arrow">▶</span>
                 </div>
                 <div class="nav-submodules">
-                    <a href="live-view.php" class="nav-submodule" data-tooltip="Live View">
+                    <a href="live-view.php" class="nav-submodule active" data-tooltip="Live View">
                         <span class="nav-submodule-icon"><i class="fas fa-circle" style="color: #ff4444;"></i></span>
                         <span class="nav-submodule-text">Live View</span>
                     </a>
@@ -171,14 +193,14 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                     </a>
                 </div>
             </div>
-            <div class="nav-module active">
+            <div class="nav-module">
                 <div class="nav-module-header" onclick="toggleModule(this)" data-tooltip="Volunteer Registry and Scheduling">
                     <span class="nav-module-icon"><i class="fas fa-handshake"></i></span>
                     <span class="nav-module-header-text">Volunteer Registry and Scheduling</span>
                     <span class="arrow">▶</span>
                 </div>
                 <div class="nav-submodules">
-                    <a href="volunteer-list.php" class="nav-submodule active" data-tooltip="Volunteer List">
+                    <a href="volunteer-list.php" class="nav-submodule" data-tooltip="Volunteer List">
                         <span class="nav-submodule-icon"><i class="fas fa-user"></i></span>
                         <span class="nav-submodule-text">Volunteer List</span>
                     </a>
@@ -222,14 +244,14 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                     </a>
                 </div>
             </div>
-            <div class="nav-module active">
+            <div class="nav-module">
                 <div class="nav-module-header" onclick="toggleModule(this)" data-tooltip="Anonymous Tip Line System">
                     <span class="nav-module-icon"><i class="fas fa-comments"></i></span>
                     <span class="nav-module-header-text">Anonymous Tip Line System</span>
                     <span class="arrow">▶</span>
                 </div>
                 <div class="nav-submodules">
-                    <a href="submit-tip.php" class="nav-submodule active" data-tooltip="Submit Tip">
+                    <a href="submit-tip.php" class="nav-submodule" data-tooltip="Submit Tip">
                         <span class="nav-submodule-icon"><i class="fas fa-envelope"></i></span>
                         <span class="nav-submodule-text">Submit Tip</span>
                     </a>
@@ -247,7 +269,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                 <button class="content-burger-btn" onclick="toggleSidebar()" aria-label="Toggle sidebar">
                     <span></span>
                 </button>
-                <h1 class="page-title">Submit Tip</h1>
+                <h1 class="page-title">Live View - CCTV Monitoring</h1>
             </div>
             <div class="user-info">
                 <span>Welcome, <?php echo htmlspecialchars($_SESSION['username'] ?? 'Admin'); ?></span>
@@ -256,28 +278,36 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
         </header>
         <main class="content-area">
             <div class="page-content">
-                <div style="max-width: 600px;">
-                    <form id="tipForm" onsubmit="submitTip(event)">
-                        <div style="margin-bottom: 1.5rem;">
-                            <label style="display: block; margin-bottom: 0.5rem; font-weight: 500;">Tip Category *</label>
-                            <select id="tipCategory" required style="width: 100%; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 8px;">
-                                <option value="">Select Category</option>
-                                <option value="safety">Safety Concern</option>
-                                <option value="suspicious">Suspicious Activity</option>
-                                <option value="vandalism">Vandalism</option>
-                                <option value="other">Other</option>
-                            </select>
+                <div class="live-view-container">
+                    <!-- Left Side (Small): Detected Objects Collage -->
+                    <div class="detected-objects-panel">
+                        <h3>Detected Objects</h3>
+                        <div class="detected-objects-list" id="detectedObjectsList">
+                            <!-- Detected objects will be populated here -->
                         </div>
-                        <div style="margin-bottom: 1.5rem;">
-                            <label style="display: block; margin-bottom: 0.5rem; font-weight: 500;">Tip Details *</label>
-                            <textarea id="tipDetails" required style="width: 100%; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 8px; min-height: 150px;" placeholder="Provide detailed information about your tip..."></textarea>
+                    </div>
+
+                    <!-- Right Side (Main): Live CCTV Feed -->
+                    <div class="live-feed-container">
+                        <div class="live-feed-placeholder">
+                            <div class="live-indicator">
+                                <div class="live-dot"></div>
+                                <span>LIVE</span>
+                            </div>
+                            <div class="camera-info">
+                                <p><strong>Camera:</strong> CAM-001</p>
+                                <p><strong>Location:</strong> Susano Road</p>
+                                <p><strong>Barangay San Agustin, Quezon City</strong></p>
+                            </div>
+                            <div class="datetime-display">
+                                <div class="date" id="currentDate"></div>
+                                <div class="time" id="currentTime"></div>
+                            </div>
+                            <div class="road-simulation">
+                                <div class="vehicle-animation"></div>
+                            </div>
                         </div>
-                        <div style="margin-bottom: 1.5rem;">
-                            <label style="display: block; margin-bottom: 0.5rem; font-weight: 500;">Location (Optional)</label>
-                            <input type="text" id="tipLocation" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 8px;" placeholder="Enter location if applicable">
-                        </div>
-                        <button type="submit" style="padding: 0.75rem 2rem; background: var(--primary-color); color: #fff; border: none; border-radius: 8px; font-size: 1rem; cursor: pointer; width: 100%;">Submit Anonymous Tip</button>
-                    </form>
+                    </div>
                 </div>
             </div>
         </main>
@@ -290,6 +320,9 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                 sidebar.classList.add('collapsed');
                 document.body.classList.add('sidebar-collapsed');
             }
+            updateDateTime();
+            setInterval(updateDateTime, 1000);
+            initializeDetectedObjects();
         });
         function toggleSidebar() {
             const sidebar = document.getElementById('sidebar');
@@ -323,10 +356,151 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             document.querySelectorAll('.nav-module').forEach(m => { m.classList.remove('active'); });
             if (!isActive) { module.classList.add('active'); }
         }
-        function submitTip(event) {
-            event.preventDefault();
-            alert('Tip submitted successfully! (This is a demo - backend integration needed)');
-            document.getElementById('tipForm').reset();
+        function updateDateTime() {
+            const now = new Date();
+            const dateStr = now.toLocaleDateString('en-US', { 
+                weekday: 'long', 
+                year: 'numeric', 
+                month: 'long', 
+                day: 'numeric' 
+            });
+            const timeStr = now.toLocaleTimeString('en-US', { 
+                hour12: false,
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+            });
+            document.getElementById('currentDate').textContent = dateStr;
+            document.getElementById('currentTime').textContent = timeStr;
+        }
+        function initializeDetectedObjects() {
+            const detectedObjects = [
+                {
+                    type: 'person',
+                    image: '👨',
+                    details: {
+                        expression: 'calm',
+                        accessories: 'eyeglasses',
+                        age: 'middle-aged',
+                        gender: 'male'
+                    }
+                },
+                {
+                    type: 'person',
+                    image: '👩',
+                    details: {
+                        expression: 'happy',
+                        accessories: 'cap',
+                        age: 'young',
+                        gender: 'female'
+                    }
+                },
+                {
+                    type: 'vehicle',
+                    image: '🚗',
+                    details: {
+                        plateNumber: 'ABC-1234',
+                        color: 'White',
+                        brand: 'Toyota',
+                        model: 'Vios'
+                    }
+                },
+                {
+                    type: 'animal',
+                    image: '🐕',
+                    details: {
+                        species: 'dog'
+                    }
+                },
+                {
+                    type: 'person',
+                    image: '👤',
+                    details: {
+                        expression: 'mysterious',
+                        accessories: 'mask',
+                        age: 'young',
+                        gender: 'male'
+                    }
+                },
+                {
+                    type: 'vehicle',
+                    image: '🏍️',
+                    details: {
+                        plateNumber: 'XYZ-5678',
+                        color: 'Red',
+                        brand: 'Honda',
+                        model: 'Click'
+                    }
+                },
+                {
+                    type: 'person',
+                    image: '👴',
+                    details: {
+                        expression: 'sad',
+                        accessories: 'hat',
+                        age: 'old',
+                        gender: 'male'
+                    }
+                },
+                {
+                    type: 'person',
+                    image: '👵',
+                    details: {
+                        expression: 'calm',
+                        accessories: 'none',
+                        age: 'old',
+                        gender: 'female'
+                    }
+                },
+                {
+                    type: 'animal',
+                    image: '🐈',
+                    details: {
+                        species: 'cat'
+                    }
+                }
+            ];
+            const container = document.getElementById('detectedObjectsList');
+            detectedObjects.forEach((obj, index) => {
+                const card = document.createElement('div');
+                card.className = 'detected-object-card';
+                
+                const badgeClass = obj.type === 'person' ? 'badge-person' : 
+                                  obj.type === 'animal' ? 'badge-animal' : 
+                                  'badge-vehicle';
+                const badgeText = obj.type.charAt(0).toUpperCase() + obj.type.slice(1);
+                
+                let detailsHTML = '';
+                if (obj.type === 'person') {
+                    detailsHTML = `
+                        <p><strong>Expression:</strong> <span style="text-transform: capitalize;">${obj.details.expression}</span></p>
+                        <p><strong>Accessories:</strong> <span style="text-transform: capitalize;">${obj.details.accessories}</span></p>
+                        <p><strong>Age:</strong> <span style="text-transform: capitalize;">${obj.details.age}</span></p>
+                        <p><strong>Gender:</strong> <span style="text-transform: capitalize;">${obj.details.gender}</span></p>
+                    `;
+                } else if (obj.type === 'animal') {
+                    detailsHTML = `
+                        <p><strong>Species:</strong> <span style="text-transform: capitalize;">${obj.details.species}</span></p>
+                    `;
+                } else if (obj.type === 'vehicle') {
+                    detailsHTML = `
+                        <p><strong>Plate Number:</strong> ${obj.details.plateNumber}</p>
+                        <p><strong>Color:</strong> ${obj.details.color}</p>
+                        <p><strong>Brand:</strong> ${obj.details.brand}</p>
+                        <p><strong>Model:</strong> ${obj.details.model}</p>
+                    `;
+                }
+                
+                card.innerHTML = `
+                    <span class="object-type-badge ${badgeClass}">${badgeText}</span>
+                    <div class="object-image">${obj.image}</div>
+                    <div class="object-details">
+                        ${detailsHTML}
+                    </div>
+                `;
+                
+                container.appendChild(card);
+            });
         }
     </script>
 </body>

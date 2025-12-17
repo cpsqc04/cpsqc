@@ -11,7 +11,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Review Tip - Alertara</title>
+    <title>Camera Management - Alertara</title>
     <link rel="icon" type="image/x-icon" href="images/favicon.ico">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="css/theme.css">
@@ -87,10 +87,14 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
         .content-burger-btn span::after { bottom: -7px; }
         .page-title { font-size: 2rem; font-weight: 700; color: var(--tertiary-color); margin: 0; }
         .page-content { background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 12px; padding: 2rem; box-shadow: 0 2px 8px var(--shadow); margin-top: 1.5rem; }
-        .search-box { margin-bottom: 1.5rem; position: relative; }
+        .search-container { display: flex; gap: 1rem; margin-bottom: 1.5rem; align-items: center; }
+        .search-box { flex: 1; position: relative; }
         .search-box input { width: 100%; padding: 0.75rem 1rem 0.75rem 2.5rem; border: 1px solid var(--border-color); border-radius: 8px; font-size: 0.95rem; transition: all 0.2s ease; }
         .search-box input:focus { outline: none; border-color: var(--primary-color); box-shadow: 0 0 0 3px rgba(76, 138, 137, 0.1); }
         .search-box::before { content: "🔍"; position: absolute; left: 0.75rem; top: 50%; transform: translateY(-50%); font-size: 1rem; }
+        .btn-add { padding: 0.75rem 1.5rem; background: var(--primary-color); color: #fff; border: none; border-radius: 8px; font-size: 0.95rem; font-weight: 600; cursor: pointer; transition: all 0.2s ease; display: inline-flex; align-items: center; gap: 0.5rem; white-space: nowrap; flex-shrink: 0; }
+        .btn-add:hover { background: #4ca8a6; transform: translateY(-2px); box-shadow: 0 4px 8px rgba(76, 138, 137, 0.3); }
+        .btn-add i { font-size: 1rem; }
         .table-container { overflow-x: auto; border-radius: 8px; border: 1px solid var(--border-color); }
         table { width: 100%; border-collapse: collapse; background: var(--card-bg); }
         thead { background: var(--tertiary-color); color: #fff; }
@@ -99,22 +103,22 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
         tbody tr:hover { background: #f9f9f9; }
         tbody tr:last-child td { border-bottom: none; }
         .status-badge { padding: 0.25rem 0.75rem; border-radius: 12px; font-size: 0.85rem; font-weight: 500; display: inline-block; }
-        .status-pending { background: #fff3cd; color: #856404; }
-        .status-resolved { background: #d1e7dd; color: #0f5132; }
+        .status-online { background: #d1e7dd; color: #0f5132; }
+        .status-offline { background: #f8d7da; color: #842029; }
+        .status-maintenance { background: #fff3cd; color: #856404; }
         .btn-view { padding: 0.5rem 1rem; background: var(--primary-color); color: #fff; border: none; border-radius: 6px; font-size: 0.85rem; cursor: pointer; transition: all 0.2s ease; margin-right: 0.5rem; }
         .btn-view:hover { background: #4ca8a6; }
-        .btn-edit { padding: 0.5rem 1rem; background: #ffc107; color: #000; border: none; border-radius: 6px; font-size: 0.85rem; cursor: pointer; transition: all 0.2s ease; }
+        .btn-edit { padding: 0.5rem 1rem; background: #ffc107; color: #000; border: none; border-radius: 6px; font-size: 0.85rem; cursor: pointer; transition: all 0.2s ease; margin-right: 0.5rem; }
         .btn-edit:hover { background: #e0a800; }
+        .btn-delete { padding: 0.5rem 1rem; background: #dc3545; color: #fff; border: none; border-radius: 6px; font-size: 0.85rem; cursor: pointer; transition: all 0.2s ease; }
+        .btn-delete:hover { background: #c82333; }
         .action-buttons { display: flex; gap: 0.5rem; align-items: center; }
         .modal { display: none; position: fixed; z-index: 2000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.5); overflow: auto; }
-        .modal-content { background-color: var(--card-bg); margin: 5% auto; padding: 2rem; border: 1px solid var(--border-color); border-radius: 12px; width: 90%; max-width: 700px; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3); }
+        .modal-content { background-color: var(--card-bg); margin: 5% auto; padding: 2rem; border: 1px solid var(--border-color); border-radius: 12px; width: 90%; max-width: 600px; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3); }
         .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; padding-bottom: 1rem; border-bottom: 2px solid var(--border-color); }
         .modal-header h2 { margin: 0; color: var(--tertiary-color); font-size: 1.5rem; }
         .close { color: #aaa; font-size: 28px; font-weight: bold; cursor: pointer; transition: color 0.2s ease; }
         .close:hover { color: var(--tertiary-color); }
-        .tip-details { line-height: 1.8; }
-        .tip-details p { margin-bottom: 1rem; }
-        .tip-details strong { color: var(--tertiary-color); }
         .form-group { margin-bottom: 1.25rem; }
         .form-group label { display: block; margin-bottom: 0.5rem; color: var(--text-color); font-weight: 500; font-size: 0.95rem; }
         .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 8px; font-size: 0.95rem; font-family: var(--font-family); transition: all 0.2s ease; box-sizing: border-box; }
@@ -125,7 +129,10 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
         .btn-cancel:hover { background: #5a6268; }
         .btn-save { padding: 0.75rem 1.5rem; background: var(--primary-color); color: #fff; border: none; border-radius: 8px; font-size: 0.95rem; font-weight: 600; cursor: pointer; transition: all 0.2s ease; }
         .btn-save:hover { background: #4ca8a6; }
-        @media (max-width: 768px) { .sidebar { width: 320px; transform: translateX(-100%); transition: transform 0.3s ease; } .sidebar.mobile-open { transform: translateX(0); } .sidebar.collapsed { width: 80px; transform: translateX(0); } .main-wrapper { margin-left: 0; } body.sidebar-collapsed .main-wrapper { margin-left: 80px; } .modal-content { width: 95%; margin: 10% auto; padding: 1.5rem; } }
+        .camera-details { line-height: 1.8; }
+        .camera-details p { margin-bottom: 1rem; }
+        .camera-details strong { color: var(--tertiary-color); }
+        @media (max-width: 768px) { .sidebar { width: 320px; transform: translateX(-100%); transition: transform 0.3s ease; } .sidebar.mobile-open { transform: translateX(0); } .sidebar.collapsed { width: 80px; transform: translateX(0); } .main-wrapper { margin-left: 0; } body.sidebar-collapsed .main-wrapper { margin-left: 80px; } .modal-content { width: 95%; margin: 10% auto; padding: 1.5rem; } .search-container { flex-direction: column; } .btn-add { width: 100%; justify-content: center; } }
     </style>
 </head>
 <body>
@@ -155,7 +162,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                     </a>
                 </div>
             </div>
-            <div class="nav-module">
+            <div class="nav-module active">
                 <div class="nav-module-header" onclick="toggleModule(this)" data-tooltip="CCTV Surveillance System Management">
                     <span class="nav-module-icon"><i class="fas fa-video"></i></span>
                     <span class="nav-module-header-text">CCTV Surveillance System Management</span>
@@ -170,7 +177,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                         <span class="nav-submodule-icon"><i class="fas fa-play"></i></span>
                         <span class="nav-submodule-text">Playback</span>
                     </a>
-                    <a href="camera-management.php" class="nav-submodule" data-tooltip="Camera Management">
+                    <a href="camera-management.php" class="nav-submodule active" data-tooltip="Camera Management">
                         <span class="nav-submodule-icon"><i class="fas fa-camera"></i></span>
                         <span class="nav-submodule-text">Camera Management</span>
                     </a>
@@ -193,14 +200,14 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                     </a>
                 </div>
             </div>
-            <div class="nav-module active">
+            <div class="nav-module">
                 <div class="nav-module-header" onclick="toggleModule(this)" data-tooltip="Volunteer Registry and Scheduling">
                     <span class="nav-module-icon"><i class="fas fa-handshake"></i></span>
                     <span class="nav-module-header-text">Volunteer Registry and Scheduling</span>
                     <span class="arrow">▶</span>
                 </div>
                 <div class="nav-submodules">
-                    <a href="volunteer-list.php" class="nav-submodule active" data-tooltip="Volunteer List">
+                    <a href="volunteer-list.php" class="nav-submodule" data-tooltip="Volunteer List">
                         <span class="nav-submodule-icon"><i class="fas fa-user"></i></span>
                         <span class="nav-submodule-text">Volunteer List</span>
                     </a>
@@ -244,7 +251,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                     </a>
                 </div>
             </div>
-            <div class="nav-module active">
+            <div class="nav-module">
                 <div class="nav-module-header" onclick="toggleModule(this)" data-tooltip="Anonymous Tip Line System">
                     <span class="nav-module-icon"><i class="fas fa-comments"></i></span>
                     <span class="nav-module-header-text">Anonymous Tip Line System</span>
@@ -255,7 +262,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                         <span class="nav-submodule-icon"><i class="fas fa-envelope"></i></span>
                         <span class="nav-submodule-text">Submit Tip</span>
                     </a>
-                    <a href="review-tip.php" class="nav-submodule active" data-tooltip="Review Tip">
+                    <a href="review-tip.php" class="nav-submodule" data-tooltip="Review Tip">
                         <span class="nav-submodule-icon"><i class="fas fa-eye"></i></span>
                         <span class="nav-submodule-text">Review Tip</span>
                     </a>
@@ -269,7 +276,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                 <button class="content-burger-btn" onclick="toggleSidebar()" aria-label="Toggle sidebar">
                     <span></span>
                 </button>
-                <h1 class="page-title">Review Tip</h1>
+                <h1 class="page-title">Camera Management</h1>
             </div>
             <div class="user-info">
                 <span>Welcome, <?php echo htmlspecialchars($_SESSION['username'] ?? 'Admin'); ?></span>
@@ -278,97 +285,66 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
         </header>
         <main class="content-area">
             <div class="page-content">
-                <div class="search-box">
-                    <input type="text" id="searchInput" placeholder="Search tips by category, date, or location..." onkeyup="filterTips()">
+                <div class="search-container">
+                    <div class="search-box">
+                        <input type="text" id="searchInput" placeholder="Search cameras by name, location, or status..." onkeyup="filterCameras()">
+                    </div>
+                    <button class="btn-add" onclick="openAddCameraModal()">
+                        <i class="fas fa-plus"></i> Add Camera
+                    </button>
                 </div>
                 <div class="table-container">
-                    <table id="tipsTable">
+                    <table id="camerasTable">
                         <thead>
                             <tr>
-                                <th>Tip ID</th>
-                                <th>Category</th>
-                                <th>Date</th>
+                                <th>Camera ID</th>
+                                <th>Camera Name</th>
                                 <th>Location</th>
+                                <th>IP Address</th>
                                 <th>Status</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
-                        <tbody id="tipsTableBody">
-                            <tr data-tip-id="1">
-                                <td>TIP-2025-001</td>
-                                <td>Suspicious Activity</td>
-                                <td>2025-01-15</td>
+                        <tbody id="camerasTableBody">
+                            <tr data-camera-id="1">
+                                <td>CAM-001</td>
+                                <td>Main Entrance Camera</td>
                                 <td>Susano Road, Barangay San Agustin, Quezon City</td>
-                                <td><span class="status-badge status-pending">Under Review</span></td>
+                                <td>192.168.1.101</td>
+                                <td><span class="status-badge status-online">Online</span></td>
                                 <td>
                                     <div class="action-buttons">
-                                        <button class="btn-view" onclick="viewTip('1')">View</button>
-                                        <button class="btn-edit" onclick="editTip('1')">Edit</button>
+                                        <button class="btn-view" onclick="viewCamera('1')">View</button>
+                                        <button class="btn-edit" onclick="editCamera('1')">Edit</button>
+                                        <button class="btn-delete" onclick="deleteCamera('1')">Delete</button>
                                     </div>
                                 </td>
                             </tr>
-                            <tr data-tip-id="2">
-                                <td>TIP-2025-002</td>
-                                <td>Safety Concern</td>
-                                <td>2025-01-14</td>
+                            <tr data-camera-id="2">
+                                <td>CAM-002</td>
+                                <td>Barangay Hall Camera</td>
                                 <td>Paraiso St., Barangay San Agustin, Quezon City</td>
-                                <td><span class="status-badge status-resolved">Reviewed</span></td>
+                                <td>192.168.1.102</td>
+                                <td><span class="status-badge status-online">Online</span></td>
                                 <td>
                                     <div class="action-buttons">
-                                        <button class="btn-view" onclick="viewTip('2')">View</button>
-                                        <button class="btn-edit" onclick="editTip('2')">Edit</button>
+                                        <button class="btn-view" onclick="viewCamera('2')">View</button>
+                                        <button class="btn-edit" onclick="editCamera('2')">Edit</button>
+                                        <button class="btn-delete" onclick="deleteCamera('2')">Delete</button>
                                     </div>
                                 </td>
                             </tr>
-                            <tr data-tip-id="3">
-                                <td>TIP-2025-003</td>
-                                <td>Vandalism</td>
-                                <td>2025-01-13</td>
+                            <tr data-camera-id="3">
+                                <td>CAM-003</td>
+                                <td>Community Center Camera</td>
                                 <td>Clemente St., Barangay San Agustin, Quezon City</td>
-                                <td><span class="status-badge status-pending">Under Review</span></td>
+                                <td>192.168.1.103</td>
+                                <td><span class="status-badge status-offline">Offline</span></td>
                                 <td>
                                     <div class="action-buttons">
-                                        <button class="btn-view" onclick="viewTip('3')">View</button>
-                                        <button class="btn-edit" onclick="editTip('3')">Edit</button>
-                                    </div>
-                                </td>
-                            </tr>
-                            <tr data-tip-id="4">
-                                <td>TIP-2025-004</td>
-                                <td>Noise Complaint</td>
-                                <td>2025-01-12</td>
-                                <td>Clemente Subd., Barangay San Agustin, Quezon City</td>
-                                <td><span class="status-badge status-resolved">Reviewed</span></td>
-                                <td>
-                                    <div class="action-buttons">
-                                        <button class="btn-view" onclick="viewTip('4')">View</button>
-                                        <button class="btn-edit" onclick="editTip('4')">Edit</button>
-                                    </div>
-                                </td>
-                            </tr>
-                            <tr data-tip-id="5">
-                                <td>TIP-2025-005</td>
-                                <td>Suspicious Activity</td>
-                                <td>2025-01-11</td>
-                                <td>Patnubay St., Barangay San Agustin, Quezon City</td>
-                                <td><span class="status-badge status-pending">Under Review</span></td>
-                                <td>
-                                    <div class="action-buttons">
-                                        <button class="btn-view" onclick="viewTip('5')">View</button>
-                                        <button class="btn-edit" onclick="editTip('5')">Edit</button>
-                                    </div>
-                                </td>
-                            </tr>
-                            <tr data-tip-id="6">
-                                <td>TIP-2025-006</td>
-                                <td>Safety Concern</td>
-                                <td>2025-01-10</td>
-                                <td>Katarungan St., Barangay San Agustin, Quezon City</td>
-                                <td><span class="status-badge status-resolved">Reviewed</span></td>
-                                <td>
-                                    <div class="action-buttons">
-                                        <button class="btn-view" onclick="viewTip('6')">View</button>
-                                        <button class="btn-edit" onclick="editTip('6')">Edit</button>
+                                        <button class="btn-view" onclick="viewCamera('3')">View</button>
+                                        <button class="btn-edit" onclick="editCamera('3')">Edit</button>
+                                        <button class="btn-delete" onclick="deleteCamera('3')">Delete</button>
                                     </div>
                                 </td>
                             </tr>
@@ -379,50 +355,21 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
         </main>
     </div>
 
-    <!-- View Tip Modal -->
-    <div id="viewTipModal" class="modal">
+    <!-- Add Camera Modal -->
+    <div id="addCameraModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h2>Tip Details</h2>
-                <span class="close" onclick="closeViewTipModal()">&times;</span>
+                <h2>Add Camera</h2>
+                <span class="close" onclick="closeAddCameraModal()">&times;</span>
             </div>
-            <div id="viewTipContent" class="tip-details">
-                <!-- Content will be populated by JavaScript -->
-            </div>
-            <div class="form-actions">
-                <button type="button" class="btn-cancel" onclick="closeViewTipModal()">Close</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Edit Tip Modal -->
-    <div id="editTipModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2>Edit Tip</h2>
-                <span class="close" onclick="closeEditTipModal()">&times;</span>
-            </div>
-            <form id="editTipForm" onsubmit="updateTip(event)">
-                <input type="hidden" id="editTipId" name="id">
+            <form id="addCameraForm" onsubmit="saveCamera(event)">
                 <div class="form-group">
-                    <label for="editTipCategory">Category *</label>
-                    <select id="editTipCategory" name="category" required>
-                        <option value="">Select Category</option>
-                        <option value="Suspicious Activity">Suspicious Activity</option>
-                        <option value="Safety Concern">Safety Concern</option>
-                        <option value="Vandalism">Vandalism</option>
-                        <option value="Noise Complaint">Noise Complaint</option>
-                        <option value="Illegal Activity">Illegal Activity</option>
-                        <option value="Other">Other</option>
-                    </select>
+                    <label for="cameraName">Camera Name *</label>
+                    <input type="text" id="cameraName" name="cameraName" required>
                 </div>
                 <div class="form-group">
-                    <label for="editTipDate">Date *</label>
-                    <input type="date" id="editTipDate" name="date" required>
-                </div>
-                <div class="form-group">
-                    <label for="editTipLocation">Location *</label>
-                    <select id="editTipLocation" name="location" required>
+                    <label for="cameraLocation">Location *</label>
+                    <select id="cameraLocation" name="location" required>
                         <option value="">Select Location</option>
                         <option value="Susano Road, Barangay San Agustin, Quezon City">Susano Road, Barangay San Agustin, Quezon City</option>
                         <option value="Paraiso St., Barangay San Agustin, Quezon City">Paraiso St., Barangay San Agustin, Quezon City</option>
@@ -433,21 +380,89 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                     </select>
                 </div>
                 <div class="form-group">
-                    <label for="editTipStatus">Status *</label>
-                    <select id="editTipStatus" name="status" required>
-                        <option value="Under Review">Under Review</option>
-                        <option value="Reviewed">Reviewed</option>
-                        <option value="Resolved">Resolved</option>
-                        <option value="Dismissed">Dismissed</option>
+                    <label for="cameraIP">IP Address *</label>
+                    <input type="text" id="cameraIP" name="ipAddress" placeholder="192.168.1.xxx" pattern="^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$" required>
+                </div>
+                <div class="form-group">
+                    <label for="cameraStatus">Status *</label>
+                    <select id="cameraStatus" name="status" required>
+                        <option value="Online">Online</option>
+                        <option value="Offline">Offline</option>
+                        <option value="Maintenance">Maintenance</option>
                     </select>
                 </div>
                 <div class="form-group">
-                    <label for="editTipDescription">Description</label>
-                    <textarea id="editTipDescription" name="description" placeholder="Tip description..."></textarea>
+                    <label for="cameraDescription">Description</label>
+                    <textarea id="cameraDescription" name="description" placeholder="Camera description or notes..."></textarea>
                 </div>
                 <div class="form-actions">
-                    <button type="button" class="btn-cancel" onclick="closeEditTipModal()">Cancel</button>
-                    <button type="submit" class="btn-save">Update Tip</button>
+                    <button type="button" class="btn-cancel" onclick="closeAddCameraModal()">Cancel</button>
+                    <button type="submit" class="btn-save">Add Camera</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- View Camera Modal -->
+    <div id="viewCameraModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Camera Details</h2>
+                <span class="close" onclick="closeViewCameraModal()">&times;</span>
+            </div>
+            <div id="viewCameraContent" class="camera-details">
+                <!-- Content will be populated by JavaScript -->
+            </div>
+            <div class="form-actions">
+                <button type="button" class="btn-cancel" onclick="closeViewCameraModal()">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Camera Modal -->
+    <div id="editCameraModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Edit Camera</h2>
+                <span class="close" onclick="closeEditCameraModal()">&times;</span>
+            </div>
+            <form id="editCameraForm" onsubmit="updateCamera(event)">
+                <input type="hidden" id="editCameraId" name="id">
+                <div class="form-group">
+                    <label for="editCameraName">Camera Name *</label>
+                    <input type="text" id="editCameraName" name="cameraName" required>
+                </div>
+                <div class="form-group">
+                    <label for="editCameraLocation">Location *</label>
+                    <select id="editCameraLocation" name="location" required>
+                        <option value="">Select Location</option>
+                        <option value="Susano Road, Barangay San Agustin, Quezon City">Susano Road, Barangay San Agustin, Quezon City</option>
+                        <option value="Paraiso St., Barangay San Agustin, Quezon City">Paraiso St., Barangay San Agustin, Quezon City</option>
+                        <option value="Clemente St., Barangay San Agustin, Quezon City">Clemente St., Barangay San Agustin, Quezon City</option>
+                        <option value="Clemente Subd., Barangay San Agustin, Quezon City">Clemente Subd., Barangay San Agustin, Quezon City</option>
+                        <option value="Patnubay St., Barangay San Agustin, Quezon City">Patnubay St., Barangay San Agustin, Quezon City</option>
+                        <option value="Katarungan St., Barangay San Agustin, Quezon City">Katarungan St., Barangay San Agustin, Quezon City</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="editCameraIP">IP Address *</label>
+                    <input type="text" id="editCameraIP" name="ipAddress" placeholder="192.168.1.xxx" pattern="^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$" required>
+                </div>
+                <div class="form-group">
+                    <label for="editCameraStatus">Status *</label>
+                    <select id="editCameraStatus" name="status" required>
+                        <option value="Online">Online</option>
+                        <option value="Offline">Offline</option>
+                        <option value="Maintenance">Maintenance</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="editCameraDescription">Description</label>
+                    <textarea id="editCameraDescription" name="description" placeholder="Camera description or notes..."></textarea>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn-cancel" onclick="closeEditCameraModal()">Cancel</button>
+                    <button type="submit" class="btn-save">Update Camera</button>
                 </div>
             </form>
         </div>
@@ -461,7 +476,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                 sidebar.classList.add('collapsed');
                 document.body.classList.add('sidebar-collapsed');
             }
-            initializeTipData();
+            initializeCameraData();
         });
         function toggleSidebar() {
             const sidebar = document.getElementById('sidebar');
@@ -495,10 +510,10 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             document.querySelectorAll('.nav-module').forEach(m => { m.classList.remove('active'); });
             if (!isActive) { module.classList.add('active'); }
         }
-        function filterTips() {
+        function filterCameras() {
             const input = document.getElementById('searchInput');
             const filter = input.value.toLowerCase();
-            const table = document.getElementById('tipsTableBody');
+            const table = document.getElementById('camerasTableBody');
             const rows = table.getElementsByTagName('tr');
             for (let i = 0; i < rows.length; i++) {
                 const row = rows[i];
@@ -510,117 +525,190 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                 }
             }
         }
-        // Initialize tip data
-        let tipData = {};
+
+        // Initialize camera data
+        let cameraData = {};
         
-        function initializeTipData() {
-            const tableBody = document.getElementById('tipsTableBody');
-            const rows = tableBody.querySelectorAll('tr[data-tip-id]');
+        function initializeCameraData() {
+            const tableBody = document.getElementById('camerasTableBody');
+            const rows = tableBody.querySelectorAll('tr[data-camera-id]');
             
             rows.forEach(row => {
-                const id = row.getAttribute('data-tip-id');
+                const id = row.getAttribute('data-camera-id');
                 const cells = row.querySelectorAll('td');
                 
-                tipData[id] = {
+                cameraData[id] = {
                     id: id,
-                    tipId: cells[0].textContent.trim(),
-                    category: cells[1].textContent.trim(),
-                    date: cells[2].textContent.trim(),
-                    location: cells[3].textContent.trim(),
+                    cameraId: cells[0].textContent.trim(),
+                    name: cells[1].textContent.trim(),
+                    location: cells[2].textContent.trim(),
+                    ipAddress: cells[3].textContent.trim(),
                     status: cells[4].querySelector('.status-badge').textContent.trim(),
                     description: ''
                 };
             });
         }
 
-        function viewTip(id) {
-            const tip = tipData[id];
-            if (!tip) {
-                alert('Tip not found');
+        function openAddCameraModal() {
+            document.getElementById('addCameraModal').style.display = 'block';
+            document.getElementById('addCameraForm').reset();
+        }
+
+        function closeAddCameraModal() {
+            document.getElementById('addCameraModal').style.display = 'none';
+        }
+
+        function viewCamera(id) {
+            const camera = cameraData[id];
+            if (!camera) {
+                alert('Camera not found');
                 return;
             }
             
             const content = `
-                <p><strong>Tip ID:</strong> ${tip.tipId}</p>
-                <p><strong>Category:</strong> ${tip.category}</p>
-                <p><strong>Date:</strong> ${tip.date}</p>
-                <p><strong>Location:</strong> ${tip.location}</p>
-                <p><strong>Status:</strong> ${tip.status}</p>
-                ${tip.description ? `<p><strong>Description:</strong><br>${tip.description}</p>` : '<p><strong>Description:</strong> No description provided.</p>'}
+                <p><strong>Camera ID:</strong> ${camera.cameraId}</p>
+                <p><strong>Camera Name:</strong> ${camera.name}</p>
+                <p><strong>Location:</strong> ${camera.location}</p>
+                <p><strong>IP Address:</strong> ${camera.ipAddress}</p>
+                <p><strong>Status:</strong> ${camera.status}</p>
+                ${camera.description ? `<p><strong>Description:</strong><br>${camera.description}</p>` : '<p><strong>Description:</strong> No description provided.</p>'}
             `;
             
-            document.getElementById('viewTipContent').innerHTML = content;
-            document.getElementById('viewTipModal').style.display = 'block';
+            document.getElementById('viewCameraContent').innerHTML = content;
+            document.getElementById('viewCameraModal').style.display = 'block';
         }
 
-        function closeViewTipModal() {
-            document.getElementById('viewTipModal').style.display = 'none';
+        function closeViewCameraModal() {
+            document.getElementById('viewCameraModal').style.display = 'none';
         }
 
-        function editTip(id) {
-            const tip = tipData[id];
-            if (!tip) return;
+        function editCamera(id) {
+            const camera = cameraData[id];
+            if (!camera) return;
             
-            document.getElementById('editTipId').value = tip.id;
-            document.getElementById('editTipCategory').value = tip.category;
-            document.getElementById('editTipDate').value = tip.date;
-            document.getElementById('editTipLocation').value = tip.location;
-            document.getElementById('editTipStatus').value = tip.status;
-            document.getElementById('editTipDescription').value = tip.description || '';
+            document.getElementById('editCameraId').value = camera.id;
+            document.getElementById('editCameraName').value = camera.name;
+            document.getElementById('editCameraLocation').value = camera.location;
+            document.getElementById('editCameraIP').value = camera.ipAddress;
+            document.getElementById('editCameraStatus').value = camera.status;
+            document.getElementById('editCameraDescription').value = camera.description || '';
             
-            document.getElementById('editTipModal').style.display = 'block';
+            document.getElementById('editCameraModal').style.display = 'block';
         }
 
-        function closeEditTipModal() {
-            document.getElementById('editTipModal').style.display = 'none';
+        function closeEditCameraModal() {
+            document.getElementById('editCameraModal').style.display = 'none';
         }
 
-        function updateTip(event) {
+        function deleteCamera(id) {
+            if (!confirm('Are you sure you want to delete this camera?')) {
+                return;
+            }
+            
+            const row = document.querySelector(`tr[data-camera-id="${id}"]`);
+            if (row) {
+                row.remove();
+                delete cameraData[id];
+            }
+        }
+
+        function saveCamera(event) {
+            event.preventDefault();
+            
+            const formData = new FormData(event.target);
+            const id = Date.now().toString();
+            const cameraId = 'CAM-' + String(Math.floor(Math.random() * 900) + 100).padStart(3, '0');
+            
+            const camera = {
+                id: id,
+                cameraId: cameraId,
+                name: formData.get('cameraName'),
+                location: formData.get('location'),
+                ipAddress: formData.get('ipAddress'),
+                status: formData.get('status'),
+                description: formData.get('description') || ''
+            };
+            
+            cameraData[id] = camera;
+            
+            const tableBody = document.getElementById('camerasTableBody');
+            const row = document.createElement('tr');
+            row.setAttribute('data-camera-id', id);
+            
+            const statusClass = camera.status === 'Online' ? 'status-online' : 
+                                camera.status === 'Offline' ? 'status-offline' : 
+                                'status-maintenance';
+            
+            row.innerHTML = `
+                <td>${camera.cameraId}</td>
+                <td>${camera.name}</td>
+                <td>${camera.location}</td>
+                <td>${camera.ipAddress}</td>
+                <td><span class="status-badge ${statusClass}">${camera.status}</span></td>
+                <td>
+                    <div class="action-buttons">
+                        <button class="btn-view" onclick="viewCamera('${id}')">View</button>
+                        <button class="btn-edit" onclick="editCamera('${id}')">Edit</button>
+                        <button class="btn-delete" onclick="deleteCamera('${id}')">Delete</button>
+                    </div>
+                </td>
+            `;
+            
+            tableBody.appendChild(row);
+            closeAddCameraModal();
+        }
+
+        function updateCamera(event) {
             event.preventDefault();
             
             const formData = new FormData(event.target);
             const id = formData.get('id');
             
-            const updatedTip = {
+            const camera = {
                 id: id,
-                tipId: tipData[id].tipId,
-                category: formData.get('category'),
-                date: formData.get('date'),
+                cameraId: cameraData[id].cameraId,
+                name: formData.get('cameraName'),
                 location: formData.get('location'),
+                ipAddress: formData.get('ipAddress'),
                 status: formData.get('status'),
                 description: formData.get('description') || ''
             };
             
-            tipData[id] = updatedTip;
+            cameraData[id] = camera;
             
-            const row = document.querySelector(`tr[data-tip-id="${id}"]`);
+            const row = document.querySelector(`tr[data-camera-id="${id}"]`);
             if (row) {
                 const cells = row.querySelectorAll('td');
-                cells[1].textContent = updatedTip.category;
-                cells[2].textContent = updatedTip.date;
-                cells[3].textContent = updatedTip.location;
+                cells[1].textContent = camera.name;
+                cells[2].textContent = camera.location;
+                cells[3].textContent = camera.ipAddress;
                 
-                const statusClass = updatedTip.status === 'Reviewed' || updatedTip.status === 'Resolved' ? 'status-resolved' : 'status-pending';
+                const statusClass = camera.status === 'Online' ? 'status-online' : 
+                                    camera.status === 'Offline' ? 'status-offline' : 
+                                    'status-maintenance';
                 
-                cells[4].innerHTML = `<span class="status-badge ${statusClass}">${updatedTip.status}</span>`;
+                cells[4].innerHTML = `<span class="status-badge ${statusClass}">${camera.status}</span>`;
             }
             
-            closeEditTipModal();
+            closeEditCameraModal();
         }
 
         // Close modal when clicking outside
         window.onclick = function(event) {
-            const viewModal = document.getElementById('viewTipModal');
-            const editModal = document.getElementById('editTipModal');
+            const addModal = document.getElementById('addCameraModal');
+            const viewModal = document.getElementById('viewCameraModal');
+            const editModal = document.getElementById('editCameraModal');
             
+            if (event.target === addModal) {
+                closeAddCameraModal();
+            }
             if (event.target === viewModal) {
-                closeViewTipModal();
+                closeViewCameraModal();
             }
             if (event.target === editModal) {
-                closeEditTipModal();
+                closeEditCameraModal();
             }
         }
-
     </script>
 </body>
 </html>

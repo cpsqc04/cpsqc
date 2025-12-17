@@ -637,10 +637,118 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             background: #4ca8a6;
         }
         
+        .btn-submit:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        
         .form-row {
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 1rem;
+        }
+        
+        /* Success Modal */
+        .success-modal {
+            display: none;
+            position: fixed;
+            z-index: 2000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(4px);
+        }
+        
+        .success-modal.active {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .success-modal-content {
+            background: var(--card-bg);
+            border-radius: 12px;
+            padding: 2rem;
+            max-width: 500px;
+            width: 90%;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+            text-align: center;
+        }
+        
+        .success-icon {
+            width: 80px;
+            height: 80px;
+            margin: 0 auto 1.5rem;
+            background: #d1e7dd;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2.5rem;
+            color: #0f5132;
+        }
+        
+        .success-modal-content h2 {
+            color: var(--tertiary-color);
+            margin-bottom: 1rem;
+        }
+        
+        .success-modal-content p {
+            color: var(--text-color);
+            margin-bottom: 0.5rem;
+        }
+        
+        .complaint-id-display {
+            background: #f9f9f9;
+            padding: 1rem;
+            border-radius: 8px;
+            margin: 1rem 0;
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--primary-color);
+        }
+        
+        .success-modal-actions {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            margin-top: 1.5rem;
+        }
+        
+        .btn-secondary {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            background: #e5e5e5;
+            color: var(--text-color);
+        }
+        
+        .btn-secondary:hover {
+            background: #d5d5d5;
+        }
+        
+        .btn-primary {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            background: var(--primary-color);
+            color: #fff;
+            text-decoration: none;
+            display: inline-block;
+        }
+        
+        .btn-primary:hover {
+            background: #4ca8a6;
         }
         
         @media (max-width: 768px) {
@@ -709,13 +817,17 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                     <span class="arrow">▶</span>
                 </div>
                 <div class="nav-submodules">
-                    <a href="#" class="nav-submodule" data-tooltip="Live View">
+                    <a href="live-view.php" class="nav-submodule" data-tooltip="Live View">
                         <span class="nav-submodule-icon"><i class="fas fa-circle" style="color: #ff4444;"></i></span>
                         <span class="nav-submodule-text">Live View</span>
                     </a>
-                    <a href="#" class="nav-submodule" data-tooltip="Playback">
+                    <a href="playback.php" class="nav-submodule" data-tooltip="Playback">
                         <span class="nav-submodule-icon"><i class="fas fa-play"></i></span>
                         <span class="nav-submodule-text">Playback</span>
+                    </a>
+                    <a href="camera-management.php" class="nav-submodule" data-tooltip="Camera Management">
+                        <span class="nav-submodule-icon"><i class="fas fa-camera"></i></span>
+                        <span class="nav-submodule-text">Camera Management</span>
                     </a>
                 </div>
             </div>
@@ -894,6 +1006,21 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
         </main>
     </div>
     
+    <!-- Success Modal -->
+    <div id="successModal" class="success-modal">
+        <div class="success-modal-content">
+            <div class="success-icon">✓</div>
+            <h2>Complaint Submitted Successfully!</h2>
+            <p>Your complaint has been received and will be processed.</p>
+            <div class="complaint-id-display" id="complaintIdDisplay"></div>
+            <p style="font-size: 0.9rem; color: var(--text-secondary);">Please save this Complaint ID for tracking purposes.</p>
+            <div class="success-modal-actions">
+                <button type="button" class="btn-secondary" onclick="closeSuccessModal()">Submit Another</button>
+                <a href="track-complaint.php" class="btn-primary">Track Complaint</a>
+            </div>
+        </div>
+    </div>
+    
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             const sidebar = document.getElementById('sidebar');
@@ -951,10 +1078,77 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             }
         }
         
+        // Generate unique complaint ID
+        function generateComplaintId() {
+            const year = new Date().getFullYear();
+            const timestamp = Date.now();
+            const random = Math.floor(Math.random() * 1000);
+            return `COMP-${year}-${String(random).padStart(3, '0')}`;
+        }
+        
+        // Get next complaint number from localStorage
+        function getNextComplaintNumber() {
+            let lastNumber = localStorage.getItem('lastComplaintNumber');
+            if (!lastNumber) {
+                lastNumber = 0;
+            }
+            lastNumber = parseInt(lastNumber) + 1;
+            localStorage.setItem('lastComplaintNumber', lastNumber);
+            return lastNumber;
+        }
+        
         function submitComplaint(event) {
             event.preventDefault();
-            alert('Complaint submitted successfully! (This is a demo - backend integration needed)');
+            
+            // Disable submit button to prevent double submission
+            const submitBtn = event.target.querySelector('.btn-submit');
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Submitting...';
+            
+            // Get form values
+            const formData = {
+                id: generateComplaintId(),
+                complainant: document.getElementById('complainantName').value.trim(),
+                contact: document.getElementById('complainantContact').value.trim(),
+                address: document.getElementById('complainantAddress').value.trim(),
+                date: document.getElementById('complaintDate').value,
+                type: document.getElementById('complaintType').value,
+                location: document.getElementById('complaintLocation').value.trim(),
+                description: document.getElementById('complaintDescription').value.trim(),
+                priority: document.getElementById('complaintPriority').value,
+                status: 'Pending',
+                assignedTo: 'Pending Assignment',
+                time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }),
+                submittedAt: new Date().toLocaleString('en-US', { 
+                    year: 'numeric', 
+                    month: '2-digit', 
+                    day: '2-digit', 
+                    hour: '2-digit', 
+                    minute: '2-digit',
+                    hour12: true 
+                }),
+                notes: 'Complaint submitted and awaiting review.'
+            };
+            
+            // Store complaint in localStorage
+            let complaints = JSON.parse(localStorage.getItem('complaints') || '[]');
+            complaints.push(formData);
+            localStorage.setItem('complaints', JSON.stringify(complaints));
+            
+            // Show success modal
+            document.getElementById('complaintIdDisplay').textContent = formData.id;
+            document.getElementById('successModal').classList.add('active');
+            
+            // Reset form
             document.getElementById('complaintForm').reset();
+            
+            // Re-enable submit button
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Submit Complaint';
+        }
+        
+        function closeSuccessModal() {
+            document.getElementById('successModal').classList.remove('active');
         }
         
         function resetForm() {
@@ -962,7 +1156,17 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                 document.getElementById('complaintForm').reset();
             }
         }
+        
+        // Set default date to today
+        document.addEventListener('DOMContentLoaded', function() {
+            const dateInput = document.getElementById('complaintDate');
+            if (dateInput) {
+                const today = new Date().toISOString().split('T')[0];
+                dateInput.setAttribute('max', today); // Prevent future dates
+            }
+        });
     </script>
 </body>
 </html>
+
 

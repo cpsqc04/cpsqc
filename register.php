@@ -1,20 +1,29 @@
 <?php 
-// Admin login page
+// Admin registration page
 session_start();
 
-// Temporary authentication (until database is set up)
+// Temporary registration (until database is set up)
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $username = $_POST['username'] ?? '';
     $password = $_POST['password'] ?? '';
+    $confirmPassword = $_POST['confirm_password'] ?? '';
+    $email = $_POST['email'] ?? '';
+    $fullName = $_POST['full_name'] ?? '';
     
-    if ($username === 'admin' && $password === 'admin123') {
-        $_SESSION['admin_logged_in'] = true;
-        $_SESSION['username'] = $username;
-        // Redirect to dashboard or home page
-        header('Location: index.php');
-        exit;
+    // Validation
+    if (empty($username) || empty($password) || empty($confirmPassword) || empty($email) || empty($fullName)) {
+        $error = 'All fields are required';
+    } elseif ($password !== $confirmPassword) {
+        $error = 'Passwords do not match';
+    } elseif (strlen($password) < 6) {
+        $error = 'Password must be at least 6 characters long';
     } else {
-        $error = 'Invalid username or password';
+        // In a real application, you would save this to a database
+        // For now, we'll just show a success message and redirect to login
+        $_SESSION['registration_success'] = true;
+        $_SESSION['registered_username'] = $username;
+        header('Location: login.php');
+        exit;
     }
 }
 
@@ -29,7 +38,7 @@ if (isset($_SESSION['admin_logged_in']) && $_SESSION['admin_logged_in'] === true
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Community Policing and Surveillance</title>
+    <title>Admin Registration - Community Policing and Surveillance</title>
     <link rel="icon" type="image/x-icon" href="images/favicon.ico">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="css/theme.css">
@@ -150,6 +159,7 @@ if (isset($_SESSION['admin_logged_in']) && $_SESSION['admin_logged_in'] === true
             color: #f8fafc;
             background: rgba(255, 255, 255, 0.08);
             transition: border-color 0.2s ease, box-shadow 0.2s ease;
+            box-sizing: border-box;
         }
         .field input:focus {
             outline: none;
@@ -177,6 +187,13 @@ if (isset($_SESSION['admin_logged_in']) && $_SESSION['admin_logged_in'] === true
         }
         .button-group .btn {
             flex: 1;
+        }
+        .button-group a {
+            flex: 1;
+            text-decoration: none;
+            display: inline-flex;
+            justify-content: center;
+            align-items: center;
         }
         .btn-secondary {
             background: transparent;
@@ -254,6 +271,15 @@ if (isset($_SESSION['admin_logged_in']) && $_SESSION['admin_logged_in'] === true
             margin: 0;
             font-size: 0.95rem;
         }
+        .error-message {
+            color: #ef4444;
+            font-size: 0.9rem;
+            padding: 0.75rem;
+            background: rgba(239, 68, 68, 0.1);
+            border-radius: 6px;
+            margin-bottom: 1rem;
+            border: 1px solid rgba(239, 68, 68, 0.2);
+        }
         @media (max-width: 900px) {
             .main-content {
                 grid-template-columns: 1fr;
@@ -289,38 +315,44 @@ if (isset($_SESSION['admin_logged_in']) && $_SESSION['admin_logged_in'] === true
                         <img src="images/tara.png" alt="A" class="logo-inline">
                         <span class="text-ler">ler</span><span class="text-taraqc">TaraQC</span>
                     </h1>
-                    <p>24/7 surveillance and instant alert system for potential threats.</p>
+                    <p>Create your admin account to access the Community Policing and Surveillance system.</p>
                 </div>
             </section>
 
-            <section class="login-card" aria-labelledby="login-title">
-                <h2 id="login-title">Login</h2>
-                <?php if (isset($_SESSION['registration_success'])): ?>
-                    <div style="color: #10b981; font-size: 0.9rem; padding: 0.75rem; background: rgba(16, 185, 129, 0.1); border-radius: 6px; margin-bottom: 1rem; border: 1px solid rgba(16, 185, 129, 0.2);">
-                        Registration successful! You can now login with username: <?php echo htmlspecialchars($_SESSION['registered_username'] ?? ''); ?>
-                    </div>
-                    <?php unset($_SESSION['registration_success'], $_SESSION['registered_username']); ?>
-                <?php endif; ?>
+            <section class="login-card" aria-labelledby="register-title">
+                <h2 id="register-title">Admin Registration</h2>
                 <?php if (isset($error)): ?>
-                    <div style="color: #ef4444; font-size: 0.9rem; padding: 0.75rem; background: rgba(239, 68, 68, 0.1); border-radius: 6px; margin-bottom: 1rem; border: 1px solid rgba(239, 68, 68, 0.2);">
+                    <div class="error-message">
                         <?php echo htmlspecialchars($error); ?>
                     </div>
                 <?php endif; ?>
                 <form method="POST" action="">
+                    <div class="field">
+                        <label for="full_name">Full Name</label>
+                        <input id="full_name" name="full_name" type="text" placeholder="Enter your full name" required>
+                    </div>
+                    <div class="field">
+                        <label for="email">Email</label>
+                        <input id="email" name="email" type="email" placeholder="Enter your email" required>
+                    </div>
                     <div class="field">
                         <label for="username">Username</label>
                         <input id="username" name="username" type="text" placeholder="Enter your username" required>
                     </div>
                     <div class="field">
                         <label for="password">Password</label>
-                        <input id="password" name="password" type="password" placeholder="••••••••" required>
+                        <input id="password" name="password" type="password" placeholder="••••••••" required minlength="6">
+                    </div>
+                    <div class="field">
+                        <label for="confirm_password">Confirm Password</label>
+                        <input id="confirm_password" name="confirm_password" type="password" placeholder="••••••••" required minlength="6">
                     </div>
                     <div class="actions">
-                        <a href="#">Forgot password?</a>
+                        <a href="login.php">Already have an account? Sign in</a>
                     </div>
                     <div class="button-group">
-                        <a href="register.php" class="btn btn-secondary" style="text-decoration: none; display: inline-flex; justify-content: center; align-items: center;">Register</a>
-                        <button class="btn" type="submit">Sign in</button>
+                        <a href="login.php" class="btn btn-secondary">Back to Login</a>
+                        <button class="btn" type="submit">Register</button>
                     </div>
                 </form>
             </section>
@@ -347,3 +379,4 @@ if (isset($_SESSION['admin_logged_in']) && $_SESSION['admin_logged_in'] === true
     </main>
 </body>
 </html>
+
