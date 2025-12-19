@@ -574,13 +574,13 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                 const zip = new JSZip();
 
                 // Create [Content_Types].xml
-                const contentTypes = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
-    <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
-    <Default Extension="xml" ContentType="application/xml"/>
-    <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
-    <Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>
-</Types>`;
+                const contentTypes = '<' + '?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' +
+'<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">\n' +
+'    <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>\n' +
+'    <Default Extension="xml" ContentType="application/xml"/>\n' +
+'    <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>\n' +
+'    <Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>\n' +
+'</Types>';
 
                 // Create word/document.xml with the actual content
                 const escapeXml = (text) => {
@@ -593,140 +593,140 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                         .replace(/'/g, '&apos;');
                 };
 
-                const documentXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
-    <w:body>
-        <w:p>
-            <w:pPr>
-                <w:jc w:val="center"/>
-                <w:spacing w:after="400"/>
-            </w:pPr>
-            <w:r>
-                <w:rPr>
-                    <w:b/>
-                    <w:sz w:val="32"/>
-                </w:rPr>
-                <w:t>PATROL LOG REPORT</w:t>
-            </w:r>
-        </w:p>
-        <w:p>
-            <w:pPr>
-                <w:jc w:val="center"/>
-                <w:spacing w:after="600"/>
-            </w:pPr>
-            <w:r>
-                <w:t>Barangay San Agustin, Quezon City</w:t>
-            </w:r>
-        </w:p>
-        <w:p>
-            <w:r>
-                <w:rPr><w:b/></w:rPr>
-                <w:t>Date:</w:t>
-            </w:r>
-            <w:r>
-                <w:t> ${escapeXml(log.date)}</w:t>
-            </w:r>
-        </w:p>
-        <w:p>
-            <w:r>
-                <w:rPr><w:b/></w:rPr>
-                <w:t>Time:</w:t>
-            </w:r>
-            <w:r>
-                <w:t> ${escapeXml(log.time)}</w:t>
-            </w:r>
-        </w:p>
-        <w:p>
-            <w:r>
-                <w:rPr><w:b/></w:rPr>
-                <w:t>Officer:</w:t>
-            </w:r>
-            <w:r>
-                <w:t> ${escapeXml(log.officer)}</w:t>
-            </w:r>
-        </w:p>
-        <w:p>
-            <w:r>
-                <w:rPr><w:b/></w:rPr>
-                <w:t>Route:</w:t>
-            </w:r>
-            <w:r>
-                <w:t> ${escapeXml(log.route)}</w:t>
-            </w:r>
-        </w:p>
-        <w:p>
-            <w:r>
-                <w:rPr><w:b/></w:rPr>
-                <w:t>Location:</w:t>
-            </w:r>
-            <w:r>
-                <w:t> ${escapeXml(log.location)}</w:t>
-            </w:r>
-        </w:p>
-        <w:p>
-            <w:r>
-                <w:rPr><w:b/></w:rPr>
-                <w:t>Status:</w:t>
-            </w:r>
-            <w:r>
-                <w:t> ${escapeXml(log.status)}</w:t>
-            </w:r>
-        </w:p>
-        <w:p>
-            <w:r>
-                <w:rPr><w:b/></w:rPr>
-                <w:t>Incidents:</w:t>
-            </w:r>
-            <w:r>
-                <w:t> ${escapeXml(log.incidents)}</w:t>
-            </w:r>
-        </w:p>
-        <w:p>
-            <w:pPr>
-                <w:spacing w:before="400"/>
-            </w:pPr>
-            <w:r>
-                <w:rPr><w:b/></w:rPr>
-                <w:t>Details:</w:t>
-            </w:r>
-        </w:p>
-        <w:p>
-            <w:r>
-                <w:t>${escapeXml(log.details)}</w:t>
-            </w:r>
-        </w:p>
-        <w:p>
-            <w:pPr>
-                <w:jc w:val="right"/>
-                <w:spacing w:before="600"/>
-            </w:pPr>
-            <w:r>
-                <w:t>Generated on: ${escapeXml(new Date().toLocaleString())}</w:t>
-            </w:r>
-        </w:p>
-    </w:body>
-</w:document>`;
+                const documentXml = '<' + '?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' +
+'<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">\n' +
+'    <w:body>\n' +
+'        <w:p>\n' +
+'            <w:pPr>\n' +
+'                <w:jc w:val="center"/>\n' +
+'                <w:spacing w:after="400"/>\n' +
+'            </w:pPr>\n' +
+'            <w:r>\n' +
+'                <w:rPr>\n' +
+'                    <w:b/>\n' +
+'                    <w:sz w:val="32"/>\n' +
+'                </w:rPr>\n' +
+'                <w:t>PATROL LOG REPORT</w:t>\n' +
+'            </w:r>\n' +
+'        </w:p>\n' +
+'        <w:p>\n' +
+'            <w:pPr>\n' +
+'                <w:jc w:val="center"/>\n' +
+'                <w:spacing w:after="600"/>\n' +
+'            </w:pPr>\n' +
+'            <w:r>\n' +
+'                <w:t>Barangay San Agustin, Quezon City</w:t>\n' +
+'            </w:r>\n' +
+'        </w:p>\n' +
+'        <w:p>\n' +
+'            <w:r>\n' +
+'                <w:rPr><w:b/></w:rPr>\n' +
+'                <w:t>Date:</w:t>\n' +
+'            </w:r>\n' +
+'            <w:r>\n' +
+'                <w:t> ' + escapeXml(log.date) + '</w:t>\n' +
+'            </w:r>\n' +
+'        </w:p>\n' +
+'        <w:p>\n' +
+'            <w:r>\n' +
+'                <w:rPr><w:b/></w:rPr>\n' +
+'                <w:t>Time:</w:t>\n' +
+'            </w:r>\n' +
+'            <w:r>\n' +
+'                <w:t> ' + escapeXml(log.time) + '</w:t>\n' +
+'            </w:r>\n' +
+'        </w:p>\n' +
+'        <w:p>\n' +
+'            <w:r>\n' +
+'                <w:rPr><w:b/></w:rPr>\n' +
+'                <w:t>Officer:</w:t>\n' +
+'            </w:r>\n' +
+'            <w:r>\n' +
+'                <w:t> ' + escapeXml(log.officer) + '</w:t>\n' +
+'            </w:r>\n' +
+'        </w:p>\n' +
+'        <w:p>\n' +
+'            <w:r>\n' +
+'                <w:rPr><w:b/></w:rPr>\n' +
+'                <w:t>Route:</w:t>\n' +
+'            </w:r>\n' +
+'            <w:r>\n' +
+'                <w:t> ' + escapeXml(log.route) + '</w:t>\n' +
+'            </w:r>\n' +
+'        </w:p>\n' +
+'        <w:p>\n' +
+'            <w:r>\n' +
+'                <w:rPr><w:b/></w:rPr>\n' +
+'                <w:t>Location:</w:t>\n' +
+'            </w:r>\n' +
+'            <w:r>\n' +
+'                <w:t> ' + escapeXml(log.location) + '</w:t>\n' +
+'            </w:r>\n' +
+'        </w:p>\n' +
+'        <w:p>\n' +
+'            <w:r>\n' +
+'                <w:rPr><w:b/></w:rPr>\n' +
+'                <w:t>Status:</w:t>\n' +
+'            </w:r>\n' +
+'            <w:r>\n' +
+'                <w:t> ' + escapeXml(log.status) + '</w:t>\n' +
+'            </w:r>\n' +
+'        </w:p>\n' +
+'        <w:p>\n' +
+'            <w:r>\n' +
+'                <w:rPr><w:b/></w:rPr>\n' +
+'                <w:t>Incidents:</w:t>\n' +
+'            </w:r>\n' +
+'            <w:r>\n' +
+'                <w:t> ' + escapeXml(log.incidents) + '</w:t>\n' +
+'            </w:r>\n' +
+'        </w:p>\n' +
+'        <w:p>\n' +
+'            <w:pPr>\n' +
+'                <w:spacing w:before="400"/>\n' +
+'            </w:pPr>\n' +
+'            <w:r>\n' +
+'                <w:rPr><w:b/></w:rPr>\n' +
+'                <w:t>Details:</w:t>\n' +
+'            </w:r>\n' +
+'        </w:p>\n' +
+'        <w:p>\n' +
+'            <w:r>\n' +
+'                <w:t>' + escapeXml(log.details) + '</w:t>\n' +
+'            </w:r>\n' +
+'        </w:p>\n' +
+'        <w:p>\n' +
+'            <w:pPr>\n' +
+'                <w:jc w:val="right"/>\n' +
+'                <w:spacing w:before="600"/>\n' +
+'            </w:pPr>\n' +
+'            <w:r>\n' +
+'                <w:t>Generated on: ' + escapeXml(new Date().toLocaleString()) + '</w:t>\n' +
+'            </w:r>\n' +
+'        </w:p>\n' +
+'    </w:body>\n' +
+'</w:document>';
 
                 // Create word/styles.xml
-                const stylesXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
-    <w:style w:type="paragraph" w:styleId="Normal">
-        <w:name w:val="Normal"/>
-        <w:qFormat/>
-    </w:style>
-</w:styles>`;
+                const stylesXml = '<' + '?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' +
+'<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">\n' +
+'    <w:style w:type="paragraph" w:styleId="Normal">\n' +
+'        <w:name w:val="Normal"/>\n' +
+'        <w:qFormat/>\n' +
+'    </w:style>\n' +
+'</w:styles>';
 
                 // Create _rels/.rels
-                const rels = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-    <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
-</Relationships>`;
+                const rels = '<' + '?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' +
+'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">\n' +
+'    <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>\n' +
+'</Relationships>';
 
                 // Create word/_rels/document.xml.rels
-                const wordRels = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-    <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
-</Relationships>`;
+                const wordRels = '<' + '?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' +
+'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">\n' +
+'    <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>\n' +
+'</Relationships>';
 
                 // Add files to zip
                 zip.file("[Content_Types].xml", contentTypes);
