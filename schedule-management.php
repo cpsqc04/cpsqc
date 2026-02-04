@@ -11,7 +11,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Schedule Management - Alertara</title>
+    <title>Volunteer Request - Alertara</title>
     <link rel="icon" type="image/x-icon" href="images/favicon.ico">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="css/theme.css">
@@ -165,6 +165,10 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                         <span class="nav-submodule-icon"><i class="fas fa-chart-bar"></i></span>
                         <span class="nav-submodule-text">Activity Logs</span>
                     </a>
+                    <a href="incident-feed.php" class="nav-submodule" data-tooltip="Incident Feed">
+                        <span class="nav-submodule-icon"><i class="fas fa-exclamation-triangle"></i></span>
+                        <span class="nav-submodule-text">Incident Feed</span>
+                    </a>
                 </div>
             </div>
             <div class="nav-module">
@@ -174,9 +178,9 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                     <span class="arrow">▶</span>
                 </div>
                 <div class="nav-submodules">
-                    <a href="live-view.php" class="nav-submodule" data-tooltip="Live View">
-                        <span class="nav-submodule-icon"><i class="fas fa-circle" style="color: #ff4444;"></i></span>
-                        <span class="nav-submodule-text">Live View</span>
+                    <a href="open-surveillance-app.php" class="nav-submodule" data-tooltip="Open Surveillance App">
+                        <span class="nav-submodule-icon"><i class="fas fa-desktop"></i></span>
+                        <span class="nav-submodule-text">Open Surveillance App</span>
                     </a>
                     <a href="playback.php" class="nav-submodule" data-tooltip="Playback">
                         <span class="nav-submodule-icon"><i class="fas fa-play"></i></span>
@@ -229,6 +233,10 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                     <span class="arrow">▶</span>
                 </div>
                 <div class="nav-submodules">
+                    <a href="patrol-list.php" class="nav-submodule" data-tooltip="Patrol List">
+                        <span class="nav-submodule-icon"><i class="fas fa-list"></i></span>
+                        <span class="nav-submodule-text">Patrol List</span>
+                    </a>
                     <a href="patrol-schedule.php" class="nav-submodule" data-tooltip="Patrol Schedule">
                         <span class="nav-submodule-icon"><i class="fas fa-calendar-alt"></i></span>
                         <span class="nav-submodule-text">Patrol Schedule</span>
@@ -263,10 +271,6 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                     <span class="arrow">▶</span>
                 </div>
                 <div class="nav-submodules">
-                    <a href="submit-tip.php" class="nav-submodule" data-tooltip="Submit Tip">
-                        <span class="nav-submodule-icon"><i class="fas fa-envelope"></i></span>
-                        <span class="nav-submodule-text">Submit Tip</span>
-                    </a>
                     <a href="review-tip.php" class="nav-submodule" data-tooltip="Review Tip">
                         <span class="nav-submodule-icon"><i class="fas fa-eye"></i></span>
                         <span class="nav-submodule-text">Review Tip</span>
@@ -291,70 +295,65 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
         <main class="content-area">
             <div class="page-content">
                 <div class="toolbar">
-                <div class="search-box">
-                        <input type="text" id="searchInput" placeholder="Search schedules by volunteer name, date, or activity..." onkeyup="filterSchedules()">
+                    <div class="search-box">
+                        <input type="text" id="searchInput" placeholder="Search requests by event, audience, or venue..." onkeyup="filterRequests()">
                     </div>
-                    <button class="btn-add" onclick="openAssignScheduleModal()">
-                        <span>+</span>
-                        <span>Assign Schedule</span>
-                    </button>
                 </div>
                 <div class="table-container">
-                    <table id="schedulesTable">
+                    <table id="requestsTable">
                         <thead>
                             <tr>
-                                <th>Volunteer</th>
-                                <th>Date</th>
-                                <th>Time</th>
-                                <th>Activity</th>
-                                <th>Location</th>
-                                <th>Status</th>
+                                <th>Request ID</th>
+                                <th>Event Type</th>
+                                <th>Event Title</th>
+                                <th>Audience Type</th>
+                                <th>Event Date</th>
+                                <th>Call Time</th>
+                                <th>End Time</th>
+                                <th>Venue</th>
+                                <th>Volunteers Needed</th>
+                                <th>Role</th>
+                                <th>Description</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
-                        <tbody id="schedulesTableBody">
-                            <tr data-schedule-id="1">
-                                <td>Maria Rizal</td>
-                                <td>2025-01-20</td>
-                                <td>09:00 - 12:00</td>
-                                <td>First Aid Training</td>
-                                <td>Barangay San Agustin Hall, Quezon City</td>
-                                <td><span class="status-badge status-resolved">Scheduled</span></td>
+                        <tbody id="requestsTableBody">
+                            <!-- Sample requests (can be replaced by API data) -->
+                            <tr data-request-id="REQ-001">
+                                <td>REQ-001</td>
+                                <td>Awareness Campaign</td>
+                                <td>Fire Safety Seminar</td>
+                                <td>Homeowners</td>
+                                <td>2025-02-10</td>
+                                <td>08:00</td>
+                                <td>12:00</td>
+                                <td>Barangay San Agustin Hall</td>
+                                <td>5</td>
+                                <td>Usher / Registration</td>
+                                <td>Assist with registration and crowd management for fire safety seminar.</td>
                                 <td>
                                     <div class="action-buttons">
-                                        <button class="btn-view" onclick="viewSchedule('1')">View</button>
-                                        <button class="btn-edit" onclick="editSchedule('1')">Edit</button>
-                                        <button class="btn-delete" onclick="deleteSchedule('1')">Delete</button>
+                                        <button class="btn-view" onclick="viewRequest('REQ-001')">View</button>
+                                        <button class="btn-edit" onclick="openAssignVolunteersModal('REQ-001')">Assign Volunteers</button>
                                     </div>
                                 </td>
                             </tr>
-                            <tr data-schedule-id="2">
-                                <td>Juan Aquino</td>
-                                <td>2025-01-21</td>
-                                <td>14:00 - 18:00</td>
-                                <td>Community Event Setup</td>
-                                <td>Barangay San Agustin Multi-Purpose Hall, Quezon City</td>
-                                <td><span class="status-badge status-resolved">Scheduled</span></td>
+                            <tr data-request-id="REQ-002">
+                                <td>REQ-002</td>
+                                <td>Health Mission</td>
+                                <td>Community First Aid Training</td>
+                                <td>General Public</td>
+                                <td>2025-02-15</td>
+                                <td>09:00</td>
+                                <td>15:00</td>
+                                <td>Covered Court, Barangay San Agustin</td>
+                                <td>8</td>
+                                <td>First Aid Volunteer</td>
+                                <td>Support trainers and assist participants during hands-on first aid drills.</td>
                                 <td>
                                     <div class="action-buttons">
-                                        <button class="btn-view" onclick="viewSchedule('2')">View</button>
-                                        <button class="btn-edit" onclick="editSchedule('2')">Edit</button>
-                                        <button class="btn-delete" onclick="deleteSchedule('2')">Delete</button>
-                                    </div>
-                                </td>
-                            </tr>
-                            <tr data-schedule-id="3">
-                                <td>Roberto Magsaysay</td>
-                                <td>2025-01-22</td>
-                                <td>10:00 - 14:00</td>
-                                <td>Community Outreach</td>
-                                <td>Rizal Street, Barangay San Agustin, Quezon City</td>
-                                <td><span class="status-badge status-pending">Pending</span></td>
-                                <td>
-                                    <div class="action-buttons">
-                                        <button class="btn-view" onclick="viewSchedule('3')">View</button>
-                                        <button class="btn-edit" onclick="editSchedule('3')">Edit</button>
-                                        <button class="btn-delete" onclick="deleteSchedule('3')">Delete</button>
+                                        <button class="btn-view" onclick="viewRequest('REQ-002')">View</button>
+                                        <button class="btn-edit" onclick="openAssignVolunteersModal('REQ-002')">Assign Volunteers</button>
                                     </div>
                                 </td>
                             </tr>
@@ -365,155 +364,61 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
         </main>
     </div>
     
-    <!-- Assign Schedule Modal -->
-    <div id="assignScheduleModal" class="modal">
+    <!-- Assign Volunteers Modal -->
+    <div id="assignVolunteersModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h2>Assign Schedule</h2>
-                <button class="close-modal" onclick="closeAssignScheduleModal()">&times;</button>
+                <h2>Assign Volunteers</h2>
+                <button class="close-modal" onclick="closeAssignVolunteersModal()">&times;</button>
             </div>
-            <form id="assignScheduleForm" onsubmit="saveSchedule(event)">
+            <form id="assignVolunteersForm" onsubmit="saveVolunteerAssignments(event)">
+                <input type="hidden" id="currentRequestId" name="requestId">
                 <div class="form-group">
-                    <label for="scheduleVolunteer">Volunteer *</label>
-                    <select id="scheduleVolunteer" name="volunteer" required>
-                        <option value="">Select Volunteer</option>
-                        <option value="Maria Rizal">Maria Rizal</option>
-                        <option value="Juan Aquino">Juan Aquino</option>
-                        <option value="Roberto Magsaysay">Roberto Magsaysay</option>
-                    </select>
+                    <label>Request Details</label>
+                    <div id="currentRequestSummary" class="detail-value" style="font-size:0.9rem;"></div>
                 </div>
-                
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="scheduleDate">Date *</label>
-                        <input type="date" id="scheduleDate" name="date" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="scheduleTime">Time *</label>
-                        <input type="time" id="scheduleTime" name="time" required>
-                    </div>
-                </div>
-                
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="scheduleEndTime">End Time *</label>
-                        <input type="time" id="scheduleEndTime" name="endTime" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="scheduleStatus">Status *</label>
-                        <select id="scheduleStatus" name="status" required>
-                            <option value="">Select Status</option>
-                            <option value="Scheduled">Scheduled</option>
-                            <option value="Pending">Pending</option>
-                            <option value="Completed">Completed</option>
-                            <option value="Cancelled">Cancelled</option>
-                        </select>
+                <div class="form-group">
+                    <label>Select Volunteers to Assign</label>
+                    <div class="table-container" style="max-height:260px; overflow-y:auto;">
+                    <table>
+                            <thead>
+                                <tr>
+                                    <th>Select</th>
+                                    <th>Volunteer ID</th>
+                                    <th>Name</th>
+                                    <th>Contact</th>
+                                    <th>Category</th>
+                                    <th>Availability</th>
+                                    <th>Current / Upcoming Tasks</th>
+                                </tr>
+                            </thead>
+                            <tbody id="volunteerChoicesBody">
+                                <!-- Filled from volunteer list (localStorage) -->
+                            </tbody>
+                        </table>
                     </div>
                 </div>
-                
                 <div class="form-group">
-                    <label for="scheduleActivity">Activity *</label>
-                    <input type="text" id="scheduleActivity" name="activity" required placeholder="e.g., First Aid Training, Community Event Setup">
+                    <label for="assignmentRole">Role for Assigned Volunteers</label>
+                    <input type="text" id="assignmentRole" name="assignmentRole" placeholder="Defaults to request role if left blank">
                 </div>
-                
-                <div class="form-group">
-                    <label for="scheduleLocation">Location *</label>
-                    <input type="text" id="scheduleLocation" name="location" required placeholder="e.g., Barangay San Agustin Hall, Quezon City">
-                </div>
-                
-                <div class="form-group">
-                    <label for="scheduleNotes">Notes</label>
-                    <textarea id="scheduleNotes" name="notes" placeholder="Additional information about the schedule..."></textarea>
-                </div>
-                
                 <div class="form-actions">
-                    <button type="button" class="btn-cancel" onclick="closeAssignScheduleModal()">Cancel</button>
-                    <button type="submit" class="btn-submit">Assign Schedule</button>
+                    <button type="button" class="btn-cancel" onclick="closeAssignVolunteersModal()">Cancel</button>
+                    <button type="submit" class="btn-submit">Assign Selected Volunteers</button>
                 </div>
             </form>
         </div>
     </div>
     
-    <!-- Edit Schedule Modal -->
-    <div id="editScheduleModal" class="modal">
+    <!-- View Request Modal -->
+    <div id="viewRequestModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h2>Edit Schedule</h2>
-                <button class="close-modal" onclick="closeEditScheduleModal()">&times;</button>
+                <h2>Request Details</h2>
+                <button class="close-modal" onclick="closeViewRequestModal()">&times;</button>
             </div>
-            <form id="editScheduleForm" onsubmit="updateSchedule(event)">
-                <input type="hidden" id="editScheduleId" name="scheduleId">
-                
-                <div class="form-group">
-                    <label for="editScheduleVolunteer">Volunteer *</label>
-                    <select id="editScheduleVolunteer" name="volunteer" required>
-                        <option value="">Select Volunteer</option>
-                        <option value="Maria Rizal">Maria Rizal</option>
-                        <option value="Juan Aquino">Juan Aquino</option>
-                        <option value="Roberto Magsaysay">Roberto Magsaysay</option>
-                    </select>
-                </div>
-                
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="editScheduleDate">Date *</label>
-                        <input type="date" id="editScheduleDate" name="date" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="editScheduleTime">Time *</label>
-                        <input type="time" id="editScheduleTime" name="time" required>
-                    </div>
-                </div>
-                
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="editScheduleEndTime">End Time *</label>
-                        <input type="time" id="editScheduleEndTime" name="endTime" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="editScheduleStatus">Status *</label>
-                        <select id="editScheduleStatus" name="status" required>
-                            <option value="">Select Status</option>
-                            <option value="Scheduled">Scheduled</option>
-                            <option value="Pending">Pending</option>
-                            <option value="Completed">Completed</option>
-                            <option value="Cancelled">Cancelled</option>
-                        </select>
-                    </div>
-                </div>
-                
-                <div class="form-group">
-                    <label for="editScheduleActivity">Activity *</label>
-                    <input type="text" id="editScheduleActivity" name="activity" required>
-                </div>
-                
-                <div class="form-group">
-                    <label for="editScheduleLocation">Location *</label>
-                    <input type="text" id="editScheduleLocation" name="location" required>
-                </div>
-                
-                <div class="form-group">
-                    <label for="editScheduleNotes">Notes</label>
-                    <textarea id="editScheduleNotes" name="notes"></textarea>
-                </div>
-                
-                <div class="form-actions">
-                    <button type="button" class="btn-cancel" onclick="closeEditScheduleModal()">Cancel</button>
-                    <button type="submit" class="btn-submit">Update Schedule</button>
-                </div>
-            </form>
-        </div>
-    </div>
-    
-    <!-- View Schedule Modal -->
-    <div id="viewScheduleModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2>Schedule Details</h2>
-                <button class="close-modal" onclick="closeViewScheduleModal()">&times;</button>
-            </div>
-            <div id="scheduleDetails" class="complaint-details">
-                <!-- Details will be populated by JavaScript -->
+            <div id="requestDetails" class="complaint-details">
+                <!-- Filled dynamically -->
             </div>
         </div>
     </div>
@@ -559,322 +464,343 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             document.querySelectorAll('.nav-module').forEach(m => { m.classList.remove('active'); });
             if (!isActive) { module.classList.add('active'); }
         }
-        function filterSchedules() {
+        function filterRequests() {
             const input = document.getElementById('searchInput');
             const filter = input.value.toLowerCase();
-            const table = document.getElementById('schedulesTableBody');
+            const table = document.getElementById('requestsTableBody');
             const rows = table.getElementsByTagName('tr');
             for (let i = 0; i < rows.length; i++) {
                 const row = rows[i];
                 const text = row.textContent || row.innerText;
-                if (text.toLowerCase().indexOf(filter) > -1) {
-                    row.style.display = '';
-                } else {
-                    row.style.display = 'none';
-                }
+                row.style.display = text.toLowerCase().includes(filter) ? '' : 'none';
             }
         }
-        // Schedule data storage
-        let scheduleData = {};
-        let nextScheduleId = 4;
-        
-        // Initialize schedule data from existing table rows
-        function initializeScheduleData() {
-            const rows = document.querySelectorAll('#schedulesTableBody tr[data-schedule-id]');
+
+        // --- Volunteer Request + Assignment State ---
+
+        // In-memory request data (could be loaded from backend)
+        const requestData = {};
+
+        // Load initial requests from table or external system
+        function initializeRequestData() {
+            const rows = document.querySelectorAll('#requestsTableBody tr[data-request-id]');
             rows.forEach((row) => {
-                const id = row.getAttribute('data-schedule-id');
+                const id = row.getAttribute('data-request-id');
                 const cells = row.querySelectorAll('td');
-                
-                scheduleData[id] = {
-                    id: id,
-                    volunteer: cells[0].textContent.trim(),
-                    date: cells[1].textContent.trim(),
-                    time: cells[2].textContent.trim(),
-                    activity: cells[3].textContent.trim(),
-                    location: cells[4].textContent.trim(),
-                    status: cells[5].querySelector('.status-badge').textContent.trim(),
-                    notes: id === '1' ? 'First aid training session for community members. Materials and equipment prepared.' : id === '2' ? 'Setting up for community outreach event. Tables, chairs, and decorations needed.' : 'Community outreach program. Distribution of information materials.'
+                requestData[id] = {
+                    requestId: id,
+                    eventType: cells[1].textContent.trim(),
+                    eventTitle: cells[2].textContent.trim(),
+                    audienceType: cells[3].textContent.trim(),
+                    eventDate: cells[4].textContent.trim(),
+                    callTime: cells[5].textContent.trim(),
+                    endTime: cells[6].textContent.trim(),
+                    venue: cells[7].textContent.trim(),
+                    volunteersNeeded: cells[8].textContent.trim(),
+                    role: cells[9].textContent.trim(),
+                    description: cells[10].textContent.trim()
                 };
             });
+
+            // Optional: try to load from external system (stub)
+            tryLoadRequestsFromExternalSystem();
         }
-        
-        // Initialize on page load
-        document.addEventListener('DOMContentLoaded', function() {
-            initializeScheduleData();
-        });
-        
-        function openAssignScheduleModal() {
-            document.getElementById('assignScheduleModal').classList.add('active');
+
+        function tryLoadRequestsFromExternalSystem() {
+            // Stub: if you expose an API from Campaign Planning / Event system,
+            // you can load live requests here.
+            fetch('api/get_volunteer_requests.php')
+                .then(r => r.ok ? r.json() : null)
+                .then(data => {
+                    if (!data || !data.success || !Array.isArray(data.requests)) return;
+                    const tbody = document.getElementById('requestsTableBody');
+                    tbody.innerHTML = '';
+                    data.requests.forEach(req => {
+                        requestData[req.requestId] = req;
+                        const row = document.createElement('tr');
+                        row.setAttribute('data-request-id', req.requestId);
+                        row.innerHTML = `
+                            <td>${req.requestId}</td>
+                            <td>${req.eventType}</td>
+                            <td>${req.eventTitle}</td>
+                            <td>${req.audienceType}</td>
+                            <td>${req.eventDate}</td>
+                            <td>${req.callTime}</td>
+                            <td>${req.endTime}</td>
+                            <td>${req.venue}</td>
+                            <td>${req.volunteersNeeded}</td>
+                            <td>${req.role}</td>
+                            <td>${req.description}</td>
+                            <td>
+                                <div class="action-buttons">
+                                    <button class="btn-view" onclick="viewRequest('${req.requestId}')">View</button>
+                                    <button class="btn-edit" onclick="openAssignVolunteersModal('${req.requestId}')">Assign Volunteers</button>
+                                </div>
+                            </td>
+                        `;
+                        tbody.appendChild(row);
+                    });
+                })
+                .catch(() => {
+                    // Fail silently if API not available; sample data remains
+                });
         }
-        
-        function closeAssignScheduleModal() {
-            document.getElementById('assignScheduleModal').classList.remove('active');
-            document.getElementById('assignScheduleForm').reset();
+
+        function viewRequest(id) {
+            const req = requestData[id];
+            if (!req) {
+                alert('Request not found');
+                return;
+            }
+            const container = document.getElementById('requestDetails');
+            container.innerHTML = `
+                <div class="detail-row inline">
+                    <span class="detail-label">Request ID:</span>
+                    <span class="detail-value"><strong>${req.requestId}</strong></span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Event Type:</span>
+                    <span class="detail-value">${req.eventType}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Event Title:</span>
+                    <span class="detail-value">${req.eventTitle}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Audience Type:</span>
+                    <span class="detail-value">${req.audienceType}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Event Date:</span>
+                    <span class="detail-value">${req.eventDate}</span>
+                </div>
+                <div class="detail-row inline">
+                    <span class="detail-label">Call Time:</span>
+                    <span class="detail-value">${req.callTime}</span>
+                </div>
+                <div class="detail-row inline">
+                    <span class="detail-label">End Time:</span>
+                    <span class="detail-value">${req.endTime}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Venue:</span>
+                    <span class="detail-value">${req.venue}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Volunteers Needed:</span>
+                    <span class="detail-value">${req.volunteersNeeded}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Role:</span>
+                    <span class="detail-value">${req.role}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Description:</span>
+                    <span class="detail-value">${req.description}</span>
+                </div>
+            `;
+            document.getElementById('viewRequestModal').classList.add('active');
         }
-        
-        function saveSchedule(event) {
+
+        function closeViewRequestModal() {
+            document.getElementById('viewRequestModal').classList.remove('active');
+        }
+
+        // --- Volunteer selection + activity recording ---
+
+        function loadVolunteerDataFromStorage() {
+            try {
+                const raw = localStorage.getItem('volunteerData');
+                if (!raw) return {};
+                const parsed = JSON.parse(raw);
+                return parsed && typeof parsed === 'object' ? parsed : {};
+            } catch (e) {
+                console.error('Failed to load volunteer data from storage', e);
+                return {};
+            }
+        }
+
+        function openAssignVolunteersModal(requestId) {
+            const req = requestData[requestId];
+            if (!req) {
+                alert('Request not found');
+                return;
+            }
+            document.getElementById('currentRequestId').value = req.requestId;
+            document.getElementById('currentRequestSummary').textContent =
+                `${req.eventTitle} (${req.eventType}) • ${req.eventDate} ${req.callTime}-${req.endTime} @ ${req.venue}`;
+
+            const volunteers = loadVolunteerDataFromStorage();
+            const activities = loadVolunteerActivities();
+            const tbody = document.getElementById('volunteerChoicesBody');
+            tbody.innerHTML = '';
+
+            const ids = Object.keys(volunteers);
+            if (ids.length === 0) {
+                const row = document.createElement('tr');
+                row.innerHTML = `<td colspan="6" style="text-align:center; color: var(--text-secondary);">No volunteers available. Please add volunteers first.</td>`;
+                tbody.appendChild(row);
+            } else {
+                ids.forEach(id => {
+                    const v = volunteers[id];
+                    const myTasks = activities.filter(a => a.volunteerId === id);
+
+                    // Show short summary of current/upcoming tasks
+                    let taskSummary = 'None';
+                    if (myTasks.length > 0) {
+                        // Simple upcoming filter: same or future date
+                        const today = new Date().toISOString().split('T')[0];
+                        const upcoming = myTasks.filter(a => (a.eventDate || '') >= today);
+                        const source = upcoming.length > 0 ? upcoming : myTasks;
+                        taskSummary = source
+                            .slice(0, 2)
+                            .map(a => `${a.eventDate || ''} - ${a.eventTitle || ''}`)
+                            .join('; ');
+                        if (source.length > 2) taskSummary += ' …';
+                    }
+
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td><input type="checkbox" name="selectedVolunteers" value="${id}"></td>
+                        <td>${id}</td>
+                        <td>${v.name}</td>
+                        <td>${v.contact}</td>
+                        <td>${v.category || ''}</td>
+                        <td>${v.availability || ''}</td>
+                        <td>${taskSummary}</td>
+                    `;
+                    tbody.appendChild(row);
+                });
+            }
+
+            document.getElementById('assignVolunteersModal').classList.add('active');
+        }
+
+        function closeAssignVolunteersModal() {
+            document.getElementById('assignVolunteersModal').classList.remove('active');
+            document.getElementById('assignVolunteersForm').reset();
+            document.getElementById('volunteerChoicesBody').innerHTML = '';
+        }
+
+        // Save volunteer activities to localStorage so Volunteer List can show them
+        function loadVolunteerActivities() {
+            try {
+                const raw = localStorage.getItem('volunteerActivities');
+                return raw ? JSON.parse(raw) : [];
+            } catch (e) {
+                console.error('Failed to load volunteer activities', e);
+                return [];
+            }
+        }
+
+        function saveVolunteerActivities(activities) {
+            localStorage.setItem('volunteerActivities', JSON.stringify(activities));
+        }
+
+        function saveVolunteerAssignments(event) {
             event.preventDefault();
-            
-            const volunteer = document.getElementById('scheduleVolunteer').value;
-            const date = document.getElementById('scheduleDate').value;
-            const time = document.getElementById('scheduleTime').value;
-            const endTime = document.getElementById('scheduleEndTime').value;
-            const activity = document.getElementById('scheduleActivity').value.trim();
-            const location = document.getElementById('scheduleLocation').value.trim();
-            const status = document.getElementById('scheduleStatus').value;
-            const notes = document.getElementById('scheduleNotes').value.trim();
-            
-            const scheduleId = nextScheduleId.toString();
-            const timeRange = time + ' - ' + endTime;
-            
-            // Store schedule data
-            scheduleData[scheduleId] = {
-                id: scheduleId,
-                volunteer: volunteer,
-                date: date,
-                time: timeRange,
-                activity: activity,
-                location: location,
-                status: status,
-                notes: notes
+            const requestId = document.getElementById('currentRequestId').value;
+            const req = requestData[requestId];
+            if (!req) {
+                alert('Request not found');
+                return;
+            }
+            const assignmentRoleInput = document.getElementById('assignmentRole').value.trim();
+            const finalRole = assignmentRoleInput || req.role;
+
+            const volunteers = loadVolunteerDataFromStorage();
+            const checkboxes = document.querySelectorAll('input[name="selectedVolunteers"]:checked');
+            if (checkboxes.length === 0) {
+                alert('Please select at least one volunteer to assign.');
+                return;
+            }
+
+            const activities = loadVolunteerActivities();
+            const assignedVolunteersPayload = [];
+
+            checkboxes.forEach(cb => {
+                const id = cb.value;
+                const v = volunteers[id];
+                if (!v) return;
+
+                const activity = {
+                    volunteerId: id,
+                    fullName: v.name,
+                    contactNumber: v.contact,
+                    role: finalRole,
+                    checkInStatus: 'Pending',
+                    emergencyContactName: v.emergencyContactName || '',
+                    emergencyContactNumber: v.emergencyContactNumber || '',
+                    requestId: req.requestId,
+                    eventType: req.eventType,
+                    eventTitle: req.eventTitle,
+                    eventDate: req.eventDate,
+                    callTime: req.callTime,
+                    endTime: req.endTime,
+                    venue: req.venue
+                };
+
+                activities.push(activity);
+                assignedVolunteersPayload.push({
+                    VolunteerID: id,
+                    FullName: v.name,
+                    ContactNumber: v.contact,
+                    Role: finalRole,
+                    CheckInStatus: 'Pending',
+                    EmergencyContactName: v.emergencyContactName || '',
+                    EmergencyContactNumber: v.emergencyContactNumber || ''
+                });
+            });
+
+            saveVolunteerActivities(activities);
+            sendAssignmentsToExternalSystem(req, assignedVolunteersPayload);
+
+            alert('Volunteers assigned and activities recorded successfully.');
+            closeAssignVolunteersModal();
+        }
+
+        // Stub to send assigned volunteers back to Campaign Planning & Event systems
+        function sendAssignmentsToExternalSystem(request, volunteers) {
+            const payload = {
+                requestId: request.requestId,
+                eventType: request.eventType,
+                eventTitle: request.eventTitle,
+                audienceType: request.audienceType,
+                eventDate: request.eventDate,
+                callTime: request.callTime,
+                endTime: request.endTime,
+                venue: request.venue,
+                role: request.role,
+                volunteers: volunteers
             };
-            
-            // Add new row to table
-            addScheduleRow(scheduleId);
-            nextScheduleId++;
-            
-            alert('Schedule assigned successfully!');
-            closeAssignScheduleModal();
-        }
-        
-        function addScheduleRow(id) {
-            const schedule = scheduleData[id];
-            const tbody = document.getElementById('schedulesTableBody');
-            
-            const row = document.createElement('tr');
-            row.setAttribute('data-schedule-id', id);
-            
-            // Determine status badge class
-            let statusClass = 'status-resolved';
-            if (schedule.status === 'Pending') {
-                statusClass = 'status-pending';
-            } else if (schedule.status === 'Cancelled') {
-                statusClass = 'status-pending';
-            }
-            
-            row.innerHTML = `
-                <td>${schedule.volunteer}</td>
-                <td>${schedule.date}</td>
-                <td>${schedule.time}</td>
-                <td>${schedule.activity}</td>
-                <td>${schedule.location}</td>
-                <td><span class="status-badge ${statusClass}">${schedule.status}</span></td>
-                <td>
-                    <div class="action-buttons">
-                        <button class="btn-view" onclick="viewSchedule('${id}')">View</button>
-                        <button class="btn-edit" onclick="editSchedule('${id}')">Edit</button>
-                        <button class="btn-delete" onclick="deleteSchedule('${id}')">Delete</button>
-                    </div>
-                </td>
-            `;
-            
-            tbody.appendChild(row);
-        }
-        
-        function viewSchedule(id) {
-            const schedule = scheduleData[id];
-            if (!schedule) {
-                alert('Schedule not found!');
-                return;
-            }
-            
-            const modal = document.getElementById('viewScheduleModal');
-            const detailsContainer = document.getElementById('scheduleDetails');
-            
-            // Determine status badge class
-            let statusClass = 'status-resolved';
-            if (schedule.status === 'Pending') {
-                statusClass = 'status-pending';
-            } else if (schedule.status === 'Cancelled') {
-                statusClass = 'status-pending';
-            }
-            
-            let detailsHTML = `
-                <div class="detail-row inline">
-                    <span class="detail-label">Volunteer:</span>
-                    <span class="detail-value"><strong>${schedule.volunteer}</strong></span>
-                </div>
-                
-                <div class="detail-row inline">
-                    <span class="detail-label">Status:</span>
-                    <span class="status-badge ${statusClass}">${schedule.status}</span>
-                </div>
-                
-                <div class="detail-row">
-                    <span class="detail-label">Date:</span>
-                    <span class="detail-value">${schedule.date}</span>
-                </div>
-                
-                <div class="detail-row">
-                    <span class="detail-label">Time:</span>
-                    <span class="detail-value">${schedule.time}</span>
-                </div>
-                
-                <div class="detail-row">
-                    <span class="detail-label">Activity:</span>
-                    <span class="detail-value">${schedule.activity}</span>
-                </div>
-                
-                <div class="detail-row">
-                    <span class="detail-label">Location:</span>
-                    <span class="detail-value">${schedule.location}</span>
-                </div>
-                
-                ${schedule.notes ? `
-                <div class="detail-row">
-                    <span class="detail-label">Notes:</span>
-                    <span class="detail-value">${schedule.notes}</span>
-                </div>
-                ` : ''}
-            `;
-            
-            detailsContainer.innerHTML = detailsHTML;
-            modal.classList.add('active');
-        }
-        
-        function closeViewScheduleModal() {
-            document.getElementById('viewScheduleModal').classList.remove('active');
-        }
-        
-        function editSchedule(id) {
-            const schedule = scheduleData[id];
-            if (!schedule) {
-                alert('Schedule not found!');
-                return;
-            }
-            
-            // Parse time range
-            const timeParts = schedule.time.split(' - ');
-            const startTime = timeParts[0];
-            const endTime = timeParts[1] || '';
-            
-            // Populate form fields
-            document.getElementById('editScheduleId').value = schedule.id;
-            document.getElementById('editScheduleVolunteer').value = schedule.volunteer;
-            document.getElementById('editScheduleDate').value = schedule.date;
-            document.getElementById('editScheduleTime').value = startTime;
-            document.getElementById('editScheduleEndTime').value = endTime;
-            document.getElementById('editScheduleActivity').value = schedule.activity;
-            document.getElementById('editScheduleLocation').value = schedule.location;
-            document.getElementById('editScheduleStatus').value = schedule.status;
-            document.getElementById('editScheduleNotes').value = schedule.notes || '';
-            
-            // Open modal
-            document.getElementById('editScheduleModal').classList.add('active');
-        }
-        
-        function closeEditScheduleModal() {
-            document.getElementById('editScheduleModal').classList.remove('active');
-            document.getElementById('editScheduleForm').reset();
-        }
-        
-        function updateSchedule(event) {
-            event.preventDefault();
-            
-            const scheduleId = document.getElementById('editScheduleId').value;
-            const schedule = scheduleData[scheduleId];
-            
-            if (!schedule) {
-                alert('Schedule not found!');
-                return;
-            }
-            
-            // Update schedule data
-            schedule.volunteer = document.getElementById('editScheduleVolunteer').value;
-            schedule.date = document.getElementById('editScheduleDate').value;
-            const startTime = document.getElementById('editScheduleTime').value;
-            const endTime = document.getElementById('editScheduleEndTime').value;
-            schedule.time = startTime + ' - ' + endTime;
-            schedule.activity = document.getElementById('editScheduleActivity').value.trim();
-            schedule.location = document.getElementById('editScheduleLocation').value.trim();
-            schedule.status = document.getElementById('editScheduleStatus').value;
-            schedule.notes = document.getElementById('editScheduleNotes').value.trim();
-            
-            // Update table row
-            updateScheduleRow(scheduleId);
-            
-            alert('Schedule updated successfully!');
-            closeEditScheduleModal();
-        }
-        
-        function updateScheduleRow(id) {
-            const schedule = scheduleData[id];
-            const row = document.querySelector(`tr[data-schedule-id="${id}"]`);
-            
-            if (!row) return;
-            
-            const cells = row.querySelectorAll('td');
-            
-            // Update volunteer
-            cells[0].textContent = schedule.volunteer;
-            
-            // Update date
-            cells[1].textContent = schedule.date;
-            
-            // Update time
-            cells[2].textContent = schedule.time;
-            
-            // Update activity
-            cells[3].textContent = schedule.activity;
-            
-            // Update location
-            cells[4].textContent = schedule.location;
-            
-            // Update status badge
-            const statusBadge = cells[5].querySelector('.status-badge');
-            statusBadge.textContent = schedule.status;
-            
-            // Determine status badge class
-            let statusClass = 'status-resolved';
-            if (schedule.status === 'Pending') {
-                statusClass = 'status-pending';
-            } else if (schedule.status === 'Cancelled') {
-                statusClass = 'status-pending';
-            }
-            statusBadge.className = `status-badge ${statusClass}`;
-        }
-        
-        function deleteSchedule(id) {
-            if (confirm('Are you sure you want to delete this schedule? This action cannot be undone.')) {
-                // Remove from data
-                delete scheduleData[id];
-                
-                // Remove row from table
-                const row = document.querySelector(`tr[data-schedule-id="${id}"]`);
-                if (row) {
-                    row.remove();
-                }
-                
-                alert('Schedule deleted successfully!');
-            }
+
+            // Adjust endpoint/contract to match the other system
+            fetch('api/send_volunteer_assignment.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            }).catch(err => {
+                console.error('Failed to send assignments to external system', err);
+            });
         }
         
         // Close modal when clicking outside
         window.onclick = function(event) {
-            const assignModal = document.getElementById('assignScheduleModal');
-            const editModal = document.getElementById('editScheduleModal');
-            const viewModal = document.getElementById('viewScheduleModal');
-            
-            if (event.target == assignModal) {
-                closeAssignScheduleModal();
+            const assignModal = document.getElementById('assignVolunteersModal');
+            const viewReqModal = document.getElementById('viewRequestModal');
+
+            if (event.target === assignModal) {
+                closeAssignVolunteersModal();
             }
-            if (event.target == editModal) {
-                closeEditScheduleModal();
-            }
-            if (event.target == viewModal) {
-                closeViewScheduleModal();
+            if (event.target === viewReqModal) {
+                closeViewRequestModal();
             }
         }
+
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeRequestData();
+        });
     </script>
 </body>
 </html>

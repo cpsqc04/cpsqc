@@ -5,13 +5,17 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
     header('Location: login.php');
     exit;
 }
+
+// Check if the surveillance app is installed
+$app_installed = file_exists('cctv.py') || file_exists('detect_gui.py');
+$launcher_exists = file_exists('start_cctv_app.bat') || file_exists('start_detection_gui.bat');
 ?>
 <!doctype html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Event List - Alertara</title>
+    <title>Open Surveillance App - CCTV Monitoring</title>
     <link rel="icon" type="image/x-icon" href="images/favicon.ico">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="css/theme.css">
@@ -87,46 +91,44 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
         .content-burger-btn span::after { bottom: -7px; }
         .page-title { font-size: 2rem; font-weight: 700; color: var(--tertiary-color); margin: 0; }
         .page-content { background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 12px; padding: 2rem; box-shadow: 0 2px 8px var(--shadow); margin-top: 1.5rem; }
-        .search-container { display: flex; gap: 1rem; margin-bottom: 1.5rem; align-items: center; }
-        .search-box { flex: 1; position: relative; }
-        .search-box input { width: 100%; padding: 0.75rem 1rem 0.75rem 2.5rem; border: 1px solid var(--border-color); border-radius: 8px; font-size: 0.95rem; transition: all 0.2s ease; }
-        .search-box input:focus { outline: none; border-color: var(--primary-color); box-shadow: 0 0 0 3px rgba(76, 138, 137, 0.1); }
-        .search-box::before { content: "🔍"; position: absolute; left: 0.75rem; top: 50%; transform: translateY(-50%); font-size: 1rem; }
-        .btn-add { padding: 0.75rem 1.5rem; background: var(--primary-color); color: #fff; border: none; border-radius: 8px; font-size: 0.95rem; font-weight: 600; cursor: pointer; transition: all 0.2s ease; display: inline-flex; align-items: center; gap: 0.5rem; white-space: nowrap; flex-shrink: 0; }
-        .btn-add:hover { background: #4ca8a6; transform: translateY(-2px); box-shadow: 0 4px 8px rgba(76, 138, 137, 0.3); }
-        .btn-add i { font-size: 1rem; }
-        .table-container { overflow-x: auto; border-radius: 8px; border: 1px solid var(--border-color); }
-        table { width: 100%; border-collapse: collapse; background: var(--card-bg); }
-        thead { background: var(--tertiary-color); color: #fff; }
-        th { padding: 1rem; text-align: left; font-weight: 600; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.5px; }
-        td { padding: 1rem; border-bottom: 1px solid var(--border-color); color: var(--text-color); }
-        tbody tr:hover { background: #f9f9f9; }
-        tbody tr:last-child td { border-bottom: none; }
-        .status-badge { padding: 0.25rem 0.75rem; border-radius: 12px; font-size: 0.85rem; font-weight: 500; display: inline-block; }
-        .status-pending { background: #fff3cd; color: #856404; }
-        .status-resolved { background: #d1e7dd; color: #0f5132; }
-        .btn-view { padding: 0.5rem 1rem; background: var(--primary-color); color: #fff; border: none; border-radius: 6px; font-size: 0.85rem; cursor: pointer; transition: all 0.2s ease; margin-right: 0.5rem; }
-        .btn-view:hover { background: #4ca8a6; }
-        .btn-edit { padding: 0.5rem 1rem; background: #ffc107; color: #000; border: none; border-radius: 6px; font-size: 0.85rem; cursor: pointer; transition: all 0.2s ease; }
-        .btn-edit:hover { background: #e0a800; }
-        .action-buttons { display: flex; gap: 0.5rem; align-items: center; }
-        .modal { display: none; position: fixed; z-index: 2000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.5); overflow: auto; }
-        .modal-content { background-color: var(--card-bg); margin: 5% auto; padding: 2rem; border: 1px solid var(--border-color); border-radius: 12px; width: 90%; max-width: 600px; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3); }
-        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; padding-bottom: 1rem; border-bottom: 2px solid var(--border-color); }
-        .modal-header h2 { margin: 0; color: var(--tertiary-color); font-size: 1.5rem; }
-        .close { color: #aaa; font-size: 28px; font-weight: bold; cursor: pointer; transition: color 0.2s ease; }
-        .close:hover { color: var(--tertiary-color); }
-        .form-group { margin-bottom: 1.25rem; }
-        .form-group label { display: block; margin-bottom: 0.5rem; color: var(--text-color); font-weight: 500; font-size: 0.95rem; }
-        .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 8px; font-size: 0.95rem; font-family: var(--font-family); transition: all 0.2s ease; box-sizing: border-box; }
-        .form-group input:focus, .form-group select:focus, .form-group textarea:focus { outline: none; border-color: var(--primary-color); box-shadow: 0 0 0 3px rgba(76, 138, 137, 0.1); }
-        .form-group textarea { resize: vertical; min-height: 100px; }
-        .form-actions { display: flex; justify-content: flex-end; gap: 1rem; margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid var(--border-color); }
-        .btn-cancel { padding: 0.75rem 1.5rem; background: #6c757d; color: #fff; border: none; border-radius: 8px; font-size: 0.95rem; cursor: pointer; transition: all 0.2s ease; }
-        .btn-cancel:hover { background: #5a6268; }
-        .btn-save { padding: 0.75rem 1.5rem; background: var(--primary-color); color: #fff; border: none; border-radius: 8px; font-size: 0.95rem; font-weight: 600; cursor: pointer; transition: all 0.2s ease; }
-        .btn-save:hover { background: #4ca8a6; }
-        @media (max-width: 768px) { .sidebar { width: 320px; transform: translateX(-100%); transition: transform 0.3s ease; } .sidebar.mobile-open { transform: translateX(0); } .sidebar.collapsed { width: 80px; transform: translateX(0); } .main-wrapper { margin-left: 0; } body.sidebar-collapsed .main-wrapper { margin-left: 80px; } .modal-content { width: 95%; margin: 10% auto; padding: 1.5rem; } .search-container { flex-direction: column; } .btn-add { width: 100%; justify-content: center; } }
+        
+        .app-container { max-width: 900px; margin: 0 auto; }
+        .app-status-card { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #fff; padding: 2rem; border-radius: 12px; margin-bottom: 2rem; text-align: center; }
+        .app-status-card.installed { background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); }
+        .app-status-card.not-installed { background: linear-gradient(135deg, #ee0979 0%, #ff6a00 100%); }
+        .app-status-icon { font-size: 4rem; margin-bottom: 1rem; }
+        .app-status-title { font-size: 1.5rem; font-weight: 700; margin-bottom: 0.5rem; }
+        .app-status-message { font-size: 1rem; opacity: 0.95; }
+        
+        .action-section { background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 12px; padding: 2rem; margin-bottom: 2rem; }
+        .action-section h2 { color: var(--tertiary-color); margin: 0 0 1.5rem 0; font-size: 1.5rem; }
+        .launch-button { display: inline-block; background: var(--primary-color); color: #fff; padding: 1rem 2rem; border-radius: 8px; text-decoration: none; font-size: 1.1rem; font-weight: 600; transition: all 0.3s ease; border: none; cursor: pointer; }
+        .launch-button:hover { background: #4ca8a6; transform: translateY(-2px); box-shadow: 0 4px 12px rgba(76, 138, 137, 0.3); }
+        .launch-button i { margin-right: 0.5rem; }
+        
+        .instructions-section { background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 12px; padding: 2rem; }
+        .instructions-section h2 { color: var(--tertiary-color); margin: 0 0 1.5rem 0; font-size: 1.5rem; }
+        .instructions-list { list-style: none; padding: 0; margin: 0; }
+        .instructions-list li { padding: 1rem; margin-bottom: 1rem; background: #f9f9f9; border-left: 4px solid var(--primary-color); border-radius: 6px; }
+        .instructions-list li strong { color: var(--tertiary-color); display: block; margin-bottom: 0.5rem; }
+        .instructions-list li code { background: #e9e9e9; padding: 0.25rem 0.5rem; border-radius: 4px; font-family: 'Courier New', monospace; font-size: 0.9rem; }
+        
+        .download-section { background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: #fff; padding: 2rem; border-radius: 12px; margin-top: 2rem; text-align: center; }
+        .download-section h3 { margin: 0 0 1rem 0; font-size: 1.3rem; }
+        .download-button { display: inline-block; background: #fff; color: #f5576c; padding: 1rem 2rem; border-radius: 8px; text-decoration: none; font-size: 1.1rem; font-weight: 600; margin-top: 1rem; transition: all 0.3s ease; }
+        .download-button:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2); }
+        
+        .file-list { background: #f9f9f9; padding: 1rem; border-radius: 6px; margin-top: 1rem; }
+        .file-list ul { margin: 0; padding-left: 1.5rem; }
+        .file-list li { margin: 0.5rem 0; }
+        
+        @media (max-width: 768px) { 
+            .sidebar { width: 320px; transform: translateX(-100%); transition: transform 0.3s ease; } 
+            .sidebar.mobile-open { transform: translateX(0); } 
+            .sidebar.collapsed { width: 80px; transform: translateX(0); } 
+            .main-wrapper { margin-left: 0; } 
+            body.sidebar-collapsed .main-wrapper { margin-left: 80px; } 
+        }
     </style>
 </head>
 <body>
@@ -160,14 +162,14 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                     </a>
                 </div>
             </div>
-            <div class="nav-module">
+            <div class="nav-module active">
                 <div class="nav-module-header" onclick="toggleModule(this)" data-tooltip="CCTV Surveillance System Management">
                     <span class="nav-module-icon"><i class="fas fa-video"></i></span>
                     <span class="nav-module-header-text">CCTV Surveillance System Management</span>
                     <span class="arrow">▶</span>
                 </div>
                 <div class="nav-submodules">
-                    <a href="open-surveillance-app.php" class="nav-submodule" data-tooltip="Open Surveillance App">
+                    <a href="open-surveillance-app.php" class="nav-submodule active" data-tooltip="Open Surveillance App">
                         <span class="nav-submodule-icon"><i class="fas fa-desktop"></i></span>
                         <span class="nav-submodule-text">Open Surveillance App</span>
                     </a>
@@ -236,14 +238,14 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                     </a>
                 </div>
             </div>
-            <div class="nav-module active">
+            <div class="nav-module">
                 <div class="nav-module-header" onclick="toggleModule(this)" data-tooltip="Awareness and Outreach Event Tracking">
                     <span class="nav-module-icon"><i class="fas fa-bullhorn"></i></span>
                     <span class="nav-module-header-text">Awareness and Outreach Event Tracking</span>
                     <span class="arrow">▶</span>
                 </div>
                 <div class="nav-submodules">
-                    <a href="event-list.php" class="nav-submodule active" data-tooltip="Event List">
+                    <a href="event-list.php" class="nav-submodule" data-tooltip="Event List">
                         <span class="nav-submodule-icon"><i class="fas fa-list"></i></span>
                         <span class="nav-submodule-text">Event List</span>
                     </a>
@@ -274,7 +276,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                 <button class="content-burger-btn" onclick="toggleSidebar()" aria-label="Toggle sidebar">
                     <span></span>
                 </button>
-                <h1 class="page-title">Event List</h1>
+                <h1 class="page-title">Open Surveillance App</h1>
             </div>
             <div class="user-info">
                 <span>Welcome, <?php echo htmlspecialchars($_SESSION['username'] ?? 'Admin'); ?></span>
@@ -283,217 +285,231 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
         </header>
         <main class="content-area">
             <div class="page-content">
-                <div class="search-container">
-                    <div class="search-box">
-                        <input type="text" id="searchInput" placeholder="Search events by ID, name, date, or type..." onkeyup="filterEvents()">
+                <div class="app-container">
+                    <?php if ($app_installed): ?>
+                        <!-- App is installed -->
+                        <div class="app-status-card installed">
+                            <div class="app-status-icon">
+                                <i class="fas fa-check-circle"></i>
+                            </div>
+                            <div class="app-status-title">Surveillance App Installed</div>
+                            <div class="app-status-message">The YOLO Object Detection GUI application is ready to use.</div>
+                        </div>
+                        
+                        <div class="action-section">
+                            <h2><i class="fas fa-rocket"></i> Launch Application</h2>
+                            <p style="margin-bottom: 1.5rem; color: var(--text-secondary);">Click the button below to launch the surveillance application.</p>
+                            
+                            <?php if ($launcher_exists): ?>
+                                <button class="launch-button" onclick="launchCCTVApp()" id="launchBtn">
+                                    <i class="fas fa-play"></i> Launch CCTV App
+                                </button>
+                                <div id="launchStatus" style="margin-top: 1rem; padding: 1rem; background: #e3f2fd; border-radius: 6px; display: none;">
+                                    <i class="fas fa-info-circle"></i> <span id="launchStatusText">Launching CCTV application...</span>
+                                </div>
+                            <?php else: ?>
+                                <button class="launch-button" onclick="launchAppManually()">
+                                    <i class="fas fa-play"></i> Launch CCTV App
+                                </button>
+                            <?php endif; ?>
+                            
+                            <div class="instructions-section" style="margin-top: 2rem;">
+                                <h3 style="color: var(--tertiary-color); margin-bottom: 1rem;">Manual Launch Instructions</h3>
+                                <ol style="line-height: 2; padding-left: 1.5rem;">
+                                    <li>Open Command Prompt or PowerShell</li>
+                                    <li>Navigate to the project directory:
+                                        <div style="background: #f0f0f0; padding: 0.5rem; border-radius: 4px; margin-top: 0.5rem; font-family: monospace;">
+                                            cd <?php echo htmlspecialchars(str_replace('\\', '/', __DIR__)); ?>
+                                        </div>
+                                    </li>
+                                    <li>Run the application:
+                                        <div style="background: #f0f0f0; padding: 0.5rem; border-radius: 4px; margin-top: 0.5rem; font-family: monospace;">
+                                            py -3.13 cctv.py
+                                        </div>
+                                        <div style="background: #f0f0f0; padding: 0.5rem; border-radius: 4px; margin-top: 0.5rem; font-family: monospace;">
+                                            (or: python detect_gui.py)
+                                        </div>
+                                    </li>
+                                </ol>
+                            </div>
+                        </div>
+                    <?php else: ?>
+                        <!-- App is not installed -->
+                        <div class="app-status-card not-installed">
+                            <div class="app-status-icon">
+                                <i class="fas fa-exclamation-triangle"></i>
+                            </div>
+                            <div class="app-status-title">Surveillance App Not Found</div>
+                            <div class="app-status-message">The YOLO Object Detection GUI application is not installed on this system.</div>
+                        </div>
+                        
+                        <div class="instructions-section">
+                            <h2><i class="fas fa-download"></i> Installation Instructions</h2>
+                            <p style="margin-bottom: 1.5rem; color: var(--text-secondary);">Follow these steps to install and set up the Surveillance App:</p>
+                            
+                            <ol class="instructions-list">
+                                <li>
+                                    <strong>Step 1: Install Python</strong>
+                                    <p>Ensure Python 3.7 or higher is installed on your system.</p>
+                                    <p>Download from: <a href="https://www.python.org/downloads/" target="_blank" style="color: var(--primary-color);">python.org</a></p>
+                                </li>
+                                <li>
+                                    <strong>Step 2: Install Required Dependencies</strong>
+                                    <p>Open Command Prompt or PowerShell in the project directory and run:</p>
+                                    <code>pip install -r requirements.txt</code>
+                                </li>
+                                <li>
+                                    <strong>Step 3: Download the Application Files</strong>
+                                    <p>The following files are required:</p>
+                                    <div class="file-list">
+                                        <ul>
+                                            <li><code>detect_gui.py</code> - Main GUI application</li>
+                                            <li><code>detect.py</code> - Detection engine (should already exist)</li>
+                                            <li><code>start_detection_gui.bat</code> - Windows launcher (optional)</li>
+                                            <li><code>yolov8n.pt</code> - YOLO model file (auto-downloaded on first run)</li>
+                                        </ul>
+                                    </div>
+                                </li>
+                                <li>
+                                    <strong>Step 4: Verify Installation</strong>
+                                    <p>After installation, refresh this page. The app status should change to "Installed".</p>
+                                </li>
+                            </ol>
+                        </div>
+                        
+                        <div class="download-section">
+                            <h3><i class="fas fa-file-download"></i> Download Application Files</h3>
+                            <p>If you have access to the application files, you can download them here:</p>
+                            <div style="margin-top: 1.5rem;">
+                                <a href="detect_gui.py" download class="download-button" style="margin-right: 1rem;">
+                                    <i class="fas fa-download"></i> Download detect_gui.py
+                                </a>
+                                <a href="start_detection_gui.bat" download class="download-button">
+                                    <i class="fas fa-download"></i> Download Launcher
+                                </a>
+                            </div>
+                            <p style="margin-top: 1.5rem; font-size: 0.9rem; opacity: 0.9;">
+                                <i class="fas fa-info-circle"></i> Note: These files must be placed in the project root directory.
+                            </p>
+                        </div>
+                    <?php endif; ?>
+                    
+                    <div class="instructions-section" style="margin-top: 2rem;">
+                        <h2><i class="fas fa-info-circle"></i> About the Surveillance App</h2>
+                        <p style="line-height: 1.8; color: var(--text-secondary);">
+                            The YOLO Object Detection GUI Application provides a user-friendly interface for managing 
+                            your CCTV surveillance system. It allows you to:
+                        </p>
+                        <ul style="line-height: 2; padding-left: 1.5rem; margin-top: 1rem;">
+                            <li>Select and configure cameras from your system</li>
+                            <li>Start and stop object detection in real-time</li>
+                            <li>Monitor detection statistics (FPS, frame count, detections)</li>
+                            <li>View live logs and manage detection settings</li>
+                            <li>Enable or disable video recording</li>
+                            <li>Adjust detection parameters (interval, confidence threshold)</li>
+                        </ul>
+                        <p style="margin-top: 1.5rem; padding: 1rem; background: #e3f2fd; border-left: 4px solid #2196f3; border-radius: 4px; color: #1565c0;">
+                            <i class="fas fa-lightbulb"></i> <strong>Tip:</strong> For detailed documentation, refer to the 
+                            <code>README_GUI.md</code> file in the project directory.
+                        </p>
                     </div>
-                </div>
-                <div class="table-container">
-                    <table id="eventsTable">
-                        <thead>
-                            <tr>
-                                <th>Event ID</th>
-                                <th>Event Name</th>
-                                <th>Date</th>
-                                <th>Time</th>
-                                <th>Organizer</th>
-                                <th>Type</th>
-                                <th>Venue</th>
-                                <th>Status</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody id="eventsTableBody">
-                            <tr data-event-id="1">
-                                <td>EVT-2025-001</td>
-                                <td>Community Safety Awareness</td>
-                                <td>2025-01-25</td>
-                                <td>09:00 AM</td>
-                                <td>Maria Santos</td>
-                                <td>Awareness</td>
-                                <td>Barangay San Agustin Hall</td>
-                                <td><span class="status-badge status-resolved">Scheduled</span></td>
-                                <td>
-                                    <div class="action-buttons">
-                                        <button class="btn-view" onclick="viewEvent('1')">View</button>
-                                    </div>
-                                </td>
-                            </tr>
-                            <tr data-event-id="2">
-                                <td>EVT-2025-002</td>
-                                <td>Neighborhood Meeting</td>
-                                <td>2025-01-28</td>
-                                <td>02:00 PM</td>
-                                <td>Juan Dela Cruz</td>
-                                <td>Meeting</td>
-                                <td>Barangay San Agustin Multi-Purpose Hall</td>
-                                <td><span class="status-badge status-resolved">Scheduled</span></td>
-                                <td>
-                                    <div class="action-buttons">
-                                        <button class="btn-view" onclick="viewEvent('2')">View</button>
-                                    </div>
-                                </td>
-                            </tr>
-                            <tr data-event-id="3">
-                                <td>EVT-2025-003</td>
-                                <td>Safety Training Workshop</td>
-                                <td>2025-02-01</td>
-                                <td>10:00 AM</td>
-                                <td>Roberto Reyes</td>
-                                <td>Training</td>
-                                <td>Barangay San Agustin Community Center</td>
-                                <td><span class="status-badge status-pending">Pending</span></td>
-                                <td>
-                                    <div class="action-buttons">
-                                        <button class="btn-view" onclick="viewEvent('3')">View</button>
-                                    </div>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
                 </div>
             </div>
         </main>
     </div>
-
-    <!-- View Event Modal -->
-    <div id="viewEventModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2>Event Details</h2>
-                <span class="close" onclick="closeViewEventModal()">&times;</span>
-            </div>
-            <div id="viewEventContent">
-                <!-- Content will be populated by JavaScript -->
-            </div>
-            <div class="form-actions">
-                <button type="button" class="btn-cancel" onclick="closeViewEventModal()">Close</button>
-            </div>
-        </div>
-    </div>
-
+    
     <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            const sidebar = document.getElementById('sidebar');
-            const savedState = localStorage.getItem('sidebarCollapsed');
-            if (savedState === 'true') {
-                sidebar.classList.add('collapsed');
-                document.body.classList.add('sidebar-collapsed');
-            }
-            initializeEventData();
-        });
         function toggleSidebar() {
             const sidebar = document.getElementById('sidebar');
-            const isCollapsed = sidebar.classList.contains('collapsed');
-            if (isCollapsed) {
-                sidebar.classList.remove('collapsed');
-                document.body.classList.remove('sidebar-collapsed');
-            } else {
-                sidebar.classList.add('collapsed');
-                document.body.classList.add('sidebar-collapsed');
-            }
-            localStorage.setItem('sidebarCollapsed', !isCollapsed);
+            const body = document.body;
+            sidebar.classList.toggle('collapsed');
+            body.classList.toggle('sidebar-collapsed');
         }
-        function toggleModule(element) {
-            const sidebar = document.getElementById('sidebar');
-            const module = element.closest('.nav-module');
-            const isActive = module.classList.contains('active');
-            const isCollapsed = sidebar.classList.contains('collapsed');
-            if (isCollapsed) {
-                sidebar.classList.remove('collapsed');
-                document.body.classList.remove('sidebar-collapsed');
-                localStorage.setItem('sidebarCollapsed', 'false');
-                document.querySelectorAll('.nav-module').forEach(m => { m.classList.remove('active'); });
-                module.classList.add('active');
-                const firstSubmodule = module.querySelector('.nav-submodule');
-                if (firstSubmodule && firstSubmodule.href && firstSubmodule.href !== '#') {
-                    window.location.href = firstSubmodule.href;
-                }
-                return;
-            }
-            document.querySelectorAll('.nav-module').forEach(m => { m.classList.remove('active'); });
-            if (!isActive) { module.classList.add('active'); }
-        }
-        function filterEvents() {
-            const input = document.getElementById('searchInput');
-            const filter = input.value.toLowerCase();
-            const table = document.getElementById('eventsTableBody');
-            const rows = table.getElementsByTagName('tr');
-            for (let i = 0; i < rows.length; i++) {
-                const row = rows[i];
-                const text = row.textContent || row.innerText;
-                if (text.toLowerCase().indexOf(filter) > -1) {
-                    row.style.display = '';
-                } else {
-                    row.style.display = 'none';
-                }
-            }
-        }
-        function openViewEventModal(id) {
-            const event = eventData[id];
-            if (!event) return;
-            
-            const content = `
-                <div style="line-height: 1.8;">
-                    <p><strong>Event ID:</strong> ${event.eventId}</p>
-                    <p><strong>Event Name:</strong> ${event.name}</p>
-                    <p><strong>Date:</strong> ${event.date}</p>
-                    <p><strong>Time:</strong> ${event.time}</p>
-                    <p><strong>Organizer:</strong> ${event.organizer}</p>
-                    <p><strong>Type:</strong> ${event.type}</p>
-                    <p><strong>Venue:</strong> ${event.venue}</p>
-                    <p><strong>Status:</strong> ${event.status}</p>
-                    ${event.description ? `<p><strong>Description:</strong> ${event.description}</p>` : ''}
-                </div>
-            `;
-            
-            document.getElementById('viewEventContent').innerHTML = content;
-            document.getElementById('viewEventModal').style.display = 'block';
-        }
-
-        function closeViewEventModal() {
-            document.getElementById('viewEventModal').style.display = 'none';
-        }
-
-        // Initialize event data
-        let eventData = {};
         
-        function initializeEventData() {
-            const tableBody = document.getElementById('eventsTableBody');
-            const rows = tableBody.querySelectorAll('tr[data-event-id]');
+        function toggleModule(header) {
+            const module = header.closest('.nav-module');
+            const isActive = module.classList.contains('active');
             
-            rows.forEach(row => {
-                const id = row.getAttribute('data-event-id');
-                const cells = row.querySelectorAll('td');
+            // Close all modules
+            document.querySelectorAll('.nav-module').forEach(m => {
+                m.classList.remove('active');
+            });
+            
+            // Open clicked module if it wasn't active
+            if (!isActive) {
+                module.classList.add('active');
+            }
+        }
+        
+        function launchCCTVApp() {
+            const btn = document.getElementById('launchBtn');
+            const status = document.getElementById('launchStatus');
+            const statusText = document.getElementById('launchStatusText');
+            
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Launching...';
+            status.style.display = 'block';
+            statusText.textContent = 'Launching CCTV application...';
+            
+            // Try to launch via PHP endpoint
+            fetch('launch_cctv.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    status.style.background = '#d4edda';
+                    status.style.border = '1px solid #c3e6cb';
+                    statusText.innerHTML = '<i class="fas fa-check-circle"></i> CCTV application launched successfully!';
+                    btn.innerHTML = '<i class="fas fa-check"></i> Launched';
+                    
+                    // Auto-hide after 3 seconds
+                    setTimeout(() => {
+                        status.style.display = 'none';
+                        btn.disabled = false;
+                        btn.innerHTML = '<i class="fas fa-play"></i> Launch CCTV App';
+                    }, 3000);
+                } else {
+                    throw new Error(data.message || 'Failed to launch');
+                }
+            })
+            .catch(error => {
+                // Fallback: try to download/execute bat file
+                status.style.background = '#f8d7da';
+                status.style.border = '1px solid #f5c6cb';
+                statusText.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Attempting alternative launch method...';
                 
-                eventData[id] = {
-                    id: id,
-                    eventId: cells[0].textContent.trim(),
-                    name: cells[1].textContent.trim(),
-                    date: cells[2].textContent.trim(),
-                    time: cells[3].textContent.trim(),
-                    organizer: cells[4].textContent.trim(),
-                    type: cells[5].textContent.trim(),
-                    venue: cells[6].textContent.trim(),
-                    status: cells[7].querySelector('.status-badge').textContent.trim(),
-                    description: ''
-                };
+                // Try to trigger download of bat file
+                const batFile = 'start_cctv_app.bat';
+                const link = document.createElement('a');
+                link.href = batFile;
+                link.download = batFile;
+                link.click();
+                
+                setTimeout(() => {
+                    statusText.innerHTML = '<i class="fas fa-info-circle"></i> Please run the downloaded .bat file to launch the CCTV app.';
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fas fa-play"></i> Launch CCTV App';
+                }, 2000);
             });
         }
-
-        function viewEvent(id) {
-            openViewEventModal(id);
+        
+        function launchAppManually() {
+            alert('To launch the app manually:\n\n1. Open Command Prompt or PowerShell\n2. Navigate to the project directory\n3. Run: py -3.13 cctv.py\n\nOr double-click: start_cctv_app.bat\n\nMake sure Python 3.13 and all dependencies are installed.');
         }
-
-        // Close modal when clicking outside
-        window.onclick = function(event) {
-            const viewModal = document.getElementById('viewEventModal');
-            
-            if (event.target === viewModal) {
-                closeViewEventModal();
-            }
-        }
-
+        
+        // Auto-launch on page load
+        window.addEventListener('load', function() {
+            // Small delay to ensure page is fully loaded
+            setTimeout(function() {
+                if (<?php echo $app_installed && $launcher_exists ? 'true' : 'false'; ?>) {
+                    launchCCTVApp();
+                }
+            }, 500);
+        });
     </script>
 </body>
 </html>

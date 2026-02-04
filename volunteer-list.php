@@ -127,10 +127,10 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
         .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
         .form-actions { display: flex; gap: 1rem; justify-content: flex-end; margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid var(--border-color); }
         .file-upload { position: relative; display: inline-block; width: 100%; }
-        .file-upload input[type="file"] { position: absolute; opacity: 0; width: 100%; height: 100%; cursor: pointer; }
+        .file-upload input[type="file"] { position: absolute; opacity: 0; width: 100%; height: 100%; cursor: pointer; z-index: 1; }
         .file-upload-label { display: flex; align-items: center; justify-content: center; padding: 1rem; border: 2px dashed var(--border-color); border-radius: 8px; cursor: pointer; transition: all 0.2s ease; background: #f9f9f9; }
         .file-upload-label:hover { border-color: var(--primary-color); background: rgba(76, 138, 137, 0.05); }
-        .file-preview { margin-top: 0.5rem; display: none; }
+        .file-preview { margin-top: 0.5rem; display: none; position: relative; z-index: 2; }
         .file-preview img { max-width: 100%; max-height: 200px; border-radius: 8px; border: 1px solid var(--border-color); }
         .id-photo-preview { width: 100px; height: 100px; object-fit: cover; border-radius: 8px; border: 2px solid var(--border-color); cursor: pointer; }
         .btn-cancel, .btn-submit { padding: 0.75rem 1.5rem; border: none; border-radius: 8px; font-size: 0.95rem; font-weight: 500; cursor: pointer; transition: all 0.2s ease; }
@@ -173,6 +173,10 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                         <span class="nav-submodule-icon"><i class="fas fa-chart-bar"></i></span>
                         <span class="nav-submodule-text">Activity Logs</span>
                     </a>
+                    <a href="incident-feed.php" class="nav-submodule" data-tooltip="Incident Feed">
+                        <span class="nav-submodule-icon"><i class="fas fa-exclamation-triangle"></i></span>
+                        <span class="nav-submodule-text">Incident Feed</span>
+                    </a>
                 </div>
             </div>
             <div class="nav-module">
@@ -182,9 +186,9 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                     <span class="arrow">▶</span>
                 </div>
                 <div class="nav-submodules">
-                    <a href="live-view.php" class="nav-submodule" data-tooltip="Live View">
-                        <span class="nav-submodule-icon"><i class="fas fa-circle" style="color: #ff4444;"></i></span>
-                        <span class="nav-submodule-text">Live View</span>
+                    <a href="open-surveillance-app.php" class="nav-submodule" data-tooltip="Open Surveillance App">
+                        <span class="nav-submodule-icon"><i class="fas fa-desktop"></i></span>
+                        <span class="nav-submodule-text">Open Surveillance App</span>
                     </a>
                     <a href="playback.php" class="nav-submodule" data-tooltip="Playback">
                         <span class="nav-submodule-icon"><i class="fas fa-play"></i></span>
@@ -224,9 +228,9 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                         <span class="nav-submodule-icon"><i class="fas fa-user"></i></span>
                         <span class="nav-submodule-text">Volunteer List</span>
                     </a>
-                    <a href="schedule-management.php" class="nav-submodule" data-tooltip="Schedule Management">
+                    <a href="schedule-management.php" class="nav-submodule" data-tooltip="Volunteer Request">
                         <span class="nav-submodule-icon"><i class="fas fa-calendar"></i></span>
-                        <span class="nav-submodule-text">Schedule Management</span>
+                        <span class="nav-submodule-text">Volunteer Request</span>
                     </a>
                 </div>
             </div>
@@ -237,6 +241,10 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                     <span class="arrow">▶</span>
                 </div>
                 <div class="nav-submodules">
+                    <a href="patrol-list.php" class="nav-submodule" data-tooltip="Patrol List">
+                        <span class="nav-submodule-icon"><i class="fas fa-list"></i></span>
+                        <span class="nav-submodule-text">Patrol List</span>
+                    </a>
                     <a href="patrol-schedule.php" class="nav-submodule" data-tooltip="Patrol Schedule">
                         <span class="nav-submodule-icon"><i class="fas fa-calendar-alt"></i></span>
                         <span class="nav-submodule-text">Patrol Schedule</span>
@@ -271,10 +279,6 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                     <span class="arrow">▶</span>
                 </div>
                 <div class="nav-submodules">
-                    <a href="submit-tip.php" class="nav-submodule" data-tooltip="Submit Tip">
-                        <span class="nav-submodule-icon"><i class="fas fa-envelope"></i></span>
-                        <span class="nav-submodule-text">Submit Tip</span>
-                    </a>
                     <a href="review-tip.php" class="nav-submodule" data-tooltip="Review Tip">
                         <span class="nav-submodule-icon"><i class="fas fa-eye"></i></span>
                         <span class="nav-submodule-text">Review Tip</span>
@@ -395,15 +399,15 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                 
                 <div class="form-row">
                     <div class="form-group">
-                        <label for="volunteerEmail">Email Address</label>
-                        <input type="email" id="volunteerEmail" name="volunteerEmail">
+                        <label for="volunteerEmail">Email Address *</label>
+                        <input type="email" id="volunteerEmail" name="volunteerEmail" required>
                     </div>
                     <div class="form-group">
-                        <label for="volunteerAddress">Address *</label>
-                        <input type="text" id="volunteerAddress" name="volunteerAddress" required>
+                        <label for="volunteerAddress">Home Address *</label>
+                        <input type="text" id="volunteerAddress" name="volunteerAddress" required placeholder="e.g., 123 Bonifacio Street, Barangay San Agustin, Quezon City">
                     </div>
                 </div>
-                
+
                 <div class="form-group">
                     <label for="volunteerCategory">Volunteer Category *</label>
                     <select id="volunteerCategory" name="volunteerCategory" required>
@@ -446,21 +450,59 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                         </select>
                     </div>
                 </div>
-                
-                <div class="form-group">
-                    <label for="volunteerNotes">Additional Notes</label>
-                    <textarea id="volunteerNotes" name="volunteerNotes" placeholder="Any additional information about the volunteer..."></textarea>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="volunteerEmergencyName">Emergency Contact Full Name *</label>
+                        <input type="text" id="volunteerEmergencyName" name="volunteerEmergencyName" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="volunteerEmergencyContact">Emergency Contact Number *</label>
+                        <input type="tel" id="volunteerEmergencyContact" name="volunteerEmergencyContact" required>
+                    </div>
                 </div>
                 
                 <div class="form-group">
-                    <label for="volunteerPhotoId">Photo ID *</label>
+                    <label for="volunteerPhoto">Volunteer Photo *</label>
+                    <div class="file-upload">
+                        <input type="file" id="volunteerPhoto" name="volunteerPhoto" accept="image/*" required onchange="previewImage(this, 'volunteerPhotoPreview')">
+                        <label for="volunteerPhoto" class="file-upload-label">
+                            <span>📷 Click to upload Volunteer Photo</span>
+                        </label>
+                        <div class="file-preview" id="volunteerPhotoPreview"></div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="volunteerPhotoId">Photo of Valid ID *</label>
                     <div class="file-upload">
                         <input type="file" id="volunteerPhotoId" name="volunteerPhotoId" accept="image/*" required onchange="previewImage(this, 'volunteerPhotoIdPreview')">
                         <label for="volunteerPhotoId" class="file-upload-label">
-                            <span>🆔 Click to upload Photo ID</span>
+                            <span>🆔 Click to upload Valid ID</span>
                         </label>
                         <div class="file-preview" id="volunteerPhotoIdPreview"></div>
                     </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="volunteerCertifications">Certifications (optional, multiple files)</label>
+                    <div class="file-upload">
+                        <input type="file" id="volunteerCertifications" name="volunteerCertifications" accept="image/jpeg,image/jpg,image/png,application/pdf" multiple onchange="previewImage(this, 'volunteerCertificationsPreview')">
+                        <label for="volunteerCertifications" class="file-upload-label">
+                            <span>📄 Click to upload certification files (JPEG, PNG, PDF)</span>
+                        </label>
+                        <div class="file-preview" id="volunteerCertificationsPreview"></div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="volunteerCertificationsDescription">Certifications Description</label>
+                    <textarea id="volunteerCertificationsDescription" name="volunteerCertificationsDescription" placeholder="Describe certifications (e.g., First Aid certificate, CPR training, etc.)"></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label for="volunteerNotes">Additional Notes</label>
+                    <textarea id="volunteerNotes" name="volunteerNotes" placeholder="Any additional information about the volunteer..."></textarea>
                 </div>
                 
                 <div class="form-actions">
@@ -642,9 +684,39 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
         // Volunteer data storage
         let volunteerData = {};
         let nextVolunteerId = 4; // Starting from 4 since we have 3 sample volunteers
-        
-        // Initialize volunteer data from existing table rows
+        // Track selected certification files so they can be removed before saving
+        let selectedCertFiles = [];
+
+        function saveVolunteerDataToStorage() {
+            try {
+                localStorage.setItem('volunteerData', JSON.stringify(volunteerData));
+            } catch (e) {
+                console.error('Failed to save volunteer data', e);
+            }
+        }
+
+        function loadVolunteerDataFromStorage() {
+            try {
+                const raw = localStorage.getItem('volunteerData');
+                return raw ? JSON.parse(raw) : null;
+            } catch (e) {
+                console.error('Failed to load volunteer data', e);
+                return null;
+            }
+        }
+
+        // Initialize volunteer data from existing table rows or storage
         function initializeVolunteerData() {
+            const stored = loadVolunteerDataFromStorage();
+            if (stored && Object.keys(stored).length > 0) {
+                volunteerData = stored;
+                const tbody = document.getElementById('volunteersTableBody');
+                tbody.innerHTML = '';
+                Object.keys(volunteerData).forEach(id => addTableRow(id));
+                nextVolunteerId = Math.max(...Object.keys(volunteerData).map(Number)) + 1;
+                return;
+            }
+
             const rows = document.querySelectorAll('#volunteersTableBody tr[data-volunteer-id]');
             rows.forEach((row) => {
                 const id = row.getAttribute('data-volunteer-id');
@@ -658,24 +730,140 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                     skills: cells[3].textContent.trim(),
                     availability: cells[4].textContent.trim(),
                     status: cells[5].querySelector('.status-badge').textContent.trim(),
-                    email: id === '1' ? 'maria.rizal@email.com' : id === '2' ? 'juan.aquino@email.com' : 'roberto.magsaysay@email.com',
-                    address: id === '1' ? '123 Bonifacio Street, Barangay San Agustin, Quezon City' : id === '2' ? '456 Rizal Avenue, Barangay San Agustin, Quezon City' : '789 Luna Street, Barangay San Agustin, Quezon City',
-                    notes: id === '1' ? 'Certified First Aid and CPR instructor. Available for weekend training sessions.' : id === '2' ? 'Experienced in organizing community events and outreach programs.' : 'Experienced in community outreach and communication programs.',
-                    category: id === '1' ? 'First Aid & Medical' : id === '2' ? 'Event Management' : 'Community Outreach',
-                    photoId: null // Default to null, can be set when uploaded
+                    email: id === '1'
+                        ? 'maria.rizal@example.com'
+                        : id === '2'
+                            ? 'juan.aquino@example.com'
+                            : 'roberto.magsaysay@example.com',
+                    address: id === '1'
+                        ? '123 Bonifacio Street, Barangay San Agustin, Quezon City'
+                        : id === '2'
+                            ? '456 Rizal Avenue, Barangay San Agustin, Quezon City'
+                            : '789 Luna Street, Barangay San Agustin, Quezon City',
+                    notes: id === '1'
+                        ? 'Certified First Aid and CPR instructor. Available for weekend training sessions.'
+                        : id === '2'
+                            ? 'Experienced in organizing community events and outreach programs.'
+                            : 'Experienced in community outreach and communication programs.',
+                    photoId: null,
+                    emergencyContactName: '',
+                    emergencyContactNumber: ''
                 };
             });
+
+            saveVolunteerDataToStorage();
         }
         
+        function renderCertificationsPreview(input, preview) {
+            preview.innerHTML = '';
+
+            if (selectedCertFiles.length > 0) {
+                selectedCertFiles.forEach((file, index) => {
+                    const wrapper = document.createElement('div');
+                    wrapper.style.display = 'flex';
+                    wrapper.style.alignItems = 'center';
+                    wrapper.style.gap = '0.5rem';
+                    wrapper.style.marginBottom = '0.5rem';
+
+                    if (file.type.startsWith('image/')) {
+                        const img = document.createElement('img');
+                        img.className = 'id-photo-preview';
+                        img.alt = file.name;
+
+                        const reader = new FileReader();
+                        reader.onload = function (e) {
+                            img.src = e.target.result;
+                            img.onclick = function () { viewPhoto(img.src); };
+                        };
+                        reader.readAsDataURL(file);
+
+                        wrapper.appendChild(img);
+                    }
+
+                    const label = document.createElement('div');
+                    label.textContent = file.name;
+                    label.style.fontSize = '0.85rem';
+                    wrapper.appendChild(label);
+
+                    const removeBtn = document.createElement('button');
+                    removeBtn.type = 'button';
+                    removeBtn.textContent = 'Remove';
+                    removeBtn.style.padding = '0.25rem 0.5rem';
+                    removeBtn.style.fontSize = '0.75rem';
+                    removeBtn.style.borderRadius = '4px';
+                    removeBtn.style.border = '1px solid #ccc';
+                    removeBtn.style.cursor = 'pointer';
+                    removeBtn.onclick = function (e) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        // Remove only this specific file from the tracked list
+                        selectedCertFiles = selectedCertFiles.filter(f => f !== file);
+                        const dtInner = new DataTransfer();
+                        selectedCertFiles.forEach(f => dtInner.items.add(f));
+                        input.files = dtInner.files;
+                        renderCertificationsPreview(input, preview);
+                    };
+                    wrapper.appendChild(removeBtn);
+
+                    preview.appendChild(wrapper);
+                });
+                preview.style.display = 'block';
+            } else {
+                preview.style.display = 'none';
+            }
+        }
+
         function previewImage(input, previewId) {
             const preview = document.getElementById(previewId);
+            if (!preview) return;
+
+            // Special handling for certifications (multiple files with remove option)
+            if (input.id === 'volunteerCertifications') {
+                // Merge newly selected files with already tracked files
+                if (input.files && input.files.length > 0) {
+                    const existing = new Set(selectedCertFiles.map(f => `${f.name}|${f.size}`));
+                    Array.from(input.files).forEach(file => {
+                        const key = `${file.name}|${file.size}`;
+                        if (!existing.has(key)) {
+                            selectedCertFiles.push(file);
+                            existing.add(key);
+                        }
+                    });
+                }
+
+                // Rebuild the FileList on the input so form submission sees the same files
+                const dt = new DataTransfer();
+                selectedCertFiles.forEach(f => dt.items.add(f));
+                input.files = dt.files;
+
+                renderCertificationsPreview(input, preview);
+                return;
+            }
+
+            // Default behaviour for single-file fields (photo, valid ID)
+            preview.innerHTML = '';
             if (input.files && input.files[0]) {
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    preview.innerHTML = '<img src="' + e.target.result + '" alt="Photo ID Preview" class="id-photo-preview" onclick="viewPhoto(this.src)">';
-                    preview.style.display = 'block';
-                };
-                reader.readAsDataURL(input.files[0]);
+                const file = input.files[0];
+                if (file.type.startsWith('image/')) {
+                    const img = document.createElement('img');
+                    img.className = 'id-photo-preview';
+                    img.alt = file.name;
+
+                    const reader = new FileReader();
+                    reader.onload = function (e) {
+                        img.src = e.target.result;
+                        img.onclick = function () { viewPhoto(img.src); };
+                    };
+                    reader.readAsDataURL(file);
+                    preview.appendChild(img);
+                } else {
+                    const label = document.createElement('div');
+                    label.textContent = file.name;
+                    preview.appendChild(label);
+                }
+                preview.style.display = 'block';
+            } else {
+                preview.style.display = 'none';
             }
         }
         
@@ -722,19 +910,22 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             const availability = document.getElementById('volunteerAvailability').value;
             const status = document.getElementById('volunteerStatus').value;
             const notes = document.getElementById('volunteerNotes').value.trim();
-            const photoFile = document.getElementById('volunteerPhotoId').files[0];
-            
+            const photoIdFile = document.getElementById('volunteerPhotoId').files[0];
+            const certFiles = selectedCertFiles;
+            const certDescription = document.getElementById('volunteerCertificationsDescription').value.trim();
+            const emergencyName = document.getElementById('volunteerEmergencyName').value.trim();
+            const emergencyContact = document.getElementById('volunteerEmergencyContact').value.trim();
             const volunteerId = nextVolunteerId.toString();
             
             // Handle photo ID upload
             let photoIdSrc = null;
-            if (photoFile) {
+            if (photoIdFile) {
                 const reader = new FileReader();
                 reader.onload = function(e) {
                     photoIdSrc = e.target.result;
                     completeSave();
                 };
-                reader.readAsDataURL(photoFile);
+                reader.readAsDataURL(photoIdFile);
             } else {
                 alert('Photo ID is required!');
                 return;
@@ -753,13 +944,17 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                     availability: availability,
                     status: status,
                     notes: notes,
-                    photoId: photoIdSrc
+                    photoId: photoIdSrc,
+                    certifications: certFiles.map(f => f.name),
+                    certificationsDescription: certDescription,
+                    emergencyContactName: emergencyName,
+                    emergencyContactNumber: emergencyContact
                 };
                 
                 // Add new row to table
                 addTableRow(volunteerId);
                 nextVolunteerId++;
-                
+                saveVolunteerDataToStorage();
                 alert('Volunteer added successfully!');
                 closeAddVolunteerModal();
             }
@@ -799,6 +994,16 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             tbody.appendChild(row);
         }
         
+        function loadVolunteerActivities() {
+            try {
+                const raw = localStorage.getItem('volunteerActivities');
+                return raw ? JSON.parse(raw) : [];
+            } catch (e) {
+                console.error('Failed to load volunteer activities', e);
+                return [];
+            }
+        }
+
         function viewVolunteer(id) {
             const volunteer = volunteerData[id];
             if (!volunteer) {
@@ -817,6 +1022,8 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                 statusClass = 'status-pending';
             }
             
+            const activities = loadVolunteerActivities().filter(a => a.volunteerId === id);
+
             let detailsHTML = `
                 <div class="detail-row inline">
                     <span class="detail-label">Name:</span>
@@ -861,6 +1068,15 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                     <span class="detail-label">Availability:</span>
                     <span class="detail-value">${volunteer.availability}</span>
                 </div>
+
+                ${volunteer.emergencyContactName || volunteer.emergencyContactNumber ? `
+                <div class="detail-row">
+                    <span class="detail-label">Emergency Contact:</span>
+                    <span class="detail-value">
+                        ${volunteer.emergencyContactName || ''}${volunteer.emergencyContactName && volunteer.emergencyContactNumber ? ' - ' : ''}${volunteer.emergencyContactNumber || ''}
+                    </span>
+                </div>
+                ` : ''}
                 
                 ${volunteer.notes ? `
                 <div class="detail-row">
@@ -882,7 +1098,57 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                     <span class="detail-value" style="color: var(--text-secondary); font-style: italic;">No photo ID uploaded</span>
                 </div>
                 `}
+                
+                ${volunteer.certifications && volunteer.certifications.length ? `
+                <div class="detail-row">
+                    <span class="detail-label">Certifications:</span>
+                    <div class="detail-value">
+                        <ul style="padding-left:1.1rem; margin:0;">
+                            ${volunteer.certifications.map(name => `<li>${name}</li>`).join('')}
+                        </ul>
+                        ${volunteer.certificationsDescription ? `<div style="margin-top:0.5rem;">${volunteer.certificationsDescription}</div>` : ''}
+                    </div>
+                </div>
+                ` : ''}
             `;
+
+            if (activities.length > 0) {
+                detailsHTML += `
+                    <div class="detail-row">
+                        <span class="detail-label">Assigned Tasks:</span>
+                        <div class="detail-value">
+                            <ul style="padding-left:1.1rem; margin:0;">
+                                ${activities.map(a => `
+                                    <li>
+                                        <strong>${a.eventTitle || ''}</strong> (${a.eventType || ''})
+                                        – ${a.eventDate || ''} ${a.callTime || ''}-${a.endTime || ''} @ ${a.venue || ''}
+                                        <br>Role: ${a.role || ''} • Check-in Status: ${a.checkInStatus || 'Pending'}
+                                    </li>
+                                `).join('')}
+                            </ul>
+                        </div>
+                    </div>
+                `;
+
+                const attended = activities.filter(a => (a.checkInStatus || '').toLowerCase() === 'checked-in');
+                if (attended.length > 0) {
+                    detailsHTML += `
+                        <div class="detail-row">
+                            <span class="detail-label">Events / Seminars Attended:</span>
+                            <div class="detail-value">
+                                <ul style="padding-left:1.1rem; margin:0;">
+                                    ${attended.map(a => `
+                                        <li>
+                                            ${a.eventDate || ''} – <strong>${a.eventTitle || ''}</strong> (${a.eventType || ''})
+                                            @ ${a.venue || ''}
+                                        </li>
+                                    `).join('')}
+                                </ul>
+                            </div>
+                        </div>
+                    `;
+                }
+            }
             
             detailsContainer.innerHTML = detailsHTML;
             modal.classList.add('active');
@@ -971,7 +1237,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             function completeUpdate() {
                 // Update table row
                 updateVolunteerRow(volunteerId);
-                
+                saveVolunteerDataToStorage();
                 alert('Volunteer updated successfully!');
                 closeEditVolunteerModal();
             }
@@ -981,7 +1247,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             if (confirm('Are you sure you want to delete this volunteer? This action cannot be undone.')) {
                 // Remove from data
                 delete volunteerData[id];
-                
+                saveVolunteerDataToStorage();
                 // Remove row from table
                 const row = document.querySelector(`tr[data-volunteer-id="${id}"]`);
                 if (row) {

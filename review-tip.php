@@ -15,6 +15,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
     <link rel="icon" type="image/x-icon" href="images/favicon.ico">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="css/theme.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <style>
         body { margin: 0; padding: 0; font-family: var(--font-family); background-color: var(--bg-color); display: flex; min-height: 100vh; }
         .sidebar { width: 320px; background: var(--tertiary-color); color: #fff; position: fixed; left: 0; top: 0; height: 100vh; overflow: hidden; box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1); z-index: 1000; transition: width 0.3s ease; display: flex; flex-direction: column; }
@@ -100,7 +101,14 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
         tbody tr:last-child td { border-bottom: none; }
         .status-badge { padding: 0.25rem 0.75rem; border-radius: 12px; font-size: 0.85rem; font-weight: 500; display: inline-block; }
         .status-pending { background: #fff3cd; color: #856404; }
-        .status-resolved { background: #d1e7dd; color: #0f5132; }
+        .status-reviewed { background: #d1e7dd; color: #0f5132; }
+        .status-under-review { background: #cfe2ff; color: #084298; }
+        .btn-action { padding: 0.5rem 1rem; background: #28a745; color: #fff; border: none; border-radius: 6px; font-size: 0.85rem; cursor: pointer; transition: all 0.2s ease; }
+        .btn-action:hover { background: #218838; }
+        .btn-export { padding: 0.5rem 1rem; background: #007bff; color: #fff; border: none; border-radius: 6px; font-size: 0.85rem; cursor: pointer; transition: all 0.2s ease; }
+        .btn-export:hover { background: #0056b3; }
+        label:hover { background: rgba(0, 0, 0, 0.02); }
+        input[type="checkbox"] { accent-color: var(--primary-color); }
         .btn-view { padding: 0.5rem 1rem; background: var(--primary-color); color: #fff; border: none; border-radius: 6px; font-size: 0.85rem; cursor: pointer; transition: all 0.2s ease; margin-right: 0.5rem; }
         .btn-view:hover { background: #4ca8a6; }
         .btn-edit { padding: 0.5rem 1rem; background: #ffc107; color: #000; border: none; border-radius: 6px; font-size: 0.85rem; cursor: pointer; transition: all 0.2s ease; }
@@ -153,6 +161,10 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                         <span class="nav-submodule-icon"><i class="fas fa-chart-bar"></i></span>
                         <span class="nav-submodule-text">Activity Logs</span>
                     </a>
+                    <a href="incident-feed.php" class="nav-submodule" data-tooltip="Incident Feed">
+                        <span class="nav-submodule-icon"><i class="fas fa-exclamation-triangle"></i></span>
+                        <span class="nav-submodule-text">Incident Feed</span>
+                    </a>
                 </div>
             </div>
             <div class="nav-module">
@@ -162,9 +174,9 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                     <span class="arrow">▶</span>
                 </div>
                 <div class="nav-submodules">
-                    <a href="live-view.php" class="nav-submodule" data-tooltip="Live View">
-                        <span class="nav-submodule-icon"><i class="fas fa-circle" style="color: #ff4444;"></i></span>
-                        <span class="nav-submodule-text">Live View</span>
+                    <a href="open-surveillance-app.php" class="nav-submodule" data-tooltip="Open Surveillance App">
+                        <span class="nav-submodule-icon"><i class="fas fa-desktop"></i></span>
+                        <span class="nav-submodule-text">Open Surveillance App</span>
                     </a>
                     <a href="playback.php" class="nav-submodule" data-tooltip="Playback">
                         <span class="nav-submodule-icon"><i class="fas fa-play"></i></span>
@@ -193,14 +205,14 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                     </a>
                 </div>
             </div>
-            <div class="nav-module active">
+            <div class="nav-module">
                 <div class="nav-module-header" onclick="toggleModule(this)" data-tooltip="Volunteer Registry and Scheduling">
                     <span class="nav-module-icon"><i class="fas fa-handshake"></i></span>
                     <span class="nav-module-header-text">Volunteer Registry and Scheduling</span>
                     <span class="arrow">▶</span>
                 </div>
                 <div class="nav-submodules">
-                    <a href="volunteer-list.php" class="nav-submodule active" data-tooltip="Volunteer List">
+                    <a href="volunteer-list.php" class="nav-submodule" data-tooltip="Volunteer List">
                         <span class="nav-submodule-icon"><i class="fas fa-user"></i></span>
                         <span class="nav-submodule-text">Volunteer List</span>
                     </a>
@@ -217,6 +229,10 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                     <span class="arrow">▶</span>
                 </div>
                 <div class="nav-submodules">
+                    <a href="patrol-list.php" class="nav-submodule" data-tooltip="Patrol List">
+                        <span class="nav-submodule-icon"><i class="fas fa-list"></i></span>
+                        <span class="nav-submodule-text">Patrol List</span>
+                    </a>
                     <a href="patrol-schedule.php" class="nav-submodule" data-tooltip="Patrol Schedule">
                         <span class="nav-submodule-icon"><i class="fas fa-calendar-alt"></i></span>
                         <span class="nav-submodule-text">Patrol Schedule</span>
@@ -251,10 +267,6 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                     <span class="arrow">▶</span>
                 </div>
                 <div class="nav-submodules">
-                    <a href="submit-tip.php" class="nav-submodule" data-tooltip="Submit Tip">
-                        <span class="nav-submodule-icon"><i class="fas fa-envelope"></i></span>
-                        <span class="nav-submodule-text">Submit Tip</span>
-                    </a>
                     <a href="review-tip.php" class="nav-submodule active" data-tooltip="Review Tip">
                         <span class="nav-submodule-icon"><i class="fas fa-eye"></i></span>
                         <span class="nav-submodule-text">Review Tip</span>
@@ -279,16 +291,16 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
         <main class="content-area">
             <div class="page-content">
                 <div class="search-box">
-                    <input type="text" id="searchInput" placeholder="Search tips by category, date, or location..." onkeyup="filterTips()">
+                    <input type="text" id="searchInput" placeholder="Search tips by ID, timestamp, location, or description..." onkeyup="filterTips()">
                 </div>
                 <div class="table-container">
                     <table id="tipsTable">
                         <thead>
                             <tr>
                                 <th>Tip ID</th>
-                                <th>Category</th>
-                                <th>Date</th>
+                                <th>Timestamp</th>
                                 <th>Location</th>
+                                <th>Tip Description</th>
                                 <th>Status</th>
                                 <th>Actions</th>
                             </tr>
@@ -296,79 +308,37 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                         <tbody id="tipsTableBody">
                             <tr data-tip-id="1">
                                 <td>TIP-2025-001</td>
-                                <td>Suspicious Activity</td>
-                                <td>2025-01-15</td>
+                                <td>2025-01-15 14:30:25</td>
                                 <td>Susano Road, Barangay San Agustin, Quezon City</td>
-                                <td><span class="status-badge status-pending">Under Review</span></td>
+                                <td>Suspicious activity observed near residential area. Multiple individuals loitering.</td>
+                                <td><span class="status-badge status-under-review">Under Review</span></td>
                                 <td>
                                     <div class="action-buttons">
                                         <button class="btn-view" onclick="viewTip('1')">View</button>
-                                        <button class="btn-edit" onclick="editTip('1')">Edit</button>
                                     </div>
                                 </td>
                             </tr>
                             <tr data-tip-id="2">
                                 <td>TIP-2025-002</td>
-                                <td>Safety Concern</td>
-                                <td>2025-01-14</td>
+                                <td>2025-01-14 10:15:42</td>
                                 <td>Paraiso St., Barangay San Agustin, Quezon City</td>
-                                <td><span class="status-badge status-resolved">Reviewed</span></td>
+                                <td>Safety concern reported regarding broken streetlights in the area.</td>
+                                <td><span class="status-badge status-reviewed">Reviewed</span></td>
                                 <td>
                                     <div class="action-buttons">
                                         <button class="btn-view" onclick="viewTip('2')">View</button>
-                                        <button class="btn-edit" onclick="editTip('2')">Edit</button>
                                     </div>
                                 </td>
                             </tr>
                             <tr data-tip-id="3">
                                 <td>TIP-2025-003</td>
-                                <td>Vandalism</td>
-                                <td>2025-01-13</td>
+                                <td>2025-01-13 18:45:10</td>
                                 <td>Clemente St., Barangay San Agustin, Quezon City</td>
-                                <td><span class="status-badge status-pending">Under Review</span></td>
+                                <td>Vandalism reported on public property. Graffiti found on walls.</td>
+                                <td><span class="status-badge status-reviewed">Reviewed</span></td>
                                 <td>
                                     <div class="action-buttons">
                                         <button class="btn-view" onclick="viewTip('3')">View</button>
-                                        <button class="btn-edit" onclick="editTip('3')">Edit</button>
-                                    </div>
-                                </td>
-                            </tr>
-                            <tr data-tip-id="4">
-                                <td>TIP-2025-004</td>
-                                <td>Noise Complaint</td>
-                                <td>2025-01-12</td>
-                                <td>Clemente Subd., Barangay San Agustin, Quezon City</td>
-                                <td><span class="status-badge status-resolved">Reviewed</span></td>
-                                <td>
-                                    <div class="action-buttons">
-                                        <button class="btn-view" onclick="viewTip('4')">View</button>
-                                        <button class="btn-edit" onclick="editTip('4')">Edit</button>
-                                    </div>
-                                </td>
-                            </tr>
-                            <tr data-tip-id="5">
-                                <td>TIP-2025-005</td>
-                                <td>Suspicious Activity</td>
-                                <td>2025-01-11</td>
-                                <td>Patnubay St., Barangay San Agustin, Quezon City</td>
-                                <td><span class="status-badge status-pending">Under Review</span></td>
-                                <td>
-                                    <div class="action-buttons">
-                                        <button class="btn-view" onclick="viewTip('5')">View</button>
-                                        <button class="btn-edit" onclick="editTip('5')">Edit</button>
-                                    </div>
-                                </td>
-                            </tr>
-                            <tr data-tip-id="6">
-                                <td>TIP-2025-006</td>
-                                <td>Safety Concern</td>
-                                <td>2025-01-10</td>
-                                <td>Katarungan St., Barangay San Agustin, Quezon City</td>
-                                <td><span class="status-badge status-resolved">Reviewed</span></td>
-                                <td>
-                                    <div class="action-buttons">
-                                        <button class="btn-view" onclick="viewTip('6')">View</button>
-                                        <button class="btn-edit" onclick="editTip('6')">Edit</button>
                                     </div>
                                 </td>
                             </tr>
@@ -389,69 +359,58 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             <div id="viewTipContent" class="tip-details">
                 <!-- Content will be populated by JavaScript -->
             </div>
+            <div class="form-group" id="statusGroup" style="margin-top: 1.5rem;">
+                <label for="tipStatus">Status *</label>
+                <select id="tipStatus" name="status" onchange="updateTipStatus()">
+                    <option value="Under Review">Under Review</option>
+                    <option value="Reviewed">Reviewed</option>
+                </select>
+            </div>
             <div class="form-actions">
                 <button type="button" class="btn-cancel" onclick="closeViewTipModal()">Close</button>
+                <button type="button" class="btn-action" id="actionButton" onclick="openActionModal()" style="display: none;">
+                    <i class="fas fa-cog"></i> Action
+                </button>
             </div>
         </div>
     </div>
 
-    <!-- Edit Tip Modal -->
-    <div id="editTipModal" class="modal">
+    <!-- Action Modal -->
+    <div id="actionModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h2>Edit Tip</h2>
-                <span class="close" onclick="closeEditTipModal()">&times;</span>
+                <h2>Tip Actions</h2>
+                <span class="close" onclick="closeActionModal()">&times;</span>
             </div>
-            <form id="editTipForm" onsubmit="updateTip(event)">
-                <input type="hidden" id="editTipId" name="id">
-                <div class="form-group">
-                    <label for="editTipCategory">Category *</label>
-                    <select id="editTipCategory" name="category" required>
-                        <option value="">Select Category</option>
-                        <option value="Suspicious Activity">Suspicious Activity</option>
-                        <option value="Safety Concern">Safety Concern</option>
-                        <option value="Vandalism">Vandalism</option>
-                        <option value="Noise Complaint">Noise Complaint</option>
-                        <option value="Illegal Activity">Illegal Activity</option>
-                        <option value="Other">Other</option>
-                    </select>
+            <div id="actionTipContent" class="tip-details" style="margin-bottom: 1.5rem; padding: 1rem; background: #f9f9f9; border-radius: 8px; line-height: 1.8;">
+                <!-- Tip details will be populated here -->
+            </div>
+            <div class="form-group">
+                <label style="display: block; margin-bottom: 0.75rem; color: var(--text-color); font-weight: 500; font-size: 0.95rem;">Select Actions:</label>
+                <div style="display: flex; flex-direction: column; gap: 0.75rem; margin-top: 0.5rem;">
+                    <label style="display: flex; align-items: flex-start; gap: 0.75rem; cursor: pointer; padding: 0.5rem; border-radius: 6px; transition: background 0.2s ease;">
+                        <input type="checkbox" id="sendToGroup1" value="group1" style="margin-top: 0.25rem; flex-shrink: 0; width: 18px; height: 18px; cursor: pointer;">
+                        <span style="flex: 1; line-height: 1.5;">Send to Suspect and Witness Management System (Group 1)</span>
+                    </label>
+                    <label style="display: flex; align-items: flex-start; gap: 0.75rem; cursor: pointer; padding: 0.5rem; border-radius: 6px; transition: background 0.2s ease;">
+                        <input type="checkbox" id="sendToGroup5" value="group5" style="margin-top: 0.25rem; flex-shrink: 0; width: 18px; height: 18px; cursor: pointer;">
+                        <span style="flex: 1; line-height: 1.5;">Send to Crime Data Analytics System (Group 5)</span>
+                    </label>
+                    <label style="display: flex; align-items: flex-start; gap: 0.75rem; cursor: pointer; padding: 0.5rem; border-radius: 6px; transition: background 0.2s ease;">
+                        <input type="checkbox" id="exportWord" value="export" style="margin-top: 0.25rem; flex-shrink: 0; width: 18px; height: 18px; cursor: pointer;">
+                        <span style="flex: 1; line-height: 1.5;">Export to Word Document</span>
+                    </label>
                 </div>
-                <div class="form-group">
-                    <label for="editTipDate">Date *</label>
-                    <input type="date" id="editTipDate" name="date" required>
-                </div>
-                <div class="form-group">
-                    <label for="editTipLocation">Location *</label>
-                    <select id="editTipLocation" name="location" required>
-                        <option value="">Select Location</option>
-                        <option value="Susano Road, Barangay San Agustin, Quezon City">Susano Road, Barangay San Agustin, Quezon City</option>
-                        <option value="Paraiso St., Barangay San Agustin, Quezon City">Paraiso St., Barangay San Agustin, Quezon City</option>
-                        <option value="Clemente St., Barangay San Agustin, Quezon City">Clemente St., Barangay San Agustin, Quezon City</option>
-                        <option value="Clemente Subd., Barangay San Agustin, Quezon City">Clemente Subd., Barangay San Agustin, Quezon City</option>
-                        <option value="Patnubay St., Barangay San Agustin, Quezon City">Patnubay St., Barangay San Agustin, Quezon City</option>
-                        <option value="Katarungan St., Barangay San Agustin, Quezon City">Katarungan St., Barangay San Agustin, Quezon City</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label for="editTipStatus">Status *</label>
-                    <select id="editTipStatus" name="status" required>
-                        <option value="Under Review">Under Review</option>
-                        <option value="Reviewed">Reviewed</option>
-                        <option value="Resolved">Resolved</option>
-                        <option value="Dismissed">Dismissed</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label for="editTipDescription">Description</label>
-                    <textarea id="editTipDescription" name="description" placeholder="Tip description..."></textarea>
-                </div>
-                <div class="form-actions">
-                    <button type="button" class="btn-cancel" onclick="closeEditTipModal()">Cancel</button>
-                    <button type="submit" class="btn-save">Update Tip</button>
-                </div>
-            </form>
+            </div>
+            <div class="form-actions">
+                <button type="button" class="btn-cancel" onclick="closeActionModal()">Cancel</button>
+                <button type="button" class="btn-save" onclick="executeActions()">
+                    <i class="fas fa-check"></i> Execute Actions
+                </button>
+            </div>
         </div>
     </div>
+
 
     <script>
         document.addEventListener('DOMContentLoaded', function() {
@@ -512,26 +471,108 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
         }
         // Initialize tip data
         let tipData = {};
+        let nextTipId = 4; // Starting from 4 since we have 3 sample tips
+        
+        function loadSubmittedTips() {
+            try {
+                const stored = localStorage.getItem('submittedTips');
+                return stored ? JSON.parse(stored) : [];
+            } catch (e) {
+                console.error('Failed to load submitted tips', e);
+                return [];
+            }
+        }
+        
+        function saveTipDataToStorage() {
+            try {
+                // Convert tipData object to array format for localStorage
+                const tipsArray = Object.values(tipData).map(tip => ({
+                    tipId: tip.tipId,
+                    timestamp: tip.timestamp,
+                    location: tip.location,
+                    description: tip.description,
+                    status: tip.status
+                }));
+                localStorage.setItem('submittedTips', JSON.stringify(tipsArray));
+            } catch (e) {
+                console.error('Failed to save tip data', e);
+            }
+        }
         
         function initializeTipData() {
+            // First, load submitted tips from localStorage
+            const submittedTips = loadSubmittedTips();
             const tableBody = document.getElementById('tipsTableBody');
-            const rows = tableBody.querySelectorAll('tr[data-tip-id]');
             
+            // Load existing tips from table rows
+            const rows = tableBody.querySelectorAll('tr[data-tip-id]');
             rows.forEach(row => {
                 const id = row.getAttribute('data-tip-id');
                 const cells = row.querySelectorAll('td');
                 
+                const statusBadge = cells[4].querySelector('.status-badge');
+                const status = statusBadge ? statusBadge.textContent.trim() : 'Under Review';
+                
                 tipData[id] = {
                     id: id,
                     tipId: cells[0].textContent.trim(),
-                    category: cells[1].textContent.trim(),
-                    date: cells[2].textContent.trim(),
-                    location: cells[3].textContent.trim(),
-                    status: cells[4].querySelector('.status-badge').textContent.trim(),
-                    description: ''
+                    timestamp: cells[1].textContent.trim(),
+                    location: cells[2].textContent.trim(),
+                    description: cells[3].textContent.trim(),
+                    status: status
                 };
             });
+            
+            // Add submitted tips from localStorage that aren't already in the table
+            submittedTips.forEach((tip, index) => {
+                // Check if tip already exists in tipData
+                const existingTip = Object.values(tipData).find(t => t.tipId === tip.tipId);
+                if (!existingTip) {
+                    const newId = nextTipId.toString();
+                    tipData[newId] = {
+                        id: newId,
+                        tipId: tip.tipId,
+                        timestamp: tip.timestamp,
+                        location: tip.location,
+                        description: tip.description,
+                        status: tip.status || 'Under Review'
+                    };
+                    
+                    // Add row to table
+                    addTipTableRow(newId);
+                    nextTipId++;
+                }
+            });
         }
+        
+        function addTipTableRow(id) {
+            const tip = tipData[id];
+            if (!tip) return;
+            
+            const tableBody = document.getElementById('tipsTableBody');
+            const row = document.createElement('tr');
+            row.setAttribute('data-tip-id', id);
+            
+            const statusClass = tip.status === 'Reviewed' ? 'status-reviewed' : 'status-under-review';
+            const statusText = tip.status || 'Under Review';
+            
+            row.innerHTML = `
+                <td>${tip.tipId}</td>
+                <td>${tip.timestamp}</td>
+                <td>${tip.location}</td>
+                <td>${tip.description}</td>
+                <td><span class="status-badge ${statusClass}">${statusText}</span></td>
+                <td>
+                    <div class="action-buttons">
+                        <button class="btn-view" onclick="viewTip('${id}')">View</button>
+                    </div>
+                </td>
+            `;
+            
+            tableBody.appendChild(row);
+        }
+
+        let currentTipId = null;
 
         function viewTip(id) {
             const tip = tipData[id];
@@ -540,84 +581,337 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                 return;
             }
             
+            currentTipId = id;
+            
             const content = `
                 <p><strong>Tip ID:</strong> ${tip.tipId}</p>
-                <p><strong>Category:</strong> ${tip.category}</p>
-                <p><strong>Date:</strong> ${tip.date}</p>
+                <p><strong>Timestamp:</strong> ${tip.timestamp}</p>
                 <p><strong>Location:</strong> ${tip.location}</p>
-                <p><strong>Status:</strong> ${tip.status}</p>
-                ${tip.description ? `<p><strong>Description:</strong><br>${tip.description}</p>` : '<p><strong>Description:</strong> No description provided.</p>'}
+                <p><strong>Tip Description:</strong><br>${tip.description}</p>
             `;
             
             document.getElementById('viewTipContent').innerHTML = content;
+            document.getElementById('tipStatus').value = tip.status || 'Under Review';
+            
+            // Show Action button only if status is Reviewed
+            const actionButton = document.getElementById('actionButton');
+            if (tip.status === 'Reviewed') {
+                actionButton.style.display = 'inline-block';
+            } else {
+                actionButton.style.display = 'none';
+            }
+            
             document.getElementById('viewTipModal').style.display = 'block';
         }
 
         function closeViewTipModal() {
             document.getElementById('viewTipModal').style.display = 'none';
+            currentTipId = null;
         }
 
-        function editTip(id) {
-            const tip = tipData[id];
-            if (!tip) return;
+        function updateTipStatus() {
+            if (!currentTipId) return;
             
-            document.getElementById('editTipId').value = tip.id;
-            document.getElementById('editTipCategory').value = tip.category;
-            document.getElementById('editTipDate').value = tip.date;
-            document.getElementById('editTipLocation').value = tip.location;
-            document.getElementById('editTipStatus').value = tip.status;
-            document.getElementById('editTipDescription').value = tip.description || '';
+            const status = document.getElementById('tipStatus').value;
+            tipData[currentTipId].status = status;
+            saveTipDataToStorage();
             
-            document.getElementById('editTipModal').style.display = 'block';
-        }
-
-        function closeEditTipModal() {
-            document.getElementById('editTipModal').style.display = 'none';
-        }
-
-        function updateTip(event) {
-            event.preventDefault();
-            
-            const formData = new FormData(event.target);
-            const id = formData.get('id');
-            
-            const updatedTip = {
-                id: id,
-                tipId: tipData[id].tipId,
-                category: formData.get('category'),
-                date: formData.get('date'),
-                location: formData.get('location'),
-                status: formData.get('status'),
-                description: formData.get('description') || ''
-            };
-            
-            tipData[id] = updatedTip;
-            
-            const row = document.querySelector(`tr[data-tip-id="${id}"]`);
+            // Update status in table
+            const row = document.querySelector(`tr[data-tip-id="${currentTipId}"]`);
             if (row) {
                 const cells = row.querySelectorAll('td');
-                cells[1].textContent = updatedTip.category;
-                cells[2].textContent = updatedTip.date;
-                cells[3].textContent = updatedTip.location;
-                
-                const statusClass = updatedTip.status === 'Reviewed' || updatedTip.status === 'Resolved' ? 'status-resolved' : 'status-pending';
-                
-                cells[4].innerHTML = `<span class="status-badge ${statusClass}">${updatedTip.status}</span>`;
+                const statusClass = status === 'Reviewed' ? 'status-reviewed' : 'status-under-review';
+                cells[4].innerHTML = `<span class="status-badge ${statusClass}">${status}</span>`;
             }
             
-            closeEditTipModal();
+            // Show/hide Action button based on status
+            const actionButton = document.getElementById('actionButton');
+            if (status === 'Reviewed') {
+                actionButton.style.display = 'inline-block';
+            } else {
+                actionButton.style.display = 'none';
+            }
         }
+
+        function openActionModal() {
+            if (!currentTipId) return;
+            
+            const tip = tipData[currentTipId];
+            if (!tip) return;
+            
+            // Populate tip details in action modal
+            document.getElementById('actionTipContent').innerHTML = `
+                <h3 style="margin-top: 0; margin-bottom: 1rem; color: var(--tertiary-color); font-size: 1.1rem;">Tip Details</h3>
+                <p style="margin-bottom: 0.75rem;"><strong>Tip ID:</strong> ${tip.tipId}</p>
+                <p style="margin-bottom: 0.75rem;"><strong>Timestamp:</strong> ${tip.timestamp}</p>
+                <p style="margin-bottom: 0.75rem;"><strong>Location:</strong> ${tip.location}</p>
+                <p style="margin-bottom: 0;"><strong>Description:</strong> ${tip.description}</p>
+            `;
+            
+            // Reset checkboxes
+            document.getElementById('sendToGroup1').checked = false;
+            document.getElementById('sendToGroup5').checked = false;
+            document.getElementById('exportWord').checked = false;
+            
+            document.getElementById('actionModal').style.display = 'block';
+        }
+
+        function closeActionModal() {
+            document.getElementById('actionModal').style.display = 'none';
+        }
+
+        function executeActions() {
+            if (!currentTipId) return;
+            
+            const tip = tipData[currentTipId];
+            const sendToGroup1 = document.getElementById('sendToGroup1').checked;
+            const sendToGroup5 = document.getElementById('sendToGroup5').checked;
+            const exportWord = document.getElementById('exportWord').checked;
+            
+            if (!sendToGroup1 && !sendToGroup5 && !exportWord) {
+                alert('Please select at least one action.');
+                return;
+            }
+            
+            const tipDataToSend = {
+                tipId: tip.tipId,
+                timestamp: tip.timestamp,
+                location: tip.location,
+                description: tip.description
+            };
+            
+            let actionsCompleted = 0;
+            let totalActions = 0;
+            
+            if (sendToGroup1) {
+                totalActions++;
+                fetch('api/send_to_group1.php', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(tipDataToSend)
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        actionsCompleted++;
+                        checkAllActionsComplete();
+                    } else {
+                        console.error('Error sending to Group 1:', data.message);
+                        checkAllActionsComplete();
+                    }
+                })
+                .catch(error => {
+                    console.error('Error sending to Group 1:', error);
+                    checkAllActionsComplete();
+                });
+            }
+            
+            if (sendToGroup5) {
+                totalActions++;
+                fetch('api/send_to_group5.php', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(tipDataToSend)
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        actionsCompleted++;
+                        checkAllActionsComplete();
+                    } else {
+                        console.error('Error sending to Group 5:', data.message);
+                        checkAllActionsComplete();
+                    }
+                })
+                .catch(error => {
+                    console.error('Error sending to Group 5:', error);
+                    checkAllActionsComplete();
+                });
+            }
+            
+            if (exportWord) {
+                totalActions++;
+                exportTipToWord(tip).then(() => {
+                    actionsCompleted++;
+                    checkAllActionsComplete();
+                }).catch(error => {
+                    console.error('Error exporting to Word:', error);
+                    checkAllActionsComplete();
+                });
+            }
+            
+            function checkAllActionsComplete() {
+                if (actionsCompleted >= totalActions && totalActions > 0) {
+                    let message = 'Actions completed:\n';
+                    if (sendToGroup1) message += '- Sent to Suspect and Witness Management System (Group 1)\n';
+                    if (sendToGroup5) message += '- Sent to Crime Data Analytics System (Group 5)\n';
+                    if (exportWord) message += '- Exported to Word document\n';
+                    alert(message);
+                    closeActionModal();
+                }
+            }
+        }
+
+        async function exportTipToWord(tip) {
+            try {
+                if (typeof JSZip === 'undefined') {
+                    alert('Export library not loaded. Please refresh the page.');
+                    return;
+                }
+
+                const zip = new JSZip();
+
+                const escapeXml = (text) => {
+                    if (!text) return '';
+                    return String(text)
+                        .replace(/&/g, '&amp;')
+                        .replace(/</g, '&lt;')
+                        .replace(/>/g, '&gt;')
+                        .replace(/"/g, '&quot;')
+                        .replace(/'/g, '&apos;');
+                };
+
+                const contentTypes = '<' + '?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' +
+'<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">\n' +
+'    <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>\n' +
+'    <Default Extension="xml" ContentType="application/xml"/>\n' +
+'    <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>\n' +
+'    <Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>\n' +
+'</Types>';
+
+                const documentXml = '<' + '?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' +
+'<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">\n' +
+'    <w:body>\n' +
+'        <w:p>\n' +
+'            <w:pPr>\n' +
+'                <w:jc w:val="center"/>\n' +
+'                <w:spacing w:after="400"/>\n' +
+'            </w:pPr>\n' +
+'            <w:r>\n' +
+'                <w:rPr>\n' +
+'                    <w:b/>\n' +
+'                    <w:sz w:val="32"/>\n' +
+'                </w:rPr>\n' +
+'                <w:t>TIP REPORT</w:t>\n' +
+'            </w:r>\n' +
+'        </w:p>\n' +
+'        <w:p>\n' +
+'            <w:pPr>\n' +
+'                <w:jc w:val="center"/>\n' +
+'                <w:spacing w:after="600"/>\n' +
+'            </w:pPr>\n' +
+'            <w:r>\n' +
+'                <w:t>Barangay San Agustin, Quezon City</w:t>\n' +
+'            </w:r>\n' +
+'        </w:p>\n' +
+'        <w:p>\n' +
+'            <w:r>\n' +
+'                <w:rPr><w:b/></w:rPr>\n' +
+'                <w:t>Tip ID:</w:t>\n' +
+'            </w:r>\n' +
+'            <w:r>\n' +
+'                <w:t> ' + escapeXml(tip.tipId) + '</w:t>\n' +
+'            </w:r>\n' +
+'        </w:p>\n' +
+'        <w:p>\n' +
+'            <w:r>\n' +
+'                <w:rPr><w:b/></w:rPr>\n' +
+'                <w:t>Timestamp:</w:t>\n' +
+'            </w:r>\n' +
+'            <w:r>\n' +
+'                <w:t> ' + escapeXml(tip.timestamp) + '</w:t>\n' +
+'            </w:r>\n' +
+'        </w:p>\n' +
+'        <w:p>\n' +
+'            <w:r>\n' +
+'                <w:rPr><w:b/></w:rPr>\n' +
+'                <w:t>Location:</w:t>\n' +
+'            </w:r>\n' +
+'            <w:r>\n' +
+'                <w:t> ' + escapeXml(tip.location) + '</w:t>\n' +
+'            </w:r>\n' +
+'        </w:p>\n' +
+'        <w:p>\n' +
+'            <w:pPr>\n' +
+'                <w:spacing w:before="400"/>\n' +
+'            </w:pPr>\n' +
+'            <w:r>\n' +
+'                <w:rPr><w:b/></w:rPr>\n' +
+'                <w:t>Tip Description:</w:t>\n' +
+'            </w:r>\n' +
+'        </w:p>\n' +
+'        <w:p>\n' +
+'            <w:r>\n' +
+'                <w:t>' + escapeXml(tip.description) + '</w:t>\n' +
+'            </w:r>\n' +
+'        </w:p>\n' +
+'        <w:p>\n' +
+'            <w:pPr>\n' +
+'                <w:jc w:val="right"/>\n' +
+'                <w:spacing w:before="600"/>\n' +
+'            </w:pPr>\n' +
+'            <w:r>\n' +
+'                <w:t>Generated on: ' + escapeXml(new Date().toLocaleString()) + '</w:t>\n' +
+'            </w:r>\n' +
+'        </w:p>\n' +
+'    </w:body>\n' +
+'</w:document>';
+
+                const stylesXml = '<' + '?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' +
+'<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">\n' +
+'    <w:style w:type="paragraph" w:styleId="Normal">\n' +
+'        <w:name w:val="Normal"/>\n' +
+'        <w:qFormat/>\n' +
+'    </w:style>\n' +
+'</w:styles>';
+
+                const rels = '<' + '?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' +
+'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">\n' +
+'    <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>\n' +
+'</Relationships>';
+
+                const wordRels = '<' + '?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' +
+'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">\n' +
+'    <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>\n' +
+'</Relationships>';
+
+                zip.file("[Content_Types].xml", contentTypes);
+                zip.file("word/document.xml", documentXml);
+                zip.file("word/styles.xml", stylesXml);
+                zip.file("_rels/.rels", rels);
+                zip.file("word/_rels/document.xml.rels", wordRels);
+
+                const blob = await zip.generateAsync({ type: "blob", mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" });
+                const fileName = `tip_report_${tip.tipId}_${tip.timestamp.replace(/[:\s]/g, '_')}.docx`;
+                
+                const link = document.createElement("a");
+                link.href = URL.createObjectURL(blob);
+                link.download = fileName;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(link.href);
+            } catch (error) {
+                console.error('Error generating DOCX:', error);
+                throw error;
+            }
+        }
+
 
         // Close modal when clicking outside
         window.onclick = function(event) {
             const viewModal = document.getElementById('viewTipModal');
-            const editModal = document.getElementById('editTipModal');
+            const actionModal = document.getElementById('actionModal');
             
             if (event.target === viewModal) {
                 closeViewTipModal();
             }
-            if (event.target === editModal) {
-                closeEditTipModal();
+            if (event.target === actionModal) {
+                closeActionModal();
             }
         }
 

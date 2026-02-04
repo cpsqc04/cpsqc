@@ -12,7 +12,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Member List - Neighborhood Watch</title>
+    <title>Incident Feed - Neighborhood Watch</title>
     <link rel="icon" type="image/x-icon" href="images/favicon.ico">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="css/theme.css">
@@ -1039,7 +1039,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                     <span class="arrow">▶</span>
                 </div>
                 <div class="nav-submodules">
-                    <a href="member-list.php" class="nav-submodule active" data-tooltip="Member List">
+                    <a href="member-list.php" class="nav-submodule" data-tooltip="Member List">
                         <span class="nav-submodule-icon"><i class="fas fa-clipboard-list"></i></span>
                         <span class="nav-submodule-text">Member List</span>
                     </a>
@@ -1047,7 +1047,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                         <span class="nav-submodule-icon"><i class="fas fa-chart-bar"></i></span>
                         <span class="nav-submodule-text">Activity Logs</span>
                     </a>
-                    <a href="incident-feed.php" class="nav-submodule" data-tooltip="Incident Feed">
+                    <a href="incident-feed.php" class="nav-submodule active" data-tooltip="Incident Feed">
                         <span class="nav-submodule-icon"><i class="fas fa-exclamation-triangle"></i></span>
                         <span class="nav-submodule-text">Incident Feed</span>
                     </a>
@@ -1175,7 +1175,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                 <button class="content-burger-btn" onclick="toggleSidebar()" aria-label="Toggle sidebar">
                     <span></span>
                 </button>
-                <h1 class="page-title">Member List</h1>
+                <h1 class="page-title">Incident Feed</h1>
             </div>
             <div class="user-info">
                 <span>Welcome, <?php echo htmlspecialchars($_SESSION['username'] ?? 'Admin'); ?></span>
@@ -1188,65 +1188,52 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                 <!-- Toolbar with Search and Add Button -->
                 <div class="toolbar">
                     <div class="search-box">
-                        <input type="text" id="searchInput" placeholder="Search members by name, address, or ID..." onkeyup="filterMembers()">
+                        <input type="text" id="searchInput" placeholder="Search incidents by ID, location, category, or description..." onkeyup="filterIncidents()">
                     </div>
-                    <button class="btn-add" onclick="openAddMemberModal()">
-                        <span>+</span>
-                        <span>Add Member</span>
-                    </button>
                 </div>
                 
-                <!-- Members Table -->
+                <!-- Incidents Table -->
                 <div class="table-container">
-                    <table id="membersTable">
+                    <table id="incidentsTable">
                         <thead>
                             <tr>
-                                <th>Photo</th>
-                                <th>Name</th>
-                                <th>Age</th>
-                                <th>Address</th>
-                                <th>Gender</th>
-                                <th>Valid ID</th>
-                                <th>Actions</th>
+                                <th>Incident ID</th>
+                                <th>Date</th>
+                                <th>Time</th>
+                                <th>Location</th>
+                                <th>Category</th>
+                                <th>Case Status</th>
+                                <th>Description</th>
                             </tr>
                         </thead>
-                        <tbody id="membersTableBody">
-                            <!-- Sample data - will be replaced with dynamic content -->
-                            <tr data-member-id="1">
-                                <td>
-                                    <img src="images/tara.png" alt="Member Photo" class="member-photo" onclick="viewPhoto(this.src)">
-                                </td>
-                                <td>Juan Dela Cruz</td>
-                                <td>35</td>
-                                <td>123 Main Street, Barangay 1, Quezon City</td>
-                                <td>Male</td>
-                                <td>
-                                    <img src="images/tara.png" alt="ID Photo" class="id-photo" onclick="viewPhoto(this.src)">
-                                </td>
-                                <td>
-                                    <div class="action-buttons">
-                                        <button class="btn-edit" onclick="editMember(1)">Edit</button>
-                                        <button class="btn-delete" onclick="deleteMember(1)">Delete</button>
-                                    </div>
-                                </td>
+                        <tbody id="incidentsTableBody">
+                            <!-- Sample data -->
+                            <tr data-incident-id="INC-001">
+                                <td>INC-001</td>
+                                <td>2025-01-15</td>
+                                <td>14:30</td>
+                                <td>Barangay 1, Quezon City</td>
+                                <td>Theft</td>
+                                <td><span style="padding: 0.25rem 0.75rem; border-radius: 12px; font-size: 0.75rem; font-weight: 600; background: #fff3cd; color: #856404;">Under Investigation</span></td>
+                                <td>Reported theft of personal belongings from residential area</td>
                             </tr>
-                            <tr data-member-id="2">
-                                <td>
-                                    <div class="photo-placeholder">No Photo</div>
-                                </td>
-                                <td>Maria Santos</td>
-                                <td>28</td>
-                                <td>456 Oak Avenue, Barangay 2, Quezon City</td>
-                                <td>Female</td>
-                                <td>
-                                    <div class="photo-placeholder">No ID</div>
-                                </td>
-                                <td>
-                                    <div class="action-buttons">
-                                        <button class="btn-edit" onclick="editMember(2)">Edit</button>
-                                        <button class="btn-delete" onclick="deleteMember(2)">Delete</button>
-                                    </div>
-                                </td>
+                            <tr data-incident-id="INC-002">
+                                <td>INC-002</td>
+                                <td>2025-01-14</td>
+                                <td>09:15</td>
+                                <td>Barangay 2, Quezon City</td>
+                                <td>Vandalism</td>
+                                <td><span style="padding: 0.25rem 0.75rem; border-radius: 12px; font-size: 0.75rem; font-weight: 600; background: #d4edda; color: #155724;">Resolved</span></td>
+                                <td>Graffiti found on public property, suspect identified</td>
+                            </tr>
+                            <tr data-incident-id="INC-003">
+                                <td>INC-003</td>
+                                <td>2025-01-13</td>
+                                <td>20:45</td>
+                                <td>Barangay 3, Quezon City</td>
+                                <td>Disturbance</td>
+                                <td><span style="padding: 0.25rem 0.75rem; border-radius: 12px; font-size: 0.75rem; font-weight: 600; background: #f8d7da; color: #721c24;">Pending</span></td>
+                                <td>Noise complaint from residential area, investigation ongoing</td>
                             </tr>
                         </tbody>
                     </table>
@@ -1255,8 +1242,8 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
         </main>
     </div>
     
-    <!-- Add/Edit Member Modal -->
-    <div id="addMemberModal" class="modal">
+    <!-- Modal removed - not needed for incident feed -->
+    <div id="addMemberModal" class="modal" style="display: none;">
         <div class="modal-content">
             <div class="modal-header">
                 <h2 id="modalTitle">Add New Member</h2>
@@ -1467,10 +1454,10 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             document.getElementById('photoModal').classList.remove('active');
         }
         
-        function filterMembers() {
+        function filterIncidents() {
             const input = document.getElementById('searchInput');
             const filter = input.value.toLowerCase();
-            const table = document.getElementById('membersTableBody');
+            const table = document.getElementById('incidentsTableBody');
             const rows = table.getElementsByTagName('tr');
             
             for (let i = 0; i < rows.length; i++) {

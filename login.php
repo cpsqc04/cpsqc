@@ -219,7 +219,7 @@ if (isset($_SESSION['admin_logged_in']) && $_SESSION['admin_logged_in'] === true
             border-radius: var(--radius);
             padding: 3rem clamp(2rem, 4vw, 3rem);
             box-shadow: 0 10px 40px -15px rgba(0, 0, 0, 0.1);
-            margin-top: 2rem;
+            margin-top: -1rem;
         }
         .mv-grid {
             display: grid;
@@ -270,6 +270,11 @@ if (isset($_SESSION['admin_logged_in']) && $_SESSION['admin_logged_in'] === true
             .login-card h2 { color: #ffffff; }
             .field label { color: #a1a1aa; }
         }
+        .action-buttons-section {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
         @media (max-width: 768px) {
             body {
                 padding: 1.5rem 1rem;
@@ -277,6 +282,121 @@ if (isset($_SESSION['admin_logged_in']) && $_SESSION['admin_logged_in'] === true
             .logo-wrap img {
                 height: 200px;
             }
+            .action-buttons-section {
+                padding: 1.5rem 1rem !important;
+            }
+            .action-buttons-section button {
+                min-width: 100% !important;
+                width: 100%;
+            }
+        }
+        .modal input:focus, .modal textarea:focus, .modal select:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(76, 138, 137, 0.25);
+        }
+        .modal .close:hover {
+            background: rgba(255, 255, 255, 0.1);
+            color: #fff;
+        }
+        .success-modal {
+            display: none;
+            position: fixed;
+            z-index: 2500;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(6px);
+            align-items: center;
+            justify-content: center;
+            animation: fadeIn 0.3s ease;
+        }
+        .success-modal.active {
+            display: flex;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px) scale(0.95);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+        .success-modal-content {
+            background: linear-gradient(145deg, #ffffff, #f8fafc);
+            border-radius: var(--radius);
+            padding: 3rem clamp(2rem, 4vw, 3rem);
+            max-width: 520px;
+            width: 90%;
+            box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.4);
+            text-align: center;
+            position: relative;
+            animation: slideUp 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        .success-icon-wrapper {
+            width: 100px;
+            height: 100px;
+            margin: 0 auto 1.5rem;
+            background: linear-gradient(135deg, #10b981, #059669);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 3.5rem;
+            color: #ffffff;
+            box-shadow: 0 10px 30px -10px rgba(16, 185, 129, 0.5);
+            animation: scaleIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) 0.2s both;
+        }
+        @keyframes scaleIn {
+            from {
+                transform: scale(0);
+            }
+            to {
+                transform: scale(1);
+            }
+        }
+        .success-icon-wrapper i {
+            animation: checkmark 0.6s ease 0.3s both;
+        }
+        @keyframes checkmark {
+            0% {
+                transform: scale(0) rotate(-45deg);
+            }
+            50% {
+                transform: scale(1.2) rotate(-45deg);
+            }
+            100% {
+                transform: scale(1) rotate(0deg);
+            }
+        }
+        .success-modal-content h2 {
+            color: var(--tertiary-color);
+            margin: 0 0 1rem 0;
+            font-size: 1.75rem;
+            font-weight: 700;
+        }
+        .success-modal-content p {
+            color: var(--text-secondary);
+            margin: 0 0 1.5rem 0;
+            font-size: 1.05rem;
+            line-height: 1.6;
+        }
+        .success-modal-actions {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            margin-top: 2rem;
+        }
+        .success-modal-actions .btn {
+            min-width: 140px;
         }
     </style>
 </head>
@@ -326,6 +446,19 @@ if (isset($_SESSION['admin_logged_in']) && $_SESSION['admin_logged_in'] === true
             </section>
         </div>
 
+        <section class="action-buttons-section" style="background: transparent; border-radius: var(--radius); padding: 2rem clamp(2rem, 4vw, 3rem); margin-top: -2rem; margin-bottom: 0.5rem;">
+            <div style="display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap; max-width: 800px; margin: 0 auto;">
+                <button class="btn btn-secondary" onclick="openTipModal()" style="flex: 1; min-width: 280px; text-align: center; justify-content: center; padding: 1rem 1.5rem; font-size: 1rem;">
+                    <i class="fas fa-shield-alt" style="margin-right: 0.5rem;"></i>
+                    Magsumite ng reklamo nang palihim. Pindutin ito
+                </button>
+                <button class="btn btn-secondary" onclick="openVolunteerModal()" style="flex: 1; min-width: 280px; text-align: center; justify-content: center; padding: 1rem 1.5rem; font-size: 1rem;">
+                    <i class="fas fa-hand-holding-heart" style="margin-right: 0.5rem;"></i>
+                    Gusto ko mag volunteer
+                </button>
+            </div>
+        </section>
+
         <section class="mv-section">
             <div class="mv-grid">
                 <div class="mv-item">
@@ -345,5 +478,450 @@ if (isset($_SESSION['admin_logged_in']) && $_SESSION['admin_logged_in'] === true
             </div>
         </section>
     </main>
+
+    <!-- Registration Success Modal -->
+    <div id="registrationSuccessModal" class="success-modal">
+        <div class="success-modal-content">
+            <div class="success-icon-wrapper">
+                <i class="fas fa-check"></i>
+            </div>
+            <h2>Registration Successful!</h2>
+            <p>Registration submitted successfully! Please proceed to the barangay hall to get your physical ID.</p>
+            <div class="success-modal-actions">
+                <button type="button" class="btn" onclick="closeRegistrationSuccessModal()">OK</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tip Submission Modal -->
+    <div id="tipModal" class="modal" style="display: none; position: fixed; z-index: 2000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.6); backdrop-filter: blur(4px); align-items: center; justify-content: center;">
+        <div class="modal-content" style="background: linear-gradient(145deg, var(--tertiary-color), var(--secondary-color)); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: var(--radius); box-shadow: 0 20px 50px -25px rgba(0, 0, 0, 0.5); padding: clamp(2.5rem, 4vw, 3.5rem); max-width: 600px; width: 90%; max-height: 90vh; overflow-y: auto;">
+            <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.75rem; padding-bottom: 1rem; border-bottom: 1px solid rgba(255, 255, 255, 0.16);">
+                <h2 style="margin: 0; color: #f8fafc; font-size: 1.75rem; font-weight: 600;">Submit Anonymous Tip</h2>
+                <span class="close" onclick="closeTipModal()" style="color: rgba(255, 255, 255, 0.8); font-size: 1.75rem; cursor: pointer; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; border-radius: 6px; transition: all 0.2s ease; line-height: 1;">&times;</span>
+            </div>
+            <form id="tipForm" onsubmit="submitTip(event)" style="display: grid; gap: 1.75rem;">
+                <div class="field">
+                    <label for="tipLocation" style="font-size: 1.1rem; color: rgba(255, 255, 255, 0.8); font-weight: 500;">Location *</label>
+                    <input id="tipLocation" name="location" type="text" placeholder="Enter location where the incident occurred" required style="width: 100%; padding: 1.15rem 1.5rem; border: 1px solid rgba(255, 255, 255, 0.16); border-radius: var(--radius); font: inherit; font-size: 1.1rem; color: #f8fafc; background: rgba(255, 255, 255, 0.08); transition: border-color 0.2s ease, box-shadow 0.2s ease; box-sizing: border-box;">
+                </div>
+                <div class="field">
+                    <label for="tipDescription" style="font-size: 1.1rem; color: rgba(255, 255, 255, 0.8); font-weight: 500;">Tip Description *</label>
+                    <textarea id="tipDescription" name="description" placeholder="Describe the incident or concern in detail" required style="width: 100%; padding: 1.15rem 1.5rem; border: 1px solid rgba(255, 255, 255, 0.16); border-radius: var(--radius); font: inherit; font-size: 1.1rem; color: #f8fafc; background: rgba(255, 255, 255, 0.08); min-height: 120px; resize: vertical; transition: border-color 0.2s ease, box-shadow 0.2s ease; box-sizing: border-box; font-family: inherit;"></textarea>
+                </div>
+                <div class="button-group" style="margin-top: 0.5rem;">
+                    <button type="button" class="btn btn-secondary" onclick="closeTipModal()" style="flex: 1;">Cancel</button>
+                    <button type="submit" class="btn" style="flex: 1;">Submit Tip</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Volunteer Registration Modal -->
+    <div id="volunteerModal" class="modal" style="display: none; position: fixed; z-index: 2000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.6); backdrop-filter: blur(4px); align-items: center; justify-content: center;">
+        <div class="modal-content" style="background: linear-gradient(145deg, var(--tertiary-color), var(--secondary-color)); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: var(--radius); box-shadow: 0 20px 50px -25px rgba(0, 0, 0, 0.5); padding: clamp(2.5rem, 4vw, 3.5rem); max-width: 700px; width: 90%; max-height: 90vh; overflow-y: auto;">
+            <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.75rem; padding-bottom: 1rem; border-bottom: 1px solid rgba(255, 255, 255, 0.16);">
+                <h2 style="margin: 0; color: #f8fafc; font-size: 1.75rem; font-weight: 600;">Volunteer Registration</h2>
+                <span class="close" onclick="closeVolunteerModal()" style="color: rgba(255, 255, 255, 0.8); font-size: 1.75rem; cursor: pointer; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; border-radius: 6px; transition: all 0.2s ease; line-height: 1;">&times;</span>
+            </div>
+            <form id="volunteerForm" onsubmit="submitVolunteer(event)" style="display: grid; gap: 1.75rem;">
+                <div class="field">
+                    <label for="volunteerName" style="font-size: 1.1rem; color: rgba(255, 255, 255, 0.8); font-weight: 500;">Full Name *</label>
+                    <input id="volunteerName" name="name" type="text" required style="width: 100%; padding: 1.15rem 1.5rem; border: 1px solid rgba(255, 255, 255, 0.16); border-radius: var(--radius); font: inherit; font-size: 1.1rem; color: #f8fafc; background: rgba(255, 255, 255, 0.08); transition: border-color 0.2s ease, box-shadow 0.2s ease; box-sizing: border-box;">
+                </div>
+                <div class="field">
+                    <label for="volunteerContact" style="font-size: 1.1rem; color: rgba(255, 255, 255, 0.8); font-weight: 500;">Contact Number *</label>
+                    <input id="volunteerContact" name="contact" type="text" required style="width: 100%; padding: 1.15rem 1.5rem; border: 1px solid rgba(255, 255, 255, 0.16); border-radius: var(--radius); font: inherit; font-size: 1.1rem; color: #f8fafc; background: rgba(255, 255, 255, 0.08); transition: border-color 0.2s ease, box-shadow 0.2s ease; box-sizing: border-box;">
+                </div>
+                <div class="field">
+                    <label for="volunteerEmail" style="font-size: 1.1rem; color: rgba(255, 255, 255, 0.8); font-weight: 500;">Email Address *</label>
+                    <input id="volunteerEmail" name="email" type="email" required style="width: 100%; padding: 1.15rem 1.5rem; border: 1px solid rgba(255, 255, 255, 0.16); border-radius: var(--radius); font: inherit; font-size: 1.1rem; color: #f8fafc; background: rgba(255, 255, 255, 0.08); transition: border-color 0.2s ease, box-shadow 0.2s ease; box-sizing: border-box;">
+                </div>
+                <div class="field">
+                    <label for="volunteerAddress" style="font-size: 1.1rem; color: rgba(255, 255, 255, 0.8); font-weight: 500;">Home Address *</label>
+                    <input id="volunteerAddress" name="address" type="text" required style="width: 100%; padding: 1.15rem 1.5rem; border: 1px solid rgba(255, 255, 255, 0.16); border-radius: var(--radius); font: inherit; font-size: 1.1rem; color: #f8fafc; background: rgba(255, 255, 255, 0.08); transition: border-color 0.2s ease, box-shadow 0.2s ease; box-sizing: border-box;">
+                </div>
+                <div class="field">
+                    <label for="volunteerCategory" style="font-size: 1.1rem; color: rgba(255, 255, 255, 0.8); font-weight: 500;">Volunteer Category *</label>
+                    <select id="volunteerCategory" name="category" required style="width: 100%; padding: 1.15rem 1.5rem; border: 1px solid rgba(255, 255, 255, 0.16); border-radius: var(--radius); font: inherit; font-size: 1.1rem; color: #f8fafc; background: rgba(255, 255, 255, 0.08); transition: border-color 0.2s ease, box-shadow 0.2s ease; box-sizing: border-box; cursor: pointer;">
+                        <option value="" style="background: var(--tertiary-color); color: #f8fafc;">Select category</option>
+                        <option value="Community Outreach" style="background: var(--tertiary-color); color: #f8fafc;">Community Outreach</option>
+                        <option value="Emergency Response" style="background: var(--tertiary-color); color: #f8fafc;">Emergency Response</option>
+                        <option value="Event Management" style="background: var(--tertiary-color); color: #f8fafc;">Event Management</option>
+                        <option value="Training and Education" style="background: var(--tertiary-color); color: #f8fafc;">Training and Education</option>
+                        <option value="Administrative Support" style="background: var(--tertiary-color); color: #f8fafc;">Administrative Support</option>
+                    </select>
+                </div>
+                <div class="field">
+                    <label for="volunteerSkills" style="font-size: 1.1rem; color: rgba(255, 255, 255, 0.8); font-weight: 500;">Skills *</label>
+                    <textarea id="volunteerSkills" name="skills" required style="width: 100%; padding: 1.15rem 1.5rem; border: 1px solid rgba(255, 255, 255, 0.16); border-radius: var(--radius); font: inherit; font-size: 1.1rem; color: #f8fafc; background: rgba(255, 255, 255, 0.08); min-height: 80px; resize: vertical; transition: border-color 0.2s ease, box-shadow 0.2s ease; box-sizing: border-box; font-family: inherit;"></textarea>
+                </div>
+                <div class="field">
+                    <label for="volunteerAvailability" style="font-size: 1.1rem; color: rgba(255, 255, 255, 0.8); font-weight: 500;">Availability *</label>
+                    <select id="volunteerAvailability" name="availability" required style="width: 100%; padding: 1.15rem 1.5rem; border: 1px solid rgba(255, 255, 255, 0.16); border-radius: var(--radius); font: inherit; font-size: 1.1rem; color: #f8fafc; background: rgba(255, 255, 255, 0.08); transition: border-color 0.2s ease, box-shadow 0.2s ease; box-sizing: border-box; cursor: pointer;">
+                        <option value="" style="background: var(--tertiary-color); color: #f8fafc;">Select availability</option>
+                        <option value="Weekdays" style="background: var(--tertiary-color); color: #f8fafc;">Weekdays</option>
+                        <option value="Weekends" style="background: var(--tertiary-color); color: #f8fafc;">Weekends</option>
+                        <option value="Both" style="background: var(--tertiary-color); color: #f8fafc;">Both</option>
+                        <option value="Flexible" style="background: var(--tertiary-color); color: #f8fafc;">Flexible</option>
+                    </select>
+                </div>
+                <div class="field">
+                    <label for="volunteerEmergencyName" style="font-size: 1.1rem; color: rgba(255, 255, 255, 0.8); font-weight: 500;">Emergency Contact Full Name *</label>
+                    <input id="volunteerEmergencyName" name="emergencyName" type="text" required style="width: 100%; padding: 1.15rem 1.5rem; border: 1px solid rgba(255, 255, 255, 0.16); border-radius: var(--radius); font: inherit; font-size: 1.1rem; color: #f8fafc; background: rgba(255, 255, 255, 0.08); transition: border-color 0.2s ease, box-shadow 0.2s ease; box-sizing: border-box;">
+                </div>
+                <div class="field">
+                    <label for="volunteerEmergencyContact" style="font-size: 1.1rem; color: rgba(255, 255, 255, 0.8); font-weight: 500;">Emergency Contact Number *</label>
+                    <input id="volunteerEmergencyContact" name="emergencyContact" type="text" required style="width: 100%; padding: 1.15rem 1.5rem; border: 1px solid rgba(255, 255, 255, 0.16); border-radius: var(--radius); font: inherit; font-size: 1.1rem; color: #f8fafc; background: rgba(255, 255, 255, 0.08); transition: border-color 0.2s ease, box-shadow 0.2s ease; box-sizing: border-box;">
+                </div>
+                <div class="field">
+                    <label for="volunteerPhoto" style="font-size: 1.1rem; color: rgba(255, 255, 255, 0.8); font-weight: 500;">Volunteer Photo *</label>
+                    <input id="volunteerPhoto" name="photo" type="file" accept="image/*" required onchange="previewVolunteerImage(this, 'volunteerPhotoPreview')" style="width: 100%; padding: 1.15rem 1.5rem; border: 1px solid rgba(255, 255, 255, 0.16); border-radius: var(--radius); font: inherit; font-size: 1.1rem; color: #f8fafc; background: rgba(255, 255, 255, 0.08); transition: border-color 0.2s ease, box-shadow 0.2s ease; box-sizing: border-box; cursor: pointer;">
+                    <div id="volunteerPhotoPreview" style="margin-top: 0.5rem; display: none;"></div>
+                </div>
+                <div class="field">
+                    <label for="volunteerPhotoId" style="font-size: 1.1rem; color: rgba(255, 255, 255, 0.8); font-weight: 500;">Volunteer Valid ID *</label>
+                    <input id="volunteerPhotoId" name="photoId" type="file" accept="image/*" required onchange="previewVolunteerImage(this, 'volunteerPhotoIdPreview')" style="width: 100%; padding: 1.15rem 1.5rem; border: 1px solid rgba(255, 255, 255, 0.16); border-radius: var(--radius); font: inherit; font-size: 1.1rem; color: #f8fafc; background: rgba(255, 255, 255, 0.08); transition: border-color 0.2s ease, box-shadow 0.2s ease; box-sizing: border-box; cursor: pointer;">
+                    <div id="volunteerPhotoIdPreview" style="margin-top: 0.5rem; display: none;"></div>
+                </div>
+                <div class="field">
+                    <label for="volunteerCertifications" style="font-size: 1.1rem; color: rgba(255, 255, 255, 0.8); font-weight: 500;">Certifications</label>
+                    <input id="volunteerCertifications" name="certifications" type="file" accept=".jpeg,.jpg,.png,.pdf" multiple onchange="handleCertificationUpload(this)" style="width: 100%; padding: 1.15rem 1.5rem; border: 1px solid rgba(255, 255, 255, 0.16); border-radius: var(--radius); font: inherit; font-size: 1.1rem; color: #f8fafc; background: rgba(255, 255, 255, 0.08); transition: border-color 0.2s ease, box-shadow 0.2s ease; box-sizing: border-box; cursor: pointer;">
+                    <div id="volunteerCertificationsPreview" style="margin-top: 0.5rem; display: none;"></div>
+                </div>
+                <div class="field">
+                    <label for="volunteerCertificationsDescription" style="font-size: 1.1rem; color: rgba(255, 255, 255, 0.8); font-weight: 500;">Certification Details</label>
+                    <textarea id="volunteerCertificationsDescription" name="certDescription" style="width: 100%; padding: 1.15rem 1.5rem; border: 1px solid rgba(255, 255, 255, 0.16); border-radius: var(--radius); font: inherit; font-size: 1.1rem; color: #f8fafc; background: rgba(255, 255, 255, 0.08); min-height: 80px; resize: vertical; transition: border-color 0.2s ease, box-shadow 0.2s ease; box-sizing: border-box; font-family: inherit;"></textarea>
+                </div>
+                <div class="button-group" style="margin-top: 0.5rem;">
+                    <button type="button" class="btn btn-secondary" onclick="closeVolunteerModal()" style="flex: 1;">Cancel</button>
+                    <button type="submit" class="btn" style="flex: 1;">Submit Registration</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        let selectedCertFiles = [];
+
+        function openTipModal() {
+            document.getElementById('tipModal').style.display = 'flex';
+        }
+
+        function closeTipModal() {
+            document.getElementById('tipModal').style.display = 'none';
+            document.getElementById('tipForm').reset();
+        }
+
+        function openVolunteerModal() {
+            document.getElementById('volunteerModal').style.display = 'flex';
+        }
+
+        function closeVolunteerModal() {
+            document.getElementById('volunteerModal').style.display = 'none';
+            document.getElementById('volunteerForm').reset();
+            document.getElementById('volunteerPhotoPreview').style.display = 'none';
+            document.getElementById('volunteerPhotoIdPreview').style.display = 'none';
+            document.getElementById('volunteerCertificationsPreview').style.display = 'none';
+            document.getElementById('volunteerPhotoPreview').innerHTML = '';
+            document.getElementById('volunteerPhotoIdPreview').innerHTML = '';
+            document.getElementById('volunteerCertificationsPreview').innerHTML = '';
+            selectedCertFiles = [];
+        }
+
+        function submitTip(event) {
+            event.preventDefault();
+            
+            const location = document.getElementById('tipLocation').value.trim();
+            const description = document.getElementById('tipDescription').value.trim();
+            
+            if (!location || !description) {
+                alert('Please fill in all required fields.');
+                return;
+            }
+            
+            // Generate Tip ID and timestamp
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const day = String(now.getDate()).padStart(2, '0');
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            const seconds = String(now.getSeconds()).padStart(2, '0');
+            
+            const timestamp = `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+            
+            // Get existing tips from localStorage
+            let tips = [];
+            try {
+                const stored = localStorage.getItem('submittedTips');
+                if (stored) {
+                    tips = JSON.parse(stored);
+                }
+            } catch (e) {
+                console.error('Failed to load tips', e);
+            }
+            
+            // Generate new tip ID
+            const tipIdNum = tips.length > 0 ? Math.max(...tips.map(t => {
+                const num = parseInt(t.tipId.replace('TIP-', '').split('-')[1]);
+                return isNaN(num) ? 0 : num;
+            })) + 1 : 1;
+            const tipId = `TIP-${year}-${String(tipIdNum).padStart(3, '0')}`;
+            
+            // Create tip object
+            const tip = {
+                tipId: tipId,
+                timestamp: timestamp,
+                location: location,
+                description: description,
+                status: 'Under Review'
+            };
+            
+            // Add to array
+            tips.push(tip);
+            
+            // Save to localStorage
+            try {
+                localStorage.setItem('submittedTips', JSON.stringify(tips));
+                alert('Tip submitted successfully! Your tip has been received and will be reviewed.');
+                closeTipModal();
+            } catch (e) {
+                console.error('Failed to save tip', e);
+                alert('Error submitting tip. Please try again.');
+            }
+        }
+
+        function previewVolunteerImage(input, previewId) {
+            const preview = document.getElementById(previewId);
+            if (!preview) return;
+            
+            preview.innerHTML = '';
+            if (input.files && input.files[0]) {
+                const file = input.files[0];
+                if (file.type.startsWith('image/')) {
+                    const img = document.createElement('img');
+                    img.style.cssText = 'max-width: 100%; max-height: 200px; border-radius: 8px; border: 2px solid rgba(255, 255, 255, 0.2); object-fit: cover; cursor: pointer; transition: transform 0.2s ease;';
+                    img.alt = file.name;
+                    img.onmouseover = function() { this.style.transform = 'scale(1.02)'; };
+                    img.onmouseout = function() { this.style.transform = 'scale(1)'; };
+                    img.onclick = function() { viewPhoto(img.src); };
+                    
+                    const reader = new FileReader();
+                    reader.onload = function (e) {
+                        img.src = e.target.result;
+                    };
+                    reader.readAsDataURL(file);
+                    preview.appendChild(img);
+                } else {
+                    const label = document.createElement('div');
+                    label.textContent = file.name;
+                    label.style.cssText = 'color: #f8fafc; padding: 0.5rem; background: rgba(255, 255, 255, 0.05); border-radius: 6px;';
+                    preview.appendChild(label);
+                }
+                preview.style.display = 'block';
+            } else {
+                preview.style.display = 'none';
+            }
+        }
+
+        function handleCertificationUpload(input) {
+            if (input.files && input.files.length > 0) {
+                const existing = new Set(selectedCertFiles.map(f => `${f.name}|${f.size}`));
+                Array.from(input.files).forEach(file => {
+                    const key = `${file.name}|${file.size}`;
+                    if (!existing.has(key)) {
+                        selectedCertFiles.push(file);
+                        existing.add(key);
+                    }
+                });
+            }
+            
+            renderCertificationsPreview(input, document.getElementById('volunteerCertificationsPreview'));
+        }
+
+        function renderCertificationsPreview(input, preview) {
+            preview.innerHTML = '';
+            
+            if (selectedCertFiles.length > 0) {
+                selectedCertFiles.forEach((file, index) => {
+                    const wrapper = document.createElement('div');
+                    wrapper.style.cssText = 'display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.75rem; padding: 0.75rem; background: rgba(255, 255, 255, 0.08); border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.1); transition: background 0.2s ease;';
+                    wrapper.onmouseover = function() { this.style.background = 'rgba(255, 255, 255, 0.12)'; };
+                    wrapper.onmouseout = function() { this.style.background = 'rgba(255, 255, 255, 0.08)'; };
+                    
+                    if (file.type.startsWith('image/')) {
+                        const img = document.createElement('img');
+                        img.style.cssText = 'width: 60px; height: 60px; object-fit: cover; border-radius: 6px; border: 2px solid rgba(255, 255, 255, 0.2); cursor: pointer; transition: transform 0.2s ease;';
+                        img.alt = file.name;
+                        img.onmouseover = function() { this.style.transform = 'scale(1.1)'; };
+                        img.onmouseout = function() { this.style.transform = 'scale(1)'; };
+                        img.onclick = function() { viewPhoto(img.src); };
+                        
+                        const reader = new FileReader();
+                        reader.onload = function (e) {
+                            img.src = e.target.result;
+                        };
+                        reader.readAsDataURL(file);
+                        wrapper.appendChild(img);
+                    } else {
+                        const fileIcon = document.createElement('div');
+                        fileIcon.style.cssText = 'width: 60px; height: 60px; display: flex; align-items: center; justify-content: center; background: rgba(255, 255, 255, 0.1); border-radius: 6px; border: 2px solid rgba(255, 255, 255, 0.2);';
+                        fileIcon.innerHTML = '<i class="fas fa-file-pdf" style="font-size: 1.5rem; color: rgba(255, 255, 255, 0.8);"></i>';
+                        wrapper.appendChild(fileIcon);
+                    }
+                    
+                    const label = document.createElement('div');
+                    label.textContent = file.name;
+                    label.style.cssText = 'flex: 1; font-size: 0.85rem; color: #f8fafc; padding: 0 0.5rem; word-break: break-word;';
+                    wrapper.appendChild(label);
+                    
+                    const removeBtn = document.createElement('button');
+                    removeBtn.type = 'button';
+                    removeBtn.textContent = 'Remove';
+                    removeBtn.style.cssText = 'padding: 0.4rem 0.75rem; font-size: 0.75rem; border-radius: 6px; border: 1px solid rgba(255, 255, 255, 0.3); cursor: pointer; background: rgba(239, 68, 68, 0.2); color: #f8fafc; transition: all 0.2s ease;';
+                    removeBtn.onmouseover = function() { this.style.background = 'rgba(239, 68, 68, 0.4)'; this.style.borderColor = 'rgba(255, 255, 255, 0.5)'; };
+                    removeBtn.onmouseout = function() { this.style.background = 'rgba(239, 68, 68, 0.2)'; this.style.borderColor = 'rgba(255, 255, 255, 0.3)'; };
+                    removeBtn.onclick = function (e) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        selectedCertFiles = selectedCertFiles.filter(f => f !== file);
+                        const dt = new DataTransfer();
+                        selectedCertFiles.forEach(f => dt.items.add(f));
+                        input.files = dt.files;
+                        renderCertificationsPreview(input, preview);
+                    };
+                    wrapper.appendChild(removeBtn);
+                    
+                    preview.appendChild(wrapper);
+                });
+                preview.style.display = 'block';
+            } else {
+                preview.style.display = 'none';
+            }
+        }
+
+        function submitVolunteer(event) {
+            event.preventDefault();
+            
+            const name = document.getElementById('volunteerName').value.trim();
+            const contact = document.getElementById('volunteerContact').value.trim();
+            const email = document.getElementById('volunteerEmail').value.trim();
+            const address = document.getElementById('volunteerAddress').value.trim();
+            const category = document.getElementById('volunteerCategory').value;
+            const skills = document.getElementById('volunteerSkills').value.trim();
+            const availability = document.getElementById('volunteerAvailability').value;
+            const emergencyName = document.getElementById('volunteerEmergencyName').value.trim();
+            const emergencyContact = document.getElementById('volunteerEmergencyContact').value.trim();
+            const photoFile = document.getElementById('volunteerPhoto').files[0];
+            const photoIdFile = document.getElementById('volunteerPhotoId').files[0];
+            const certDescription = document.getElementById('volunteerCertificationsDescription').value.trim();
+            
+            if (!name || !contact || !email || !address || !category || !skills || !availability || !emergencyName || !emergencyContact || !photoFile || !photoIdFile) {
+                alert('Please fill in all required fields.');
+                return;
+            }
+            
+            // Load existing volunteers
+            let volunteerData = {};
+            try {
+                const stored = localStorage.getItem('volunteerData');
+                if (stored) {
+                    volunteerData = JSON.parse(stored);
+                }
+            } catch (e) {
+                console.error('Failed to load volunteer data', e);
+            }
+            
+            // Generate volunteer ID
+            const existingIds = Object.keys(volunteerData).map(Number).filter(id => !isNaN(id));
+            const nextId = existingIds.length > 0 ? Math.max(...existingIds) + 1 : 1;
+            const volunteerId = nextId.toString();
+            
+            // Read photo files as base64
+            const reader1 = new FileReader();
+            reader1.onload = function(e1) {
+                const photoSrc = e1.target.result;
+                
+                const reader2 = new FileReader();
+                reader2.onload = function(e2) {
+                    const photoIdSrc = e2.target.result;
+                    
+                    // Store volunteer data
+                    volunteerData[volunteerId] = {
+                        id: volunteerId,
+                        name: name,
+                        contact: contact,
+                        email: email,
+                        address: address,
+                        category: category,
+                        skills: skills,
+                        availability: availability,
+                        status: 'Pending',
+                        notes: '',
+                        photo: photoSrc,
+                        photoId: photoIdSrc,
+                        certifications: selectedCertFiles.map(f => f.name),
+                        certificationsDescription: certDescription,
+                        emergencyContactName: emergencyName,
+                        emergencyContactNumber: emergencyContact
+                    };
+                    
+                    // Save to localStorage
+                    try {
+                        localStorage.setItem('volunteerData', JSON.stringify(volunteerData));
+                        closeVolunteerModal();
+                        // Show beautiful success modal
+                        setTimeout(() => {
+                            showRegistrationSuccessModal();
+                        }, 300);
+                    } catch (e) {
+                        console.error('Failed to save volunteer data', e);
+                        alert('Error submitting registration. Please try again.');
+                    }
+                };
+                reader2.readAsDataURL(photoIdFile);
+            };
+            reader1.readAsDataURL(photoFile);
+        }
+
+        function showRegistrationSuccessModal() {
+            document.getElementById('registrationSuccessModal').classList.add('active');
+        }
+
+        function closeRegistrationSuccessModal() {
+            document.getElementById('registrationSuccessModal').classList.remove('active');
+        }
+
+        function viewPhoto(src) {
+            const modal = document.createElement('div');
+            modal.style.cssText = 'position: fixed; z-index: 3000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.9); display: flex; align-items: center; justify-content: center;';
+            modal.onclick = function() { document.body.removeChild(modal); };
+            
+            const img = document.createElement('img');
+            img.src = src;
+            img.style.cssText = 'max-width: 90%; max-height: 90%; border-radius: 8px; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);';
+            img.onclick = function(e) { e.stopPropagation(); };
+            
+            modal.appendChild(img);
+            document.body.appendChild(modal);
+        }
+
+        // Close modals when clicking outside
+        window.onclick = function(event) {
+            const tipModal = document.getElementById('tipModal');
+            const volunteerModal = document.getElementById('volunteerModal');
+            const successModal = document.getElementById('registrationSuccessModal');
+            if (event.target === tipModal) {
+                closeTipModal();
+            }
+            if (event.target === volunteerModal) {
+                closeVolunteerModal();
+            }
+            if (event.target === successModal) {
+                closeRegistrationSuccessModal();
+            }
+        }
+    </script>
 </body>
 </html>

@@ -148,6 +148,10 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                         <span class="nav-submodule-icon"><i class="fas fa-chart-bar"></i></span>
                         <span class="nav-submodule-text">Activity Logs</span>
                     </a>
+                    <a href="incident-feed.php" class="nav-submodule" data-tooltip="Incident Feed">
+                        <span class="nav-submodule-icon"><i class="fas fa-exclamation-triangle"></i></span>
+                        <span class="nav-submodule-text">Incident Feed</span>
+                    </a>
                 </div>
             </div>
             <div class="nav-module">
@@ -157,9 +161,9 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                     <span class="arrow">▶</span>
                 </div>
                 <div class="nav-submodules">
-                    <a href="live-view.php" class="nav-submodule" data-tooltip="Live View">
-                        <span class="nav-submodule-icon"><i class="fas fa-circle" style="color: #ff4444;"></i></span>
-                        <span class="nav-submodule-text">Live View</span>
+                    <a href="open-surveillance-app.php" class="nav-submodule" data-tooltip="Open Surveillance App">
+                        <span class="nav-submodule-icon"><i class="fas fa-desktop"></i></span>
+                        <span class="nav-submodule-text">Open Surveillance App</span>
                     </a>
                     <a href="playback.php" class="nav-submodule" data-tooltip="Playback">
                         <span class="nav-submodule-icon"><i class="fas fa-play"></i></span>
@@ -188,14 +192,14 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                     </a>
                 </div>
             </div>
-            <div class="nav-module active">
+            <div class="nav-module">
                 <div class="nav-module-header" onclick="toggleModule(this)" data-tooltip="Volunteer Registry and Scheduling">
                     <span class="nav-module-icon"><i class="fas fa-handshake"></i></span>
                     <span class="nav-module-header-text">Volunteer Registry and Scheduling</span>
                     <span class="arrow">▶</span>
                 </div>
                 <div class="nav-submodules">
-                    <a href="volunteer-list.php" class="nav-submodule active" data-tooltip="Volunteer List">
+                    <a href="volunteer-list.php" class="nav-submodule" data-tooltip="Volunteer List">
                         <span class="nav-submodule-icon"><i class="fas fa-user"></i></span>
                         <span class="nav-submodule-text">Volunteer List</span>
                     </a>
@@ -212,6 +216,10 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                     <span class="arrow">▶</span>
                 </div>
                 <div class="nav-submodules">
+                    <a href="patrol-list.php" class="nav-submodule" data-tooltip="Patrol List">
+                        <span class="nav-submodule-icon"><i class="fas fa-list"></i></span>
+                        <span class="nav-submodule-text">Patrol List</span>
+                    </a>
                     <a href="patrol-schedule.php" class="nav-submodule" data-tooltip="Patrol Schedule">
                         <span class="nav-submodule-icon"><i class="fas fa-calendar-alt"></i></span>
                         <span class="nav-submodule-text">Patrol Schedule</span>
@@ -246,10 +254,6 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                     <span class="arrow">▶</span>
                 </div>
                 <div class="nav-submodules">
-                    <a href="submit-tip.php" class="nav-submodule" data-tooltip="Submit Tip">
-                        <span class="nav-submodule-icon"><i class="fas fa-envelope"></i></span>
-                        <span class="nav-submodule-text">Submit Tip</span>
-                    </a>
                     <a href="review-tip.php" class="nav-submodule" data-tooltip="Review Tip">
                         <span class="nav-submodule-icon"><i class="fas fa-eye"></i></span>
                         <span class="nav-submodule-text">Review Tip</span>
@@ -274,27 +278,29 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
         <main class="content-area">
             <div class="page-content">
                 <div class="search-box">
-                    <input type="text" id="searchInput" placeholder="Search event reports by event name, date, or organizer..." onkeyup="filterReports()">
+                    <input type="text" id="searchInput" placeholder="Search event reports by ID, title, date, or organizer..." onkeyup="filterReports()">
                 </div>
                 <div class="table-container">
                     <table id="reportsTable">
                         <thead>
                             <tr>
-                                <th>Event Name</th>
+                                <th>Event ID</th>
+                                <th>Title</th>
                                 <th>Date</th>
-                                <th>Attendance</th>
+                                <th>Attendance Count</th>
                                 <th>Organizer</th>
-                                <th>Status</th>
+                                <th>Survey Result</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody id="reportsTableBody">
                             <tr data-report-id="1">
+                                <td>EVT-2025-001</td>
                                 <td>Community Safety Awareness</td>
                                 <td>2025-01-15</td>
                                 <td>150</td>
                                 <td>Maria Santos</td>
-                                <td><span class="status-badge status-resolved">Completed</span></td>
+                                <td>85% Positive</td>
                                 <td>
                                     <div class="action-buttons">
                                         <button class="btn-view" onclick="viewReport('1')">View</button>
@@ -303,11 +309,12 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                                 </td>
                             </tr>
                             <tr data-report-id="2">
+                                <td>EVT-2025-002</td>
                                 <td>Neighborhood Meeting</td>
                                 <td>2025-01-10</td>
                                 <td>85</td>
                                 <td>Juan Dela Cruz</td>
-                                <td><span class="status-badge status-resolved">Completed</span></td>
+                                <td>92% Positive</td>
                                 <td>
                                     <div class="action-buttons">
                                         <button class="btn-view" onclick="viewReport('2')">View</button>
@@ -316,11 +323,12 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                                 </td>
                             </tr>
                             <tr data-report-id="3">
+                                <td>EVT-2025-003</td>
                                 <td>Safety Training Workshop</td>
                                 <td>2025-01-05</td>
                                 <td>120</td>
                                 <td>Roberto Reyes</td>
-                                <td><span class="status-badge status-resolved">Completed</span></td>
+                                <td>78% Positive</td>
                                 <td>
                                     <div class="action-buttons">
                                         <button class="btn-view" onclick="viewReport('3')">View</button>
@@ -407,35 +415,38 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                 }
             }
         }
-        // Initialize event report data
+        // Initialize event report data (from Impact Monitoring and Evaluation System - Group 6)
         let eventReportData = {
             '1': {
                 id: '1',
-                eventName: 'Community Safety Awareness',
+                eventId: 'EVT-2025-001',
+                title: 'Community Safety Awareness',
                 date: '2025-01-15',
-                attendance: '150',
+                attendanceCount: '150',
                 organizer: 'Maria Santos',
-                status: 'Completed',
+                surveyResult: '85% Positive',
                 location: 'Barangay San Agustin Hall, Quezon City',
                 description: 'Community safety awareness event conducted to educate residents about safety measures and emergency procedures. The event was well-attended with 150 participants.'
             },
             '2': {
                 id: '2',
-                eventName: 'Neighborhood Meeting',
+                eventId: 'EVT-2025-002',
+                title: 'Neighborhood Meeting',
                 date: '2025-01-10',
-                attendance: '85',
+                attendanceCount: '85',
                 organizer: 'Juan Dela Cruz',
-                status: 'Completed',
+                surveyResult: '92% Positive',
                 location: 'Barangay San Agustin Multi-Purpose Hall, Quezon City',
                 description: 'Monthly neighborhood meeting to discuss community concerns, upcoming events, and safety initiatives. 85 residents attended the meeting.'
             },
             '3': {
                 id: '3',
-                eventName: 'Safety Training Workshop',
+                eventId: 'EVT-2025-003',
+                title: 'Safety Training Workshop',
                 date: '2025-01-05',
-                attendance: '120',
+                attendanceCount: '120',
                 organizer: 'Roberto Reyes',
-                status: 'Completed',
+                surveyResult: '78% Positive',
                 location: 'Barangay San Agustin Community Center, Quezon City',
                 description: 'Safety training workshop covering first aid, emergency response, and community safety protocols. 120 participants completed the training.'
             }
@@ -449,12 +460,13 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             }
             
             const content = `
-                <p><strong>Event Name:</strong> ${report.eventName}</p>
+                <p><strong>Event ID:</strong> ${report.eventId}</p>
+                <p><strong>Title:</strong> ${report.title}</p>
                 <p><strong>Date:</strong> ${report.date}</p>
                 <p><strong>Location:</strong> ${report.location}</p>
-                <p><strong>Attendance:</strong> ${report.attendance} participants</p>
+                <p><strong>Attendance Count:</strong> ${report.attendanceCount} participants</p>
                 <p><strong>Organizer:</strong> ${report.organizer}</p>
-                <p><strong>Status:</strong> ${report.status}</p>
+                <p><strong>Survey Result:</strong> ${report.surveyResult}</p>
                 <p><strong>Description:</strong><br>${report.description}</p>
             `;
             

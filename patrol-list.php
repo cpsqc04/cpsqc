@@ -11,7 +11,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Patrol Schedule - Alertara</title>
+    <title>Patrol List - Alertara</title>
     <link rel="icon" type="image/x-icon" href="images/favicon.ico">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="css/theme.css">
@@ -100,8 +100,9 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
         tbody tr:hover { background: #f9f9f9; }
         tbody tr:last-child td { border-bottom: none; }
         .status-badge { padding: 0.25rem 0.75rem; border-radius: 12px; font-size: 0.85rem; font-weight: 500; display: inline-block; }
-        .status-pending { background: #fff3cd; color: #856404; }
-        .status-resolved { background: #d1e7dd; color: #0f5132; }
+        .status-available { background: #d1e7dd; color: #0f5132; }
+        .status-assigned { background: #fff3cd; color: #856404; }
+        .status-off-duty { background: #f8d7da; color: #842029; }
         .btn-view { padding: 0.5rem 1rem; background: var(--primary-color); color: #fff; border: none; border-radius: 6px; font-size: 0.85rem; cursor: pointer; transition: all 0.2s ease; }
         .btn-view:hover { background: #4ca8a6; }
         .btn-add { padding: 0.75rem 1.5rem; background: var(--primary-color); color: #fff; border: none; border-radius: 8px; font-size: 0.95rem; font-weight: 600; cursor: pointer; transition: all 0.2s ease; display: inline-flex; align-items: center; gap: 0.5rem; white-space: nowrap; flex-shrink: 0; }
@@ -128,8 +129,6 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
         .btn-cancel:hover { background: #5a6268; }
         .btn-save { padding: 0.75rem 1.5rem; background: var(--primary-color); color: #fff; border: none; border-radius: 8px; font-size: 0.95rem; font-weight: 600; cursor: pointer; transition: all 0.2s ease; }
         .btn-save:hover { background: #4ca8a6; }
-        .status-in-progress { background: #cfe2ff; color: #084298; }
-        .status-completed { background: #d1e7dd; color: #0f5132; }
         @media (max-width: 768px) { .sidebar { width: 320px; transform: translateX(-100%); transition: transform 0.3s ease; } .sidebar.mobile-open { transform: translateX(0); } .sidebar.collapsed { width: 80px; transform: translateX(0); } .main-wrapper { margin-left: 0; } body.sidebar-collapsed .main-wrapper { margin-left: 80px; } .modal-content { width: 95%; margin: 10% auto; padding: 1.5rem; } .search-container { flex-direction: column; } .btn-add { width: 100%; justify-content: center; } }
     </style>
 </head>
@@ -226,11 +225,11 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                     <span class="arrow">▶</span>
                 </div>
                 <div class="nav-submodules">
-                    <a href="patrol-list.php" class="nav-submodule" data-tooltip="Patrol List">
+                    <a href="patrol-list.php" class="nav-submodule active" data-tooltip="Patrol List">
                         <span class="nav-submodule-icon"><i class="fas fa-list"></i></span>
                         <span class="nav-submodule-text">Patrol List</span>
                     </a>
-                    <a href="patrol-schedule.php" class="nav-submodule active" data-tooltip="Patrol Schedule">
+                    <a href="patrol-schedule.php" class="nav-submodule" data-tooltip="Patrol Schedule">
                         <span class="nav-submodule-icon"><i class="fas fa-calendar-alt"></i></span>
                         <span class="nav-submodule-text">Patrol Schedule</span>
                     </a>
@@ -278,7 +277,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                 <button class="content-burger-btn" onclick="toggleSidebar()" aria-label="Toggle sidebar">
                     <span></span>
                 </button>
-                <h1 class="page-title">Patrol Schedule</h1>
+                <h1 class="page-title">Patrol List</h1>
             </div>
             <div class="user-info">
                 <span>Welcome, <?php echo htmlspecialchars($_SESSION['username'] ?? 'Admin'); ?></span>
@@ -289,60 +288,64 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             <div class="page-content">
                 <div class="search-container">
                     <div class="search-box">
-                        <input type="text" id="searchInput" placeholder="Search by location, date, or incident type..." onkeyup="filterPatrols()">
+                        <input type="text" id="searchInput" placeholder="Search patrol officers by name, badge number, or schedule..." onkeyup="filterPatrolOfficers()">
                     </div>
+                    <button class="btn-add" onclick="openAddOfficerModal()">
+                        <i class="fas fa-plus"></i> Add Officer
+                    </button>
                 </div>
                 <div class="table-container">
-                    <table id="patrolsTable">
+                    <table id="patrolOfficersTable">
                         <thead>
                             <tr>
-                                <th>Location</th>
-                                <th>Date</th>
-                                <th>Incident Type</th>
-                                <th>Description</th>
+                                <th>Badge Number</th>
+                                <th>Officer Name</th>
+                                <th>Contact Number</th>
+                                <th>Schedule</th>
+                                <th>Status</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
-                        <tbody id="patrolsTableBody">
-                            <tr data-patrol-id="1">
-                                <td>San Agustin Street, Barangay San Agustin</td>
-                                <td>2025-01-20</td>
-                                <td>Theft</td>
-                                <td>Reported theft incident at residential area. Requires immediate patrol dispatch.</td>
+                        <tbody id="patrolOfficersTableBody">
+                            <tr data-officer-id="1">
+                                <td>PO-001</td>
+                                <td>Juan Dela Cruz</td>
+                                <td>09123456789</td>
+                                <td>Mon-Fri, 08:00-16:00</td>
+                                <td><span class="status-badge status-available">Available</span></td>
                                 <td>
                                     <div class="action-buttons">
-                                        <button class="btn-view" onclick="viewPatrol('1')">View</button>
-                                        <button class="btn-add" onclick="assignPatrolToDispatch('1')" style="padding: 0.5rem 1rem; font-size: 0.85rem;">
-                                            <i class="fas fa-user-check"></i> Assign Patrol
-                                        </button>
+                                        <button class="btn-view" onclick="viewOfficer('1')">View</button>
+                                        <button class="btn-edit" onclick="editOfficer('1')">Edit</button>
+                                        <button class="btn-delete" onclick="deleteOfficer('1')">Delete</button>
                                     </div>
                                 </td>
                             </tr>
-                            <tr data-patrol-id="2">
-                                <td>Quezon Avenue Extension, Barangay San Agustin</td>
-                                <td>2025-01-21</td>
-                                <td>Vandalism</td>
-                                <td>Vandalism reported on public property. Patrol needed for investigation.</td>
+                            <tr data-officer-id="2">
+                                <td>PO-002</td>
+                                <td>Maria Santos</td>
+                                <td>09123456790</td>
+                                <td>Tue-Sat, 16:00-00:00</td>
+                                <td><span class="status-badge status-assigned">Assigned</span></td>
                                 <td>
                                     <div class="action-buttons">
-                                        <button class="btn-view" onclick="viewPatrol('2')">View</button>
-                                        <button class="btn-add" onclick="assignPatrolToDispatch('2')" style="padding: 0.5rem 1rem; font-size: 0.85rem;">
-                                            <i class="fas fa-user-check"></i> Assign Patrol
-                                        </button>
+                                        <button class="btn-view" onclick="viewOfficer('2')">View</button>
+                                        <button class="btn-edit" onclick="editOfficer('2')">Edit</button>
+                                        <button class="btn-delete" onclick="deleteOfficer('2')">Delete</button>
                                     </div>
                                 </td>
                             </tr>
-                            <tr data-patrol-id="3">
-                                <td>Rizal Street, Barangay San Agustin</td>
-                                <td>2025-01-22</td>
-                                <td>Suspicious Activity</td>
-                                <td>Suspicious activity detected. Requires patrol verification.</td>
+                            <tr data-officer-id="3">
+                                <td>PO-003</td>
+                                <td>Roberto Reyes</td>
+                                <td>09123456791</td>
+                                <td>Wed-Sun, 00:00-08:00</td>
+                                <td><span class="status-badge status-available">Available</span></td>
                                 <td>
                                     <div class="action-buttons">
-                                        <button class="btn-view" onclick="viewPatrol('3')">View</button>
-                                        <button class="btn-add" onclick="assignPatrolToDispatch('3')" style="padding: 0.5rem 1rem; font-size: 0.85rem;">
-                                            <i class="fas fa-user-check"></i> Assign Patrol
-                                        </button>
+                                        <button class="btn-view" onclick="viewOfficer('3')">View</button>
+                                        <button class="btn-edit" onclick="editOfficer('3')">Edit</button>
+                                        <button class="btn-delete" onclick="deleteOfficer('3')">Delete</button>
                                     </div>
                                 </td>
                             </tr>
@@ -353,77 +356,102 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
         </main>
     </div>
 
-    <!-- Assign Patrol to Dispatch Modal -->
-    <div id="assignPatrolModal" class="modal">
-        <div class="modal-content" style="max-width: 800px;">
+    <!-- Add Officer Modal -->
+    <div id="addOfficerModal" class="modal">
+        <div class="modal-content">
             <div class="modal-header">
-                <h2>Assign Patrol to Dispatch</h2>
-                <span class="close" onclick="closeAssignPatrolModal()">&times;</span>
+                <h2>Add Patrol Officer</h2>
+                <span class="close" onclick="closeAddOfficerModal()">&times;</span>
             </div>
-            <div id="incidentDetails" style="margin-bottom: 1.5rem; padding: 1rem; background: #f9f9f9; border-radius: 8px;">
-                <!-- Incident details will be populated here -->
-            </div>
-            <form id="assignPatrolForm" onsubmit="savePatrolAssignment(event)">
+            <form id="addOfficerForm" onsubmit="saveOfficer(event)">
                 <div class="form-group">
-                    <label>Select Patrol Officer *</label>
-                    <div style="margin-bottom: 1rem;">
-                        <label style="font-weight: 600; margin-bottom: 0.5rem; display: block;">Official Patrol Officers</label>
-                        <select id="patrolOfficer" name="officer" style="margin-bottom: 0.5rem;">
-                            <option value="">Select Official Patrol Officer</option>
-                            <option value="PO-001|Juan Dela Cruz|Official">PO-001 - Juan Dela Cruz</option>
-                            <option value="PO-002|Maria Santos|Official">PO-002 - Maria Santos</option>
-                            <option value="PO-003|Roberto Reyes|Official">PO-003 - Roberto Reyes</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label style="font-weight: 600; margin-bottom: 0.5rem; display: block;">Neighborhood Watch Members</label>
-                        <select id="neighborhoodMember" name="member">
-                            <option value="">Select Neighborhood Watch Member</option>
-                            <option value="NW-001|John Doe|Neighborhood Watch Only">NW-001 - John Doe <span style="color: #ff9800;">(Neighborhood Watch Only)</span></option>
-                            <option value="NW-002|Jane Smith|Neighborhood Watch Only">NW-002 - Jane Smith <span style="color: #ff9800;">(Neighborhood Watch Only)</span></option>
-                            <option value="NW-003|Mike Johnson|Neighborhood Watch Only">NW-003 - Mike Johnson <span style="color: #ff9800;">(Neighborhood Watch Only)</span></option>
-                        </select>
-                        <small style="color: #856404; display: block; margin-top: 0.25rem;">
-                            <i class="fas fa-info-circle"></i> Members marked as "Neighborhood Watch Only" are volunteers
-                        </small>
-                    </div>
+                    <label for="officerBadgeNumber">Badge Number *</label>
+                    <input type="text" id="officerBadgeNumber" name="badgeNumber" required>
                 </div>
                 <div class="form-group">
-                    <label for="patrolDate">Date *</label>
-                    <input type="date" id="patrolDate" name="date" required>
+                    <label for="officerName">Officer Name *</label>
+                    <input type="text" id="officerName" name="name" required>
                 </div>
                 <div class="form-group">
-                    <label for="patrolTime">Time *</label>
-                    <input type="time" id="patrolTime" name="time" required>
+                    <label for="officerContact">Contact Number *</label>
+                    <input type="text" id="officerContact" name="contact" required>
                 </div>
                 <div class="form-group">
-                    <label for="patrolRoute">Route *</label>
-                    <input type="text" id="patrolRoute" name="route" required>
+                    <label for="officerSchedule">Schedule *</label>
+                    <input type="text" id="officerSchedule" name="schedule" placeholder="e.g., Mon-Fri, 08:00-16:00" required>
+                </div>
+                <div class="form-group">
+                    <label for="officerStatus">Status *</label>
+                    <select id="officerStatus" name="status" required>
+                        <option value="Available">Available</option>
+                        <option value="Assigned">Assigned</option>
+                        <option value="Off-Duty">Off-Duty</option>
+                    </select>
                 </div>
                 <div class="form-actions">
-                    <button type="button" class="btn-cancel" onclick="closeAssignPatrolModal()">Cancel</button>
-                    <button type="submit" class="btn-save">Assign and Dispatch</button>
+                    <button type="button" class="btn-cancel" onclick="closeAddOfficerModal()">Cancel</button>
+                    <button type="submit" class="btn-save">Add Officer</button>
                 </div>
             </form>
         </div>
     </div>
 
-    <!-- View Patrol Modal -->
-    <div id="viewPatrolModal" class="modal">
+    <!-- View Officer Modal -->
+    <div id="viewOfficerModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h2>Patrol Details</h2>
-                <span class="close" onclick="closeViewPatrolModal()">&times;</span>
+                <h2>Officer Details</h2>
+                <span class="close" onclick="closeViewOfficerModal()">&times;</span>
             </div>
-            <div id="viewPatrolContent">
+            <div id="viewOfficerContent">
                 <!-- Content will be populated by JavaScript -->
             </div>
             <div class="form-actions">
-                <button type="button" class="btn-cancel" onclick="closeViewPatrolModal()">Close</button>
+                <button type="button" class="btn-cancel" onclick="closeViewOfficerModal()">Close</button>
             </div>
         </div>
     </div>
 
+    <!-- Edit Officer Modal -->
+    <div id="editOfficerModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Edit Patrol Officer</h2>
+                <span class="close" onclick="closeEditOfficerModal()">&times;</span>
+            </div>
+            <form id="editOfficerForm" onsubmit="updateOfficer(event)">
+                <input type="hidden" id="editOfficerId" name="id">
+                <div class="form-group">
+                    <label for="editOfficerBadgeNumber">Badge Number *</label>
+                    <input type="text" id="editOfficerBadgeNumber" name="badgeNumber" required>
+                </div>
+                <div class="form-group">
+                    <label for="editOfficerName">Officer Name *</label>
+                    <input type="text" id="editOfficerName" name="name" required>
+                </div>
+                <div class="form-group">
+                    <label for="editOfficerContact">Contact Number *</label>
+                    <input type="text" id="editOfficerContact" name="contact" required>
+                </div>
+                <div class="form-group">
+                    <label for="editOfficerSchedule">Schedule *</label>
+                    <input type="text" id="editOfficerSchedule" name="schedule" placeholder="e.g., Mon-Fri, 08:00-16:00" required>
+                </div>
+                <div class="form-group">
+                    <label for="editOfficerStatus">Status *</label>
+                    <select id="editOfficerStatus" name="status" required>
+                        <option value="Available">Available</option>
+                        <option value="Assigned">Assigned</option>
+                        <option value="Off-Duty">Off-Duty</option>
+                    </select>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn-cancel" onclick="closeEditOfficerModal()">Cancel</button>
+                    <button type="submit" class="btn-save">Update Officer</button>
+                </div>
+            </form>
+        </div>
+    </div>
 
     <script>
         document.addEventListener('DOMContentLoaded', function() {
@@ -433,6 +461,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                 sidebar.classList.add('collapsed');
                 document.body.classList.add('sidebar-collapsed');
             }
+            initializeOfficerData();
         });
         function toggleSidebar() {
             const sidebar = document.getElementById('sidebar');
@@ -466,10 +495,10 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             document.querySelectorAll('.nav-module').forEach(m => { m.classList.remove('active'); });
             if (!isActive) { module.classList.add('active'); }
         }
-        function filterPatrols() {
+        function filterPatrolOfficers() {
             const input = document.getElementById('searchInput');
             const filter = input.value.toLowerCase();
-            const table = document.getElementById('patrolsTableBody');
+            const table = document.getElementById('patrolOfficersTableBody');
             const rows = table.getElementsByTagName('tr');
             for (let i = 0; i < rows.length; i++) {
                 const row = rows[i];
@@ -481,167 +510,194 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                 }
             }
         }
-        // Initialize patrol data (from Crime Mapping and Heatmaps System - Group 5)
-        let patrolData = {};
+        // Initialize officer data
+        let officerData = {};
         
-        function initializePatrolData() {
-            const tableBody = document.getElementById('patrolsTableBody');
-            const rows = tableBody.querySelectorAll('tr[data-patrol-id]');
+        function initializeOfficerData() {
+            const tableBody = document.getElementById('patrolOfficersTableBody');
+            const rows = tableBody.querySelectorAll('tr[data-officer-id]');
             
             rows.forEach(row => {
-                const id = row.getAttribute('data-patrol-id');
+                const id = row.getAttribute('data-officer-id');
                 const cells = row.querySelectorAll('td');
                 
-                patrolData[id] = {
+                officerData[id] = {
                     id: id,
-                    location: cells[0].textContent.trim(),
-                    date: cells[1].textContent.trim(),
-                    incidentType: cells[2].textContent.trim(),
-                    description: cells[3].textContent.trim()
+                    badgeNumber: cells[0].textContent.trim(),
+                    name: cells[1].textContent.trim(),
+                    contact: cells[2].textContent.trim(),
+                    schedule: cells[3].textContent.trim(),
+                    status: cells[4].querySelector('.status-badge').textContent.trim()
                 };
             });
         }
 
-        function assignPatrolToDispatch(id) {
-            const incident = patrolData[id];
-            if (!incident) return;
-            
-            // Populate incident details
-            document.getElementById('incidentDetails').innerHTML = `
-                <h3 style="margin-top: 0; color: var(--tertiary-color);">Incident Details</h3>
-                <p><strong>Location:</strong> ${incident.location}</p>
-                <p><strong>Date:</strong> ${incident.date}</p>
-                <p><strong>Incident Type:</strong> ${incident.incidentType}</p>
-                <p><strong>Description:</strong> ${incident.description}</p>
-            `;
-            
-            // Set default values
-            document.getElementById('patrolDate').value = incident.date;
-            document.getElementById('patrolRoute').value = incident.location;
-            
-            // Store incident ID for later use
-            document.getElementById('assignPatrolForm').setAttribute('data-incident-id', id);
-            
-            document.getElementById('assignPatrolModal').style.display = 'block';
+        function openAddOfficerModal() {
+            document.getElementById('addOfficerModal').style.display = 'block';
+            document.getElementById('addOfficerForm').reset();
         }
 
-        function closeAssignPatrolModal() {
-            document.getElementById('assignPatrolModal').style.display = 'none';
-            document.getElementById('assignPatrolForm').reset();
+        function closeAddOfficerModal() {
+            document.getElementById('addOfficerModal').style.display = 'none';
         }
 
-        function openViewPatrolModal(id) {
-            const incident = patrolData[id];
-            if (!incident) return;
+        function openViewOfficerModal(id) {
+            const officer = officerData[id];
+            if (!officer) return;
             
             const content = `
                 <div style="line-height: 1.8;">
-                    <p><strong>Location:</strong> ${incident.location}</p>
-                    <p><strong>Date:</strong> ${incident.date}</p>
-                    <p><strong>Incident Type:</strong> ${incident.incidentType}</p>
-                    <p><strong>Description:</strong> ${incident.description}</p>
-                    <p style="margin-top: 1rem; color: #856404; font-style: italic;">
-                        <i class="fas fa-info-circle"></i> Data from Crime Mapping and Heatmaps System (Group 5)
-                    </p>
+                    <p><strong>Badge Number:</strong> ${officer.badgeNumber}</p>
+                    <p><strong>Officer Name:</strong> ${officer.name}</p>
+                    <p><strong>Contact Number:</strong> ${officer.contact}</p>
+                    <p><strong>Schedule:</strong> ${officer.schedule}</p>
+                    <p><strong>Status:</strong> ${officer.status}</p>
                 </div>
             `;
             
-            document.getElementById('viewPatrolContent').innerHTML = content;
-            document.getElementById('viewPatrolModal').style.display = 'block';
+            document.getElementById('viewOfficerContent').innerHTML = content;
+            document.getElementById('viewOfficerModal').style.display = 'block';
         }
 
-        function closeViewPatrolModal() {
-            document.getElementById('viewPatrolModal').style.display = 'none';
+        function closeViewOfficerModal() {
+            document.getElementById('viewOfficerModal').style.display = 'none';
         }
 
-        function viewPatrol(id) {
-            openViewPatrolModal(id);
+        function openEditOfficerModal(id) {
+            const officer = officerData[id];
+            if (!officer) return;
+            
+            document.getElementById('editOfficerId').value = officer.id;
+            document.getElementById('editOfficerBadgeNumber').value = officer.badgeNumber;
+            document.getElementById('editOfficerName').value = officer.name;
+            document.getElementById('editOfficerContact').value = officer.contact;
+            document.getElementById('editOfficerSchedule').value = officer.schedule;
+            document.getElementById('editOfficerStatus').value = officer.status;
+            
+            document.getElementById('editOfficerModal').style.display = 'block';
         }
 
-        function savePatrolAssignment(event) {
-            event.preventDefault();
-            
-            const formData = new FormData(event.target);
-            const incidentId = event.target.getAttribute('data-incident-id');
-            const incident = patrolData[incidentId];
-            
-            // Get selected officer or member
-            const officerValue = formData.get('officer');
-            const memberValue = formData.get('member');
-            
-            if (!officerValue && !memberValue) {
-                alert('Please select either a patrol officer or a neighborhood watch member.');
+        function closeEditOfficerModal() {
+            document.getElementById('editOfficerModal').style.display = 'none';
+        }
+
+        function viewOfficer(id) {
+            openViewOfficerModal(id);
+        }
+
+        function editOfficer(id) {
+            openEditOfficerModal(id);
+        }
+
+        function deleteOfficer(id) {
+            if (!confirm('Are you sure you want to delete this patrol officer?')) {
                 return;
             }
             
-            let officerName = '';
-            let officerType = '';
-            
-            if (officerValue) {
-                const parts = officerValue.split('|');
-                officerName = parts[1];
-                officerType = parts[2];
-            } else if (memberValue) {
-                const parts = memberValue.split('|');
-                officerName = parts[1];
-                officerType = parts[2];
+            const row = document.querySelector(`tr[data-officer-id="${id}"]`);
+            if (row) {
+                row.remove();
+                delete officerData[id];
             }
+        }
+
+        function saveOfficer(event) {
+            event.preventDefault();
             
-            const assignmentData = {
-                date: formData.get('date'),
-                time: formData.get('time'),
-                route: formData.get('route'),
-                officerName: officerName,
-                officerType: officerType,
-                incidentId: incidentId,
-                location: incident.location,
-                incidentType: incident.incidentType
+            const formData = new FormData(event.target);
+            const id = Date.now().toString();
+            
+            const officer = {
+                id: id,
+                badgeNumber: formData.get('badgeNumber'),
+                name: formData.get('name'),
+                contact: formData.get('contact'),
+                schedule: formData.get('schedule'),
+                status: formData.get('status')
             };
             
-            // Send to Incident Prioritization and Dispatch (Group 3)
-            fetch('api/send_patrol_assignment.php', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(assignmentData)
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    alert('Patrol assignment sent successfully to Incident Prioritization and Dispatch System (Group 3)');
-                    closeAssignPatrolModal();
-                } else {
-                    alert('Error sending assignment: ' + (data.message || 'Unknown error'));
-                }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                alert('Assignment saved locally. Note: Integration with Group 3 system needs to be configured.');
-                closeAssignPatrolModal();
-            });
+            officerData[id] = officer;
+            
+            const tableBody = document.getElementById('patrolOfficersTableBody');
+            const row = document.createElement('tr');
+            row.setAttribute('data-officer-id', id);
+            
+            const statusClass = officer.status === 'Available' ? 'status-available' : 
+                                officer.status === 'Assigned' ? 'status-assigned' : 
+                                'status-off-duty';
+            
+            row.innerHTML = `
+                <td>${officer.badgeNumber}</td>
+                <td>${officer.name}</td>
+                <td>${officer.contact}</td>
+                <td>${officer.schedule}</td>
+                <td><span class="status-badge ${statusClass}">${officer.status}</span></td>
+                <td>
+                    <div class="action-buttons">
+                        <button class="btn-view" onclick="viewOfficer('${id}')">View</button>
+                        <button class="btn-edit" onclick="editOfficer('${id}')">Edit</button>
+                        <button class="btn-delete" onclick="deleteOfficer('${id}')">Delete</button>
+                    </div>
+                </td>
+            `;
+            
+            tableBody.appendChild(row);
+            closeAddOfficerModal();
+        }
+
+        function updateOfficer(event) {
+            event.preventDefault();
+            
+            const formData = new FormData(event.target);
+            const id = formData.get('id');
+            
+            const officer = {
+                id: id,
+                badgeNumber: formData.get('badgeNumber'),
+                name: formData.get('name'),
+                contact: formData.get('contact'),
+                schedule: formData.get('schedule'),
+                status: formData.get('status')
+            };
+            
+            officerData[id] = officer;
+            
+            const row = document.querySelector(`tr[data-officer-id="${id}"]`);
+            if (row) {
+                const cells = row.querySelectorAll('td');
+                cells[0].textContent = officer.badgeNumber;
+                cells[1].textContent = officer.name;
+                cells[2].textContent = officer.contact;
+                cells[3].textContent = officer.schedule;
+                
+                const statusClass = officer.status === 'Available' ? 'status-available' : 
+                                    officer.status === 'Assigned' ? 'status-assigned' : 
+                                    'status-off-duty';
+                
+                cells[4].innerHTML = `<span class="status-badge ${statusClass}">${officer.status}</span>`;
+            }
+            
+            closeEditOfficerModal();
         }
 
         // Close modals when clicking outside
         window.onclick = function(event) {
-            const assignModal = document.getElementById('assignPatrolModal');
-            const viewModal = document.getElementById('viewPatrolModal');
+            const addModal = document.getElementById('addOfficerModal');
+            const viewModal = document.getElementById('viewOfficerModal');
+            const editModal = document.getElementById('editOfficerModal');
             
-            if (event.target === assignModal) {
-                closeAssignPatrolModal();
+            if (event.target === addModal) {
+                closeAddOfficerModal();
             }
             if (event.target === viewModal) {
-                closeViewPatrolModal();
+                closeViewOfficerModal();
+            }
+            if (event.target === editModal) {
+                closeEditOfficerModal();
             }
         }
-
-        // Initialize data on page load
-        document.addEventListener('DOMContentLoaded', function() {
-            initializePatrolData();
-            // Load patrol officers from patrol-list (could be from localStorage or API)
-            // Load neighborhood watch members (could be from member-list or API)
-        });
     </script>
 </body>
 </html>
+
 

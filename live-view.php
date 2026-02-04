@@ -100,11 +100,57 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
         .badge-person { background: #cfe2ff; color: #084298; }
         .badge-animal { background: #d1e7dd; color: #0f5132; }
         .badge-vehicle { background: #fff3cd; color: #856404; }
+        .badge-weapon { background: #f8d7da; color: #842029; }
         .object-details { font-size: 0.9rem; line-height: 1.6; }
         .object-details p { margin: 0.25rem 0; }
         .object-details strong { color: var(--tertiary-color); }
-        .live-feed-container { flex: 1; background: #000; border-radius: 12px; position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center; }
+        .live-feed-container { flex: 1; background: #000; border-radius: 12px; position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: transform 0.2s ease, box-shadow 0.2s ease; }
+        .live-feed-container:hover { transform: scale(1.01); box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3); }
+        /* Ensure container can hold double-buffered images */
+        .live-feed-container > img { position: absolute; top: 0; left: 0; }
         .live-feed-placeholder { width: 100%; height: 100%; background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%); display: flex; flex-direction: column; align-items: center; justify-content: center; color: #fff; position: relative; }
+        .live-video-stream { 
+            width: 100%; 
+            height: 100%; 
+            object-fit: contain; 
+            display: block; 
+            image-rendering: auto; /* Smooth rendering for video */
+            opacity: 1;
+            visibility: visible;
+            /* Force hardware acceleration for smooth rendering */
+            backface-visibility: hidden;
+            -webkit-backface-visibility: hidden;
+            transform: translateZ(0);
+            -webkit-transform: translateZ(0);
+            will-change: contents;
+            /* Optimize rendering */
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+        /* Dual buffer styling - prevents glitching with instant switching */
+        .stream-buffer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            opacity: 0;
+            visibility: hidden;
+            /* NO transitions - instant switch prevents flickering */
+            transition: none !important;
+        }
+        .stream-buffer.active {
+            opacity: 1;
+            visibility: visible;
+            z-index: 2;
+        }
+        .stream-buffer.loading {
+            opacity: 0;
+            visibility: hidden;
+            z-index: 1;
+        }
+        .stream-loading { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #fff; text-align: center; }
+        .stream-loading i { font-size: 3rem; margin-bottom: 1rem; opacity: 0.5; }
+        .stream-error { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #ff6b6b; text-align: center; padding: 2rem; }
+        .stream-error i { font-size: 3rem; margin-bottom: 1rem; }
         .live-feed-placeholder::before { content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(255, 255, 255, 0.03) 2px, rgba(255, 255, 255, 0.03) 4px); }
         .live-indicator { position: absolute; top: 1rem; left: 1rem; display: flex; align-items: center; gap: 0.5rem; background: rgba(239, 68, 68, 0.9); padding: 0.5rem 1rem; border-radius: 20px; z-index: 10; }
         .live-dot { width: 10px; height: 10px; background: #fff; border-radius: 50%; animation: pulse 2s infinite; }
@@ -126,6 +172,200 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             .detected-objects-panel { width: 100%; max-height: 400px; }
         }
         @media (max-width: 768px) { .sidebar { width: 320px; transform: translateX(-100%); transition: transform 0.3s ease; } .sidebar.mobile-open { transform: translateX(0); } .sidebar.collapsed { width: 80px; transform: translateX(0); } .main-wrapper { margin-left: 0; } body.sidebar-collapsed .main-wrapper { margin-left: 80px; } }
+        
+        /* Multi-Camera Grid Modal */
+        .camera-grid-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.95);
+            z-index: 10000;
+            padding: 2rem;
+            overflow-y: auto;
+        }
+        .camera-grid-modal.active {
+            display: flex;
+            flex-direction: column;
+        }
+        .camera-grid-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+            color: #fff;
+        }
+        .camera-grid-header h2 {
+            margin: 0;
+            font-size: 2rem;
+            color: #fff;
+        }
+        .camera-grid-close {
+            background: var(--primary-color);
+            color: #fff;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: background 0.2s ease;
+        }
+        .camera-grid-close:hover {
+            background: #4ca8a6;
+        }
+        .camera-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1rem;
+            flex: 1;
+        }
+        .camera-grid-item {
+            aspect-ratio: 16/9;
+            background: #1a1a1a;
+            border-radius: 8px;
+            position: relative;
+            overflow: hidden;
+            border: 2px solid #333;
+            cursor: pointer;
+            transition: border-color 0.2s ease, transform 0.2s ease;
+        }
+        .camera-grid-item:hover {
+            border-color: var(--primary-color);
+            transform: scale(1.02);
+        }
+        .camera-grid-item.active {
+            border-color: var(--primary-color);
+            border-width: 3px;
+        }
+        .camera-grid-item:not(.empty) {
+            cursor: pointer;
+        }
+        .camera-grid-item:not(.empty)::after {
+            content: 'Double-click for fullscreen';
+            position: absolute;
+            bottom: 0.5rem;
+            left: 0.5rem;
+            right: 0.5rem;
+            background: rgba(0, 0, 0, 0.8);
+            color: #fff;
+            padding: 0.5rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            text-align: center;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+            pointer-events: none;
+        }
+        .camera-grid-item:not(.empty):hover::after {
+            opacity: 1;
+        }
+        
+        /* Fullscreen Camera View */
+        .camera-fullscreen-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.98);
+            z-index: 20000;
+            padding: 2rem;
+        }
+        .camera-fullscreen-modal.active {
+            display: flex;
+            flex-direction: column;
+        }
+        .fullscreen-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+            color: #fff;
+        }
+        .fullscreen-header h2 {
+            margin: 0;
+            font-size: 1.5rem;
+            color: #fff;
+        }
+        .fullscreen-close {
+            background: var(--primary-color);
+            color: #fff;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: background 0.2s ease;
+        }
+        .fullscreen-close:hover {
+            background: #4ca8a6;
+        }
+        .fullscreen-video-container {
+            flex: 1;
+            background: #000;
+            border-radius: 8px;
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .fullscreen-video-container img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+        .fullscreen-info {
+            position: absolute;
+            top: 1rem;
+            left: 1rem;
+            background: rgba(0, 0, 0, 0.7);
+            color: #fff;
+            padding: 1rem;
+            border-radius: 8px;
+            z-index: 10;
+        }
+        .fullscreen-info p {
+            margin: 0.25rem 0;
+        }
+        .camera-grid-item img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+        .camera-grid-item.empty {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            gap: 1rem;
+            color: #666;
+        }
+        .camera-grid-item.empty:hover {
+            background: #252525;
+            color: var(--primary-color);
+        }
+        .camera-grid-item.empty i {
+            font-size: 4rem;
+        }
+        .camera-grid-item.empty span {
+            font-size: 1.2rem;
+            font-weight: 500;
+        }
+        .camera-label {
+            position: absolute;
+            top: 0.5rem;
+            left: 0.5rem;
+            background: rgba(0, 0, 0, 0.7);
+            color: #fff;
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
     </style>
 </head>
 <body>
@@ -153,6 +393,10 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                         <span class="nav-submodule-icon"><i class="fas fa-chart-bar"></i></span>
                         <span class="nav-submodule-text">Activity Logs</span>
                     </a>
+                    <a href="incident-feed.php" class="nav-submodule" data-tooltip="Incident Feed">
+                        <span class="nav-submodule-icon"><i class="fas fa-exclamation-triangle"></i></span>
+                        <span class="nav-submodule-text">Incident Feed</span>
+                    </a>
                 </div>
             </div>
             <div class="nav-module active">
@@ -162,9 +406,9 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                     <span class="arrow">▶</span>
                 </div>
                 <div class="nav-submodules">
-                    <a href="live-view.php" class="nav-submodule active" data-tooltip="Live View">
-                        <span class="nav-submodule-icon"><i class="fas fa-circle" style="color: #ff4444;"></i></span>
-                        <span class="nav-submodule-text">Live View</span>
+                    <a href="open-surveillance-app.php" class="nav-submodule active" data-tooltip="Open Surveillance App">
+                        <span class="nav-submodule-icon"><i class="fas fa-desktop"></i></span>
+                        <span class="nav-submodule-text">Open Surveillance App</span>
                     </a>
                     <a href="playback.php" class="nav-submodule" data-tooltip="Playback">
                         <span class="nav-submodule-icon"><i class="fas fa-play"></i></span>
@@ -217,6 +461,10 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                     <span class="arrow">▶</span>
                 </div>
                 <div class="nav-submodules">
+                    <a href="patrol-list.php" class="nav-submodule" data-tooltip="Patrol List">
+                        <span class="nav-submodule-icon"><i class="fas fa-list"></i></span>
+                        <span class="nav-submodule-text">Patrol List</span>
+                    </a>
                     <a href="patrol-schedule.php" class="nav-submodule" data-tooltip="Patrol Schedule">
                         <span class="nav-submodule-icon"><i class="fas fa-calendar-alt"></i></span>
                         <span class="nav-submodule-text">Patrol Schedule</span>
@@ -251,10 +499,6 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                     <span class="arrow">▶</span>
                 </div>
                 <div class="nav-submodules">
-                    <a href="submit-tip.php" class="nav-submodule" data-tooltip="Submit Tip">
-                        <span class="nav-submodule-icon"><i class="fas fa-envelope"></i></span>
-                        <span class="nav-submodule-text">Submit Tip</span>
-                    </a>
                     <a href="review-tip.php" class="nav-submodule" data-tooltip="Review Tip">
                         <span class="nav-submodule-icon"><i class="fas fa-eye"></i></span>
                         <span class="nav-submodule-text">Review Tip</span>
@@ -288,8 +532,20 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                     </div>
 
                     <!-- Right Side (Main): Live CCTV Feed -->
-                    <div class="live-feed-container">
-                        <div class="live-feed-placeholder">
+                    <div class="live-feed-container" onclick="openCameraGrid()" title="Click to view all cameras">
+                        <!-- Dual buffering: Two images for seamless frame swapping -->
+                        <img id="liveStream1" class="live-video-stream stream-buffer" src="" alt="Live Camera Feed" style="display: none;" loading="eager" decoding="async">
+                        <img id="liveStream2" class="live-video-stream stream-buffer" src="" alt="Live Camera Feed" style="display: none;" loading="eager" decoding="async">
+                        <div id="streamLoading" class="stream-loading">
+                            <i class="fas fa-spinner fa-spin"></i>
+                            <p>Connecting to camera stream...</p>
+                        </div>
+                        <div id="streamError" class="stream-error" style="display: none;">
+                            <i class="fas fa-exclamation-triangle"></i>
+                            <p>Unable to load camera stream</p>
+                            <p style="font-size: 0.9rem; margin-top: 0.5rem;">Please ensure the detection script is running</p>
+                        </div>
+                        <div class="live-feed-placeholder" id="streamPlaceholder" style="display: none;">
                             <div class="live-indicator">
                                 <div class="live-dot"></div>
                                 <span>LIVE</span>
@@ -303,15 +559,47 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                                 <div class="date" id="currentDate"></div>
                                 <div class="time" id="currentTime"></div>
                             </div>
-                            <div class="road-simulation">
-                                <div class="vehicle-animation"></div>
-                            </div>
+                        </div>
+                        <!-- Click hint -->
+                        <div style="position: absolute; bottom: 1rem; right: 1rem; background: rgba(0, 0, 0, 0.7); color: #fff; padding: 0.5rem 1rem; border-radius: 6px; font-size: 0.85rem; pointer-events: none;">
+                            <i class="fas fa-expand"></i> Click to view all cameras
                         </div>
                     </div>
                 </div>
             </div>
         </main>
     </div>
+    
+    <!-- Multi-Camera Grid Modal -->
+    <div id="cameraGridModal" class="camera-grid-modal">
+        <div class="camera-grid-header">
+            <h2>Camera Grid View</h2>
+            <button class="camera-grid-close" onclick="closeCameraGrid()">
+                <i class="fas fa-times"></i> Close
+            </button>
+        </div>
+        <div class="camera-grid" id="cameraGrid">
+            <!-- Cameras will be loaded dynamically -->
+        </div>
+    </div>
+    
+    <!-- Fullscreen Camera View Modal -->
+    <div id="cameraFullscreenModal" class="camera-fullscreen-modal">
+        <div class="fullscreen-header">
+            <h2 id="fullscreenCameraName">Camera View</h2>
+            <button class="fullscreen-close" onclick="closeFullscreenView()">
+                <i class="fas fa-times"></i> Close Fullscreen
+            </button>
+        </div>
+        <div class="fullscreen-video-container">
+            <img id="fullscreenVideo" src="" alt="Fullscreen Camera Feed">
+            <div class="fullscreen-info" id="fullscreenInfo">
+                <p><strong id="fullscreenCameraId">CAM-001</strong></p>
+                <p id="fullscreenLocation">Location</p>
+            </div>
+        </div>
+    </div>
+    
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             const sidebar = document.getElementById('sidebar');
@@ -322,7 +610,21 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             }
             updateDateTime();
             setInterval(updateDateTime, 1000);
-            initializeDetectedObjects();
+            
+            // Start live stream immediately - no delays
+            startLiveStream();
+            
+            loadDetectedObjects();
+            setInterval(loadDetectedObjects, 2000); // Refresh detections every 2 seconds
+            
+            // Additional safety: Force start if stream doesn't start after 1 second
+            setTimeout(function() {
+                const streamImg = document.getElementById('liveStream');
+                if (streamImg && (!streamImg.src || streamImg.src === '')) {
+                    console.log('Stream not started, forcing start...');
+                    startLiveStream();
+                }
+            }, 1000);
         });
         function toggleSidebar() {
             const sidebar = document.getElementById('sidebar');
@@ -373,135 +675,469 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             document.getElementById('currentDate').textContent = dateStr;
             document.getElementById('currentTime').textContent = timeStr;
         }
-        function initializeDetectedObjects() {
-            const detectedObjects = [
-                {
-                    type: 'person',
-                    image: '👨',
-                    details: {
-                        expression: 'calm',
-                        accessories: 'eyeglasses',
-                        age: 'middle-aged',
-                        gender: 'male'
-                    }
-                },
-                {
-                    type: 'person',
-                    image: '👩',
-                    details: {
-                        expression: 'happy',
-                        accessories: 'cap',
-                        age: 'young',
-                        gender: 'female'
-                    }
-                },
-                {
-                    type: 'vehicle',
-                    image: '🚗',
-                    details: {
-                        plateNumber: 'ABC-1234',
-                        color: 'White',
-                        brand: 'Toyota',
-                        model: 'Vios'
-                    }
-                },
-                {
-                    type: 'animal',
-                    image: '🐕',
-                    details: {
-                        species: 'dog'
-                    }
-                },
-                {
-                    type: 'person',
-                    image: '👤',
-                    details: {
-                        expression: 'mysterious',
-                        accessories: 'mask',
-                        age: 'young',
-                        gender: 'male'
-                    }
-                },
-                {
-                    type: 'vehicle',
-                    image: '🏍️',
-                    details: {
-                        plateNumber: 'XYZ-5678',
-                        color: 'Red',
-                        brand: 'Honda',
-                        model: 'Click'
-                    }
-                },
-                {
-                    type: 'person',
-                    image: '👴',
-                    details: {
-                        expression: 'sad',
-                        accessories: 'hat',
-                        age: 'old',
-                        gender: 'male'
-                    }
-                },
-                {
-                    type: 'person',
-                    image: '👵',
-                    details: {
-                        expression: 'calm',
-                        accessories: 'none',
-                        age: 'old',
-                        gender: 'female'
-                    }
-                },
-                {
-                    type: 'animal',
-                    image: '🐈',
-                    details: {
-                        species: 'cat'
-                    }
-                }
-            ];
-            const container = document.getElementById('detectedObjectsList');
-            detectedObjects.forEach((obj, index) => {
-                const card = document.createElement('div');
-                card.className = 'detected-object-card';
+        // Stream state management - Dual buffer system for glitch-free playback
+        let streamErrorCount = 0;
+        let lastSuccessfulLoad = Date.now();
+        let streamRefreshTimer = null;
+        let isImageLoading = false;
+        let currentFrameIndex = 0;
+        let activeBuffer = 1; // 1 or 2 - which buffer is currently visible
+        let frameFiles = ['current_frame.jpg', 'current_frame_alt.jpg'];
+        
+        function startLiveStream() {
+            const streamImg1 = document.getElementById('liveStream1');
+            const streamImg2 = document.getElementById('liveStream2');
+            const loadingDiv = document.getElementById('streamLoading');
+            const errorDiv = document.getElementById('streamError');
+            const placeholderDiv = document.getElementById('streamPlaceholder');
+            
+            // Clear any existing timers
+            if (streamRefreshTimer) {
+                clearInterval(streamRefreshTimer);
+                streamRefreshTimer = null;
+            }
+            
+            // Show loading indicator initially
+            loadingDiv.style.display = 'block';
+            errorDiv.style.display = 'none';
+            placeholderDiv.style.display = 'none';
+            streamImg1.style.display = 'none';
+            streamImg2.style.display = 'none';
+            
+            // Get currently active and inactive buffers
+            function getBuffers() {
+                const active = activeBuffer === 1 ? streamImg1 : streamImg2;
+                const inactive = activeBuffer === 1 ? streamImg2 : streamImg1;
+                return { active, inactive };
+            }
+            
+            // Switch active buffer (instant switch - no transition to prevent flickering)
+            function switchBuffer() {
+                const { active, inactive } = getBuffers();
                 
-                const badgeClass = obj.type === 'person' ? 'badge-person' : 
-                                  obj.type === 'animal' ? 'badge-animal' : 
-                                  'badge-vehicle';
-                const badgeText = obj.type.charAt(0).toUpperCase() + obj.type.slice(1);
+                // Instant switch - remove active from current, add to new
+                active.classList.remove('active');
+                active.classList.add('loading');
                 
-                let detailsHTML = '';
-                if (obj.type === 'person') {
-                    detailsHTML = `
-                        <p><strong>Expression:</strong> <span style="text-transform: capitalize;">${obj.details.expression}</span></p>
-                        <p><strong>Accessories:</strong> <span style="text-transform: capitalize;">${obj.details.accessories}</span></p>
-                        <p><strong>Age:</strong> <span style="text-transform: capitalize;">${obj.details.age}</span></p>
-                        <p><strong>Gender:</strong> <span style="text-transform: capitalize;">${obj.details.gender}</span></p>
-                    `;
-                } else if (obj.type === 'animal') {
-                    detailsHTML = `
-                        <p><strong>Species:</strong> <span style="text-transform: capitalize;">${obj.details.species}</span></p>
-                    `;
-                } else if (obj.type === 'vehicle') {
-                    detailsHTML = `
-                        <p><strong>Plate Number:</strong> ${obj.details.plateNumber}</p>
-                        <p><strong>Color:</strong> ${obj.details.color}</p>
-                        <p><strong>Brand:</strong> ${obj.details.brand}</p>
-                        <p><strong>Model:</strong> ${obj.details.model}</p>
-                    `;
+                // Make inactive buffer active instantly
+                inactive.classList.remove('loading');
+                inactive.classList.add('active');
+                
+                // Update active buffer index
+                activeBuffer = activeBuffer === 1 ? 2 : 1;
+            }
+            
+            // Unified load handler for both buffers
+            function setupImageHandlers(img, bufferNum) {
+                img.onload = function() {
+                    isImageLoading = false;
+                    streamErrorCount = 0;
+                    lastSuccessfulLoad = Date.now();
+                    
+                    // Hide loading/error states
+                    loadingDiv.style.display = 'none';
+                    errorDiv.style.display = 'none';
+                    placeholderDiv.style.display = 'none';
+                    
+                    // Show the buffer
+                    img.style.display = 'block';
+                    
+                    // If this is the inactive buffer that just loaded, switch to it
+                    const { active, inactive } = getBuffers();
+                    if (img === inactive) {
+                        // Inactive buffer finished loading - switch to it smoothly
+                        switchBuffer();
+                    } else if (img === active) {
+                        // Active buffer loaded - ensure it's visible (initial load)
+                        img.classList.add('active');
+                        img.classList.remove('loading');
+                    }
+                };
+                
+                img.onerror = function() {
+                    isImageLoading = false;
+                    streamErrorCount++;
+                    const timeSinceLastSuccess = Date.now() - lastSuccessfulLoad;
+                    
+                    // Only show error after extended failure
+                    if (timeSinceLastSuccess > 5000 && streamErrorCount > 20) {
+                        loadingDiv.style.display = 'none';
+                        errorDiv.style.display = 'block';
+                        placeholderDiv.style.display = 'none';
+                        streamImg1.style.display = 'none';
+                        streamImg2.style.display = 'none';
+                    } else if (timeSinceLastSuccess > 3000) {
+                        loadingDiv.style.display = 'block';
+                        errorDiv.style.display = 'none';
+                    }
+                    // Otherwise keep showing current active buffer
+                };
+            }
+            
+            // Setup handlers for both buffers
+            setupImageHandlers(streamImg1, 1);
+            setupImageHandlers(streamImg2, 2);
+            
+            // Dual buffer refresh - eliminates glitching with proper state management
+            function refreshFrame() {
+                // Skip if currently loading - prevents queue buildup
+                if (isImageLoading) {
+                    return;
                 }
                 
-                card.innerHTML = `
-                    <span class="object-type-badge ${badgeClass}">${badgeText}</span>
-                    <div class="object-image">${obj.image}</div>
-                    <div class="object-details">
-                        ${detailsHTML}
-                    </div>
-                `;
+                // Get inactive buffer (the one we'll load into)
+                const { inactive, active } = getBuffers();
                 
-                container.appendChild(card);
-            });
+                // Ensure inactive buffer is properly hidden before loading
+                inactive.classList.remove('active');
+                inactive.classList.add('loading');
+                
+                isImageLoading = true;
+                
+                // Alternate between files for double buffering
+                currentFrameIndex = (currentFrameIndex + 1) % 2;
+                const imageUrl = frameFiles[currentFrameIndex];
+                
+                // Use timestamp for cache busting - ensures fresh frames
+                const cacheBuster = '?t=' + Date.now();
+                const newSrc = imageUrl + cacheBuster;
+                
+                // Only change src if it's different - prevents unnecessary reloads
+                if (inactive.src && inactive.src.split('?')[0].endsWith(imageUrl)) {
+                    // Same file, just update cache buster
+                    inactive.src = newSrc;
+                } else {
+                    // Different file or first load
+                    inactive.src = newSrc;
+                }
+            }
+            
+            // Initial load
+            streamImg1.src = frameFiles[0] + '?t=' + Date.now();
+            
+            // Refresh rate - 10 FPS (100ms) for stable, flicker-free playback
+            // Slower refresh reduces flickering and ensures smooth updates
+            streamRefreshTimer = setInterval(function() {
+                refreshFrame();
+            }, 100); // 10 FPS = 100ms intervals - stable and flicker-free, glitch-free
         }
+        
+        // Global handlers for HTML onload/onerror attributes (keep for compatibility)
+        function handleStreamLoad() {
+            // This is handled by the onload handler in startLiveStream
+            // Keep for compatibility but it shouldn't be called directly
+        }
+        
+        function handleStreamError() {
+            // This is handled by the onerror handler in startLiveStream
+            // Keep for compatibility but it shouldn't be called directly
+        }
+        
+        function loadDetectedObjects() {
+            fetch('api/get_detections.php')
+                .then(response => response.json())
+                .then(data => {
+                    const container = document.getElementById('detectedObjectsList');
+                    
+                    if (!data.success || !data.detections || data.detections.length === 0) {
+                        container.innerHTML = '<div class="empty-state"><i class="fas fa-eye-slash"></i><p>No objects detected</p></div>';
+                        return;
+                    }
+                    
+                    // Clear existing content
+                    container.innerHTML = '';
+                    
+                    // Process each detection
+                    data.detections.forEach((detection, index) => {
+                        const card = document.createElement('div');
+                        card.className = 'detected-object-card';
+                        
+                        const category = detection.category || 'unknown';
+                        const badgeClass = category === 'person' ? 'badge-person' : 
+                                          category === 'animal' ? 'badge-animal' : 
+                                          category === 'vehicle' ? 'badge-vehicle' :
+                                          category === 'weapon' ? 'badge-weapon' : 'badge-person';
+                        const badgeText = category.charAt(0).toUpperCase() + category.slice(1);
+                        
+                        // Get emoji/icon for category
+                        // Format timestamp
+                        const detectionTime = new Date(detection.timestamp || Date.now());
+                        const timeStr = detectionTime.toLocaleTimeString();
+                        
+                        // Use actual detected object image if available, otherwise use emoji placeholder
+                        let imageHTML = '';
+                        if (detection.image) {
+                            // Display actual cropped object image
+                            imageHTML = `<img src="${detection.image}" alt="${category}" style="width: 100%; height: 150px; object-fit: cover; border-radius: 6px;" onerror="this.style.display='none'; this.parentElement.innerHTML='<div style=\\'width:100%;height:150px;display:flex;align-items:center;justify-content:center;font-size:3rem;\\'>${category === 'person' ? '👤' : category === 'animal' ? '🐾' : category === 'vehicle' ? '🚗' : category === 'weapon' ? '⚠️' : '📦'}</div>';">`;
+                        } else {
+                            // Fallback to emoji if image not available
+                            const categoryEmoji = category === 'person' ? '👤' : 
+                                                category === 'animal' ? '🐾' : 
+                                                category === 'vehicle' ? '🚗' :
+                                                category === 'weapon' ? '⚠️' : '📦';
+                            imageHTML = `<div style="width: 100%; height: 150px; display: flex; align-items: center; justify-content: center; font-size: 3rem;">${categoryEmoji}</div>`;
+                        }
+                        
+                        let detailsHTML = '';
+                        if (category === 'person') {
+                            const gender = detection.gender || 'Unknown';
+                            const expression = detection.expression || 'calm';
+                            // Handle accessories: if null, undefined, empty string, or "None", show "None"
+                            const accessories = (detection.accessories && detection.accessories.trim() !== '' && detection.accessories !== 'null') 
+                                ? detection.accessories 
+                                : 'None';
+                            const clothesColor = detection.clothes_color || 'Unknown';
+                            
+                            detailsHTML = `
+                                <p><strong>Gender:</strong> ${gender}</p>
+                                <p><strong>Expression:</strong> ${expression.charAt(0).toUpperCase() + expression.slice(1)}</p>
+                                <p><strong>Accessories:</strong> ${accessories}</p>
+                                <p><strong>Clothes Color:</strong> ${clothesColor.charAt(0).toUpperCase() + clothesColor.slice(1)}</p>
+                                ${detection.weapon ? `<p style="color: #dc3545; font-weight: bold;">⚠️ Weapon: ${detection.weapon.class} (${(detection.weapon.confidence * 100).toFixed(1)}%)</p>` : ''}
+                                <p><strong>Confidence:</strong> ${(detection.confidence * 100).toFixed(1)}%</p>
+                                <p><strong>Detected:</strong> ${timeStr}</p>
+                            `;
+                            
+                            // If person has weapon, also add weapon image below person image
+                            if (detection.weapon && detection.weapon.image) {
+                                imageHTML += `<img src="${detection.weapon.image}" alt="Weapon: ${detection.weapon.class}" style="width: 100%; height: 100px; object-fit: cover; border-radius: 6px; margin-top: 0.5rem; border: 2px solid #dc3545;" onerror="this.style.display='none';">`;
+                            }
+                        } else if (category === 'animal') {
+                            detailsHTML = `
+                                <p><strong>Class:</strong> ${detection.class || 'Animal'}</p>
+                                <p><strong>Confidence:</strong> ${(detection.confidence * 100).toFixed(1)}%</p>
+                                <p><strong>Detected:</strong> ${timeStr}</p>
+                            `;
+                        } else if (category === 'vehicle') {
+                            detailsHTML = `
+                                <p><strong>Class:</strong> ${detection.class || 'Vehicle'}</p>
+                                <p><strong>Confidence:</strong> ${(detection.confidence * 100).toFixed(1)}%</p>
+                                <p><strong>Detected:</strong> ${timeStr}</p>
+                            `;
+                        } else if (category === 'weapon') {
+                            detailsHTML = `
+                                <p><strong>Class:</strong> ${detection.class || 'Weapon'}</p>
+                                <p><strong>Confidence:</strong> ${(detection.confidence * 100).toFixed(1)}%</p>
+                                <p><strong>Detected:</strong> ${timeStr}</p>
+                                <p style="color: #dc3545; font-weight: bold;">⚠️ Alert: Weapon Detected</p>
+                            `;
+                        } else {
+                            detailsHTML = `
+                                <p><strong>Class:</strong> ${detection.class || 'Object'}</p>
+                                <p><strong>Confidence:</strong> ${(detection.confidence * 100).toFixed(1)}%</p>
+                                <p><strong>Detected:</strong> ${timeStr}</p>
+                            `;
+                        }
+                        
+                        card.innerHTML = `
+                            <span class="object-type-badge ${badgeClass}">${badgeText}</span>
+                            <div class="object-image">${imageHTML}</div>
+                            <div class="object-details">
+                                ${detailsHTML}
+                            </div>
+                        `;
+                        
+                        container.appendChild(card);
+                    });
+                })
+                .catch(error => {
+                    console.error('Error loading detections:', error);
+                    const container = document.getElementById('detectedObjectsList');
+                    container.innerHTML = '<div class="empty-state"><i class="fas fa-exclamation-circle"></i><p>Error loading detections</p></div>';
+                });
+        }
+        
+        // Camera data
+        let camerasData = [];
+        let activeCameraId = '1'; // Default active camera
+        
+        // Load cameras from API
+        function loadCamerasForGrid() {
+            fetch('api/cameras.php')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success && data.cameras) {
+                        camerasData = data.cameras;
+                        populateCameraGrid();
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading cameras:', error);
+                    // Fallback to default camera
+                    populateCameraGrid();
+                });
+        }
+        
+        function populateCameraGrid() {
+            const grid = document.getElementById('cameraGrid');
+            if (!grid) return;
+            
+            grid.innerHTML = '';
+            
+            // Create up to 4 camera slots
+            for (let i = 0; i < 4; i++) {
+                if (i < camerasData.length) {
+                    const camera = camerasData[i];
+                    const cameraItem = document.createElement('div');
+                    cameraItem.className = 'camera-grid-item';
+                    if (camera.id === activeCameraId) {
+                        cameraItem.classList.add('active');
+                    }
+                    cameraItem.setAttribute('data-camera-id', camera.id);
+                    
+                    // Double-click to view fullscreen and set as active
+                    cameraItem.ondblclick = function() {
+                        showCameraFullscreen(camera);
+                        setActiveCamera(camera.id);
+                    };
+                    
+                    // Single click to select (visual feedback)
+                    cameraItem.onclick = function(e) {
+                        // Don't trigger if clicking on label
+                        if (e.target.classList.contains('camera-label')) return;
+                        
+                        // Update active state
+                        document.querySelectorAll('.camera-grid-item').forEach(item => {
+                            item.classList.remove('active');
+                        });
+                        cameraItem.classList.add('active');
+                    };
+                    
+                    cameraItem.innerHTML = `
+                        <div class="camera-label">${camera.cameraId}</div>
+                        <img id="gridCamera${i}" src="current_frame.jpg" alt="${camera.name}" onerror="this.parentElement.classList.add('empty')">
+                    `;
+                    
+                    grid.appendChild(cameraItem);
+                } else {
+                    // Empty slot
+                    const emptyItem = document.createElement('div');
+                    emptyItem.className = 'camera-grid-item empty';
+                    emptyItem.onclick = redirectToAddCamera;
+                    emptyItem.innerHTML = `
+                        <i class="fas fa-video-slash"></i>
+                        <span>Add Camera</span>
+                    `;
+                    grid.appendChild(emptyItem);
+                }
+            }
+        }
+        
+        function setActiveCamera(cameraId) {
+            activeCameraId = cameraId;
+            // Update main live view indicator (if needed)
+            const camera = camerasData.find(c => c.id === cameraId);
+            if (camera) {
+                // Store active camera in localStorage for persistence
+                localStorage.setItem('activeCameraId', cameraId);
+                
+                // Update active state in grid
+                document.querySelectorAll('.camera-grid-item').forEach(item => {
+                    item.classList.remove('active');
+                    if (item.getAttribute('data-camera-id') === cameraId) {
+                        item.classList.add('active');
+                    }
+                });
+            }
+        }
+        
+        function showCameraFullscreen(camera) {
+            const modal = document.getElementById('cameraFullscreenModal');
+            const video = document.getElementById('fullscreenVideo');
+            const nameEl = document.getElementById('fullscreenCameraName');
+            const idEl = document.getElementById('fullscreenCameraId');
+            const locationEl = document.getElementById('fullscreenLocation');
+            
+            if (!modal || !video) return;
+            
+            // Update info
+            nameEl.textContent = camera.name || 'Camera View';
+            idEl.textContent = camera.cameraId || 'CAM-001';
+            locationEl.textContent = camera.location || 'Location';
+            
+            // Start loading camera feed (for now, all use current_frame.jpg - in future could use different endpoints)
+            video.src = 'current_frame.jpg?t=' + Date.now();
+            
+            modal.classList.add('active');
+            
+            // Start refreshing fullscreen view
+            refreshFullscreenCamera();
+        }
+        
+        function closeFullscreenView() {
+            const modal = document.getElementById('cameraFullscreenModal');
+            if (modal) {
+                modal.classList.remove('active');
+            }
+        }
+        
+        function refreshFullscreenCamera() {
+            const modal = document.getElementById('cameraFullscreenModal');
+            if (!modal || !modal.classList.contains('active')) return;
+            
+            const video = document.getElementById('fullscreenVideo');
+            if (video) {
+                const timestamp = '?t=' + Date.now();
+                video.src = 'current_frame.jpg' + timestamp;
+            }
+            
+            // Continue refreshing while fullscreen is open
+            setTimeout(refreshFullscreenCamera, 500); // Refresh every 500ms
+        }
+        
+        // Camera Grid Modal Functions
+        function openCameraGrid() {
+            const modal = document.getElementById('cameraGridModal');
+            if (modal) {
+                modal.classList.add('active');
+                loadCamerasForGrid();
+                refreshGridCameras();
+            }
+        }
+        
+        function closeCameraGrid() {
+            const modal = document.getElementById('cameraGridModal');
+            if (modal) {
+                modal.classList.remove('active');
+            }
+        }
+        
+        function refreshGridCameras() {
+            const modal = document.getElementById('cameraGridModal');
+            if (!modal || !modal.classList.contains('active')) return;
+            
+            // Refresh all camera feeds in grid
+            camerasData.forEach((camera, index) => {
+                const img = document.getElementById(`gridCamera${index}`);
+                if (img && !img.parentElement.classList.contains('empty')) {
+                    const timestamp = '?t=' + Date.now();
+                    img.src = 'current_frame.jpg' + timestamp;
+                }
+            });
+            
+            // Continue refreshing while modal is open
+            setTimeout(refreshGridCameras, 500); // Refresh every 500ms
+        }
+    
+        function redirectToAddCamera() {
+            // Redirect to camera management and open add camera modal
+            window.location.href = 'camera-management.php?action=add';
+        }
+        
+        // Close modals on Escape key
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                closeCameraGrid();
+                closeFullscreenView();
+            }
+        });
+        
+        // Load active camera from localStorage on page load
+        const savedActiveCamera = localStorage.getItem('activeCameraId');
+        if (savedActiveCamera) {
+            activeCameraId = savedActiveCamera;
+        }
+        loadCamerasForGrid();
     </script>
 </body>
 </html>

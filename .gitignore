@@ -27,3 +27,17 @@ vendor/
 *.temp
 *.cache
 
+# Python caches
+__pycache__/
+*.pyc
+
+# CCTV / detection generated artifacts (keep local, don't commit)
+recordings/
+detected_objects/
+current_frame*.jpg
+detect.lock
+detections.json
+
+# ML model weights (large; download separately)
+*.pt
+
