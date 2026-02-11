@@ -398,9 +398,93 @@ if (isset($_SESSION['admin_logged_in']) && $_SESSION['admin_logged_in'] === true
         .success-modal-actions .btn {
             min-width: 140px;
         }
+
+        /* Entry Overlay (Frosted Glass) */
+        .entry-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 2600;
+            background: rgba(255, 255, 255, 0.65);
+            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(14px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1.5rem;
+        }
+        .entry-overlay.is-hidden {
+            display: none;
+        }
+        .entry-overlay-close {
+            position: absolute;
+            top: 18px;
+            right: 18px;
+            width: 34px;
+            height: 34px;
+            border-radius: 10px;
+            border: 1px solid rgba(0, 0, 0, 0.08);
+            background: rgba(255, 255, 255, 0.7);
+            color: rgba(28, 37, 65, 0.85);
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.15s ease, background 0.2s ease, box-shadow 0.2s ease;
+            z-index: 2;
+        }
+        .entry-overlay-close:hover {
+            background: rgba(255, 255, 255, 0.9);
+            box-shadow: 0 8px 18px -14px rgba(0, 0, 0, 0.25);
+            transform: translateY(-1px);
+        }
+        .entry-overlay-content {
+            position: relative;
+            z-index: 1;
+            display: grid;
+            gap: 1.25rem;
+        }
+        .entry-overlay-actions {
+            display: flex;
+            gap: 2.5rem;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-top: 0.25rem;
+        }
+        .entry-overlay-actions .btn {
+            flex: 1;
+            min-width: 220px;
+            max-width: 260px;
+            height: 220px;
+            text-align: center;
+            justify-content: center;
+            flex-direction: column;
+            padding: 1.2rem 1.25rem;
+            font-size: 0.95rem;
+        }
+        .entry-overlay-actions .btn i {
+            margin: 0 0 0.65rem 0 !important;
+            font-size: 1in;
+        }
     </style>
 </head>
 <body>
+    <!-- Entry Overlay (shows first) -->
+    <div id="entryOverlay" class="entry-overlay<?php echo isset($_GET['noOverlay']) ? ' is-hidden' : ''; ?>" aria-modal="true" role="dialog">
+        <button type="button" class="entry-overlay-close" onclick="closeEntryOverlay()" aria-label="Close">
+            &times;
+        </button>
+        <div class="entry-overlay-actions">
+            <button class="btn btn-secondary" onclick="openTipModal()" type="button">
+                <i class="fas fa-shield-alt"></i>
+                <span>Magsumite ng reklamo nang palihim. Pindutin ito</span>
+            </button>
+            <button class="btn btn-secondary" onclick="openVolunteerModal()" type="button">
+                <i class="fas fa-hand-holding-heart"></i>
+                <span>Gusto ko mag volunteer</span>
+            </button>
+        </div>
+    </div>
+
     <main class="page">
         <div class="main-content">
             <section class="hero">
@@ -445,19 +529,6 @@ if (isset($_SESSION['admin_logged_in']) && $_SESSION['admin_logged_in'] === true
                 </form>
             </section>
         </div>
-
-        <section class="action-buttons-section" style="background: transparent; border-radius: var(--radius); padding: 2rem clamp(2rem, 4vw, 3rem); margin-top: -2rem; margin-bottom: 0.5rem;">
-            <div style="display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap; max-width: 800px; margin: 0 auto;">
-                <button class="btn btn-secondary" onclick="openTipModal()" style="flex: 1; min-width: 280px; text-align: center; justify-content: center; padding: 1rem 1.5rem; font-size: 1rem;">
-                    <i class="fas fa-shield-alt" style="margin-right: 0.5rem;"></i>
-                    Magsumite ng reklamo nang palihim. Pindutin ito
-                </button>
-                <button class="btn btn-secondary" onclick="openVolunteerModal()" style="flex: 1; min-width: 280px; text-align: center; justify-content: center; padding: 1rem 1.5rem; font-size: 1rem;">
-                    <i class="fas fa-hand-holding-heart" style="margin-right: 0.5rem;"></i>
-                    Gusto ko mag volunteer
-                </button>
-            </div>
-        </section>
 
         <section class="mv-section">
             <div class="mv-grid">
@@ -604,7 +675,13 @@ if (isset($_SESSION['admin_logged_in']) && $_SESSION['admin_logged_in'] === true
     <script>
         let selectedCertFiles = [];
 
+        function closeEntryOverlay() {
+            const overlay = document.getElementById('entryOverlay');
+            if (overlay) overlay.classList.add('is-hidden');
+        }
+
         function openTipModal() {
+            closeEntryOverlay();
             document.getElementById('tipModal').style.display = 'flex';
         }
 
@@ -614,6 +691,7 @@ if (isset($_SESSION['admin_logged_in']) && $_SESSION['admin_logged_in'] === true
         }
 
         function openVolunteerModal() {
+            closeEntryOverlay();
             document.getElementById('volunteerModal').style.display = 'flex';
         }
 
@@ -675,7 +753,8 @@ if (isset($_SESSION['admin_logged_in']) && $_SESSION['admin_logged_in'] === true
                 timestamp: timestamp,
                 location: location,
                 description: description,
-                status: 'Under Review'
+                status: 'Under Review',
+                outcome: 'No Outcome Yet'
             };
             
             // Add to array

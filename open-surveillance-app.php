@@ -173,14 +173,6 @@ $launcher_exists = file_exists('start_cctv_app.bat') || file_exists('start_detec
                         <span class="nav-submodule-icon"><i class="fas fa-desktop"></i></span>
                         <span class="nav-submodule-text">Open Surveillance App</span>
                     </a>
-                    <a href="playback.php" class="nav-submodule" data-tooltip="Playback">
-                        <span class="nav-submodule-icon"><i class="fas fa-play"></i></span>
-                        <span class="nav-submodule-text">Playback</span>
-                    </a>
-                    <a href="camera-management.php" class="nav-submodule" data-tooltip="Camera Management">
-                        <span class="nav-submodule-icon"><i class="fas fa-camera"></i></span>
-                        <span class="nav-submodule-text">Camera Management</span>
-                    </a>
                 </div>
             </div>
             <div class="nav-module">
@@ -312,26 +304,6 @@ $launcher_exists = file_exists('start_cctv_app.bat') || file_exists('start_detec
                                     <i class="fas fa-play"></i> Launch CCTV App
                                 </button>
                             <?php endif; ?>
-                            
-                            <div class="instructions-section" style="margin-top: 2rem;">
-                                <h3 style="color: var(--tertiary-color); margin-bottom: 1rem;">Manual Launch Instructions</h3>
-                                <ol style="line-height: 2; padding-left: 1.5rem;">
-                                    <li>Open Command Prompt or PowerShell</li>
-                                    <li>Navigate to the project directory:
-                                        <div style="background: #f0f0f0; padding: 0.5rem; border-radius: 4px; margin-top: 0.5rem; font-family: monospace;">
-                                            cd <?php echo htmlspecialchars(str_replace('\\', '/', __DIR__)); ?>
-                                        </div>
-                                    </li>
-                                    <li>Run the application:
-                                        <div style="background: #f0f0f0; padding: 0.5rem; border-radius: 4px; margin-top: 0.5rem; font-family: monospace;">
-                                            py -3.13 cctv.py
-                                        </div>
-                                        <div style="background: #f0f0f0; padding: 0.5rem; border-radius: 4px; margin-top: 0.5rem; font-family: monospace;">
-                                            (or: python detect_gui.py)
-                                        </div>
-                                    </li>
-                                </ol>
-                            </div>
                         </div>
                     <?php else: ?>
                         <!-- App is not installed -->
@@ -343,76 +315,8 @@ $launcher_exists = file_exists('start_cctv_app.bat') || file_exists('start_detec
                             <div class="app-status-message">The YOLO Object Detection GUI application is not installed on this system.</div>
                         </div>
                         
-                        <div class="instructions-section">
-                            <h2><i class="fas fa-download"></i> Installation Instructions</h2>
-                            <p style="margin-bottom: 1.5rem; color: var(--text-secondary);">Follow these steps to install and set up the Surveillance App:</p>
-                            
-                            <ol class="instructions-list">
-                                <li>
-                                    <strong>Step 1: Install Python</strong>
-                                    <p>Ensure Python 3.7 or higher is installed on your system.</p>
-                                    <p>Download from: <a href="https://www.python.org/downloads/" target="_blank" style="color: var(--primary-color);">python.org</a></p>
-                                </li>
-                                <li>
-                                    <strong>Step 2: Install Required Dependencies</strong>
-                                    <p>Open Command Prompt or PowerShell in the project directory and run:</p>
-                                    <code>pip install -r requirements.txt</code>
-                                </li>
-                                <li>
-                                    <strong>Step 3: Download the Application Files</strong>
-                                    <p>The following files are required:</p>
-                                    <div class="file-list">
-                                        <ul>
-                                            <li><code>detect_gui.py</code> - Main GUI application</li>
-                                            <li><code>detect.py</code> - Detection engine (should already exist)</li>
-                                            <li><code>start_detection_gui.bat</code> - Windows launcher (optional)</li>
-                                            <li><code>yolov8n.pt</code> - YOLO model file (auto-downloaded on first run)</li>
-                                        </ul>
-                                    </div>
-                                </li>
-                                <li>
-                                    <strong>Step 4: Verify Installation</strong>
-                                    <p>After installation, refresh this page. The app status should change to "Installed".</p>
-                                </li>
-                            </ol>
-                        </div>
-                        
-                        <div class="download-section">
-                            <h3><i class="fas fa-file-download"></i> Download Application Files</h3>
-                            <p>If you have access to the application files, you can download them here:</p>
-                            <div style="margin-top: 1.5rem;">
-                                <a href="detect_gui.py" download class="download-button" style="margin-right: 1rem;">
-                                    <i class="fas fa-download"></i> Download detect_gui.py
-                                </a>
-                                <a href="start_detection_gui.bat" download class="download-button">
-                                    <i class="fas fa-download"></i> Download Launcher
-                                </a>
-                            </div>
-                            <p style="margin-top: 1.5rem; font-size: 0.9rem; opacity: 0.9;">
-                                <i class="fas fa-info-circle"></i> Note: These files must be placed in the project root directory.
-                            </p>
-                        </div>
+                        <!-- Installation and download instructions removed per UI simplification -->
                     <?php endif; ?>
-                    
-                    <div class="instructions-section" style="margin-top: 2rem;">
-                        <h2><i class="fas fa-info-circle"></i> About the Surveillance App</h2>
-                        <p style="line-height: 1.8; color: var(--text-secondary);">
-                            The YOLO Object Detection GUI Application provides a user-friendly interface for managing 
-                            your CCTV surveillance system. It allows you to:
-                        </p>
-                        <ul style="line-height: 2; padding-left: 1.5rem; margin-top: 1rem;">
-                            <li>Select and configure cameras from your system</li>
-                            <li>Start and stop object detection in real-time</li>
-                            <li>Monitor detection statistics (FPS, frame count, detections)</li>
-                            <li>View live logs and manage detection settings</li>
-                            <li>Enable or disable video recording</li>
-                            <li>Adjust detection parameters (interval, confidence threshold)</li>
-                        </ul>
-                        <p style="margin-top: 1.5rem; padding: 1rem; background: #e3f2fd; border-left: 4px solid #2196f3; border-radius: 4px; color: #1565c0;">
-                            <i class="fas fa-lightbulb"></i> <strong>Tip:</strong> For detailed documentation, refer to the 
-                            <code>README_GUI.md</code> file in the project directory.
-                        </p>
-                    </div>
                 </div>
             </div>
         </main>

@@ -351,7 +351,7 @@ if (isset($_SESSION['admin_logged_in']) && $_SESSION['admin_logged_in'] === true
                         <a href="login.php">Already have an account? Sign in</a>
                     </div>
                     <div class="button-group">
-                        <a href="login.php" class="btn btn-secondary">Back to Login</a>
+                        <a href="login.php?noOverlay=1" class="btn btn-secondary">Back to Login</a>
                         <button class="btn" type="submit">Register</button>
                     </div>
                 </form>

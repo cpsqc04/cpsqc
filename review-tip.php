@@ -178,14 +178,6 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                         <span class="nav-submodule-icon"><i class="fas fa-desktop"></i></span>
                         <span class="nav-submodule-text">Open Surveillance App</span>
                     </a>
-                    <a href="playback.php" class="nav-submodule" data-tooltip="Playback">
-                        <span class="nav-submodule-icon"><i class="fas fa-play"></i></span>
-                        <span class="nav-submodule-text">Playback</span>
-                    </a>
-                    <a href="camera-management.php" class="nav-submodule" data-tooltip="Camera Management">
-                        <span class="nav-submodule-icon"><i class="fas fa-camera"></i></span>
-                        <span class="nav-submodule-text">Camera Management</span>
-                    </a>
                 </div>
             </div>
             <div class="nav-module">
@@ -302,6 +294,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                                 <th>Location</th>
                                 <th>Tip Description</th>
                                 <th>Status</th>
+                                <th>Outcome</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
@@ -312,6 +305,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                                 <td>Susano Road, Barangay San Agustin, Quezon City</td>
                                 <td>Suspicious activity observed near residential area. Multiple individuals loitering.</td>
                                 <td><span class="status-badge status-under-review">Under Review</span></td>
+                                <td><span class="outcome-badge outcome-none">No Outcome Yet</span></td>
                                 <td>
                                     <div class="action-buttons">
                                         <button class="btn-view" onclick="viewTip('1')">View</button>
@@ -324,6 +318,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                                 <td>Paraiso St., Barangay San Agustin, Quezon City</td>
                                 <td>Safety concern reported regarding broken streetlights in the area.</td>
                                 <td><span class="status-badge status-reviewed">Reviewed</span></td>
+                                <td><span class="outcome-badge outcome-none">No Outcome Yet</span></td>
                                 <td>
                                     <div class="action-buttons">
                                         <button class="btn-view" onclick="viewTip('2')">View</button>
@@ -336,6 +331,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                                 <td>Clemente St., Barangay San Agustin, Quezon City</td>
                                 <td>Vandalism reported on public property. Graffiti found on walls.</td>
                                 <td><span class="status-badge status-reviewed">Reviewed</span></td>
+                                <td><span class="outcome-badge outcome-none">No Outcome Yet</span></td>
                                 <td>
                                     <div class="action-buttons">
                                         <button class="btn-view" onclick="viewTip('3')">View</button>
@@ -366,6 +362,19 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                     <option value="Reviewed">Reviewed</option>
                 </select>
             </div>
+            <div class="form-group" id="outcomeGroup" style="margin-top: 1rem;">
+                <label for="tipOutcome">Outcome</label>
+                <select id="tipOutcome" name="outcome" onchange="updateTipOutcome()">
+                    <option value="No Outcome Yet">No Outcome Yet</option>
+                    <option value="Under Investigation">Under Investigation</option>
+                    <option value="Investigation Successful">Investigation Successful (No Arrest)</option>
+                    <option value="Arrest Made">Arrest Made</option>
+                    <option value="Unfounded / No Action">Unfounded / No Action</option>
+                </select>
+                <p style="margin-top: 0.5rem; font-size: 0.8rem; color: var(--text-secondary);">
+                    This will be used for dashboard analytics on how effective submitted tips are.
+                </p>
+            </div>
             <div class="form-actions">
                 <button type="button" class="btn-cancel" onclick="closeViewTipModal()">Close</button>
                 <button type="button" class="btn-action" id="actionButton" onclick="openActionModal()" style="display: none;">
@@ -390,11 +399,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                 <div style="display: flex; flex-direction: column; gap: 0.75rem; margin-top: 0.5rem;">
                     <label style="display: flex; align-items: flex-start; gap: 0.75rem; cursor: pointer; padding: 0.5rem; border-radius: 6px; transition: background 0.2s ease;">
                         <input type="checkbox" id="sendToGroup1" value="group1" style="margin-top: 0.25rem; flex-shrink: 0; width: 18px; height: 18px; cursor: pointer;">
-                        <span style="flex: 1; line-height: 1.5;">Send to Suspect and Witness Management System (Group 1)</span>
-                    </label>
-                    <label style="display: flex; align-items: flex-start; gap: 0.75rem; cursor: pointer; padding: 0.5rem; border-radius: 6px; transition: background 0.2s ease;">
-                        <input type="checkbox" id="sendToGroup5" value="group5" style="margin-top: 0.25rem; flex-shrink: 0; width: 18px; height: 18px; cursor: pointer;">
-                        <span style="flex: 1; line-height: 1.5;">Send to Crime Data Analytics System (Group 5)</span>
+                        <span style="flex: 1; line-height: 1.5;">Send to Incident Logging and Classification</span>
                     </label>
                     <label style="display: flex; align-items: flex-start; gap: 0.75rem; cursor: pointer; padding: 0.5rem; border-radius: 6px; transition: background 0.2s ease;">
                         <input type="checkbox" id="exportWord" value="export" style="margin-top: 0.25rem; flex-shrink: 0; width: 18px; height: 18px; cursor: pointer;">
@@ -491,7 +496,8 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                     timestamp: tip.timestamp,
                     location: tip.location,
                     description: tip.description,
-                    status: tip.status
+                    status: tip.status,
+                    outcome: tip.outcome || 'No Outcome Yet'
                 }));
                 localStorage.setItem('submittedTips', JSON.stringify(tipsArray));
             } catch (e) {
@@ -512,6 +518,8 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                 
                 const statusBadge = cells[4].querySelector('.status-badge');
                 const status = statusBadge ? statusBadge.textContent.trim() : 'Under Review';
+                const outcomeCell = cells[5];
+                const outcomeText = outcomeCell ? outcomeCell.textContent.trim() : 'No Outcome Yet';
                 
                 tipData[id] = {
                     id: id,
@@ -519,7 +527,8 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                     timestamp: cells[1].textContent.trim(),
                     location: cells[2].textContent.trim(),
                     description: cells[3].textContent.trim(),
-                    status: status
+                    status: status,
+                    outcome: outcomeText || 'No Outcome Yet'
                 };
             });
             
@@ -535,7 +544,8 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                         timestamp: tip.timestamp,
                         location: tip.location,
                         description: tip.description,
-                        status: tip.status || 'Under Review'
+                        status: tip.status || 'Under Review',
+                        outcome: tip.outcome || 'No Outcome Yet'
                     };
                     
                     // Add row to table
@@ -545,6 +555,21 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             });
         }
         
+        function getOutcomeBadgeClass(outcome) {
+            switch (outcome) {
+                case 'Under Investigation':
+                    return 'outcome-investigating';
+                case 'Investigation Successful':
+                    return 'outcome-success';
+                case 'Arrest Made':
+                    return 'outcome-arrest';
+                case 'Unfounded / No Action':
+                    return 'outcome-unfounded';
+                default:
+                    return 'outcome-none';
+            }
+        }
+
         function addTipTableRow(id) {
             const tip = tipData[id];
             if (!tip) return;
@@ -555,6 +580,8 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             
             const statusClass = tip.status === 'Reviewed' ? 'status-reviewed' : 'status-under-review';
             const statusText = tip.status || 'Under Review';
+            const outcomeText = tip.outcome || 'No Outcome Yet';
+            const outcomeClass = getOutcomeBadgeClass(outcomeText);
             
             row.innerHTML = `
                 <td>${tip.tipId}</td>
@@ -562,6 +589,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                 <td>${tip.location}</td>
                 <td>${tip.description}</td>
                 <td><span class="status-badge ${statusClass}">${statusText}</span></td>
+                <td><span class="outcome-badge ${outcomeClass}">${outcomeText}</span></td>
                 <td>
                     <div class="action-buttons">
                         <button class="btn-view" onclick="viewTip('${id}')">View</button>
@@ -592,6 +620,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             
             document.getElementById('viewTipContent').innerHTML = content;
             document.getElementById('tipStatus').value = tip.status || 'Under Review';
+            document.getElementById('tipOutcome').value = tip.outcome || 'No Outcome Yet';
             
             // Show Action button only if status is Reviewed
             const actionButton = document.getElementById('actionButton');
@@ -633,6 +662,21 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             }
         }
 
+        function updateTipOutcome() {
+            if (!currentTipId) return;
+            
+            const outcome = document.getElementById('tipOutcome').value;
+            tipData[currentTipId].outcome = outcome;
+            saveTipDataToStorage();
+            
+            const row = document.querySelector(`tr[data-tip-id="${currentTipId}"]`);
+            if (row) {
+                const cells = row.querySelectorAll('td');
+                const outcomeClass = getOutcomeBadgeClass(outcome);
+                cells[5].innerHTML = `<span class="outcome-badge ${outcomeClass}">${outcome}</span>`;
+            }
+        }
+
         function openActionModal() {
             if (!currentTipId) return;
             
@@ -650,7 +694,6 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             
             // Reset checkboxes
             document.getElementById('sendToGroup1').checked = false;
-            document.getElementById('sendToGroup5').checked = false;
             document.getElementById('exportWord').checked = false;
             
             document.getElementById('actionModal').style.display = 'block';
@@ -665,10 +708,9 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             
             const tip = tipData[currentTipId];
             const sendToGroup1 = document.getElementById('sendToGroup1').checked;
-            const sendToGroup5 = document.getElementById('sendToGroup5').checked;
             const exportWord = document.getElementById('exportWord').checked;
             
-            if (!sendToGroup1 && !sendToGroup5 && !exportWord) {
+            if (!sendToGroup1 && !exportWord) {
                 alert('Please select at least one action.');
                 return;
             }
@@ -698,37 +740,12 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                         actionsCompleted++;
                         checkAllActionsComplete();
                     } else {
-                        console.error('Error sending to Group 1:', data.message);
+                        console.error('Error sending to Incident Logging and Classification:', data.message);
                         checkAllActionsComplete();
                     }
                 })
                 .catch(error => {
-                    console.error('Error sending to Group 1:', error);
-                    checkAllActionsComplete();
-                });
-            }
-            
-            if (sendToGroup5) {
-                totalActions++;
-                fetch('api/send_to_group5.php', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(tipDataToSend)
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        actionsCompleted++;
-                        checkAllActionsComplete();
-                    } else {
-                        console.error('Error sending to Group 5:', data.message);
-                        checkAllActionsComplete();
-                    }
-                })
-                .catch(error => {
-                    console.error('Error sending to Group 5:', error);
+                    console.error('Error sending to Incident Logging and Classification:', error);
                     checkAllActionsComplete();
                 });
             }
@@ -747,8 +764,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             function checkAllActionsComplete() {
                 if (actionsCompleted >= totalActions && totalActions > 0) {
                     let message = 'Actions completed:\n';
-                    if (sendToGroup1) message += '- Sent to Suspect and Witness Management System (Group 1)\n';
-                    if (sendToGroup5) message += '- Sent to Crime Data Analytics System (Group 5)\n';
+                    if (sendToGroup1) message += '- Sent to Incident Logging and Classification\n';
                     if (exportWord) message += '- Exported to Word document\n';
                     alert(message);
                     closeActionModal();

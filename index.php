@@ -773,6 +773,38 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             margin: 0 0 1rem 0;
         }
         
+        .tip-analytics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 1rem;
+        }
+        
+        .tip-analytics-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 1.25rem 1.5rem;
+            box-shadow: 0 2px 8px var(--shadow);
+        }
+        
+        .tip-analytics-label {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            margin-bottom: 0.35rem;
+        }
+        
+        .tip-analytics-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--tertiary-color);
+        }
+        
+        .tip-analytics-subtext {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            margin-top: 0.25rem;
+        }
+        
         .activity-list {
             background: var(--card-bg);
             border: 1px solid var(--border-color);
@@ -961,14 +993,6 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                     <a href="open-surveillance-app.php" class="nav-submodule" data-tooltip="Open Surveillance App">
                         <span class="nav-submodule-icon"><i class="fas fa-desktop"></i></span>
                         <span class="nav-submodule-text">Open Surveillance App</span>
-                    </a>
-                    <a href="playback.php" class="nav-submodule" data-tooltip="Playback">
-                        <span class="nav-submodule-icon"><i class="fas fa-play"></i></span>
-                        <span class="nav-submodule-text">Playback</span>
-                    </a>
-                    <a href="camera-management.php" class="nav-submodule" data-tooltip="Camera Management">
-                        <span class="nav-submodule-icon"><i class="fas fa-camera"></i></span>
-                        <span class="nav-submodule-text">Camera Management</span>
                     </a>
                 </div>
             </div>
@@ -1233,6 +1257,33 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                     </div>
                 </div>
                 
+                <!-- Tip Outcome Analytics -->
+                <div class="dashboard-section">
+                    <h3>Tip Outcome Analytics</h3>
+                    <div class="tip-analytics-grid">
+                        <div class="tip-analytics-card">
+                            <div class="tip-analytics-label">Total Tips Received</div>
+                            <div class="tip-analytics-value" id="tipAnalyticsTotal">0</div>
+                            <div class="tip-analytics-subtext">All tips submitted through the anonymous tip line.</div>
+                        </div>
+                        <div class="tip-analytics-card">
+                            <div class="tip-analytics-label">Successful Investigations</div>
+                            <div class="tip-analytics-value" id="tipAnalyticsSuccessful">0</div>
+                            <div class="tip-analytics-subtext">Tips that led to a successful investigation or case resolution.</div>
+                        </div>
+                        <div class="tip-analytics-card">
+                            <div class="tip-analytics-label">Arrests Made from Tips</div>
+                            <div class="tip-analytics-value" id="tipAnalyticsArrests">0</div>
+                            <div class="tip-analytics-subtext">Subset of successful tips where an arrest was made.</div>
+                        </div>
+                        <div class="tip-analytics-card">
+                            <div class="tip-analytics-label">Tip Effectiveness Rate</div>
+                            <div class="tip-analytics-value" id="tipAnalyticsRate">0%</div>
+                            <div class="tip-analytics-subtext">Percentage of all tips that resulted in successful investigations.</div>
+                        </div>
+                    </div>
+                </div>
+                
                 <!-- Quick Links -->
                 <div class="dashboard-section">
                     <h3>Quick Actions</h3>
@@ -1278,7 +1329,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
     </div>
     
     <script>
-        // Load sidebar state from localStorage
+        // Load sidebar state from localStorage and initialize dashboard data
         document.addEventListener('DOMContentLoaded', function() {
             const sidebar = document.getElementById('sidebar');
             const savedState = localStorage.getItem('sidebarCollapsed');
@@ -1286,6 +1337,8 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                 sidebar.classList.add('collapsed');
                 document.body.classList.add('sidebar-collapsed');
             }
+            
+            updateTipOutcomeAnalytics();
         });
         
         function toggleSidebar() {
@@ -1341,6 +1394,60 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             if (!isActive) {
                 module.classList.add('active');
             }
+        }
+        
+        function getTipOutcomeAnalytics() {
+            let tips = [];
+            try {
+                const stored = localStorage.getItem('submittedTips');
+                tips = stored ? JSON.parse(stored) : [];
+            } catch (e) {
+                console.error('Failed to load submitted tips for analytics', e);
+                tips = [];
+            }
+            
+            const totalTips = tips.length;
+            let successfulInvestigations = 0;
+            let arrests = 0;
+            
+            tips.forEach(tip => {
+                const outcome = (tip.outcome || '').trim();
+                if (outcome === 'Investigation Successful' || outcome === 'Arrest Made') {
+                    successfulInvestigations++;
+                }
+                if (outcome === 'Arrest Made') {
+                    arrests++;
+                }
+            });
+            
+            const effectivenessRate = totalTips > 0
+                ? Math.round((successfulInvestigations / totalTips) * 100)
+                : 0;
+            
+            return {
+                totalTips,
+                successfulInvestigations,
+                arrests,
+                effectivenessRate
+            };
+        }
+        
+        function updateTipOutcomeAnalytics() {
+            const analytics = getTipOutcomeAnalytics();
+            
+            const totalEl = document.getElementById('tipAnalyticsTotal');
+            const successEl = document.getElementById('tipAnalyticsSuccessful');
+            const arrestsEl = document.getElementById('tipAnalyticsArrests');
+            const rateEl = document.getElementById('tipAnalyticsRate');
+            
+            if (!totalEl || !successEl || !arrestsEl || !rateEl) {
+                return;
+            }
+            
+            totalEl.textContent = analytics.totalTips;
+            successEl.textContent = analytics.successfulInvestigations;
+            arrestsEl.textContent = analytics.arrests;
+            rateEl.textContent = analytics.effectivenessRate + '%';
         }
     </script>
 </body>

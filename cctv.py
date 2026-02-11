@@ -15,6 +15,7 @@ from datetime import datetime
 from pathlib import Path
 import queue
 import sys
+import io
 from PIL import Image, ImageTk
 import cv2
 import numpy as np
@@ -23,6 +24,11 @@ from requests.auth import HTTPDigestAuth, HTTPBasicAuth
 import base64
 import re
 from onvif import ONVIFCamera
+
+try:
+    from cairosvg import svg2png
+except ImportError:
+    svg2png = None
 
 # Dark mode color scheme
 COLORS = {
@@ -98,28 +104,11 @@ class LoginWindow:
         left_panel = tk.Frame(main_container, bg='#f5f7fa')
         left_panel.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=60, pady=60)
         
-        # Logo and text container
+        # Logo and text container (text-only – no logo)
         hero_frame = tk.Frame(left_panel, bg='#f5f7fa')
         hero_frame.pack(expand=True)
         
-        # Logo image
-        logo_path = 'images/tara.png'
-        if os.path.exists(logo_path):
-            try:
-                logo_img = Image.open(logo_path)
-                logo_img = logo_img.resize((80, 80), Image.Resampling.LANCZOS)
-                logo_photo = ImageTk.PhotoImage(logo_img)
-                logo_label = tk.Label(
-                    hero_frame,
-                    image=logo_photo,
-                    bg='#f5f7fa'
-                )
-                logo_label.image = logo_photo
-                logo_label.pack(anchor='w', pady=(0, 20))
-            except:
-                pass
-        
-        # AlerTaraQC title
+        # AlerTaraQC title (wordmark)
         title_frame = tk.Frame(hero_frame, bg='#f5f7fa')
         title_frame.pack(anchor='w', pady=(0, 15))
         
@@ -143,7 +132,7 @@ class LoginWindow:
         )
         taraqc_label.pack(side=tk.LEFT)
         
-        # Tagline
+        # Tagline under the title
         tagline_label = tk.Label(
             hero_frame,
             text="24/7 surveillance and instant alert system for potential threats.",

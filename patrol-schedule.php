@@ -175,14 +175,6 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                         <span class="nav-submodule-icon"><i class="fas fa-desktop"></i></span>
                         <span class="nav-submodule-text">Open Surveillance App</span>
                     </a>
-                    <a href="playback.php" class="nav-submodule" data-tooltip="Playback">
-                        <span class="nav-submodule-icon"><i class="fas fa-play"></i></span>
-                        <span class="nav-submodule-text">Playback</span>
-                    </a>
-                    <a href="camera-management.php" class="nav-submodule" data-tooltip="Camera Management">
-                        <span class="nav-submodule-icon"><i class="fas fa-camera"></i></span>
-                        <span class="nav-submodule-text">Camera Management</span>
-                    </a>
                 </div>
             </div>
             <div class="nav-module">
