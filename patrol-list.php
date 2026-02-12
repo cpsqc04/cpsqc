@@ -299,48 +299,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                             </tr>
                         </thead>
                         <tbody id="patrolOfficersTableBody">
-                            <tr data-officer-id="1">
-                                <td>PO-001</td>
-                                <td>Juan Dela Cruz</td>
-                                <td>09123456789</td>
-                                <td>Mon-Fri, 08:00-16:00</td>
-                                <td><span class="status-badge status-available">Available</span></td>
-                                <td>
-                                    <div class="action-buttons">
-                                        <button class="btn-view" onclick="viewOfficer('1')">View</button>
-                                        <button class="btn-edit" onclick="editOfficer('1')">Edit</button>
-                                        <button class="btn-delete" onclick="deleteOfficer('1')">Delete</button>
-                                    </div>
-                                </td>
-                            </tr>
-                            <tr data-officer-id="2">
-                                <td>PO-002</td>
-                                <td>Maria Santos</td>
-                                <td>09123456790</td>
-                                <td>Tue-Sat, 16:00-00:00</td>
-                                <td><span class="status-badge status-assigned">Assigned</span></td>
-                                <td>
-                                    <div class="action-buttons">
-                                        <button class="btn-view" onclick="viewOfficer('2')">View</button>
-                                        <button class="btn-edit" onclick="editOfficer('2')">Edit</button>
-                                        <button class="btn-delete" onclick="deleteOfficer('2')">Delete</button>
-                                    </div>
-                                </td>
-                            </tr>
-                            <tr data-officer-id="3">
-                                <td>PO-003</td>
-                                <td>Roberto Reyes</td>
-                                <td>09123456791</td>
-                                <td>Wed-Sun, 00:00-08:00</td>
-                                <td><span class="status-badge status-available">Available</span></td>
-                                <td>
-                                    <div class="action-buttons">
-                                        <button class="btn-view" onclick="viewOfficer('3')">View</button>
-                                        <button class="btn-edit" onclick="editOfficer('3')">Edit</button>
-                                        <button class="btn-delete" onclick="deleteOfficer('3')">Delete</button>
-                                    </div>
-                                </td>
-                            </tr>
+                            <!-- Patrol officers will be loaded from database via JavaScript -->
                         </tbody>
                     </table>
                 </div>
@@ -453,7 +412,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                 sidebar.classList.add('collapsed');
                 document.body.classList.add('sidebar-collapsed');
             }
-            initializeOfficerData();
+            loadPatrols();
         });
         function toggleSidebar() {
             const sidebar = document.getElementById('sidebar');
@@ -502,26 +461,67 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                 }
             }
         }
-        // Initialize officer data
+        // Patrol officer data storage (loaded from database)
         let officerData = {};
         
-        function initializeOfficerData() {
-            const tableBody = document.getElementById('patrolOfficersTableBody');
-            const rows = tableBody.querySelectorAll('tr[data-officer-id]');
-            
-            rows.forEach(row => {
-                const id = row.getAttribute('data-officer-id');
-                const cells = row.querySelectorAll('td');
+        // Load patrols from database
+        async function loadPatrols() {
+            try {
+                const response = await fetch('api/patrols.php');
+                const result = await response.json();
                 
-                officerData[id] = {
-                    id: id,
-                    badgeNumber: cells[0].textContent.trim(),
-                    name: cells[1].textContent.trim(),
-                    contact: cells[2].textContent.trim(),
-                    schedule: cells[3].textContent.trim(),
-                    status: cells[4].querySelector('.status-badge').textContent.trim()
-                };
-            });
+                if (!result.success) {
+                    console.error(result.message || 'Failed to load patrols');
+                    return;
+                }
+                
+                const patrols = result.data || [];
+                const tbody = document.getElementById('patrolOfficersTableBody');
+                tbody.innerHTML = '';
+                
+                // Store patrols by id for easy lookup
+                officerData = {};
+                patrols.forEach(p => {
+                    officerData[p.id] = p;
+                });
+                
+                // Populate table
+                patrols.forEach(p => {
+                    addTableRow(p.id);
+                });
+            } catch (e) {
+                console.error('Error loading patrols:', e);
+            }
+        }
+        
+        function addTableRow(id) {
+            const officer = officerData[id];
+            if (!officer) return;
+            
+            const tbody = document.getElementById('patrolOfficersTableBody');
+            const row = document.createElement('tr');
+            row.setAttribute('data-officer-id', id);
+            
+            const statusClass = officer.status === 'Available' ? 'status-available' : 
+                                officer.status === 'Assigned' ? 'status-assigned' : 
+                                'status-off-duty';
+            
+            row.innerHTML = `
+                <td>${officer.badge_number || ''}</td>
+                <td>${officer.officer_name || ''}</td>
+                <td>${officer.contact_number || ''}</td>
+                <td>${officer.schedule || ''}</td>
+                <td><span class="status-badge ${statusClass}">${officer.status || 'Available'}</span></td>
+                <td>
+                    <div class="action-buttons">
+                        <button class="btn-view" onclick="viewOfficer('${id}')">View</button>
+                        <button class="btn-edit" onclick="editOfficer('${id}')">Edit</button>
+                        <button class="btn-delete" onclick="deleteOfficer('${id}')">Delete</button>
+                    </div>
+                </td>
+            `;
+            
+            tbody.appendChild(row);
         }
 
         function openAddOfficerModal() {
@@ -539,11 +539,11 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             
             const content = `
                 <div style="line-height: 1.8;">
-                    <p><strong>Badge Number:</strong> ${officer.badgeNumber}</p>
-                    <p><strong>Officer Name:</strong> ${officer.name}</p>
-                    <p><strong>Contact Number:</strong> ${officer.contact}</p>
-                    <p><strong>Schedule:</strong> ${officer.schedule}</p>
-                    <p><strong>Status:</strong> ${officer.status}</p>
+                    <p><strong>Badge Number:</strong> ${officer.badge_number || ''}</p>
+                    <p><strong>Officer Name:</strong> ${officer.officer_name || ''}</p>
+                    <p><strong>Contact Number:</strong> ${officer.contact_number || ''}</p>
+                    <p><strong>Schedule:</strong> ${officer.schedule || ''}</p>
+                    <p><strong>Status:</strong> ${officer.status || 'Available'}</p>
                 </div>
             `;
             
@@ -560,11 +560,11 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             if (!officer) return;
             
             document.getElementById('editOfficerId').value = officer.id;
-            document.getElementById('editOfficerBadgeNumber').value = officer.badgeNumber;
-            document.getElementById('editOfficerName').value = officer.name;
-            document.getElementById('editOfficerContact').value = officer.contact;
-            document.getElementById('editOfficerSchedule').value = officer.schedule;
-            document.getElementById('editOfficerStatus').value = officer.status;
+            document.getElementById('editOfficerBadgeNumber').value = officer.badge_number || '';
+            document.getElementById('editOfficerName').value = officer.officer_name || '';
+            document.getElementById('editOfficerContact').value = officer.contact_number || '';
+            document.getElementById('editOfficerSchedule').value = officer.schedule || '';
+            document.getElementById('editOfficerStatus').value = officer.status || 'Available';
             
             document.getElementById('editOfficerModal').style.display = 'block';
         }
@@ -586,90 +586,150 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                 return;
             }
             
-            const row = document.querySelector(`tr[data-officer-id="${id}"]`);
-            if (row) {
-                row.remove();
-                delete officerData[id];
-            }
+            fetch('api/patrols.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    action: 'delete',
+                    id: parseInt(id)
+                })
+            })
+            .then(res => res.json())
+            .then(result => {
+                if (!result.success) {
+                    alert(result.message || 'Failed to delete patrol officer.');
+                    return;
+                }
+                
+                // Reload patrols to refresh the table
+                loadPatrols();
+                alert('Patrol officer deleted successfully!');
+            })
+            .catch(err => {
+                console.error('Error deleting patrol officer:', err);
+                alert('Error deleting patrol officer. Please try again.');
+            });
         }
 
         function saveOfficer(event) {
             event.preventDefault();
             
             const formData = new FormData(event.target);
-            const id = Date.now().toString();
-            
-            const officer = {
-                id: id,
-                badgeNumber: formData.get('badgeNumber'),
-                name: formData.get('name'),
-                contact: formData.get('contact'),
-                schedule: formData.get('schedule'),
+            const apiData = {
+                action: 'create',
+                badge_number: formData.get('badgeNumber').trim(),
+                officer_name: formData.get('name').trim(),
+                contact_number: formData.get('contact').trim(),
+                schedule: formData.get('schedule').trim(),
                 status: formData.get('status')
             };
             
-            officerData[id] = officer;
+            if (!apiData.badge_number || !apiData.officer_name || !apiData.contact_number || !apiData.schedule) {
+                alert('Please fill in all required fields.');
+                return;
+            }
             
-            const tableBody = document.getElementById('patrolOfficersTableBody');
-            const row = document.createElement('tr');
-            row.setAttribute('data-officer-id', id);
-            
-            const statusClass = officer.status === 'Available' ? 'status-available' : 
-                                officer.status === 'Assigned' ? 'status-assigned' : 
-                                'status-off-duty';
-            
-            row.innerHTML = `
-                <td>${officer.badgeNumber}</td>
-                <td>${officer.name}</td>
-                <td>${officer.contact}</td>
-                <td>${officer.schedule}</td>
-                <td><span class="status-badge ${statusClass}">${officer.status}</span></td>
-                <td>
-                    <div class="action-buttons">
-                        <button class="btn-view" onclick="viewOfficer('${id}')">View</button>
-                        <button class="btn-edit" onclick="editOfficer('${id}')">Edit</button>
-                        <button class="btn-delete" onclick="deleteOfficer('${id}')">Delete</button>
-                    </div>
-                </td>
-            `;
-            
-            tableBody.appendChild(row);
-            closeAddOfficerModal();
+            fetch('api/patrols.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(apiData)
+            })
+            .then(res => {
+                if (!res.ok) {
+                    return res.text().then(text => {
+                        try {
+                            const json = JSON.parse(text);
+                            throw new Error(json.message || 'Server error');
+                        } catch (e) {
+                            if (e instanceof Error && e.message !== 'Server error') {
+                                throw e;
+                            }
+                            throw new Error('Server error: ' + res.status + ' ' + res.statusText);
+                        }
+                    });
+                }
+                return res.json();
+            })
+            .then(result => {
+                if (!result.success) {
+                    alert(result.message || 'Failed to save patrol officer.');
+                    return;
+                }
+                
+                // Reload patrols to refresh the table
+                loadPatrols();
+                alert('Patrol officer added successfully!');
+                closeAddOfficerModal();
+            })
+            .catch(err => {
+                console.error('Error saving patrol officer:', err);
+                alert('Error saving patrol officer: ' + (err.message || 'Please try again.'));
+            });
         }
 
         function updateOfficer(event) {
             event.preventDefault();
             
             const formData = new FormData(event.target);
-            const id = formData.get('id');
+            const id = parseInt(formData.get('id'));
             
-            const officer = {
+            const apiData = {
+                action: 'update',
                 id: id,
-                badgeNumber: formData.get('badgeNumber'),
-                name: formData.get('name'),
-                contact: formData.get('contact'),
-                schedule: formData.get('schedule'),
+                badge_number: formData.get('badgeNumber').trim(),
+                officer_name: formData.get('name').trim(),
+                contact_number: formData.get('contact').trim(),
+                schedule: formData.get('schedule').trim(),
                 status: formData.get('status')
             };
             
-            officerData[id] = officer;
-            
-            const row = document.querySelector(`tr[data-officer-id="${id}"]`);
-            if (row) {
-                const cells = row.querySelectorAll('td');
-                cells[0].textContent = officer.badgeNumber;
-                cells[1].textContent = officer.name;
-                cells[2].textContent = officer.contact;
-                cells[3].textContent = officer.schedule;
-                
-                const statusClass = officer.status === 'Available' ? 'status-available' : 
-                                    officer.status === 'Assigned' ? 'status-assigned' : 
-                                    'status-off-duty';
-                
-                cells[4].innerHTML = `<span class="status-badge ${statusClass}">${officer.status}</span>`;
+            if (!apiData.badge_number || !apiData.officer_name || !apiData.contact_number || !apiData.schedule || !apiData.status) {
+                alert('Please fill in all required fields.');
+                return;
             }
             
-            closeEditOfficerModal();
+            fetch('api/patrols.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(apiData)
+            })
+            .then(res => {
+                if (!res.ok) {
+                    return res.text().then(text => {
+                        try {
+                            const json = JSON.parse(text);
+                            throw new Error(json.message || 'Server error');
+                        } catch (e) {
+                            if (e instanceof Error && e.message !== 'Server error') {
+                                throw e;
+                            }
+                            throw new Error('Server error: ' + res.status + ' ' + res.statusText);
+                        }
+                    });
+                }
+                return res.json();
+            })
+            .then(result => {
+                if (!result.success) {
+                    alert(result.message || 'Failed to update patrol officer.');
+                    return;
+                }
+                
+                // Reload patrols to refresh the table
+                loadPatrols();
+                alert('Patrol officer updated successfully!');
+                closeEditOfficerModal();
+            })
+            .catch(err => {
+                console.error('Error updating patrol officer:', err);
+                alert('Error updating patrol officer: ' + (err.message || 'Please try again.'));
+            });
         }
 
         // Close modals when clicking outside

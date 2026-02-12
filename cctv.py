@@ -1942,7 +1942,7 @@ class DetectionGUI:
         
         if not rtsp_url:
             # Default RTSP URL from detect.py
-            rtsp_url = "rtsp://admin:admin123@10.219.58.187:554/Preview_01_sub"
+            rtsp_url = "rtsp://admin:admin123@10.245.53.187:554/Preview_01_sub"
         
         # Start detection in background
         threading.Thread(target=self.start_detection_background, args=(rtsp_url,), daemon=True).start()

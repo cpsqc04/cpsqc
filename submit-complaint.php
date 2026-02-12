@@ -1082,16 +1082,6 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             return `COMP-${year}-${String(random).padStart(3, '0')}`;
         }
         
-        // Get next complaint number from localStorage
-        function getNextComplaintNumber() {
-            let lastNumber = localStorage.getItem('lastComplaintNumber');
-            if (!lastNumber) {
-                lastNumber = 0;
-            }
-            lastNumber = parseInt(lastNumber) + 1;
-            localStorage.setItem('lastComplaintNumber', lastNumber);
-            return lastNumber;
-        }
         
         function submitComplaint(event) {
             event.preventDefault();
@@ -1102,45 +1092,57 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             submitBtn.textContent = 'Submitting...';
             
             // Get form values
+            const complaintId = generateComplaintId();
             const formData = {
-                id: generateComplaintId(),
-                complainant: document.getElementById('complainantName').value.trim(),
-                contact: document.getElementById('complainantContact').value.trim(),
+                action: 'create',
+                complaint_id: complaintId,
+                complainant_name: document.getElementById('complainantName').value.trim(),
+                contact_number: document.getElementById('complainantContact').value.trim(),
                 address: document.getElementById('complainantAddress').value.trim(),
-                date: document.getElementById('complaintDate').value,
-                type: document.getElementById('complaintType').value,
+                incident_date: document.getElementById('complaintDate').value,
+                complaint_type: document.getElementById('complaintType').value,
                 location: document.getElementById('complaintLocation').value.trim(),
                 description: document.getElementById('complaintDescription').value.trim(),
                 priority: document.getElementById('complaintPriority').value,
                 status: 'Pending',
-                assignedTo: 'Pending Assignment',
-                time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }),
-                submittedAt: new Date().toLocaleString('en-US', { 
-                    year: 'numeric', 
-                    month: '2-digit', 
-                    day: '2-digit', 
-                    hour: '2-digit', 
-                    minute: '2-digit',
-                    hour12: true 
-                }),
+                assigned_to: 'Pending Assignment',
                 notes: 'Complaint submitted and awaiting review.'
             };
             
-            // Store complaint in localStorage
-            let complaints = JSON.parse(localStorage.getItem('complaints') || '[]');
-            complaints.push(formData);
-            localStorage.setItem('complaints', JSON.stringify(complaints));
-            
-            // Show success modal
-            document.getElementById('complaintIdDisplay').textContent = formData.id;
-            document.getElementById('successModal').classList.add('active');
-            
-            // Reset form
-            document.getElementById('complaintForm').reset();
-            
-            // Re-enable submit button
-            submitBtn.disabled = false;
-            submitBtn.textContent = 'Submit Complaint';
+            // Send to API
+            fetch('api/complaints.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(formData)
+            })
+            .then(res => res.json())
+            .then(result => {
+                if (!result.success) {
+                    alert(result.message || 'Failed to submit complaint.');
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Submit Complaint';
+                    return;
+                }
+                
+                // Show success modal
+                document.getElementById('complaintIdDisplay').textContent = complaintId;
+                document.getElementById('successModal').classList.add('active');
+                
+                // Reset form
+                document.getElementById('complaintForm').reset();
+                
+                // Re-enable submit button
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Submit Complaint';
+            })
+            .catch(err => {
+                console.error('Error submitting complaint:', err);
+                alert('Error submitting complaint. Please try again.');
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Submit Complaint';
+            });
         }
         
         function closeSuccessModal() {

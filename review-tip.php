@@ -299,45 +299,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                             </tr>
                         </thead>
                         <tbody id="tipsTableBody">
-                            <tr data-tip-id="1">
-                                <td>TIP-2025-001</td>
-                                <td>2025-01-15 14:30:25</td>
-                                <td>Susano Road, Barangay San Agustin, Quezon City</td>
-                                <td>Suspicious activity observed near residential area. Multiple individuals loitering.</td>
-                                <td><span class="status-badge status-under-review">Under Review</span></td>
-                                <td><span class="outcome-badge outcome-none">No Outcome Yet</span></td>
-                                <td>
-                                    <div class="action-buttons">
-                                        <button class="btn-view" onclick="viewTip('1')">View</button>
-                                    </div>
-                                </td>
-                            </tr>
-                            <tr data-tip-id="2">
-                                <td>TIP-2025-002</td>
-                                <td>2025-01-14 10:15:42</td>
-                                <td>Paraiso St., Barangay San Agustin, Quezon City</td>
-                                <td>Safety concern reported regarding broken streetlights in the area.</td>
-                                <td><span class="status-badge status-reviewed">Reviewed</span></td>
-                                <td><span class="outcome-badge outcome-none">No Outcome Yet</span></td>
-                                <td>
-                                    <div class="action-buttons">
-                                        <button class="btn-view" onclick="viewTip('2')">View</button>
-                                    </div>
-                                </td>
-                            </tr>
-                            <tr data-tip-id="3">
-                                <td>TIP-2025-003</td>
-                                <td>2025-01-13 18:45:10</td>
-                                <td>Clemente St., Barangay San Agustin, Quezon City</td>
-                                <td>Vandalism reported on public property. Graffiti found on walls.</td>
-                                <td><span class="status-badge status-reviewed">Reviewed</span></td>
-                                <td><span class="outcome-badge outcome-none">No Outcome Yet</span></td>
-                                <td>
-                                    <div class="action-buttons">
-                                        <button class="btn-view" onclick="viewTip('3')">View</button>
-                                    </div>
-                                </td>
-                            </tr>
+                            <!-- Tips will be loaded from database via JavaScript -->
                         </tbody>
                     </table>
                 </div>
@@ -474,85 +436,41 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                 }
             }
         }
-        // Initialize tip data
+        // Tip data storage (loaded from database)
         let tipData = {};
-        let nextTipId = 4; // Starting from 4 since we have 3 sample tips
         
-        function loadSubmittedTips() {
+        // Load tips from database
+        async function loadTips() {
             try {
-                const stored = localStorage.getItem('submittedTips');
-                return stored ? JSON.parse(stored) : [];
+                const response = await fetch('api/tips.php');
+                const result = await response.json();
+                
+                if (!result.success) {
+                    console.error(result.message || 'Failed to load tips');
+                    return;
+                }
+                
+                const tips = result.data || [];
+                const tbody = document.getElementById('tipsTableBody');
+                tbody.innerHTML = '';
+                
+                // Store tips by id for easy lookup
+                tipData = {};
+                tips.forEach(tip => {
+                    tipData[tip.id] = tip;
+                });
+                
+                // Populate table
+                tips.forEach(tip => {
+                    addTipTableRow(tip.id);
+                });
             } catch (e) {
-                console.error('Failed to load submitted tips', e);
-                return [];
-            }
-        }
-        
-        function saveTipDataToStorage() {
-            try {
-                // Convert tipData object to array format for localStorage
-                const tipsArray = Object.values(tipData).map(tip => ({
-                    tipId: tip.tipId,
-                    timestamp: tip.timestamp,
-                    location: tip.location,
-                    description: tip.description,
-                    status: tip.status,
-                    outcome: tip.outcome || 'No Outcome Yet'
-                }));
-                localStorage.setItem('submittedTips', JSON.stringify(tipsArray));
-            } catch (e) {
-                console.error('Failed to save tip data', e);
+                console.error('Error loading tips:', e);
             }
         }
         
         function initializeTipData() {
-            // First, load submitted tips from localStorage
-            const submittedTips = loadSubmittedTips();
-            const tableBody = document.getElementById('tipsTableBody');
-            
-            // Load existing tips from table rows
-            const rows = tableBody.querySelectorAll('tr[data-tip-id]');
-            rows.forEach(row => {
-                const id = row.getAttribute('data-tip-id');
-                const cells = row.querySelectorAll('td');
-                
-                const statusBadge = cells[4].querySelector('.status-badge');
-                const status = statusBadge ? statusBadge.textContent.trim() : 'Under Review';
-                const outcomeCell = cells[5];
-                const outcomeText = outcomeCell ? outcomeCell.textContent.trim() : 'No Outcome Yet';
-                
-                tipData[id] = {
-                    id: id,
-                    tipId: cells[0].textContent.trim(),
-                    timestamp: cells[1].textContent.trim(),
-                    location: cells[2].textContent.trim(),
-                    description: cells[3].textContent.trim(),
-                    status: status,
-                    outcome: outcomeText || 'No Outcome Yet'
-                };
-            });
-            
-            // Add submitted tips from localStorage that aren't already in the table
-            submittedTips.forEach((tip, index) => {
-                // Check if tip already exists in tipData
-                const existingTip = Object.values(tipData).find(t => t.tipId === tip.tipId);
-                if (!existingTip) {
-                    const newId = nextTipId.toString();
-                    tipData[newId] = {
-                        id: newId,
-                        tipId: tip.tipId,
-                        timestamp: tip.timestamp,
-                        location: tip.location,
-                        description: tip.description,
-                        status: tip.status || 'Under Review',
-                        outcome: tip.outcome || 'No Outcome Yet'
-                    };
-                    
-                    // Add row to table
-                    addTipTableRow(newId);
-                    nextTipId++;
-                }
-            });
+            loadTips();
         }
         
         function getOutcomeBadgeClass(outcome) {
@@ -583,11 +501,22 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             const outcomeText = tip.outcome || 'No Outcome Yet';
             const outcomeClass = getOutcomeBadgeClass(outcomeText);
             
+            // Format timestamp
+            const timestamp = tip.submitted_at ? new Date(tip.submitted_at).toLocaleString('en-US', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+                hour12: false
+            }).replace(',', '') : '';
+            
             row.innerHTML = `
-                <td>${tip.tipId}</td>
-                <td>${tip.timestamp}</td>
-                <td>${tip.location}</td>
-                <td>${tip.description}</td>
+                <td>${tip.tip_id || ''}</td>
+                <td>${timestamp}</td>
+                <td>${tip.location || ''}</td>
+                <td>${tip.description || ''}</td>
                 <td><span class="status-badge ${statusClass}">${statusText}</span></td>
                 <td><span class="outcome-badge ${outcomeClass}">${outcomeText}</span></td>
                 <td>
@@ -611,11 +540,22 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             
             currentTipId = id;
             
+            // Format timestamp
+            const timestamp = tip.submitted_at ? new Date(tip.submitted_at).toLocaleString('en-US', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+                hour12: false
+            }).replace(',', '') : '';
+            
             const content = `
-                <p><strong>Tip ID:</strong> ${tip.tipId}</p>
-                <p><strong>Timestamp:</strong> ${tip.timestamp}</p>
-                <p><strong>Location:</strong> ${tip.location}</p>
-                <p><strong>Tip Description:</strong><br>${tip.description}</p>
+                <p><strong>Tip ID:</strong> ${tip.tip_id || ''}</p>
+                <p><strong>Timestamp:</strong> ${timestamp}</p>
+                <p><strong>Location:</strong> ${tip.location || ''}</p>
+                <p><strong>Tip Description:</strong><br>${tip.description || ''}</p>
             `;
             
             document.getElementById('viewTipContent').innerHTML = content;
@@ -642,39 +582,96 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             if (!currentTipId) return;
             
             const status = document.getElementById('tipStatus').value;
-            tipData[currentTipId].status = status;
-            saveTipDataToStorage();
+            const tip = tipData[currentTipId];
+            if (!tip) return;
             
-            // Update status in table
-            const row = document.querySelector(`tr[data-tip-id="${currentTipId}"]`);
-            if (row) {
-                const cells = row.querySelectorAll('td');
-                const statusClass = status === 'Reviewed' ? 'status-reviewed' : 'status-under-review';
-                cells[4].innerHTML = `<span class="status-badge ${statusClass}">${status}</span>`;
-            }
-            
-            // Show/hide Action button based on status
-            const actionButton = document.getElementById('actionButton');
-            if (status === 'Reviewed') {
-                actionButton.style.display = 'inline-block';
-            } else {
-                actionButton.style.display = 'none';
-            }
+            // Update in database
+            fetch('api/tips.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    action: 'update',
+                    id: parseInt(currentTipId),
+                    status: status,
+                    outcome: tip.outcome || 'No Outcome Yet'
+                })
+            })
+            .then(res => res.json())
+            .then(result => {
+                if (!result.success) {
+                    alert(result.message || 'Failed to update tip status.');
+                    return;
+                }
+                
+                // Update local data
+                tipData[currentTipId].status = status;
+                
+                // Update table row
+                const row = document.querySelector(`tr[data-tip-id="${currentTipId}"]`);
+                if (row) {
+                    const cells = row.querySelectorAll('td');
+                    const statusClass = status === 'Reviewed' ? 'status-reviewed' : 'status-under-review';
+                    cells[4].innerHTML = `<span class="status-badge ${statusClass}">${status}</span>`;
+                }
+                
+                // Show/hide Action button based on status
+                const actionButton = document.getElementById('actionButton');
+                if (status === 'Reviewed') {
+                    actionButton.style.display = 'inline-block';
+                } else {
+                    actionButton.style.display = 'none';
+                }
+            })
+            .catch(err => {
+                console.error('Error updating tip status:', err);
+                alert('Error updating tip status. Please try again.');
+            });
         }
 
         function updateTipOutcome() {
             if (!currentTipId) return;
             
             const outcome = document.getElementById('tipOutcome').value;
-            tipData[currentTipId].outcome = outcome;
-            saveTipDataToStorage();
+            const tip = tipData[currentTipId];
+            if (!tip) return;
             
-            const row = document.querySelector(`tr[data-tip-id="${currentTipId}"]`);
-            if (row) {
-                const cells = row.querySelectorAll('td');
-                const outcomeClass = getOutcomeBadgeClass(outcome);
-                cells[5].innerHTML = `<span class="outcome-badge ${outcomeClass}">${outcome}</span>`;
-            }
+            // Update in database
+            fetch('api/tips.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    action: 'update',
+                    id: parseInt(currentTipId),
+                    status: tip.status || 'Under Review',
+                    outcome: outcome
+                })
+            })
+            .then(res => res.json())
+            .then(result => {
+                if (!result.success) {
+                    alert(result.message || 'Failed to update tip outcome.');
+                    return;
+                }
+                
+                // Update local data
+                tipData[currentTipId].outcome = outcome;
+                
+                // Update table row
+                const row = document.querySelector(`tr[data-tip-id="${currentTipId}"]`);
+                if (row) {
+                    const cells = row.querySelectorAll('td');
+                    const outcomeClass = getOutcomeBadgeClass(outcome);
+                    cells[5].innerHTML = `<span class="outcome-badge ${outcomeClass}">${outcome}</span>`;
+                }
+            })
+            .catch(err => {
+                console.error('Error updating tip outcome:', err);
+                alert('Error updating tip outcome. Please try again.');
+            });
         }
 
         function openActionModal() {
@@ -683,13 +680,24 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             const tip = tipData[currentTipId];
             if (!tip) return;
             
+            // Format timestamp
+            const timestamp = tip.submitted_at ? new Date(tip.submitted_at).toLocaleString('en-US', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+                hour12: false
+            }).replace(',', '') : '';
+            
             // Populate tip details in action modal
             document.getElementById('actionTipContent').innerHTML = `
                 <h3 style="margin-top: 0; margin-bottom: 1rem; color: var(--tertiary-color); font-size: 1.1rem;">Tip Details</h3>
-                <p style="margin-bottom: 0.75rem;"><strong>Tip ID:</strong> ${tip.tipId}</p>
-                <p style="margin-bottom: 0.75rem;"><strong>Timestamp:</strong> ${tip.timestamp}</p>
-                <p style="margin-bottom: 0.75rem;"><strong>Location:</strong> ${tip.location}</p>
-                <p style="margin-bottom: 0;"><strong>Description:</strong> ${tip.description}</p>
+                <p style="margin-bottom: 0.75rem;"><strong>Tip ID:</strong> ${tip.tip_id || ''}</p>
+                <p style="margin-bottom: 0.75rem;"><strong>Timestamp:</strong> ${timestamp}</p>
+                <p style="margin-bottom: 0.75rem;"><strong>Location:</strong> ${tip.location || ''}</p>
+                <p style="margin-bottom: 0;"><strong>Description:</strong> ${tip.description || ''}</p>
             `;
             
             // Reset checkboxes

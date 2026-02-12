@@ -362,22 +362,15 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                         <label style="font-weight: 600; margin-bottom: 0.5rem; display: block;">Official Patrol Officers</label>
                         <select id="patrolOfficer" name="officer" style="margin-bottom: 0.5rem;">
                             <option value="">Select Official Patrol Officer</option>
-                            <option value="PO-001|Juan Dela Cruz|Official">PO-001 - Juan Dela Cruz</option>
-                            <option value="PO-002|Maria Santos|Official">PO-002 - Maria Santos</option>
-                            <option value="PO-003|Roberto Reyes|Official">PO-003 - Roberto Reyes</option>
+                            <!-- Options will be loaded from database -->
                         </select>
                     </div>
                     <div>
                         <label style="font-weight: 600; margin-bottom: 0.5rem; display: block;">Neighborhood Watch Members</label>
                         <select id="neighborhoodMember" name="member">
                             <option value="">Select Neighborhood Watch Member</option>
-                            <option value="NW-001|John Doe|Neighborhood Watch Only">NW-001 - John Doe <span style="color: #ff9800;">(Neighborhood Watch Only)</span></option>
-                            <option value="NW-002|Jane Smith|Neighborhood Watch Only">NW-002 - Jane Smith <span style="color: #ff9800;">(Neighborhood Watch Only)</span></option>
-                            <option value="NW-003|Mike Johnson|Neighborhood Watch Only">NW-003 - Mike Johnson <span style="color: #ff9800;">(Neighborhood Watch Only)</span></option>
+                            <!-- Options will be loaded from database -->
                         </select>
-                        <small style="color: #856404; display: block; margin-top: 0.25rem;">
-                            <i class="fas fa-info-circle"></i> Members marked as "Neighborhood Watch Only" are volunteers
-                        </small>
                     </div>
                 </div>
                 <div class="form-group">
@@ -494,7 +487,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             });
         }
 
-        function assignPatrolToDispatch(id) {
+        async function assignPatrolToDispatch(id) {
             const incident = patrolData[id];
             if (!incident) return;
             
@@ -514,6 +507,46 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             // Store incident ID for later use
             document.getElementById('assignPatrolForm').setAttribute('data-incident-id', id);
             
+            // Load patrol officers from database
+            const patrolOfficerSelect = document.getElementById('patrolOfficer');
+            patrolOfficerSelect.innerHTML = '<option value="">Select Official Patrol Officer</option>';
+            
+            try {
+                const patrolResponse = await fetch('api/patrols.php');
+                const patrolResult = await patrolResponse.json();
+                
+                if (patrolResult.success && patrolResult.data) {
+                    patrolResult.data.forEach(officer => {
+                        const option = document.createElement('option');
+                        option.value = `${officer.badge_number}|${officer.officer_name}|Official`;
+                        option.textContent = `${officer.badge_number} - ${officer.officer_name}`;
+                        patrolOfficerSelect.appendChild(option);
+                    });
+                }
+            } catch (e) {
+                console.error('Error loading patrol officers:', e);
+            }
+            
+            // Load neighborhood watch members from database
+            const neighborhoodMemberSelect = document.getElementById('neighborhoodMember');
+            neighborhoodMemberSelect.innerHTML = '<option value="">Select Neighborhood Watch Member</option>';
+            
+            try {
+                const memberResponse = await fetch('api/members.php');
+                const memberResult = await memberResponse.json();
+                
+                if (memberResult.success && memberResult.data) {
+                    memberResult.data.forEach(member => {
+                        const option = document.createElement('option');
+                        option.value = `NW-${String(member.id).padStart(3, '0')}|${member.name}|Neighborhood Watch Only`;
+                        option.innerHTML = `NW-${String(member.id).padStart(3, '0')} - ${member.name} <span style="color: #ff9800;">(Neighborhood Watch Only)</span>`;
+                        neighborhoodMemberSelect.appendChild(option);
+                    });
+                }
+            } catch (e) {
+                console.error('Error loading neighborhood watch members:', e);
+            }
+            
             document.getElementById('assignPatrolModal').style.display = 'block';
         }
 
@@ -532,9 +565,6 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                     <p><strong>Date:</strong> ${incident.date}</p>
                     <p><strong>Incident Type:</strong> ${incident.incidentType}</p>
                     <p><strong>Description:</strong> ${incident.description}</p>
-                    <p style="margin-top: 1rem; color: #856404; font-style: italic;">
-                        <i class="fas fa-info-circle"></i> Data from Crime Mapping and Heatmaps System (Group 5)
-                    </p>
                 </div>
             `;
             

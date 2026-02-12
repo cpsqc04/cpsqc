@@ -2,28 +2,81 @@
 // Admin registration page
 session_start();
 
-// Temporary registration (until database is set up)
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $username = $_POST['username'] ?? '';
+require_once __DIR__ . '/db.php';
+
+/**
+ * Ensure the admins table exists (same as in login.php).
+ */
+function ensureAdminsTable(PDO $pdo): void
+{
+    $pdo->exec("CREATE TABLE IF NOT EXISTS admins (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        username VARCHAR(100) NOT NULL UNIQUE,
+        password_hash VARCHAR(255) NOT NULL,
+        email VARCHAR(255) DEFAULT NULL,
+        full_name VARCHAR(255) DEFAULT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+    $columns = [];
+    foreach ($pdo->query('SHOW COLUMNS FROM admins') as $row) {
+        $columns[$row['Field']] = true;
+    }
+    if (!isset($columns['email'])) {
+        $pdo->exec('ALTER TABLE admins ADD COLUMN email VARCHAR(255) DEFAULT NULL');
+    }
+    if (!isset($columns['full_name'])) {
+        $pdo->exec('ALTER TABLE admins ADD COLUMN full_name VARCHAR(255) DEFAULT NULL');
+    }
+    if (!isset($columns['created_at'])) {
+        $pdo->exec('ALTER TABLE admins ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP');
+    }
+}
+
+try {
+    ensureAdminsTable($pdo);
+} catch (PDOException $e) {
+    $error = 'Registration system error: ' . htmlspecialchars($e->getMessage());
+}
+
+// Database-backed registration
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($error)) {
+    $username = trim($_POST['username'] ?? '');
     $password = $_POST['password'] ?? '';
     $confirmPassword = $_POST['confirm_password'] ?? '';
-    $email = $_POST['email'] ?? '';
-    $fullName = $_POST['full_name'] ?? '';
+    $email = trim($_POST['email'] ?? '');
+    $fullName = trim($_POST['full_name'] ?? '');
     
     // Validation
-    if (empty($username) || empty($password) || empty($confirmPassword) || empty($email) || empty($fullName)) {
+    if ($username === '' || $password === '' || $confirmPassword === '' || $email === '' || $fullName === '') {
         $error = 'All fields are required';
     } elseif ($password !== $confirmPassword) {
         $error = 'Passwords do not match';
     } elseif (strlen($password) < 6) {
         $error = 'Password must be at least 6 characters long';
     } else {
-        // In a real application, you would save this to a database
-        // For now, we'll just show a success message and redirect to login
-        $_SESSION['registration_success'] = true;
-        $_SESSION['registered_username'] = $username;
-        header('Location: login.php');
-        exit;
+        // Check for existing username or email
+        $stmt = $pdo->prepare('SELECT id FROM admins WHERE username = :u OR email = :e LIMIT 1');
+        $stmt->execute([':u' => $username, ':e' => $email]);
+        $existing = $stmt->fetch();
+        if ($existing) {
+            $error = 'Username or email is already taken';
+        } else {
+            // Save to database
+            $hash = password_hash($password, PASSWORD_DEFAULT);
+            $stmt = $pdo->prepare('INSERT INTO admins (username, password_hash, email, full_name) VALUES (:u, :p, :e, :f)');
+            $stmt->execute([
+                ':u' => $username,
+                ':p' => $hash,
+                ':e' => $email,
+                ':f' => $fullName,
+            ]);
+
+            $_SESSION['registration_success'] = true;
+            $_SESSION['registered_username'] = $username;
+            header('Location: login.php?noOverlay=1');
+            exit;
+        }
     }
 }
 

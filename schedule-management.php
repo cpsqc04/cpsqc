@@ -115,6 +115,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
         .modal { display: none; position: fixed; z-index: 2000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.5); backdrop-filter: blur(4px); }
         .modal.active { display: flex; align-items: center; justify-content: center; }
         .modal-content { background: var(--card-bg); border-radius: 12px; padding: 2rem; max-width: 600px; width: 90%; max-height: 90vh; overflow-y: auto; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2); }
+        #assignVolunteersModal .modal-content { max-width: 1200px; width: 95%; }
         .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; padding-bottom: 1rem; border-bottom: 1px solid var(--border-color); }
         .modal-header h2 { margin: 0; color: var(--tertiary-color); font-size: 1.5rem; }
         .close-modal { background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--text-secondary); transition: color 0.2s ease; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; border-radius: 6px; }
@@ -371,21 +372,21 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                 </div>
                 <div class="form-group">
                     <label>Select Volunteers to Assign</label>
-                    <div class="table-container" style="max-height:260px; overflow-y:auto;">
+                    <div class="table-container" style="max-height:400px; overflow-y:auto;">
                     <table>
                             <thead>
                                 <tr>
                                     <th>Select</th>
-                                    <th>Volunteer ID</th>
                                     <th>Name</th>
                                     <th>Contact</th>
                                     <th>Category</th>
+                                    <th>Skills</th>
                                     <th>Availability</th>
-                                    <th>Current / Upcoming Tasks</th>
+                                    <th>Status</th>
                                 </tr>
                             </thead>
                             <tbody id="volunteerChoicesBody">
-                                <!-- Filled from volunteer list (localStorage) -->
+                                <!-- Filled from database -->
                             </tbody>
                         </table>
                     </div>
@@ -612,7 +613,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             }
         }
 
-        function openAssignVolunteersModal(requestId) {
+        async function openAssignVolunteersModal(requestId) {
             const req = requestData[requestId];
             if (!req) {
                 alert('Request not found');
@@ -622,47 +623,48 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             document.getElementById('currentRequestSummary').textContent =
                 `${req.eventTitle} (${req.eventType}) • ${req.eventDate} ${req.callTime}-${req.endTime} @ ${req.venue}`;
 
-            const volunteers = loadVolunteerDataFromStorage();
-            const activities = loadVolunteerActivities();
             const tbody = document.getElementById('volunteerChoicesBody');
-            tbody.innerHTML = '';
+            tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding: 2rem; color: var(--text-secondary);">Loading volunteers...</td></tr>';
 
-            const ids = Object.keys(volunteers);
-            if (ids.length === 0) {
-                const row = document.createElement('tr');
-                row.innerHTML = `<td colspan="6" style="text-align:center; color: var(--text-secondary);">No volunteers available. Please add volunteers first.</td>`;
-                tbody.appendChild(row);
-            } else {
-                ids.forEach(id => {
-                    const v = volunteers[id];
-                    const myTasks = activities.filter(a => a.volunteerId === id);
-
-                    // Show short summary of current/upcoming tasks
-                    let taskSummary = 'None';
-                    if (myTasks.length > 0) {
-                        // Simple upcoming filter: same or future date
-                        const today = new Date().toISOString().split('T')[0];
-                        const upcoming = myTasks.filter(a => (a.eventDate || '') >= today);
-                        const source = upcoming.length > 0 ? upcoming : myTasks;
-                        taskSummary = source
-                            .slice(0, 2)
-                            .map(a => `${a.eventDate || ''} - ${a.eventTitle || ''}`)
-                            .join('; ');
-                        if (source.length > 2) taskSummary += ' …';
-                    }
-
+            try {
+                // Load volunteers from database
+                const response = await fetch('api/volunteers.php');
+                const result = await response.json();
+                
+                tbody.innerHTML = '';
+                
+                if (!result.success || !result.data || result.data.length === 0) {
                     const row = document.createElement('tr');
-                    row.innerHTML = `
-                        <td><input type="checkbox" name="selectedVolunteers" value="${id}"></td>
-                        <td>${id}</td>
-                        <td>${v.name}</td>
-                        <td>${v.contact}</td>
-                        <td>${v.category || ''}</td>
-                        <td>${v.availability || ''}</td>
-                        <td>${taskSummary}</td>
-                    `;
+                    row.innerHTML = `<td colspan="7" style="text-align:center; padding: 2rem; color: var(--text-secondary);">No volunteers available. Please add volunteers first.</td>`;
                     tbody.appendChild(row);
-                });
+                } else {
+                    const volunteers = result.data;
+                    
+                    volunteers.forEach(v => {
+                        // Determine status badge class
+                        let statusClass = 'status-resolved';
+                        if (v.status === 'Pending') {
+                            statusClass = 'status-pending';
+                        } else if (v.status === 'Inactive') {
+                            statusClass = 'status-pending';
+                        }
+                        
+                        const row = document.createElement('tr');
+                        row.innerHTML = `
+                            <td><input type="checkbox" name="selectedVolunteers" value="${v.id}"></td>
+                            <td>${v.name || ''}</td>
+                            <td>${v.contact || ''}</td>
+                            <td>${v.category || 'Not specified'}</td>
+                            <td>${v.skills || ''}</td>
+                            <td>${v.availability || ''}</td>
+                            <td><span class="status-badge ${statusClass}">${v.status || 'Pending'}</span></td>
+                        `;
+                        tbody.appendChild(row);
+                    });
+                }
+            } catch (e) {
+                console.error('Error loading volunteers:', e);
+                tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding: 2rem; color: #dc3545;">Error loading volunteers. Please try again.</td></tr>';
             }
 
             document.getElementById('assignVolunteersModal').classList.add('active');
@@ -689,7 +691,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             localStorage.setItem('volunteerActivities', JSON.stringify(activities));
         }
 
-        function saveVolunteerAssignments(event) {
+        async function saveVolunteerAssignments(event) {
             event.preventDefault();
             const requestId = document.getElementById('currentRequestId').value;
             const req = requestData[requestId];
@@ -700,11 +702,24 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             const assignmentRoleInput = document.getElementById('assignmentRole').value.trim();
             const finalRole = assignmentRoleInput || req.role;
 
-            const volunteers = loadVolunteerDataFromStorage();
             const checkboxes = document.querySelectorAll('input[name="selectedVolunteers"]:checked');
             if (checkboxes.length === 0) {
                 alert('Please select at least one volunteer to assign.');
                 return;
+            }
+
+            // Load volunteers from database to get full details
+            let volunteers = {};
+            try {
+                const response = await fetch('api/volunteers.php');
+                const result = await response.json();
+                if (result.success && result.data) {
+                    result.data.forEach(v => {
+                        volunteers[v.id] = v;
+                    });
+                }
+            } catch (e) {
+                console.error('Error loading volunteers:', e);
             }
 
             const activities = loadVolunteerActivities();
@@ -713,7 +728,10 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             checkboxes.forEach(cb => {
                 const id = cb.value;
                 const v = volunteers[id];
-                if (!v) return;
+                if (!v) {
+                    console.warn('Volunteer not found:', id);
+                    return;
+                }
 
                 const activity = {
                     volunteerId: id,
@@ -721,8 +739,8 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                     contactNumber: v.contact,
                     role: finalRole,
                     checkInStatus: 'Pending',
-                    emergencyContactName: v.emergencyContactName || '',
-                    emergencyContactNumber: v.emergencyContactNumber || '',
+                    emergencyContactName: v.emergency_contact_name || '',
+                    emergencyContactNumber: v.emergency_contact_number || '',
                     requestId: req.requestId,
                     eventType: req.eventType,
                     eventTitle: req.eventTitle,

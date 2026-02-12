@@ -2,19 +2,80 @@
 // Admin login page
 session_start();
 
-// Temporary authentication (until database is set up)
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $username = $_POST['username'] ?? '';
+require_once __DIR__ . '/db.php';
+
+/**
+ * Ensure the admins table exists and has required columns.
+ * Also creates a default admin account (admin / admin123) if table is empty.
+ */
+function ensureAdminsTable(PDO $pdo): void
+{
+    $pdo->exec("CREATE TABLE IF NOT EXISTS admins (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        username VARCHAR(100) NOT NULL UNIQUE,
+        password_hash VARCHAR(255) NOT NULL,
+        email VARCHAR(255) DEFAULT NULL,
+        full_name VARCHAR(255) DEFAULT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+    // Ensure newer columns exist
+    $columns = [];
+    foreach ($pdo->query('SHOW COLUMNS FROM admins') as $row) {
+        $columns[$row['Field']] = true;
+    }
+    if (!isset($columns['email'])) {
+        $pdo->exec('ALTER TABLE admins ADD COLUMN email VARCHAR(255) DEFAULT NULL');
+    }
+    if (!isset($columns['full_name'])) {
+        $pdo->exec('ALTER TABLE admins ADD COLUMN full_name VARCHAR(255) DEFAULT NULL');
+    }
+    if (!isset($columns['created_at'])) {
+        $pdo->exec('ALTER TABLE admins ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP');
+    }
+
+    // Create default admin account if none exists
+    $stmt = $pdo->query('SELECT COUNT(*) AS cnt FROM admins');
+    $count = (int)$stmt->fetch()['cnt'];
+    if ($count === 0) {
+        $hash = password_hash('admin123', PASSWORD_DEFAULT);
+        $stmt = $pdo->prepare('INSERT INTO admins (username, password_hash, email, full_name) VALUES (:u, :p, :e, :f)');
+        $stmt->execute([
+            ':u' => 'admin',
+            ':p' => $hash,
+            ':e' => null,
+            ':f' => 'Default Administrator'
+        ]);
+    }
+}
+
+try {
+    ensureAdminsTable($pdo);
+} catch (PDOException $e) {
+    $error = 'Login system error: ' . htmlspecialchars($e->getMessage());
+}
+
+// Database-backed authentication
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($error)) {
+    $username = trim($_POST['username'] ?? '');
     $password = $_POST['password'] ?? '';
     
-    if ($username === 'admin' && $password === 'admin123') {
-        $_SESSION['admin_logged_in'] = true;
-        $_SESSION['username'] = $username;
-        // Redirect to dashboard or home page
-        header('Location: index.php');
-        exit;
+    if ($username === '' || $password === '') {
+        $error = 'Please enter both username and password';
     } else {
-        $error = 'Invalid username or password';
+        $stmt = $pdo->prepare('SELECT id, username, password_hash, full_name FROM admins WHERE username = :u LIMIT 1');
+        $stmt->execute([':u' => $username]);
+        $admin = $stmt->fetch();
+        
+        if ($admin && password_verify($password, $admin['password_hash'])) {
+            $_SESSION['admin_logged_in'] = true;
+            $_SESSION['username'] = $admin['full_name'] ?: $admin['username'];
+            // Redirect to dashboard or home page
+            header('Location: index.php');
+            exit;
+        } else {
+            $error = 'Invalid username or password';
+        }
     }
 }
 
@@ -363,6 +424,16 @@ if (isset($_SESSION['admin_logged_in']) && $_SESSION['admin_logged_in'] === true
                 transform: scale(1);
             }
         }
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
         .success-icon-wrapper i {
             animation: checkmark 0.6s ease 0.3s both;
         }
@@ -588,6 +659,20 @@ if (isset($_SESSION['admin_logged_in']) && $_SESSION['admin_logged_in'] === true
         </div>
     </div>
 
+    <!-- Success Message Modal -->
+    <div id="successModal" class="modal" style="display: none; position: fixed; z-index: 3000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.6); backdrop-filter: blur(4px); align-items: center; justify-content: center;">
+        <div class="modal-content" style="background: linear-gradient(145deg, #10b981, #059669); border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 16px; box-shadow: 0 20px 50px -25px rgba(0, 0, 0, 0.5); padding: 2.5rem; max-width: 500px; width: 90%; text-align: center; animation: slideIn 0.3s ease-out;">
+            <div style="margin-bottom: 1.5rem;">
+                <div style="width: 80px; height: 80px; margin: 0 auto; background: rgba(255, 255, 255, 0.2); border-radius: 50%; display: flex; align-items: center; justify-content: center; animation: scaleIn 0.3s ease-out;">
+                    <i class="fas fa-check-circle" style="font-size: 3rem; color: #fff;"></i>
+                </div>
+            </div>
+            <h2 style="margin: 0 0 1rem 0; color: #fff; font-size: 1.75rem; font-weight: 600;">Success!</h2>
+            <p id="successMessage" style="margin: 0 0 2rem 0; color: rgba(255, 255, 255, 0.95); font-size: 1.1rem; line-height: 1.6;"></p>
+            <button onclick="closeSuccessModal()" style="padding: 0.875rem 2rem; background: rgba(255, 255, 255, 0.2); color: #fff; border: 2px solid rgba(255, 255, 255, 0.3); border-radius: 8px; font-size: 1rem; font-weight: 500; cursor: pointer; transition: all 0.2s ease; width: 100%;">OK</button>
+        </div>
+    </div>
+
     <!-- Volunteer Registration Modal -->
     <div id="volunteerModal" class="modal" style="display: none; position: fixed; z-index: 2000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.6); backdrop-filter: blur(4px); align-items: center; justify-content: center;">
         <div class="modal-content" style="background: linear-gradient(145deg, var(--tertiary-color), var(--secondary-color)); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: var(--radius); box-shadow: 0 20px 50px -25px rgba(0, 0, 0, 0.5); padding: clamp(2.5rem, 4vw, 3.5rem); max-width: 700px; width: 90%; max-height: 90vh; overflow-y: auto;">
@@ -690,6 +775,35 @@ if (isset($_SESSION['admin_logged_in']) && $_SESSION['admin_logged_in'] === true
             document.getElementById('tipForm').reset();
         }
 
+        function showSuccessModal(title, message, isError = false) {
+            const modal = document.getElementById('successModal');
+            const titleElement = modal.querySelector('h2');
+            const messageElement = document.getElementById('successMessage');
+            const iconElement = modal.querySelector('i');
+            const modalContent = modal.querySelector('.modal-content');
+            
+            // Update title
+            titleElement.textContent = title;
+            
+            // Update message
+            messageElement.innerHTML = message;
+            
+            // Change styling if error
+            if (isError) {
+                modalContent.style.background = 'linear-gradient(145deg, #ef4444, #dc2626)';
+                iconElement.className = 'fas fa-exclamation-circle';
+            } else {
+                modalContent.style.background = 'linear-gradient(145deg, #10b981, #059669)';
+                iconElement.className = 'fas fa-check-circle';
+            }
+            
+            modal.style.display = 'flex';
+        }
+
+        function closeSuccessModal() {
+            document.getElementById('successModal').style.display = 'none';
+        }
+
         function openVolunteerModal() {
             closeEntryOverlay();
             document.getElementById('volunteerModal').style.display = 'flex';
@@ -714,61 +828,38 @@ if (isset($_SESSION['admin_logged_in']) && $_SESSION['admin_logged_in'] === true
             const description = document.getElementById('tipDescription').value.trim();
             
             if (!location || !description) {
-                alert('Please fill in all required fields.');
+                showSuccessModal('Validation Error', 'Please fill in all required fields.', true);
                 return;
             }
             
-            // Generate Tip ID and timestamp
-            const now = new Date();
-            const year = now.getFullYear();
-            const month = String(now.getMonth() + 1).padStart(2, '0');
-            const day = String(now.getDate()).padStart(2, '0');
-            const hours = String(now.getHours()).padStart(2, '0');
-            const minutes = String(now.getMinutes()).padStart(2, '0');
-            const seconds = String(now.getSeconds()).padStart(2, '0');
-            
-            const timestamp = `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
-            
-            // Get existing tips from localStorage
-            let tips = [];
-            try {
-                const stored = localStorage.getItem('submittedTips');
-                if (stored) {
-                    tips = JSON.parse(stored);
+            // Submit to database
+            fetch('api/tips.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    action: 'create',
+                    location: location,
+                    description: description
+                })
+            })
+            .then(res => res.json())
+            .then(result => {
+                if (!result.success) {
+                    showSuccessModal('Error', result.message || 'Failed to submit tip. Please try again.', true);
+                    return;
                 }
-            } catch (e) {
-                console.error('Failed to load tips', e);
-            }
-            
-            // Generate new tip ID
-            const tipIdNum = tips.length > 0 ? Math.max(...tips.map(t => {
-                const num = parseInt(t.tipId.replace('TIP-', '').split('-')[1]);
-                return isNaN(num) ? 0 : num;
-            })) + 1 : 1;
-            const tipId = `TIP-${year}-${String(tipIdNum).padStart(3, '0')}`;
-            
-            // Create tip object
-            const tip = {
-                tipId: tipId,
-                timestamp: timestamp,
-                location: location,
-                description: description,
-                status: 'Under Review',
-                outcome: 'No Outcome Yet'
-            };
-            
-            // Add to array
-            tips.push(tip);
-            
-            // Save to localStorage
-            try {
-                localStorage.setItem('submittedTips', JSON.stringify(tips));
-                alert('Tip submitted successfully! Your tip has been received and will be reviewed.');
+                
+                const message = 'Your tip ID is: <strong style="font-size: 1.2em; color: #fff;">' + result.data.tip_id + '</strong><br><br>Your tip has been received and will be reviewed.';
+                showSuccessModal('Tip Submitted Successfully!', message, false);
+                document.getElementById('tipForm').reset();
                 closeTipModal();
-            } catch (e) {
-                console.error('Failed to save tip', e);
-                alert('Error submitting tip. Please try again.');
-            }
+            })
+            .catch(err => {
+                console.error('Error submitting tip:', err);
+                showSuccessModal('Error', 'Error submitting tip. Please try again.', true);
+            });
         }
 
         function previewVolunteerImage(input, previewId) {
@@ -901,21 +992,22 @@ if (isset($_SESSION['admin_logged_in']) && $_SESSION['admin_logged_in'] === true
                 return;
             }
             
-            // Load existing volunteers
-            let volunteerData = {};
-            try {
-                const stored = localStorage.getItem('volunteerData');
-                if (stored) {
-                    volunteerData = JSON.parse(stored);
-                }
-            } catch (e) {
-                console.error('Failed to load volunteer data', e);
-            }
-            
-            // Generate volunteer ID
-            const existingIds = Object.keys(volunteerData).map(Number).filter(id => !isNaN(id));
-            const nextId = existingIds.length > 0 ? Math.max(...existingIds) + 1 : 1;
-            const volunteerId = nextId.toString();
+            // Process certifications
+            let certificationsData = [];
+            const certPromises = selectedCertFiles.map(file => {
+                return new Promise(resolve => {
+                    const reader = new FileReader();
+                    reader.onload = e => {
+                        certificationsData.push({
+                            name: file.name,
+                            data: e.target.result,
+                            type: file.type
+                        });
+                        resolve();
+                    };
+                    reader.readAsDataURL(file);
+                });
+            });
             
             // Read photo files as base64
             const reader1 = new FileReader();
@@ -926,38 +1018,53 @@ if (isset($_SESSION['admin_logged_in']) && $_SESSION['admin_logged_in'] === true
                 reader2.onload = function(e2) {
                     const photoIdSrc = e2.target.result;
                     
-                    // Store volunteer data
-                    volunteerData[volunteerId] = {
-                        id: volunteerId,
-                        name: name,
-                        contact: contact,
-                        email: email,
-                        address: address,
-                        category: category,
-                        skills: skills,
-                        availability: availability,
-                        status: 'Pending',
-                        notes: '',
-                        photo: photoSrc,
-                        photoId: photoIdSrc,
-                        certifications: selectedCertFiles.map(f => f.name),
-                        certificationsDescription: certDescription,
-                        emergencyContactName: emergencyName,
-                        emergencyContactNumber: emergencyContact
-                    };
-                    
-                    // Save to localStorage
-                    try {
-                        localStorage.setItem('volunteerData', JSON.stringify(volunteerData));
-                        closeVolunteerModal();
-                        // Show beautiful success modal
-                        setTimeout(() => {
-                            showRegistrationSuccessModal();
-                        }, 300);
-                    } catch (e) {
-                        console.error('Failed to save volunteer data', e);
-                        alert('Error submitting registration. Please try again.');
-                    }
+                    // Wait for all certifications to be processed
+                    Promise.all(certPromises).then(() => {
+                        // Send to API
+                        const formData = {
+                            action: 'create',
+                            name: name,
+                            contact: contact,
+                            email: email,
+                            address: address,
+                            category: category,
+                            skills: skills,
+                            availability: availability,
+                            status: 'Pending',
+                            notes: '',
+                            photo: photoSrc,
+                            photo_id: photoIdSrc,
+                            certifications: certificationsData,
+                            certifications_description: certDescription,
+                            emergency_contact_name: emergencyName,
+                            emergency_contact_number: emergencyContact
+                        };
+                        
+                        fetch('api/volunteers.php', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify(formData)
+                        })
+                        .then(res => res.json())
+                        .then(result => {
+                            if (!result.success) {
+                                alert(result.message || 'Failed to submit registration. Please try again.');
+                                return;
+                            }
+                            
+                            closeVolunteerModal();
+                            // Show beautiful success modal
+                            setTimeout(() => {
+                                showRegistrationSuccessModal();
+                            }, 300);
+                        })
+                        .catch(err => {
+                            console.error('Error submitting volunteer registration:', err);
+                            alert('Error submitting registration. Please try again.');
+                        });
+                    });
                 };
                 reader2.readAsDataURL(photoIdFile);
             };
@@ -999,6 +1106,10 @@ if (isset($_SESSION['admin_logged_in']) && $_SESSION['admin_logged_in'] === true
             }
             if (event.target === successModal) {
                 closeRegistrationSuccessModal();
+            }
+            const tipSuccessModal = document.getElementById('successModal');
+            if (event.target === tipSuccessModal && !tipSuccessModal.querySelector('.modal-content').contains(event.target)) {
+                closeSuccessModal();
             }
         }
     </script>

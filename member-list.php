@@ -1203,43 +1203,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                             </tr>
                         </thead>
                         <tbody id="membersTableBody">
-                            <!-- Sample data - will be replaced with dynamic content -->
-                            <tr data-member-id="1">
-                                <td>
-                                    <img src="images/tara.png" alt="Member Photo" class="member-photo" onclick="viewPhoto(this.src)">
-                                </td>
-                                <td>Juan Dela Cruz</td>
-                                <td>35</td>
-                                <td>123 Main Street, Barangay 1, Quezon City</td>
-                                <td>Male</td>
-                                <td>
-                                    <img src="images/tara.png" alt="ID Photo" class="id-photo" onclick="viewPhoto(this.src)">
-                                </td>
-                                <td>
-                                    <div class="action-buttons">
-                                        <button class="btn-edit" onclick="editMember(1)">Edit</button>
-                                        <button class="btn-delete" onclick="deleteMember(1)">Delete</button>
-                                    </div>
-                                </td>
-                            </tr>
-                            <tr data-member-id="2">
-                                <td>
-                                    <div class="photo-placeholder">No Photo</div>
-                                </td>
-                                <td>Maria Santos</td>
-                                <td>28</td>
-                                <td>456 Oak Avenue, Barangay 2, Quezon City</td>
-                                <td>Female</td>
-                                <td>
-                                    <div class="photo-placeholder">No ID</div>
-                                </td>
-                                <td>
-                                    <div class="action-buttons">
-                                        <button class="btn-edit" onclick="editMember(2)">Edit</button>
-                                        <button class="btn-delete" onclick="deleteMember(2)">Delete</button>
-                                    </div>
-                                </td>
-                            </tr>
+                            <!-- Rows will be populated from the LGU database via JavaScript -->
                         </tbody>
                     </table>
                 </div>
@@ -1385,36 +1349,44 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             }
         }
         
-        // Store member data
+        // Store member data (loaded from database)
         let memberData = {};
-        let nextMemberId = 3; // Starting from 3 since we have 2 sample members
         
-        // Initialize member data from existing table rows
-        function initializeMemberData() {
-            const rows = document.querySelectorAll('#membersTableBody tr[data-member-id]');
-            rows.forEach(row => {
-                const id = row.getAttribute('data-member-id');
-                const cells = row.querySelectorAll('td');
-                const photoImg = cells[0].querySelector('img');
-                const idImg = cells[5].querySelector('img');
-                
-                memberData[id] = {
-                    id: id,
-                    name: cells[1].textContent.trim(),
-                    age: cells[2].textContent.trim(),
-                    address: cells[3].textContent.trim(),
-                    gender: cells[4].textContent.trim(),
-                    photo: photoImg ? photoImg.src : null,
-                    validId: idImg ? idImg.src : null,
-                    hasPhoto: !!photoImg,
-                    hasId: !!idImg
-                };
-            });
+        async function loadMembers() {
+            try {
+                const response = await fetch('api/members.php');
+                const result = await response.json();
+                if (!result.success) {
+                    console.error(result.message || 'Failed to load members');
+                    return;
+                }
+                const members = result.data || [];
+                const tbody = document.getElementById('membersTableBody');
+                tbody.innerHTML = '';
+                memberData = {};
+                members.forEach(m => {
+                    const id = String(m.id);
+                    memberData[id] = {
+                        id,
+                        name: m.name,
+                        age: m.age,
+                        address: m.address,
+                        gender: m.gender,
+                        photo: m.photo_data || null,
+                        validId: m.id_data || null,
+                        hasPhoto: !!m.photo_data,
+                        hasId: !!m.id_data
+                    };
+                    addTableRow(id);
+                });
+            } catch (e) {
+                console.error('Error loading members:', e);
+            }
         }
         
         // Initialize on page load
         document.addEventListener('DOMContentLoaded', function() {
-            initializeMemberData();
+            loadMembers();
         });
         
         function openAddMemberModal() {
@@ -1488,7 +1460,6 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             const idFile = document.getElementById('validIdPhoto').files[0];
             
             const isEdit = memberId !== '';
-            const currentId = isEdit ? memberId : nextMemberId.toString();
             
             // Handle photo uploads asynchronously
             let photoSrc = null;
@@ -1532,52 +1503,58 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             
             function completeSave() {
                 // Update member data
-                if (isEdit && memberData[currentId]) {
-                    // Edit existing member - preserve existing photos if no new ones uploaded
-                    memberData[currentId].name = name;
-                    memberData[currentId].age = age;
-                    memberData[currentId].address = address;
-                    memberData[currentId].gender = gender;
-                    // Only update photo if a new one was uploaded
-                    if (photoSrc) {
-                        memberData[currentId].photo = photoSrc;
-                        memberData[currentId].hasPhoto = true;
-                    }
-                    // Only update ID if a new one was uploaded, otherwise keep existing
-                    if (idSrc) {
-                        memberData[currentId].validId = idSrc;
-                        memberData[currentId].hasId = true;
-                    }
-                    // If no new ID uploaded, keep existing ID (already in memberData)
-                    
-                    // Update table row
-                    updateTableRow(currentId);
-                } else {
-                    // Add new member - require ID photo
-                    if (!idSrc) {
-                        alert('Valid ID photo is required for new members!');
+                // Persist to backend
+                const payload = {
+                    action: isEdit ? 'update' : 'create',
+                    id: isEdit ? Number(memberId) : undefined,
+                    name,
+                    age: Number(age),
+                    address,
+                    gender,
+                    photo: photoSrc,
+                    validId: idSrc
+                };
+                
+                fetch('api/members.php', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(payload)
+                })
+                .then(res => res.json())
+                .then(result => {
+                    if (!result.success) {
+                        alert(result.message || 'Failed to save member.');
                         return;
                     }
-                    
-                    memberData[currentId] = {
-                        id: currentId,
-                        name: name,
-                        age: age,
-                        address: address,
-                        gender: gender,
-                        photo: photoSrc,
-                        validId: idSrc,
-                        hasPhoto: !!photoSrc,
-                        hasId: !!idSrc
+                    const m = result.data;
+                    const id = String(m.id);
+                    memberData[id] = {
+                        id,
+                        name: m.name,
+                        age: m.age,
+                        address: m.address,
+                        gender: m.gender,
+                        photo: m.photo_data || null,
+                        validId: m.id_data || null,
+                        hasPhoto: !!m.photo_data,
+                        hasId: !!m.id_data
                     };
                     
-                    // Add new row to table
-                    addTableRow(currentId);
-                    nextMemberId++;
-                }
-                
-                alert('Member ' + (isEdit ? 'updated' : 'saved') + ' successfully!');
-                closeAddMemberModal();
+                    if (isEdit) {
+                        updateTableRow(id);
+                    } else {
+                        addTableRow(id);
+                    }
+                    
+                    alert('Member ' + (isEdit ? 'updated' : 'saved') + ' successfully!');
+                    closeAddMemberModal();
+                })
+                .catch(err => {
+                    console.error('Error saving member:', err);
+                    alert('Error saving member: ' + (err && err.message ? err.message : err));
+                });
             }
         }
         
@@ -1634,16 +1611,35 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
         
         function deleteMember(id) {
             if (confirm('Are you sure you want to delete this member? This action cannot be undone.')) {
-                // Remove from data
-                delete memberData[id];
-                
-                // Remove row from table
-                const row = document.querySelector(`tr[data-member-id="${id}"]`);
-                if (row) {
-                    row.remove();
-                }
-                
-                alert('Member deleted successfully!');
+                fetch('api/members.php', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ action: 'delete', id: Number(id) })
+                })
+                .then(res => res.json())
+                .then(result => {
+                    if (!result.success) {
+                        alert(result.message || 'Failed to delete member.');
+                        return;
+                    }
+                    
+                    // Remove from data
+                    delete memberData[id];
+                    
+                    // Remove row from table
+                    const row = document.querySelector(`tr[data-member-id="${id}"]`);
+                    if (row) {
+                        row.remove();
+                    }
+                    
+                    alert('Member deleted successfully!');
+                })
+                .catch(err => {
+                    console.error('Error deleting member:', err);
+                    alert('Error deleting member.');
+                });
             }
         }
         

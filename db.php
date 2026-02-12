@@ -1,14 +1,25 @@
 <?php
-// Central database connection for CPS using the LGU database.
-// All modules should include this file (require_once 'db.php') to use the same PDO instance.
+// Central database connection for CPS.
+// For local XAMPP: uses default MySQL (empty password, cps_db database)
+// For production: change to LGU database credentials
 
 $dbHost = 'localhost';
-$dbName = 'LGU';
+$dbName = 'cps_db';  // Change to 'LGU' for production
 $dbUser = 'root';
-$dbPass = 'YsqnXk6q#145';
+$dbPass = '';  // Empty password for XAMPP default. Change to 'YsqnXk6q#145' for production LGU database
 $dbPort = 3306;
 
 try {
+    // First, connect without database to create it if needed
+    $dsn_no_db = "mysql:host={$dbHost};port={$dbPort};charset=utf8mb4";
+    $pdo_temp = new PDO($dsn_no_db, $dbUser, $dbPass, [
+        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+    ]);
+    
+    // Create database if it doesn't exist
+    $pdo_temp->exec("CREATE DATABASE IF NOT EXISTS `{$dbName}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
+    
+    // Now connect to the specific database
     $dsn = "mysql:host={$dbHost};port={$dbPort};dbname={$dbName};charset=utf8mb4";
     $pdo = new PDO($dsn, $dbUser, $dbPass, [
         PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,

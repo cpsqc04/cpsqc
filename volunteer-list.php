@@ -317,51 +317,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                             </tr>
                         </thead>
                         <tbody id="volunteersTableBody">
-                            <tr data-volunteer-id="1">
-                                <td>Maria Rizal</td>
-                                <td>0912-345-6789</td>
-                                <td>First Aid & Medical</td>
-                                <td>First Aid, CPR</td>
-                                <td>Weekends</td>
-                                <td><span class="status-badge status-resolved">Active</span></td>
-                                <td>
-                                    <div class="action-buttons">
-                                        <button class="btn-view" onclick="viewVolunteer('1')">View</button>
-                                        <button class="btn-edit" onclick="editVolunteer('1')">Edit</button>
-                                        <button class="btn-delete" onclick="deleteVolunteer('1')">Delete</button>
-                                    </div>
-                                </td>
-                            </tr>
-                            <tr data-volunteer-id="2">
-                                <td>Juan Aquino</td>
-                                <td>0917-890-1234</td>
-                                <td>Event Management</td>
-                                <td>Event Management</td>
-                                <td>Evenings</td>
-                                <td><span class="status-badge status-resolved">Active</span></td>
-                                <td>
-                                    <div class="action-buttons">
-                                        <button class="btn-view" onclick="viewVolunteer('2')">View</button>
-                                        <button class="btn-edit" onclick="editVolunteer('2')">Edit</button>
-                                        <button class="btn-delete" onclick="deleteVolunteer('2')">Delete</button>
-                                    </div>
-                                </td>
-                            </tr>
-                            <tr data-volunteer-id="3">
-                                <td>Roberto Magsaysay</td>
-                                <td>0918-567-8901</td>
-                                <td>Community Outreach</td>
-                                <td>Community Outreach, Communication</td>
-                                <td>Flexible</td>
-                                <td><span class="status-badge status-pending">Pending</span></td>
-                                <td>
-                                    <div class="action-buttons">
-                                        <button class="btn-view" onclick="viewVolunteer('3')">View</button>
-                                        <button class="btn-edit" onclick="editVolunteer('3')">Edit</button>
-                                        <button class="btn-delete" onclick="deleteVolunteer('3')">Delete</button>
-                                    </div>
-                                </td>
-                            </tr>
+                            <!-- Volunteers will be loaded from database via JavaScript -->
                         </tbody>
                     </table>
                 </div>
@@ -580,9 +536,25 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                     </div>
                 </div>
                 
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="editVolunteerEmergencyName">Emergency Contact Full Name *</label>
+                        <input type="text" id="editVolunteerEmergencyName" name="volunteerEmergencyName" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="editVolunteerEmergencyContact">Emergency Contact Number *</label>
+                        <input type="tel" id="editVolunteerEmergencyContact" name="volunteerEmergencyContact" required>
+                    </div>
+                </div>
+                
                 <div class="form-group">
                     <label for="editVolunteerNotes">Additional Notes</label>
                     <textarea id="editVolunteerNotes" name="volunteerNotes" placeholder="Any additional information about the volunteer..."></textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label for="editVolunteerCertificationsDescription">Certifications Description</label>
+                    <textarea id="editVolunteerCertificationsDescription" name="volunteerCertificationsDescription" placeholder="Description of certifications..."></textarea>
                 </div>
                 
                 <div class="form-group">
@@ -673,77 +645,39 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                 }
             }
         }
-        // Volunteer data storage
+        // Volunteer data storage (loaded from database)
         let volunteerData = {};
-        let nextVolunteerId = 4; // Starting from 4 since we have 3 sample volunteers
         // Track selected certification files so they can be removed before saving
         let selectedCertFiles = [];
 
-        function saveVolunteerDataToStorage() {
+        // Load volunteers from database
+        async function loadVolunteers() {
             try {
-                localStorage.setItem('volunteerData', JSON.stringify(volunteerData));
-            } catch (e) {
-                console.error('Failed to save volunteer data', e);
-            }
-        }
-
-        function loadVolunteerDataFromStorage() {
-            try {
-                const raw = localStorage.getItem('volunteerData');
-                return raw ? JSON.parse(raw) : null;
-            } catch (e) {
-                console.error('Failed to load volunteer data', e);
-                return null;
-            }
-        }
-
-        // Initialize volunteer data from existing table rows or storage
-        function initializeVolunteerData() {
-            const stored = loadVolunteerDataFromStorage();
-            if (stored && Object.keys(stored).length > 0) {
-                volunteerData = stored;
+                const response = await fetch('api/volunteers.php');
+                const result = await response.json();
+                
+                if (!result.success) {
+                    console.error(result.message || 'Failed to load volunteers');
+                    return;
+                }
+                
+                const volunteers = result.data || [];
                 const tbody = document.getElementById('volunteersTableBody');
                 tbody.innerHTML = '';
-                Object.keys(volunteerData).forEach(id => addTableRow(id));
-                nextVolunteerId = Math.max(...Object.keys(volunteerData).map(Number)) + 1;
-                return;
-            }
-
-            const rows = document.querySelectorAll('#volunteersTableBody tr[data-volunteer-id]');
-            rows.forEach((row) => {
-                const id = row.getAttribute('data-volunteer-id');
-                const cells = row.querySelectorAll('td');
                 
-                volunteerData[id] = {
-                    id: id,
-                    name: cells[0].textContent.trim(),
-                    contact: cells[1].textContent.trim(),
-                    category: cells[2].textContent.trim(),
-                    skills: cells[3].textContent.trim(),
-                    availability: cells[4].textContent.trim(),
-                    status: cells[5].querySelector('.status-badge').textContent.trim(),
-                    email: id === '1'
-                        ? 'maria.rizal@example.com'
-                        : id === '2'
-                            ? 'juan.aquino@example.com'
-                            : 'roberto.magsaysay@example.com',
-                    address: id === '1'
-                        ? '123 Bonifacio Street, Barangay San Agustin, Quezon City'
-                        : id === '2'
-                            ? '456 Rizal Avenue, Barangay San Agustin, Quezon City'
-                            : '789 Luna Street, Barangay San Agustin, Quezon City',
-                    notes: id === '1'
-                        ? 'Certified First Aid and CPR instructor. Available for weekend training sessions.'
-                        : id === '2'
-                            ? 'Experienced in organizing community events and outreach programs.'
-                            : 'Experienced in community outreach and communication programs.',
-                    photoId: null,
-                    emergencyContactName: '',
-                    emergencyContactNumber: ''
-                };
-            });
-
-            saveVolunteerDataToStorage();
+                // Store volunteers by id for easy lookup
+                volunteerData = {};
+                volunteers.forEach(v => {
+                    volunteerData[v.id] = v;
+                });
+                
+                // Populate table
+                volunteers.forEach(v => {
+                    addTableRow(v.id);
+                });
+            } catch (e) {
+                console.error('Error loading volunteers:', e);
+            }
         }
         
         function renderCertificationsPreview(input, preview) {
@@ -876,7 +810,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
         
         // Initialize on page load
         document.addEventListener('DOMContentLoaded', function() {
-            initializeVolunteerData();
+            loadVolunteers();
         });
         
         function openAddVolunteerModal() {
@@ -888,6 +822,11 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             document.getElementById('addVolunteerForm').reset();
             document.getElementById('volunteerPhotoIdPreview').style.display = 'none';
             document.getElementById('volunteerPhotoIdPreview').innerHTML = '';
+            document.getElementById('volunteerPhotoPreview').style.display = 'none';
+            document.getElementById('volunteerPhotoPreview').innerHTML = '';
+            document.getElementById('volunteerCertificationsPreview').style.display = 'none';
+            document.getElementById('volunteerCertificationsPreview').innerHTML = '';
+            selectedCertFiles = [];
         }
         
         function saveVolunteer(event) {
@@ -902,31 +841,83 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             const availability = document.getElementById('volunteerAvailability').value;
             const status = document.getElementById('volunteerStatus').value;
             const notes = document.getElementById('volunteerNotes').value.trim();
+            const photoFile = document.getElementById('volunteerPhoto').files[0];
             const photoIdFile = document.getElementById('volunteerPhotoId').files[0];
             const certFiles = selectedCertFiles;
             const certDescription = document.getElementById('volunteerCertificationsDescription').value.trim();
             const emergencyName = document.getElementById('volunteerEmergencyName').value.trim();
             const emergencyContact = document.getElementById('volunteerEmergencyContact').value.trim();
-            const volunteerId = nextVolunteerId.toString();
             
-            // Handle photo ID upload
-            let photoIdSrc = null;
-            if (photoIdFile) {
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    photoIdSrc = e.target.result;
-                    completeSave();
-                };
-                reader.readAsDataURL(photoIdFile);
-            } else {
+            if (!photoFile) {
+                alert('Volunteer photo is required!');
+                return;
+            }
+            
+            if (!photoIdFile) {
                 alert('Photo ID is required!');
                 return;
             }
             
+            // Handle file uploads
+            let photoSrc = null;
+            let photoIdSrc = null;
+            let certificationsData = [];
+            
+            const processFiles = () => {
+                const promises = [];
+                
+                if (photoFile) {
+                    promises.push(new Promise(resolve => {
+                        const reader = new FileReader();
+                        reader.onload = e => {
+                            photoSrc = e.target.result;
+                            resolve();
+                        };
+                        reader.readAsDataURL(photoFile);
+                    }));
+                } else {
+                    promises.push(Promise.resolve());
+                }
+                
+                promises.push(new Promise(resolve => {
+                    const reader = new FileReader();
+                    reader.onload = e => {
+                        photoIdSrc = e.target.result;
+                        resolve();
+                    };
+                    reader.readAsDataURL(photoIdFile);
+                }));
+                
+                // Process certifications
+                if (certFiles.length > 0) {
+                    certFiles.forEach(file => {
+                        promises.push(new Promise(resolve => {
+                            const reader = new FileReader();
+                            reader.onload = e => {
+                                certificationsData.push({
+                                    name: file.name,
+                                    data: e.target.result,
+                                    type: file.type
+                                });
+                                resolve();
+                            };
+                            reader.readAsDataURL(file);
+                        }));
+                    });
+                } else {
+                    promises.push(Promise.resolve());
+                }
+                
+                Promise.all(promises).then(() => {
+                    completeSave();
+                });
+            };
+            
+            processFiles();
+            
             function completeSave() {
-                // Store volunteer data
-                volunteerData[volunteerId] = {
-                    id: volunteerId,
+                const formData = {
+                    action: 'create',
                     name: name,
                     contact: contact,
                     email: email,
@@ -936,24 +927,60 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                     availability: availability,
                     status: status,
                     notes: notes,
-                    photoId: photoIdSrc,
-                    certifications: certFiles.map(f => f.name),
-                    certificationsDescription: certDescription,
-                    emergencyContactName: emergencyName,
-                    emergencyContactNumber: emergencyContact
+                    photo: photoSrc,
+                    photo_id: photoIdSrc,
+                    certifications: certificationsData,
+                    certifications_description: certDescription,
+                    emergency_contact_name: emergencyName,
+                    emergency_contact_number: emergencyContact
                 };
                 
-                // Add new row to table
-                addTableRow(volunteerId);
-                nextVolunteerId++;
-                saveVolunteerDataToStorage();
-                alert('Volunteer added successfully!');
-                closeAddVolunteerModal();
+                fetch('api/volunteers.php', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(formData)
+                })
+                .then(res => {
+                    if (!res.ok) {
+                        return res.text().then(text => {
+                            try {
+                                const json = JSON.parse(text);
+                                throw new Error(json.message || 'Server error');
+                            } catch (e) {
+                                if (e instanceof Error && e.message !== 'Server error') {
+                                    throw e;
+                                }
+                                throw new Error('Server error: ' + res.status + ' ' + res.statusText);
+                            }
+                        });
+                    }
+                    return res.json();
+                })
+                .then(result => {
+                    if (!result.success) {
+                        alert(result.message || 'Failed to save volunteer.');
+                        return;
+                    }
+                    
+                    // Reload volunteers to refresh the table
+                    loadVolunteers();
+                    alert('Volunteer added successfully!');
+                    closeAddVolunteerModal();
+                    selectedCertFiles = [];
+                })
+                .catch(err => {
+                    console.error('Error saving volunteer:', err);
+                    alert('Error saving volunteer: ' + (err.message || 'Please try again.'));
+                });
             }
         }
         
         function addTableRow(id) {
             const volunteer = volunteerData[id];
+            if (!volunteer) return;
+            
             const tbody = document.getElementById('volunteersTableBody');
             
             const row = document.createElement('tr');
@@ -968,12 +995,12 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             }
             
             row.innerHTML = `
-                <td>${volunteer.name}</td>
-                <td>${volunteer.contact}</td>
+                <td>${volunteer.name || ''}</td>
+                <td>${volunteer.contact || ''}</td>
                 <td>${volunteer.category || 'Not specified'}</td>
-                <td>${volunteer.skills}</td>
-                <td>${volunteer.availability}</td>
-                <td><span class="status-badge ${statusClass}">${volunteer.status}</span></td>
+                <td>${volunteer.skills || ''}</td>
+                <td>${volunteer.availability || ''}</td>
+                <td><span class="status-badge ${statusClass}">${volunteer.status || 'Pending'}</span></td>
                 <td>
                     <div class="action-buttons">
                         <button class="btn-view" onclick="viewVolunteer('${id}')">View</button>
@@ -1061,11 +1088,11 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                     <span class="detail-value">${volunteer.availability}</span>
                 </div>
 
-                ${volunteer.emergencyContactName || volunteer.emergencyContactNumber ? `
+                ${volunteer.emergency_contact_name || volunteer.emergency_contact_number ? `
                 <div class="detail-row">
                     <span class="detail-label">Emergency Contact:</span>
                     <span class="detail-value">
-                        ${volunteer.emergencyContactName || ''}${volunteer.emergencyContactName && volunteer.emergencyContactNumber ? ' - ' : ''}${volunteer.emergencyContactNumber || ''}
+                        ${volunteer.emergency_contact_name || ''}${volunteer.emergency_contact_name && volunteer.emergency_contact_number ? ' - ' : ''}${volunteer.emergency_contact_number || ''}
                     </span>
                 </div>
                 ` : ''}
@@ -1077,11 +1104,11 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                 </div>
                 ` : ''}
                 
-                ${volunteer.photoId ? `
+                ${volunteer.photo_id_data ? `
                 <div class="detail-row">
                     <span class="detail-label">Photo ID:</span>
                     <div class="detail-value">
-                        <img src="${volunteer.photoId}" alt="Photo ID" class="id-photo-preview" onclick="viewPhoto(this.src)">
+                        <img src="${volunteer.photo_id_data}" alt="Photo ID" class="id-photo-preview" onclick="viewPhoto(this.src)">
                     </div>
                 </div>
                 ` : `
@@ -1091,14 +1118,20 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                 </div>
                 `}
                 
-                ${volunteer.certifications && volunteer.certifications.length ? `
+                ${volunteer.certifications_data ? `
                 <div class="detail-row">
                     <span class="detail-label">Certifications:</span>
                     <div class="detail-value">
-                        <ul style="padding-left:1.1rem; margin:0;">
-                            ${volunteer.certifications.map(name => `<li>${name}</li>`).join('')}
-                        </ul>
-                        ${volunteer.certificationsDescription ? `<div style="margin-top:0.5rem;">${volunteer.certificationsDescription}</div>` : ''}
+                        ${(() => {
+                            try {
+                                const certs = typeof volunteer.certifications_data === 'string' ? JSON.parse(volunteer.certifications_data) : volunteer.certifications_data;
+                                if (Array.isArray(certs) && certs.length > 0) {
+                                    return `<ul style="padding-left:1.1rem; margin:0;">${certs.map(c => `<li>${c.name || 'Certificate'}</li>`).join('')}</ul>`;
+                                }
+                            } catch(e) {}
+                            return '<span style="color: var(--text-secondary); font-style: italic;">No certifications uploaded</span>';
+                        })()}
+                        ${volunteer.certifications_description ? `<div style="margin-top:0.5rem;">${volunteer.certifications_description}</div>` : ''}
                     </div>
                 </div>
                 ` : ''}
@@ -1159,20 +1192,23 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             
             // Populate form fields
             document.getElementById('editVolunteerId').value = volunteer.id;
-            document.getElementById('editVolunteerName').value = volunteer.name;
-            document.getElementById('editVolunteerContact').value = volunteer.contact;
+            document.getElementById('editVolunteerName').value = volunteer.name || '';
+            document.getElementById('editVolunteerContact').value = volunteer.contact || '';
             document.getElementById('editVolunteerEmail').value = volunteer.email || '';
             document.getElementById('editVolunteerAddress').value = volunteer.address || '';
             document.getElementById('editVolunteerCategory').value = volunteer.category || '';
-            document.getElementById('editVolunteerSkills').value = volunteer.skills;
-            document.getElementById('editVolunteerAvailability').value = volunteer.availability;
-            document.getElementById('editVolunteerStatus').value = volunteer.status;
+            document.getElementById('editVolunteerSkills').value = volunteer.skills || '';
+            document.getElementById('editVolunteerAvailability').value = volunteer.availability || '';
+            document.getElementById('editVolunteerStatus').value = volunteer.status || 'Pending';
             document.getElementById('editVolunteerNotes').value = volunteer.notes || '';
+            document.getElementById('editVolunteerEmergencyName').value = volunteer.emergency_contact_name || '';
+            document.getElementById('editVolunteerEmergencyContact').value = volunteer.emergency_contact_number || '';
+            document.getElementById('editVolunteerCertificationsDescription').value = volunteer.certifications_description || '';
             
             // Show existing photo ID if available
             const photoPreview = document.getElementById('editVolunteerPhotoIdPreview');
-            if (volunteer.photoId) {
-                photoPreview.innerHTML = '<img src="' + volunteer.photoId + '" alt="Photo ID Preview" class="id-photo-preview" onclick="viewPhoto(this.src)">';
+            if (volunteer.photo_id_data) {
+                photoPreview.innerHTML = '<img src="' + volunteer.photo_id_data + '" alt="Photo ID Preview" class="id-photo-preview" onclick="viewPhoto(this.src)">';
                 photoPreview.style.display = 'block';
             } else {
                 photoPreview.style.display = 'none';
@@ -1193,31 +1229,39 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
         function updateVolunteer(event) {
             event.preventDefault();
             
-            const volunteerId = document.getElementById('editVolunteerId').value;
-            const volunteer = volunteerData[volunteerId];
+            const id = parseInt(document.getElementById('editVolunteerId').value);
+            if (!id) {
+                alert('Invalid volunteer ID!');
+                return;
+            }
             
+            const volunteer = volunteerData[id];
             if (!volunteer) {
                 alert('Volunteer not found!');
                 return;
             }
             
-            // Update volunteer data
-            volunteer.name = document.getElementById('editVolunteerName').value.trim();
-            volunteer.contact = document.getElementById('editVolunteerContact').value.trim();
-            volunteer.email = document.getElementById('editVolunteerEmail').value.trim();
-            volunteer.address = document.getElementById('editVolunteerAddress').value.trim();
-            volunteer.category = document.getElementById('editVolunteerCategory').value;
-            volunteer.skills = document.getElementById('editVolunteerSkills').value.trim();
-            volunteer.availability = document.getElementById('editVolunteerAvailability').value;
-            volunteer.status = document.getElementById('editVolunteerStatus').value;
-            volunteer.notes = document.getElementById('editVolunteerNotes').value.trim();
+            const name = document.getElementById('editVolunteerName').value.trim();
+            const contact = document.getElementById('editVolunteerContact').value.trim();
+            const email = document.getElementById('editVolunteerEmail').value.trim();
+            const address = document.getElementById('editVolunteerAddress').value.trim();
+            const category = document.getElementById('editVolunteerCategory').value;
+            const skills = document.getElementById('editVolunteerSkills').value.trim();
+            const availability = document.getElementById('editVolunteerAvailability').value;
+            const status = document.getElementById('editVolunteerStatus').value;
+            const notes = document.getElementById('editVolunteerNotes').value.trim();
+            const emergencyName = document.getElementById('editVolunteerEmergencyName').value.trim();
+            const emergencyContact = document.getElementById('editVolunteerEmergencyContact').value.trim();
+            const certDescription = document.getElementById('editVolunteerCertificationsDescription').value.trim();
             
             // Handle photo ID upload if new file is selected
             const photoFile = document.getElementById('editVolunteerPhotoId').files[0];
+            let photoIdSrc = null;
+            
             if (photoFile) {
                 const reader = new FileReader();
                 reader.onload = function(e) {
-                    volunteer.photoId = e.target.result;
+                    photoIdSrc = e.target.result;
                     completeUpdate();
                 };
                 reader.readAsDataURL(photoFile);
@@ -1227,26 +1271,77 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             }
             
             function completeUpdate() {
-                // Update table row
-                updateVolunteerRow(volunteerId);
-                saveVolunteerDataToStorage();
-                alert('Volunteer updated successfully!');
-                closeEditVolunteerModal();
+                const formData = {
+                    action: 'update',
+                    id: id,
+                    name: name,
+                    contact: contact,
+                    email: email,
+                    address: address,
+                    category: category,
+                    skills: skills,
+                    availability: availability,
+                    status: status,
+                    notes: notes,
+                    photo_id: photoIdSrc,
+                    certifications_description: certDescription,
+                    emergency_contact_name: emergencyName,
+                    emergency_contact_number: emergencyContact
+                };
+                
+                fetch('api/volunteers.php', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(formData)
+                })
+                .then(res => res.json())
+                .then(result => {
+                    if (!result.success) {
+                        alert(result.message || 'Failed to update volunteer.');
+                        return;
+                    }
+                    
+                    // Reload volunteers to refresh the table
+                    loadVolunteers();
+                    alert('Volunteer updated successfully!');
+                    closeEditVolunteerModal();
+                })
+                .catch(err => {
+                    console.error('Error updating volunteer:', err);
+                    alert('Error updating volunteer. Please try again.');
+                });
             }
         }
         
         function deleteVolunteer(id) {
             if (confirm('Are you sure you want to delete this volunteer? This action cannot be undone.')) {
-                // Remove from data
-                delete volunteerData[id];
-                saveVolunteerDataToStorage();
-                // Remove row from table
-                const row = document.querySelector(`tr[data-volunteer-id="${id}"]`);
-                if (row) {
-                    row.remove();
-                }
-                
-                alert('Volunteer deleted successfully!');
+                fetch('api/volunteers.php', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        action: 'delete',
+                        id: parseInt(id)
+                    })
+                })
+                .then(res => res.json())
+                .then(result => {
+                    if (!result.success) {
+                        alert(result.message || 'Failed to delete volunteer.');
+                        return;
+                    }
+                    
+                    // Reload volunteers to refresh the table
+                    loadVolunteers();
+                    alert('Volunteer deleted successfully!');
+                })
+                .catch(err => {
+                    console.error('Error deleting volunteer:', err);
+                    alert('Error deleting volunteer. Please try again.');
+                });
             }
         }
         

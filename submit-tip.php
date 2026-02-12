@@ -321,8 +321,41 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
         }
         function submitTip(event) {
             event.preventDefault();
-            alert('Tip submitted successfully! (This is a demo - backend integration needed)');
-            document.getElementById('tipForm').reset();
+            
+            const location = document.getElementById('tipLocation').value.trim();
+            const description = document.getElementById('tipDetails').value.trim();
+            
+            if (!description) {
+                alert('Please provide tip details.');
+                return;
+            }
+            
+            // Submit to database
+            fetch('api/tips.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    action: 'create',
+                    location: location || 'Not specified',
+                    description: description
+                })
+            })
+            .then(res => res.json())
+            .then(result => {
+                if (!result.success) {
+                    alert(result.message || 'Failed to submit tip. Please try again.');
+                    return;
+                }
+                
+                alert('Tip submitted successfully! Your tip ID is: ' + result.data.tip_id);
+                document.getElementById('tipForm').reset();
+            })
+            .catch(err => {
+                console.error('Error submitting tip:', err);
+                alert('Error submitting tip. Please try again.');
+            });
         }
     </script>
 </body>

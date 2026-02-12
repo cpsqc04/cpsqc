@@ -111,7 +111,7 @@ except ImportError:
 # Main stream for 4K quality: H.264, 3840x2160 (4K UHD)
 # Sub-stream (fallback): 640x360, 10fps - lower quality but more stable
 # REOLINK cameras use Preview_01_sub (not h264Preview_01_sub)
-RTSP_URL = "rtsp://admin:admin123@10.219.58.187:554/Preview_01_sub"
+RTSP_URL = "rtsp://admin:admin123@10.245.53.187:554/Preview_01_sub"
 PREFER_SUB_STREAM = True  # Use sub-stream for stability (H.264, lower resolution, more stable)
 DETECTIONS_FILE = "detections.json"
 FRAME_FILE = "current_frame.jpg"  # Frame saved for web display
@@ -1623,12 +1623,12 @@ def try_http_snapshot_fallback():
     if not REQUESTS_AVAILABLE:
         return None
     
-    camera_ip = "10.219.58.187"
+    camera_ip = "10.245.53.187"
     username = "admin"
     password = "admin123"
     
     # REOLINK HTTP snapshot URLs (prioritize known working format)
-    # Tested: http://10.219.58.187/cgi-bin/api.cgi?cmd=Snap&channel=0&rs=wuuPhkmUCeI9WP7T&user=admin&password=admin123
+    # Tested: http://10.245.53.187/cgi-bin/api.cgi?cmd=Snap&channel=0&rs=wuuPhkmUCeI9WP7T&user=admin&password=admin123
     snapshot_urls = [
         # REOLINK API format (CONFIRMED WORKING - tested)
         f"http://{camera_ip}/cgi-bin/api.cgi?cmd=Snap&channel=0&rs=wuuPhkmUCeI9WP7T&user={username}&password={password}",
@@ -1712,8 +1712,8 @@ def connect_to_stream(url, timeout=STREAM_TIMEOUT):
     # REOLINK cameras support multiple URL formats - try all common ones
     # Note: Some formats may need authentication in URL, others may need separate auth
     url_variants = []
-    base_rtsp = "rtsp://admin:admin123@10.219.58.187:554"
-    base_rtsp_no_auth = "rtsp://10.219.58.187:554"  # Try without auth in URL (auth via DESCRIBE)
+    base_rtsp = "rtsp://admin:admin123@10.245.53.187:554"
+    base_rtsp_no_auth = "rtsp://10.245.53.187:554"  # Try without auth in URL (auth via DESCRIBE)
     
     # REOLINK common formats (try most common first)
     # Try URLs without auth in URL first (some cameras prefer auth via RTSP DESCRIBE)
@@ -1911,10 +1911,10 @@ def connect_to_stream(url, timeout=STREAM_TIMEOUT):
         save_frame_atomic(placeholder, FRAME_FILE)
         save_detections([])
         print(f"\n  Possible solutions:")
-        print(f"  1. Check camera IP: 10.219.58.187")
+        print(f"  1. Check camera IP: 10.245.53.187")
         print(f"  2. Verify credentials: admin / admin123")
-        print(f"  3. Test in VLC: rtsp://admin:admin123@10.219.58.187:554/cam/realmonitor?channel=1&subtype=1")
-        print(f"  4. Check camera web interface: http://10.219.58.187")
+        print(f"  3. Test in VLC: rtsp://admin:admin123@10.245.53.187:554/cam/realmonitor?channel=1&subtype=1")
+        print(f"  4. Check camera web interface: http://10.245.53.187")
         print(f"  5. Verify camera is powered on and connected to network")
         print(f"  6. Check firewall settings")
         return None

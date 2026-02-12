@@ -1113,48 +1113,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                             </tr>
                         </thead>
                         <tbody id="complaintsTableBody">
-                            <tr data-complaint-id="COMP-2025-001">
-                                <td>COMP-2025-001</td>
-                                <td>Juan Rizal</td>
-                                <td>Noise</td>
-                                <td>2025-01-15</td>
-                                <td><span class="priority-badge priority-high">High</span></td>
-                                <td><span class="status-badge status-processing">Processing</span></td>
-                                <td>
-                                    <div class="action-buttons">
-                                        <button class="btn-view" onclick="viewComplaint('COMP-2025-001')">View</button>
-                                        <button class="btn-edit" onclick="editComplaint('COMP-2025-001')">Edit</button>
-                                    </div>
-                                </td>
-                            </tr>
-                            <tr data-complaint-id="COMP-2025-002">
-                                <td>COMP-2025-002</td>
-                                <td>Maria Aquino</td>
-                                <td>Vandalism</td>
-                                <td>2025-01-14</td>
-                                <td><span class="priority-badge priority-urgent">Urgent</span></td>
-                                <td><span class="status-badge status-resolved">Resolved</span></td>
-                                <td>
-                                    <div class="action-buttons">
-                                        <button class="btn-view" onclick="viewComplaint('COMP-2025-002')">View</button>
-                                        <button class="btn-edit" onclick="editComplaint('COMP-2025-002')">Edit</button>
-                                    </div>
-                                </td>
-                            </tr>
-                            <tr data-complaint-id="COMP-2025-003">
-                                <td>COMP-2025-003</td>
-                                <td>Roberto Magsaysay</td>
-                                <td>Safety</td>
-                                <td>2025-01-13</td>
-                                <td><span class="priority-badge priority-medium">Medium</span></td>
-                                <td><span class="status-badge status-pending">Pending</span></td>
-                                <td>
-                                    <div class="action-buttons">
-                                        <button class="btn-view" onclick="viewComplaint('COMP-2025-003')">View</button>
-                                        <button class="btn-edit" onclick="editComplaint('COMP-2025-003')">Edit</button>
-                                    </div>
-                                </td>
-                            </tr>
+                            <!-- Complaints will be loaded from database via JavaScript -->
                         </tbody>
                     </table>
                 </div>
@@ -1196,12 +1155,23 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                 </div>
                 
                 <div class="form-group">
+                    <label for="editAddress">Address *</label>
+                    <input type="text" id="editAddress" name="address" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="editIncidentDate">Date of Incident *</label>
+                    <input type="date" id="editIncidentDate" name="incidentDate" required>
+                </div>
+                
+                <div class="form-group">
                     <label for="editType">Complaint Type *</label>
                     <select id="editType" name="type" required>
                         <option value="">Select Type</option>
-                        <option value="Noise">Noise</option>
+                        <option value="Noise">Noise Complaint</option>
                         <option value="Vandalism">Vandalism</option>
-                        <option value="Safety">Safety</option>
+                        <option value="Trespassing">Trespassing</option>
+                        <option value="Safety">Safety Concern</option>
                         <option value="Other">Other</option>
                     </select>
                 </div>
@@ -1330,73 +1300,105 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             }
         }
         
-        // Complaint data storage
-        const complaintData = {
-            'COMP-2025-001': {
-                id: 'COMP-2025-001',
-                complainant: 'Juan Rizal',
-                contact: '0912-345-6789',
-                type: 'Noise',
-                date: '2025-01-15',
-                time: '10:30 AM',
-                priority: 'High',
-                status: 'Processing',
-                description: 'Excessive noise from neighboring property during late hours. Loud music and shouting heard from 10 PM to 2 AM. This has been ongoing for the past week and is disturbing the peace of the neighborhood.',
-                location: '123 Bonifacio Street, Barangay San Agustin, Quezon City',
-                attachment: null,
-                assignedTo: 'Officer Maria Aquino',
-                lastUpdated: '2025-01-15 2:30 PM',
-                notes: 'Initial investigation conducted. Spoke with property owner. Warning issued. Follow-up scheduled for next week.'
-            },
-            'COMP-2025-002': {
-                id: 'COMP-2025-002',
-                complainant: 'Maria Aquino',
-                contact: '0917-890-1234',
-                type: 'Vandalism',
-                date: '2025-01-14',
-                time: '8:15 AM',
-                priority: 'Urgent',
-                status: 'Resolved',
-                description: 'Graffiti found on the community center wall. Property damage includes spray paint on the main entrance and side walls. Estimated repair cost: PHP 5,000.',
-                location: 'Barangay San Agustin Hall, Quezon City',
-                attachment: null,
-                assignedTo: 'Officer Pedro Aguinaldo',
-                lastUpdated: '2025-01-14 4:00 PM',
-                notes: 'Graffiti removed. Security cameras reviewed. Suspect identified and case filed. Community center restored to original condition.'
-            },
-            'COMP-2025-003': {
-                id: 'COMP-2025-003',
-                complainant: 'Roberto Magsaysay',
-                contact: '0918-567-8901',
-                type: 'Safety',
-                date: '2025-01-13',
-                time: '3:45 PM',
-                priority: 'Medium',
-                status: 'Pending',
-                description: 'Broken streetlight on Rizal Street corner Quezon Avenue. Area is dark at night, posing safety concerns for pedestrians and motorists. Request immediate repair.',
-                location: 'Rizal Street corner Quezon Avenue, Barangay San Agustin, Quezon City',
-                attachment: null,
-                assignedTo: 'Pending Assignment',
-                lastUpdated: '2025-01-13 4:00 PM',
-                notes: 'Report forwarded to Quezon City Engineering Department. Awaiting response for repair schedule.'
-            }
-        };
+        // Complaint data storage (loaded from database)
+        let complaintData = {};
         
-        function viewComplaint(id) {
-            const complaint = complaintData[id];
+        // Load complaints from database
+        async function loadComplaints() {
+            try {
+                const response = await fetch('api/complaints.php');
+                const result = await response.json();
+                
+                if (!result.success) {
+                    console.error(result.message || 'Failed to load complaints');
+                    return;
+                }
+                
+                const complaints = result.data || [];
+                const tbody = document.getElementById('complaintsTableBody');
+                tbody.innerHTML = '';
+                
+                // Store complaints by complaint_id for easy lookup
+                complaintData = {};
+                complaints.forEach(c => {
+                    complaintData[c.complaint_id] = c;
+                });
+                
+                // Populate table
+                complaints.forEach(c => {
+                    const row = document.createElement('tr');
+                    row.setAttribute('data-complaint-id', c.complaint_id);
+                    
+                    // Format date
+                    const date = new Date(c.incident_date);
+                    const formattedDate = date.toLocaleDateString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit' });
+                    
+                    // Format submitted_at for time display
+                    let timeDisplay = '';
+                    if (c.submitted_at) {
+                        const submittedDate = new Date(c.submitted_at);
+                        timeDisplay = submittedDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+                    }
+                    
+                    row.innerHTML = `
+                        <td>${c.complaint_id}</td>
+                        <td>${c.complainant_name}</td>
+                        <td>${c.complaint_type}</td>
+                        <td>${formattedDate}</td>
+                        <td><span class="priority-badge priority-${c.priority.toLowerCase()}">${c.priority}</span></td>
+                        <td><span class="status-badge status-${c.status.toLowerCase()}">${c.status}</span></td>
+                        <td>
+                            <div class="action-buttons">
+                                <button class="btn-view" onclick="viewComplaint('${c.complaint_id}')">View</button>
+                                <button class="btn-edit" onclick="editComplaint('${c.complaint_id}')">Edit</button>
+                            </div>
+                        </td>
+                    `;
+                    tbody.appendChild(row);
+                });
+            } catch (e) {
+                console.error('Error loading complaints:', e);
+            }
+        }
+        
+        // Load complaints on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            loadComplaints();
+        });
+        
+        function viewComplaint(complaintId) {
+            const complaint = complaintData[complaintId];
             if (!complaint) {
-                alert('Complaint details not found for: ' + id);
+                alert('Complaint details not found for: ' + complaintId);
                 return;
             }
             
             const modal = document.getElementById('complaintModal');
             const detailsContainer = document.getElementById('complaintDetails');
             
+            // Format dates
+            const incidentDate = new Date(complaint.incident_date);
+            const formattedIncidentDate = incidentDate.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+            const formattedTime = incidentDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+            
+            let lastUpdated = 'N/A';
+            if (complaint.submitted_at) {
+                const submittedDate = new Date(complaint.submitted_at);
+                lastUpdated = submittedDate.toLocaleString('en-US', { 
+                    year: 'numeric', 
+                    month: '2-digit', 
+                    day: '2-digit', 
+                    hour: '2-digit', 
+                    minute: '2-digit',
+                    hour12: true 
+                });
+            }
+            
             // Build the details HTML
             let detailsHTML = `
                 <div class="detail-row inline">
                     <span class="detail-label">Complaint ID:</span>
-                    <span class="detail-value"><strong>${complaint.id}</strong></span>
+                    <span class="detail-value"><strong>${complaint.complaint_id}</strong></span>
                 </div>
                 
                 <div class="detail-row inline">
@@ -1411,22 +1413,27 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                 
                 <div class="detail-row">
                     <span class="detail-label">Complainant Name:</span>
-                    <span class="detail-value">${complaint.complainant}</span>
+                    <span class="detail-value">${complaint.complainant_name}</span>
                 </div>
                 
                 <div class="detail-row">
                     <span class="detail-label">Contact Number:</span>
-                    <span class="detail-value">${complaint.contact}</span>
+                    <span class="detail-value">${complaint.contact_number}</span>
+                </div>
+                
+                <div class="detail-row">
+                    <span class="detail-label">Address:</span>
+                    <span class="detail-value">${complaint.address}</span>
                 </div>
                 
                 <div class="detail-row">
                     <span class="detail-label">Complaint Type:</span>
-                    <span class="detail-value">${complaint.type}</span>
+                    <span class="detail-value">${complaint.complaint_type}</span>
                 </div>
                 
                 <div class="detail-row">
                     <span class="detail-label">Date & Time:</span>
-                    <span class="detail-value">${complaint.date} at ${complaint.time}</span>
+                    <span class="detail-value">${formattedIncidentDate} at ${formattedTime}</span>
                 </div>
                 
                 <div class="detail-row">
@@ -1441,27 +1448,17 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                 
                 <div class="detail-row">
                     <span class="detail-label">Assigned To:</span>
-                    <span class="detail-value">${complaint.assignedTo}</span>
+                    <span class="detail-value">${complaint.assigned_to || 'Pending Assignment'}</span>
                 </div>
                 
                 <div class="detail-row">
                     <span class="detail-label">Last Updated:</span>
-                    <span class="detail-value">${complaint.lastUpdated}</span>
+                    <span class="detail-value">${lastUpdated}</span>
                 </div>
                 
                 <div class="detail-row">
                     <span class="detail-label">Notes:</span>
-                    <div class="detail-value description">${complaint.notes}</div>
-                </div>
-                
-                <div class="detail-row">
-                    <span class="detail-label">Attachment:</span>
-                    <div class="detail-value">
-                        ${complaint.attachment ? 
-                            `<div class="attachment-preview"><img src="${complaint.attachment}" alt="Complaint Attachment"></div>` : 
-                            '<span class="no-attachment">No attachment provided</span>'
-                        }
-                    </div>
+                    <div class="detail-value description">${complaint.notes || 'No notes available.'}</div>
                 </div>
             `;
             
@@ -1473,24 +1470,26 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             document.getElementById('complaintModal').classList.remove('active');
         }
         
-        function editComplaint(id) {
-            const complaint = complaintData[id];
+        function editComplaint(complaintId) {
+            const complaint = complaintData[complaintId];
             if (!complaint) {
-                alert('Complaint details not found for: ' + id);
+                alert('Complaint details not found for: ' + complaintId);
                 return;
             }
             
             // Populate form fields
             document.getElementById('editComplaintId').value = complaint.id;
-            document.getElementById('editComplainant').value = complaint.complainant;
-            document.getElementById('editContact').value = complaint.contact;
-            document.getElementById('editType').value = complaint.type;
+            document.getElementById('editComplainant').value = complaint.complainant_name;
+            document.getElementById('editContact').value = complaint.contact_number;
+            document.getElementById('editAddress').value = complaint.address || '';
+            document.getElementById('editIncidentDate').value = complaint.incident_date || '';
+            document.getElementById('editType').value = complaint.complaint_type;
             document.getElementById('editPriority').value = complaint.priority;
             document.getElementById('editStatus').value = complaint.status;
             document.getElementById('editLocation').value = complaint.location;
             document.getElementById('editDescription').value = complaint.description;
-            document.getElementById('editAssignedTo').value = complaint.assignedTo;
-            document.getElementById('editNotes').value = complaint.notes;
+            document.getElementById('editAssignedTo').value = complaint.assigned_to || '';
+            document.getElementById('editNotes').value = complaint.notes || '';
             
             // Open modal
             document.getElementById('editComplaintModal').classList.add('active');
@@ -1504,63 +1503,59 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
         function saveComplaintEdit(event) {
             event.preventDefault();
             
-            const complaintId = document.getElementById('editComplaintId').value;
-            const complaint = complaintData[complaintId];
+            const id = parseInt(document.getElementById('editComplaintId').value);
+            if (!id) {
+                alert('Invalid complaint ID!');
+                return;
+            }
             
+            // Find the complaint by database ID to get address and incident_date
+            const complaint = Object.values(complaintData).find(c => c.id === id);
             if (!complaint) {
                 alert('Complaint not found!');
                 return;
             }
             
-            // Update complaint data
-            complaint.complainant = document.getElementById('editComplainant').value;
-            complaint.contact = document.getElementById('editContact').value;
-            complaint.type = document.getElementById('editType').value;
-            complaint.priority = document.getElementById('editPriority').value;
-            complaint.status = document.getElementById('editStatus').value;
-            complaint.location = document.getElementById('editLocation').value;
-            complaint.description = document.getElementById('editDescription').value;
-            complaint.assignedTo = document.getElementById('editAssignedTo').value;
-            complaint.notes = document.getElementById('editNotes').value;
-            complaint.lastUpdated = new Date().toLocaleString('en-US', { 
-                year: 'numeric', 
-                month: '2-digit', 
-                day: '2-digit', 
-                hour: '2-digit', 
-                minute: '2-digit',
-                hour12: true 
+            const formData = {
+                action: 'update',
+                id: id,
+                complainant_name: document.getElementById('editComplainant').value.trim(),
+                contact_number: document.getElementById('editContact').value.trim(),
+                address: document.getElementById('editAddress').value.trim(),
+                incident_date: document.getElementById('editIncidentDate').value,
+                complaint_type: document.getElementById('editType').value,
+                priority: document.getElementById('editPriority').value,
+                status: document.getElementById('editStatus').value,
+                location: document.getElementById('editLocation').value.trim(),
+                description: document.getElementById('editDescription').value.trim(),
+                assigned_to: document.getElementById('editAssignedTo').value.trim(),
+                notes: document.getElementById('editNotes').value.trim()
+            };
+            
+            fetch('api/complaints.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(formData)
+            })
+            .then(res => res.json())
+            .then(result => {
+                if (!result.success) {
+                    alert(result.message || 'Failed to update complaint.');
+                    return;
+                }
+                
+                // Reload complaints to refresh the table
+                loadComplaints();
+                
+                alert('Complaint updated successfully!');
+                closeEditComplaintModal();
+            })
+            .catch(err => {
+                console.error('Error updating complaint:', err);
+                alert('Error updating complaint. Please try again.');
             });
-            
-            // Update table row
-            updateComplaintRow(complaintId);
-            
-            alert('Complaint updated successfully!');
-            closeEditComplaintModal();
-        }
-        
-        function updateComplaintRow(id) {
-            const complaint = complaintData[id];
-            const row = document.querySelector(`tr[data-complaint-id="${id}"]`);
-            
-            if (!row) return;
-            
-            const cells = row.querySelectorAll('td');
-            
-            // Update complainant
-            cells[1].textContent = complaint.complainant;
-            
-            // Update type
-            cells[2].textContent = complaint.type;
-            
-            // Update priority badge
-            const priorityBadge = cells[4].querySelector('.priority-badge');
-            priorityBadge.textContent = complaint.priority;
-            priorityBadge.className = `priority-badge priority-${complaint.priority.toLowerCase()}`;
-            
-            // Update status badge
-            const statusBadge = cells[5].querySelector('.status-badge');
-            statusBadge.textContent = complaint.status;
-            statusBadge.className = `status-badge status-${complaint.status.toLowerCase()}`;
         }
         
         // Close modal when clicking outside
