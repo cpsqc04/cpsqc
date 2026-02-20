@@ -961,7 +961,19 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             </div>
         </div>
         <nav class="sidebar-nav">
-            <div class="nav-module active">
+            <!-- Dashboard Link -->
+            <a href="index.php" class="nav-module-header" data-tooltip="Dashboard" style="text-decoration: none; display: flex; align-items: center; justify-content: space-between; padding: 0.875rem 1.5rem; color: rgba(255, 255, 255, 0.9); cursor: pointer; transition: background-color 0.2s ease; font-weight: 500; user-select: none; gap: 0.75rem; <?php echo basename($_SERVER['PHP_SELF']) == 'index.php' ? 'background: rgba(76, 138, 137, 0.25); border-left: 3px solid #4c8a89;' : ''; ?>">
+                <span class="nav-module-icon"><i class="fas fa-home"></i></span>
+                <span class="nav-module-header-text">Dashboard</span>
+            </a>
+            
+            <!-- User Management Link -->
+            <a href="user-management.php" class="nav-module-header" data-tooltip="User Management" style="text-decoration: none; display: flex; align-items: center; justify-content: space-between; padding: 0.875rem 1.5rem; color: rgba(255, 255, 255, 0.9); cursor: pointer; transition: background-color 0.2s ease; font-weight: 500; user-select: none; gap: 0.75rem; <?php echo basename($_SERVER['PHP_SELF']) == 'user-management.php' ? 'background: rgba(76, 138, 137, 0.25); border-left: 3px solid #4c8a89;' : ''; ?>">
+                <span class="nav-module-icon"><i class="fas fa-users-cog"></i></span>
+                <span class="nav-module-header-text">User Management</span>
+            </a>
+            
+            <div class="nav-module">
                 <div class="nav-module-header" onclick="toggleModule(this)" data-tooltip="Neighborhood Watch Coordination">
                     <span class="nav-module-icon"><i class="fas fa-users"></i></span>
                     <span class="nav-module-header-text">Neighborhood Watch Coordination</span>
@@ -1117,11 +1129,11 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                                 <i class="fas fa-users"></i>
                             </div>
                         </div>
-                        <h3 class="stat-card-value" id="totalMembers">156</h3>
+                        <h3 class="stat-card-value" id="totalMembers">0</h3>
                         <p class="stat-card-label">Total Members</p>
-                        <div class="stat-card-change positive">
+                        <div class="stat-card-change positive" id="membersTrend">
                             <i class="fas fa-arrow-up"></i>
-                            <span>+12 this month</span>
+                            <span>0 this month</span>
                         </div>
                     </div>
                     
@@ -1131,11 +1143,11 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                                 <i class="fas fa-file-alt"></i>
                             </div>
                         </div>
-                        <h3 class="stat-card-value" id="totalComplaints">42</h3>
+                        <h3 class="stat-card-value" id="totalComplaints">0</h3>
                         <p class="stat-card-label">Active Complaints</p>
-                        <div class="stat-card-change positive">
+                        <div class="stat-card-change positive" id="complaintsTrend">
                             <i class="fas fa-arrow-down"></i>
-                            <span>8 resolved this week</span>
+                            <span>0 resolved this week</span>
                         </div>
                     </div>
                     
@@ -1145,11 +1157,11 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                                 <i class="fas fa-handshake"></i>
                             </div>
                         </div>
-                        <h3 class="stat-card-value" id="totalVolunteers">89</h3>
+                        <h3 class="stat-card-value" id="totalVolunteers">0</h3>
                         <p class="stat-card-label">Active Volunteers</p>
-                        <div class="stat-card-change positive">
+                        <div class="stat-card-change positive" id="volunteersTrend">
                             <i class="fas fa-arrow-up"></i>
-                            <span>+5 this month</span>
+                            <span>0 this month</span>
                         </div>
                     </div>
                     
@@ -1159,11 +1171,11 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                                 <i class="fas fa-bullhorn"></i>
                             </div>
                         </div>
-                        <h3 class="stat-card-value" id="totalEvents">18</h3>
+                        <h3 class="stat-card-value" id="totalEvents">0</h3>
                         <p class="stat-card-label">Upcoming Events</p>
-                        <div class="stat-card-change positive">
+                        <div class="stat-card-change positive" id="eventsTrend">
                             <i class="fas fa-calendar"></i>
-                            <span>3 this week</span>
+                            <span>0 this week</span>
                         </div>
                     </div>
                     
@@ -1173,25 +1185,11 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                                 <i class="fas fa-comments"></i>
                             </div>
                         </div>
-                        <h3 class="stat-card-value" id="totalTips">24</h3>
+                        <h3 class="stat-card-value" id="totalTips">0</h3>
                         <p class="stat-card-label">Pending Tips</p>
-                        <div class="stat-card-change positive">
+                        <div class="stat-card-change positive" id="tipsTrend">
                             <i class="fas fa-arrow-up"></i>
-                            <span>+6 this week</span>
-                        </div>
-                    </div>
-                    
-                    <div class="stat-card" onclick="window.location.href='camera-management.php'">
-                        <div class="stat-card-header">
-                            <div class="stat-card-icon cameras">
-                                <i class="fas fa-video"></i>
-                            </div>
-                        </div>
-                        <h3 class="stat-card-value" id="totalCameras">3</h3>
-                        <p class="stat-card-label">Active Cameras</p>
-                        <div class="stat-card-change positive">
-                            <i class="fas fa-check-circle"></i>
-                            <span>All online</span>
+                            <span>0 this week</span>
                         </div>
                     </div>
                 </div>
@@ -1338,8 +1336,63 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                 document.body.classList.add('sidebar-collapsed');
             }
             
+            loadDashboardData();
             updateTipOutcomeAnalytics();
         });
+        
+        // Load dashboard statistics from API
+        async function loadDashboardData() {
+            try {
+                const response = await fetch('api/dashboard.php');
+                const data = await response.json();
+                
+                if (data.success && data.statistics) {
+                    const stats = data.statistics;
+                    const trends = data.trends || {};
+                    
+                    // Update stat cards
+                    document.getElementById('totalMembers').textContent = stats.totalMembers || 0;
+                    document.getElementById('totalComplaints').textContent = stats.activeComplaints || 0;
+                    document.getElementById('totalVolunteers').textContent = stats.activeVolunteers || 0;
+                    document.getElementById('totalEvents').textContent = stats.upcomingEvents || 0;
+                    document.getElementById('totalTips').textContent = stats.pendingTips || 0;
+                    
+                    // Update trends
+                    if (trends.membersTrend) {
+                        const membersTrendEl = document.getElementById('membersTrend');
+                        if (membersTrendEl) {
+                            membersTrendEl.querySelector('span').textContent = trends.membersTrend;
+                        }
+                    }
+                    if (trends.complaintsTrend) {
+                        const complaintsTrendEl = document.getElementById('complaintsTrend');
+                        if (complaintsTrendEl) {
+                            complaintsTrendEl.querySelector('span').textContent = trends.complaintsTrend;
+                        }
+                    }
+                    if (trends.volunteersTrend) {
+                        const volunteersTrendEl = document.getElementById('volunteersTrend');
+                        if (volunteersTrendEl) {
+                            volunteersTrendEl.querySelector('span').textContent = trends.volunteersTrend;
+                        }
+                    }
+                    if (trends.eventsTrend) {
+                        const eventsTrendEl = document.getElementById('eventsTrend');
+                        if (eventsTrendEl) {
+                            eventsTrendEl.querySelector('span').textContent = trends.eventsTrend;
+                        }
+                    }
+                    if (trends.tipsTrend) {
+                        const tipsTrendEl = document.getElementById('tipsTrend');
+                        if (tipsTrendEl) {
+                            tipsTrendEl.querySelector('span').textContent = trends.tipsTrend;
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error('Error loading dashboard data:', error);
+            }
+        }
         
         function toggleSidebar() {
             const sidebar = document.getElementById('sidebar');

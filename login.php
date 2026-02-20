@@ -4,6 +4,12 @@ session_start();
 
 require_once __DIR__ . '/db.php';
 
+// Load PHPMailer via Composer autoloader
+$autoloadPath = __DIR__ . DIRECTORY_SEPARATOR . 'vendor' . DIRECTORY_SEPARATOR . 'autoload.php';
+if (file_exists($autoloadPath)) {
+    require_once $autoloadPath;
+}
+
 /**
  * Ensure the admins table exists and has required columns.
  * Also creates a default admin account (admin / admin123) if table is empty.
@@ -33,13 +39,22 @@ function ensureAdminsTable(PDO $pdo): void
     if (!isset($columns['created_at'])) {
         $pdo->exec('ALTER TABLE admins ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP');
     }
+    if (!isset($columns['failed_attempts'])) {
+        $pdo->exec('ALTER TABLE admins ADD COLUMN failed_attempts INT DEFAULT 0');
+    }
+    if (!isset($columns['last_failed_at'])) {
+        $pdo->exec('ALTER TABLE admins ADD COLUMN last_failed_at DATETIME DEFAULT NULL');
+    }
+    if (!isset($columns['locked_until'])) {
+        $pdo->exec('ALTER TABLE admins ADD COLUMN locked_until DATETIME DEFAULT NULL');
+    }
 
     // Create default admin account if none exists
     $stmt = $pdo->query('SELECT COUNT(*) AS cnt FROM admins');
     $count = (int)$stmt->fetch()['cnt'];
     if ($count === 0) {
         $hash = password_hash('admin123', PASSWORD_DEFAULT);
-        $stmt = $pdo->prepare('INSERT INTO admins (username, password_hash, email, full_name) VALUES (:u, :p, :e, :f)');
+        $stmt = $pdo->prepare('INSERT INTO admins (username, password_hash, email, full_name, status) VALUES (:u, :p, :e, :f, "Active")');
         $stmt->execute([
             ':u' => 'admin',
             ':p' => $hash,
@@ -55,7 +70,231 @@ try {
     $error = 'Login system error: ' . htmlspecialchars($e->getMessage());
 }
 
+// Email sending functions
+function sendAccountLockEmail($email, $username, $lockedUntil) {
+    $mailHost = $_ENV['MAIL_HOST'] ?? 'smtp.gmail.com';
+    $mailPort = (int)($_ENV['MAIL_PORT'] ?? 465);
+    $mailUser = $_ENV['MAIL_USERNAME'] ?? '';
+    $mailPass = $_ENV['MAIL_PASSWORD'] ?? '';
+    $mailFrom = $_ENV['MAIL_FROM_ADDRESS'] ?? $mailUser;
+    $mailFromName = $_ENV['MAIL_FROM_NAME'] ?? 'AlerTara QC';
+    $mailEncryption = $_ENV['MAIL_ENCRYPTION'] ?? 'ssl';
+    
+    if (empty($mailUser) || empty($mailPass) || empty($email)) {
+        error_log('Email credentials or recipient email not set');
+        return false;
+    }
+    
+    $unlockTime = date('F j, Y \a\t g:i A', strtotime($lockedUntil));
+    
+    if (class_exists('PHPMailer\\PHPMailer\\PHPMailer')) {
+        try {
+            $mail = new \PHPMailer\PHPMailer\PHPMailer(true);
+            $mail->isSMTP();
+            $mail->Host = $mailHost;
+            $mail->SMTPAuth = true;
+            $mail->Username = $mailUser;
+            $mail->Password = $mailPass;
+            
+            if ($mailPort === 587 || strtolower($mailEncryption) === 'tls') {
+                $mail->SMTPSecure = \PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_STARTTLS;
+            } else {
+                $mail->SMTPSecure = \PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_SMTPS;
+            }
+            $mail->Port = $mailPort;
+            $mail->CharSet = 'UTF-8';
+            $mail->SMTPOptions = [
+                'ssl' => [
+                    'verify_peer' => false,
+                    'verify_peer_name' => false,
+                    'allow_self_signed' => true,
+                ],
+            ];
+            
+            $mail->setFrom($mailFrom, $mailFromName);
+            $mail->addAddress($email);
+            $mail->isHTML(true);
+            $mail->Subject = 'AlerTara QC - Account Temporarily Locked';
+            $mail->Body = "
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset='UTF-8'>
+                <style>
+                    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; }
+                    .email-container { max-width: 600px; margin: 0 auto; background: #ffffff; }
+                    .header { background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); color: white; padding: 30px 20px; text-align: center; }
+                    .header h1 { margin: 0; font-size: 24px; font-weight: 600; }
+                    .body-content { padding: 30px 20px; background: #ffffff; }
+                    .body-content p { margin: 0 0 15px 0; color: #333; font-size: 14px; }
+                    .warning-box { background: #fef2f2; border-left: 4px solid #ef4444; padding: 15px; margin: 20px 0; border-radius: 4px; }
+                    .footer { background: #f5f5f5; padding: 15px 20px; text-align: center; color: #999; font-size: 11px; }
+                </style>
+            </head>
+            <body>
+                <div class='email-container'>
+                    <div class='header'>
+                        <h1>Account Temporarily Locked</h1>
+                    </div>
+                    <div class='body-content'>
+                        <p>Hello,</p>
+                        <p>Your account <strong>{$username}</strong> has been temporarily locked due to multiple failed login attempts.</p>
+                        <div class='warning-box'>
+                            <p><strong>Security Alert:</strong> We detected suspicious activity on your account. For your security, the account has been locked.</p>
+                        </div>
+                        <p>Your account will be automatically unlocked on <strong>{$unlockTime}</strong> (30 minutes from the last failed attempt).</p>
+                        <p>If you did not attempt to log in, please contact an administrator immediately as your account may have been compromised.</p>
+                    </div>
+                    <div class='footer'>
+                        <p>This is an automated security message. Please do not reply to this email.</p>
+                    </div>
+                </div>
+            </body>
+            </html>
+            ";
+            
+            $mail->send();
+            return true;
+        } catch (Exception $e) {
+            error_log('Account lock email send failed: ' . $mail->ErrorInfo);
+            return false;
+        }
+    }
+    
+    // Fallback to native mail()
+    $subject = 'AlerTara QC - Account Temporarily Locked';
+    $message = "Your account {$username} has been temporarily locked due to multiple failed login attempts. It will be unlocked on {$unlockTime}.";
+    $headers = "MIME-Version: 1.0\r\nContent-Type: text/html; charset=UTF-8\r\nFrom: {$mailFromName} <{$mailFrom}>\r\n";
+    return mail($email, $subject, $message, $headers);
+}
+
+function sendLoginSuccessEmail($email, $username, $loginTime, $ipAddress) {
+    $mailHost = $_ENV['MAIL_HOST'] ?? 'smtp.gmail.com';
+    $mailPort = (int)($_ENV['MAIL_PORT'] ?? 465);
+    $mailUser = $_ENV['MAIL_USERNAME'] ?? '';
+    $mailPass = $_ENV['MAIL_PASSWORD'] ?? '';
+    $mailFrom = $_ENV['MAIL_FROM_ADDRESS'] ?? $mailUser;
+    $mailFromName = $_ENV['MAIL_FROM_NAME'] ?? 'AlerTara QC';
+    $mailEncryption = $_ENV['MAIL_ENCRYPTION'] ?? 'ssl';
+    
+    if (empty($mailUser) || empty($mailPass) || empty($email)) {
+        error_log('Email credentials or recipient email not set');
+        return false;
+    }
+    
+    $resetLink = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http') . '://' . $_SERVER['HTTP_HOST'] . dirname($_SERVER['PHP_SELF']) . '/login.php?reset=1';
+    
+    if (class_exists('PHPMailer\\PHPMailer\\PHPMailer')) {
+        try {
+            $mail = new \PHPMailer\PHPMailer\PHPMailer(true);
+            $mail->isSMTP();
+            $mail->Host = $mailHost;
+            $mail->SMTPAuth = true;
+            $mail->Username = $mailUser;
+            $mail->Password = $mailPass;
+            
+            if ($mailPort === 587 || strtolower($mailEncryption) === 'tls') {
+                $mail->SMTPSecure = \PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_STARTTLS;
+            } else {
+                $mail->SMTPSecure = \PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_SMTPS;
+            }
+            $mail->Port = $mailPort;
+            $mail->CharSet = 'UTF-8';
+            $mail->SMTPOptions = [
+                'ssl' => [
+                    'verify_peer' => false,
+                    'verify_peer_name' => false,
+                    'allow_self_signed' => true,
+                ],
+            ];
+            
+            $mail->setFrom($mailFrom, $mailFromName);
+            $mail->addAddress($email);
+            $mail->isHTML(true);
+            $mail->Subject = 'AlerTara QC - Successful Login Notification';
+            $mail->Body = "
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset='UTF-8'>
+                <style>
+                    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; }
+                    .email-container { max-width: 600px; margin: 0 auto; background: #ffffff; }
+                    .header { background: linear-gradient(135deg, #4c8a89 0%, #2a5a59 100%); color: white; padding: 30px 20px; text-align: center; }
+                    .header h1 { margin: 0; font-size: 24px; font-weight: 600; }
+                    .body-content { padding: 30px 20px; background: #ffffff; }
+                    .body-content p { margin: 0 0 15px 0; color: #333; font-size: 14px; }
+                    .info-box { background: #f0f9ff; border-left: 4px solid #4c8a89; padding: 15px; margin: 20px 0; border-radius: 4px; }
+                    .warning-box { background: #fef2f2; border-left: 4px solid #ef4444; padding: 15px; margin: 20px 0; border-radius: 4px; }
+                    .btn { display: inline-block; padding: 12px 24px; background: #4c8a89; color: white; text-decoration: none; border-radius: 6px; margin-top: 10px; }
+                    .footer { background: #f5f5f5; padding: 15px 20px; text-align: center; color: #999; font-size: 11px; }
+                </style>
+            </head>
+            <body>
+                <div class='email-container'>
+                    <div class='header'>
+                        <h1>Successful Login</h1>
+                    </div>
+                    <div class='body-content'>
+                        <p>Hello,</p>
+                        <p>This is to notify you that a successful login was made to your AlerTara QC account.</p>
+                        <div class='info-box'>
+                            <p><strong>Login Details:</strong></p>
+                            <p>Username: <strong>{$username}</strong></p>
+                            <p>Login Time: <strong>{$loginTime}</strong></p>
+                            <p>IP Address: <strong>{$ipAddress}</strong></p>
+                        </div>
+                        <div class='warning-box'>
+                            <p><strong>Security Notice:</strong></p>
+                            <p>If you did not log in, please secure your account immediately by resetting your password.</p>
+                            <a href='{$resetLink}' class='btn'>Reset Your Password</a>
+                        </div>
+                    </div>
+                    <div class='footer'>
+                        <p>This is an automated security message. Please do not reply to this email.</p>
+                    </div>
+                </div>
+            </body>
+            </html>
+            ";
+            
+            $mail->send();
+            return true;
+        } catch (Exception $e) {
+            error_log('Login success email send failed: ' . $mail->ErrorInfo);
+            return false;
+        }
+    }
+    
+    // Fallback to native mail()
+    $subject = 'AlerTara QC - Successful Login Notification';
+    $message = "A successful login was made to your account {$username} at {$loginTime} from IP {$ipAddress}. If you did not log in, please reset your password: {$resetLink}";
+    $headers = "MIME-Version: 1.0\r\nContent-Type: text/html; charset=UTF-8\r\nFrom: {$mailFromName} <{$mailFrom}>\r\n";
+    return mail($email, $subject, $message, $headers);
+}
+
+// Get client IP address
+function getClientIP() {
+    $ip = $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1';
+    
+    // Handle IPv6 localhost
+    if ($ip === '::1') {
+        return '127.0.0.1';
+    }
+    
+    // Check for forwarded IP (behind proxy)
+    if (!empty($_SERVER['HTTP_X_FORWARDED_FOR'])) {
+        $forwarded = explode(',', $_SERVER['HTTP_X_FORWARDED_FOR']);
+        $ip = trim($forwarded[0]);
+    } elseif (!empty($_SERVER['HTTP_CLIENT_IP'])) {
+        $ip = $_SERVER['HTTP_CLIENT_IP'];
+    }
+    
+    return $ip;
+}
+
 // Database-backed authentication
+$attemptsRemaining = null;
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($error)) {
     $username = trim($_POST['username'] ?? '');
     $password = $_POST['password'] ?? '';
@@ -63,18 +302,144 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($error)) {
     if ($username === '' || $password === '') {
         $error = 'Please enter both username and password';
     } else {
-        $stmt = $pdo->prepare('SELECT id, username, password_hash, full_name FROM admins WHERE username = :u LIMIT 1');
+        $stmt = $pdo->prepare('SELECT id, username, password_hash, full_name, status, email, failed_attempts, last_failed_at, locked_until FROM admins WHERE username = :u LIMIT 1');
         $stmt->execute([':u' => $username]);
         $admin = $stmt->fetch();
         
-        if ($admin && password_verify($password, $admin['password_hash'])) {
-            $_SESSION['admin_logged_in'] = true;
-            $_SESSION['username'] = $admin['full_name'] ?: $admin['username'];
-            // Redirect to dashboard or home page
-            header('Location: index.php');
-            exit;
+        if ($admin) {
+            $now = date('Y-m-d H:i:s');
+            $lockedUntil = $admin['locked_until'] ?? null;
+            
+            // Check if account is locked
+            if ($lockedUntil && strtotime($lockedUntil) > time()) {
+                // Ensure locked_until is 30 minutes from last_failed_at (recalculate if needed)
+                $lastFailed = $admin['last_failed_at'] ?? null;
+                if ($lastFailed) {
+                    $correctLockedUntil = date('Y-m-d H:i:s', strtotime($lastFailed . ' +30 minutes'));
+                    // Update if the stored value is incorrect
+                    if ($lockedUntil !== $correctLockedUntil) {
+                        $stmt = $pdo->prepare('UPDATE admins SET locked_until = :locked_until WHERE id = :id');
+                        $stmt->execute([
+                            ':locked_until' => $correctLockedUntil,
+                            ':id' => $admin['id']
+                        ]);
+                        $lockedUntil = $correctLockedUntil;
+                    }
+                }
+                $error = "Your account has been temporarily locked due to multiple failed login attempts. It will be unlocked after 30 minutes.";
+            } else {
+                // Unlock account if lock period has passed
+                if ($lockedUntil && strtotime($lockedUntil) <= time()) {
+                    $stmt = $pdo->prepare('UPDATE admins SET failed_attempts = 0, locked_until = NULL, last_failed_at = NULL WHERE id = :id');
+                    $stmt->execute([':id' => $admin['id']]);
+                    $admin['failed_attempts'] = 0;
+                    $admin['locked_until'] = null;
+                }
+                
+                // Check if account is active
+                if (isset($admin['status']) && $admin['status'] !== 'Active') {
+                    $error = 'Your account has been disabled. Please contact an administrator.';
+                } else {
+                    $failedAttempts = (int)($admin['failed_attempts'] ?? 0);
+                    
+                    // Check password
+                    $passwordCorrect = password_verify($password, $admin['password_hash']);
+                    
+                    // If account has 5 or more failed attempts, lock it even if password is correct
+                    if ($failedAttempts >= 5) {
+                        // If account is already locked, use existing locked_until (don't extend it)
+                        if ($lockedUntil && strtotime($lockedUntil) > time()) {
+                            // Account is already locked, don't update anything
+                            $error = "Your account has been temporarily locked due to multiple failed login attempts. It will be unlocked after 30 minutes.";
+                        } else {
+                            // Calculate lockout time as 30 minutes from last_failed_at (or now if last_failed_at is null)
+                            $lastFailed = $admin['last_failed_at'] ?? $now;
+                            $lockedUntil = date('Y-m-d H:i:s', strtotime($lastFailed . ' +30 minutes'));
+                            
+                            $stmt = $pdo->prepare('UPDATE admins SET locked_until = :locked_until, last_failed_at = :last_failed WHERE id = :id');
+                            $stmt->execute([
+                                ':locked_until' => $lockedUntil,
+                                ':last_failed' => $now,
+                                ':id' => $admin['id']
+                            ]);
+                            
+                            // Send lockout email
+                            if (!empty($admin['email'])) {
+                                sendAccountLockEmail($admin['email'], $admin['username'], $lockedUntil);
+                            }
+                            
+                            $error = "Your account has been temporarily locked due to multiple failed login attempts. It will be unlocked after 30 minutes.";
+                        }
+                    } elseif ($passwordCorrect) {
+                        // Successful login - reset failed attempts
+                        $stmt = $pdo->prepare('UPDATE admins SET failed_attempts = 0, locked_until = NULL, last_failed_at = NULL WHERE id = :id');
+                        $stmt->execute([':id' => $admin['id']]);
+                        
+                        $_SESSION['admin_logged_in'] = true;
+                        $_SESSION['username'] = $admin['full_name'] ?: $admin['username'];
+                        
+                        // Send successful login email
+                        if (!empty($admin['email'])) {
+                            $loginTime = date('F j, Y \a\t g:i A');
+                            $ipAddress = getClientIP();
+                            sendLoginSuccessEmail($admin['email'], $admin['username'], $loginTime, $ipAddress);
+                        }
+                        
+                        // Redirect to dashboard or home page
+                        header('Location: index.php');
+                        exit;
+                    } else {
+                        // Wrong password - increment failed attempts
+                        $newFailedAttempts = $failedAttempts + 1;
+                        $lockedUntil = null;
+                        
+                        // Lock account after 5 failed attempts
+                        if ($newFailedAttempts >= 5) {
+                            // Calculate lockout time as 30 minutes from the current failed attempt (now)
+                            $lockedUntil = date('Y-m-d H:i:s', strtotime($now . ' +30 minutes'));
+                            
+                            // Send lockout email
+                            if (!empty($admin['email'])) {
+                                sendAccountLockEmail($admin['email'], $admin['username'], $lockedUntil);
+                            }
+                        }
+                        
+                        $stmt = $pdo->prepare('UPDATE admins SET failed_attempts = :attempts, last_failed_at = :last_failed, locked_until = :locked_until WHERE id = :id');
+                        $stmt->execute([
+                            ':attempts' => $newFailedAttempts,
+                            ':last_failed' => $now,
+                            ':locked_until' => $lockedUntil,
+                            ':id' => $admin['id']
+                        ]);
+                        
+                        $attemptsRemaining = max(0, 5 - $newFailedAttempts);
+                        if ($newFailedAttempts >= 5) {
+                            $error = "Your account has been temporarily locked due to multiple failed login attempts. It will be unlocked after 30 minutes.";
+                        } else {
+                            $error = 'Invalid username or password';
+                        }
+                    }
+                }
+            }
         } else {
             $error = 'Invalid username or password';
+        }
+    }
+}
+
+// Get attempts remaining for display (if user exists)
+if (!isset($attemptsRemaining) && isset($_POST['username'])) {
+    $username = trim($_POST['username'] ?? '');
+    if (!empty($username)) {
+        $stmt = $pdo->prepare('SELECT failed_attempts, locked_until FROM admins WHERE username = :u LIMIT 1');
+        $stmt->execute([':u' => $username]);
+        $admin = $stmt->fetch();
+        if ($admin) {
+            $lockedUntil = $admin['locked_until'] ?? null;
+            if (!$lockedUntil || strtotime($lockedUntil) <= time()) {
+                $failedAttempts = (int)($admin['failed_attempts'] ?? 0);
+                $attemptsRemaining = max(0, 5 - $failedAttempts);
+            }
         }
     }
 }
@@ -470,92 +835,9 @@ if (isset($_SESSION['admin_logged_in']) && $_SESSION['admin_logged_in'] === true
             min-width: 140px;
         }
 
-        /* Entry Overlay (Frosted Glass) */
-        .entry-overlay {
-            position: fixed;
-            inset: 0;
-            z-index: 2600;
-            background: rgba(255, 255, 255, 0.65);
-            backdrop-filter: blur(14px);
-            -webkit-backdrop-filter: blur(14px);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 1.5rem;
-        }
-        .entry-overlay.is-hidden {
-            display: none;
-        }
-        .entry-overlay-close {
-            position: absolute;
-            top: 18px;
-            right: 18px;
-            width: 34px;
-            height: 34px;
-            border-radius: 10px;
-            border: 1px solid rgba(0, 0, 0, 0.08);
-            background: rgba(255, 255, 255, 0.7);
-            color: rgba(28, 37, 65, 0.85);
-            cursor: pointer;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            transition: transform 0.15s ease, background 0.2s ease, box-shadow 0.2s ease;
-            z-index: 2;
-        }
-        .entry-overlay-close:hover {
-            background: rgba(255, 255, 255, 0.9);
-            box-shadow: 0 8px 18px -14px rgba(0, 0, 0, 0.25);
-            transform: translateY(-1px);
-        }
-        .entry-overlay-content {
-            position: relative;
-            z-index: 1;
-            display: grid;
-            gap: 1.25rem;
-        }
-        .entry-overlay-actions {
-            display: flex;
-            gap: 2.5rem;
-            justify-content: center;
-            flex-wrap: wrap;
-            margin-top: 0.25rem;
-        }
-        .entry-overlay-actions .btn {
-            flex: 1;
-            min-width: 220px;
-            max-width: 260px;
-            height: 220px;
-            text-align: center;
-            justify-content: center;
-            flex-direction: column;
-            padding: 1.2rem 1.25rem;
-            font-size: 0.95rem;
-        }
-        .entry-overlay-actions .btn i {
-            margin: 0 0 0.65rem 0 !important;
-            font-size: 1in;
-        }
     </style>
 </head>
 <body>
-    <!-- Entry Overlay (shows first) -->
-    <div id="entryOverlay" class="entry-overlay<?php echo isset($_GET['noOverlay']) ? ' is-hidden' : ''; ?>" aria-modal="true" role="dialog">
-        <button type="button" class="entry-overlay-close" onclick="closeEntryOverlay()" aria-label="Close">
-            &times;
-        </button>
-        <div class="entry-overlay-actions">
-            <button class="btn btn-secondary" onclick="openTipModal()" type="button">
-                <i class="fas fa-shield-alt"></i>
-                <span>Magsumite ng reklamo nang palihim. Pindutin ito</span>
-            </button>
-            <button class="btn btn-secondary" onclick="openVolunteerModal()" type="button">
-                <i class="fas fa-hand-holding-heart"></i>
-                <span>Gusto ko mag volunteer</span>
-            </button>
-        </div>
-    </div>
-
     <main class="page">
         <div class="main-content">
             <section class="hero">
@@ -581,6 +863,12 @@ if (isset($_SESSION['admin_logged_in']) && $_SESSION['admin_logged_in'] === true
                         <?php echo htmlspecialchars($error); ?>
                     </div>
                 <?php endif; ?>
+                <?php if (isset($attemptsRemaining) && $attemptsRemaining > 0 && $attemptsRemaining < 5): ?>
+                    <div style="color: #f59e0b; font-size: 0.9rem; padding: 0.75rem; background: rgba(245, 158, 11, 0.1); border-radius: 6px; margin-bottom: 1rem; border: 1px solid rgba(245, 158, 11, 0.2);">
+                        <i class="fas fa-exclamation-triangle" style="margin-right: 0.5rem;"></i>
+                        You have <?php echo $attemptsRemaining; ?> more <?php echo $attemptsRemaining === 1 ? 'attempt' : 'attempts'; ?> before your account is locked.
+                    </div>
+                <?php endif; ?>
                 <form method="POST" action="">
                     <div class="field">
                         <label for="username">Username</label>
@@ -591,11 +879,10 @@ if (isset($_SESSION['admin_logged_in']) && $_SESSION['admin_logged_in'] === true
                         <input id="password" name="password" type="password" placeholder="••••••••" required>
                     </div>
                     <div class="actions">
-                        <a href="#">Forgot password?</a>
+                        <a href="#" onclick="event.preventDefault(); openForgotPasswordModal();" style="cursor: pointer;">Forgot password?</a>
                     </div>
                     <div class="button-group">
-                        <a href="register.php" class="btn btn-secondary" style="text-decoration: none; display: inline-flex; justify-content: center; align-items: center;">Register</a>
-                        <button class="btn" type="submit">Sign in</button>
+                        <button class="btn" type="submit" style="width: 100%;">Sign in</button>
                     </div>
                 </form>
             </section>
@@ -635,27 +922,65 @@ if (isset($_SESSION['admin_logged_in']) && $_SESSION['admin_logged_in'] === true
         </div>
     </div>
 
-    <!-- Tip Submission Modal -->
-    <div id="tipModal" class="modal" style="display: none; position: fixed; z-index: 2000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.6); backdrop-filter: blur(4px); align-items: center; justify-content: center;">
-        <div class="modal-content" style="background: linear-gradient(145deg, var(--tertiary-color), var(--secondary-color)); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: var(--radius); box-shadow: 0 20px 50px -25px rgba(0, 0, 0, 0.5); padding: clamp(2.5rem, 4vw, 3.5rem); max-width: 600px; width: 90%; max-height: 90vh; overflow-y: auto;">
+    <!-- Forgot Password Modal -->
+    <div id="forgotPasswordModal" class="modal" style="display: none; position: fixed; z-index: 2000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.6); backdrop-filter: blur(4px); align-items: center; justify-content: center;">
+        <div class="modal-content" style="background: linear-gradient(145deg, var(--tertiary-color), var(--secondary-color)); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: var(--radius); box-shadow: 0 20px 50px -25px rgba(0, 0, 0, 0.5); padding: clamp(2.5rem, 4vw, 3.5rem); max-width: 500px; width: 90%; max-height: 90vh; overflow-y: auto;">
             <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.75rem; padding-bottom: 1rem; border-bottom: 1px solid rgba(255, 255, 255, 0.16);">
-                <h2 style="margin: 0; color: #f8fafc; font-size: 1.75rem; font-weight: 600;">Submit Anonymous Tip</h2>
-                <span class="close" onclick="closeTipModal()" style="color: rgba(255, 255, 255, 0.8); font-size: 1.75rem; cursor: pointer; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; border-radius: 6px; transition: all 0.2s ease; line-height: 1;">&times;</span>
+                <h2 id="forgotPasswordTitle" style="margin: 0; color: #f8fafc; font-size: 1.75rem; font-weight: 600;">Forgot Password</h2>
+                <span class="close" onclick="closeForgotPasswordModal()" style="color: rgba(255, 255, 255, 0.8); font-size: 1.75rem; cursor: pointer; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; border-radius: 6px; transition: all 0.2s ease; line-height: 1;">&times;</span>
             </div>
-            <form id="tipForm" onsubmit="submitTip(event)" style="display: grid; gap: 1.75rem;">
-                <div class="field">
-                    <label for="tipLocation" style="font-size: 1.1rem; color: rgba(255, 255, 255, 0.8); font-weight: 500;">Location *</label>
-                    <input id="tipLocation" name="location" type="text" placeholder="Enter location where the incident occurred" required style="width: 100%; padding: 1.15rem 1.5rem; border: 1px solid rgba(255, 255, 255, 0.16); border-radius: var(--radius); font: inherit; font-size: 1.1rem; color: #f8fafc; background: rgba(255, 255, 255, 0.08); transition: border-color 0.2s ease, box-shadow 0.2s ease; box-sizing: border-box;">
-                </div>
-                <div class="field">
-                    <label for="tipDescription" style="font-size: 1.1rem; color: rgba(255, 255, 255, 0.8); font-weight: 500;">Tip Description *</label>
-                    <textarea id="tipDescription" name="description" placeholder="Describe the incident or concern in detail" required style="width: 100%; padding: 1.15rem 1.5rem; border: 1px solid rgba(255, 255, 255, 0.16); border-radius: var(--radius); font: inherit; font-size: 1.1rem; color: #f8fafc; background: rgba(255, 255, 255, 0.08); min-height: 120px; resize: vertical; transition: border-color 0.2s ease, box-shadow 0.2s ease; box-sizing: border-box; font-family: inherit;"></textarea>
-                </div>
-                <div class="button-group" style="margin-top: 0.5rem;">
-                    <button type="button" class="btn btn-secondary" onclick="closeTipModal()" style="flex: 1;">Cancel</button>
-                    <button type="submit" class="btn" style="flex: 1;">Submit Tip</button>
-                </div>
-            </form>
+            
+            <!-- Step 1: Request OTP -->
+            <div id="forgotPasswordStep1">
+                <p style="color: rgba(255, 255, 255, 0.85); margin-bottom: 1.5rem; line-height: 1.6;">Enter your username to receive an OTP code via email.</p>
+                <form id="forgotPasswordForm1" onsubmit="requestOTP(event)" style="display: grid; gap: 1.75rem;">
+                    <div class="field">
+                        <label for="forgotUsername" style="font-size: 1.1rem; color: rgba(255, 255, 255, 0.8); font-weight: 500;">Username *</label>
+                        <input id="forgotUsername" name="username" type="text" placeholder="Enter your username" required style="width: 100%; padding: 1.15rem 1.5rem; border: 1px solid rgba(255, 255, 255, 0.16); border-radius: var(--radius); font: inherit; font-size: 1.1rem; color: #f8fafc; background: rgba(255, 255, 255, 0.08); transition: border-color 0.2s ease, box-shadow 0.2s ease; box-sizing: border-box;">
+                    </div>
+                    <div id="forgotPasswordMessage" style="display: none; padding: 0.75rem; border-radius: 6px; margin-bottom: 1rem; font-size: 0.9rem;"></div>
+                    <div class="button-group" style="margin-top: 0.5rem;">
+                        <button type="button" class="btn btn-secondary" onclick="closeForgotPasswordModal()" style="flex: 1;">Cancel</button>
+                        <button type="submit" class="btn" style="flex: 1;">Send OTP</button>
+                    </div>
+                </form>
+            </div>
+            
+            <!-- Step 2: Verify OTP -->
+            <div id="forgotPasswordStep2" style="display: none;">
+                <p style="color: rgba(255, 255, 255, 0.85); margin-bottom: 1.5rem; line-height: 1.6;">Enter the 6-digit OTP code sent to your email address.</p>
+                <form id="forgotPasswordForm2" onsubmit="verifyOTP(event)" style="display: grid; gap: 1.75rem;">
+                    <div class="field">
+                        <label for="forgotOTP" style="font-size: 1.1rem; color: rgba(255, 255, 255, 0.8); font-weight: 500;">OTP Code *</label>
+                        <input id="forgotOTP" name="otp" type="text" placeholder="Enter 6-digit OTP" maxlength="6" required style="width: 100%; padding: 1.15rem 1.5rem; border: 1px solid rgba(255, 255, 255, 0.16); border-radius: var(--radius); font: inherit; font-size: 1.5rem; color: #f8fafc; background: rgba(255, 255, 255, 0.08); transition: border-color 0.2s ease, box-shadow 0.2s ease; box-sizing: border-box; text-align: center; letter-spacing: 0.5rem;">
+                    </div>
+                    <div id="forgotPasswordMessage2" style="display: none; padding: 0.75rem; border-radius: 6px; margin-bottom: 1rem; font-size: 0.9rem;"></div>
+                    <div class="button-group" style="margin-top: 0.5rem;">
+                        <button type="button" class="btn btn-secondary" onclick="backToStep1()" style="flex: 1;">Back</button>
+                        <button type="submit" class="btn" style="flex: 1;">Verify OTP</button>
+                    </div>
+                </form>
+            </div>
+            
+            <!-- Step 3: Reset Password -->
+            <div id="forgotPasswordStep3" style="display: none;">
+                <p style="color: rgba(255, 255, 255, 0.85); margin-bottom: 1.5rem; line-height: 1.6;">Enter your new password.</p>
+                <form id="forgotPasswordForm3" onsubmit="resetPassword(event)" style="display: grid; gap: 1.75rem;">
+                    <div class="field">
+                        <label for="newPassword" style="font-size: 1.1rem; color: rgba(255, 255, 255, 0.8); font-weight: 500;">New Password *</label>
+                        <input id="newPassword" name="new_password" type="password" placeholder="Enter new password" required style="width: 100%; padding: 1.15rem 1.5rem; border: 1px solid rgba(255, 255, 255, 0.16); border-radius: var(--radius); font: inherit; font-size: 1.1rem; color: #f8fafc; background: rgba(255, 255, 255, 0.08); transition: border-color 0.2s ease, box-shadow 0.2s ease; box-sizing: border-box;">
+                    </div>
+                    <div class="field">
+                        <label for="confirmPassword" style="font-size: 1.1rem; color: rgba(255, 255, 255, 0.8); font-weight: 500;">Confirm Password *</label>
+                        <input id="confirmPassword" name="confirm_password" type="password" placeholder="Confirm new password" required style="width: 100%; padding: 1.15rem 1.5rem; border: 1px solid rgba(255, 255, 255, 0.16); border-radius: var(--radius); font: inherit; font-size: 1.1rem; color: #f8fafc; background: rgba(255, 255, 255, 0.08); transition: border-color 0.2s ease, box-shadow 0.2s ease; box-sizing: border-box;">
+                    </div>
+                    <div id="forgotPasswordMessage3" style="display: none; padding: 0.75rem; border-radius: 6px; margin-bottom: 1rem; font-size: 0.9rem;"></div>
+                    <div class="button-group" style="margin-top: 0.5rem;">
+                        <button type="button" class="btn btn-secondary" onclick="backToStep2()" style="flex: 1;">Back</button>
+                        <button type="submit" class="btn" style="flex: 1;">Reset Password</button>
+                    </div>
+                </form>
+            </div>
         </div>
     </div>
 
@@ -673,108 +998,7 @@ if (isset($_SESSION['admin_logged_in']) && $_SESSION['admin_logged_in'] === true
         </div>
     </div>
 
-    <!-- Volunteer Registration Modal -->
-    <div id="volunteerModal" class="modal" style="display: none; position: fixed; z-index: 2000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.6); backdrop-filter: blur(4px); align-items: center; justify-content: center;">
-        <div class="modal-content" style="background: linear-gradient(145deg, var(--tertiary-color), var(--secondary-color)); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: var(--radius); box-shadow: 0 20px 50px -25px rgba(0, 0, 0, 0.5); padding: clamp(2.5rem, 4vw, 3.5rem); max-width: 700px; width: 90%; max-height: 90vh; overflow-y: auto;">
-            <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.75rem; padding-bottom: 1rem; border-bottom: 1px solid rgba(255, 255, 255, 0.16);">
-                <h2 style="margin: 0; color: #f8fafc; font-size: 1.75rem; font-weight: 600;">Volunteer Registration</h2>
-                <span class="close" onclick="closeVolunteerModal()" style="color: rgba(255, 255, 255, 0.8); font-size: 1.75rem; cursor: pointer; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; border-radius: 6px; transition: all 0.2s ease; line-height: 1;">&times;</span>
-            </div>
-            <form id="volunteerForm" onsubmit="submitVolunteer(event)" style="display: grid; gap: 1.75rem;">
-                <div class="field">
-                    <label for="volunteerName" style="font-size: 1.1rem; color: rgba(255, 255, 255, 0.8); font-weight: 500;">Full Name *</label>
-                    <input id="volunteerName" name="name" type="text" required style="width: 100%; padding: 1.15rem 1.5rem; border: 1px solid rgba(255, 255, 255, 0.16); border-radius: var(--radius); font: inherit; font-size: 1.1rem; color: #f8fafc; background: rgba(255, 255, 255, 0.08); transition: border-color 0.2s ease, box-shadow 0.2s ease; box-sizing: border-box;">
-                </div>
-                <div class="field">
-                    <label for="volunteerContact" style="font-size: 1.1rem; color: rgba(255, 255, 255, 0.8); font-weight: 500;">Contact Number *</label>
-                    <input id="volunteerContact" name="contact" type="text" required style="width: 100%; padding: 1.15rem 1.5rem; border: 1px solid rgba(255, 255, 255, 0.16); border-radius: var(--radius); font: inherit; font-size: 1.1rem; color: #f8fafc; background: rgba(255, 255, 255, 0.08); transition: border-color 0.2s ease, box-shadow 0.2s ease; box-sizing: border-box;">
-                </div>
-                <div class="field">
-                    <label for="volunteerEmail" style="font-size: 1.1rem; color: rgba(255, 255, 255, 0.8); font-weight: 500;">Email Address *</label>
-                    <input id="volunteerEmail" name="email" type="email" required style="width: 100%; padding: 1.15rem 1.5rem; border: 1px solid rgba(255, 255, 255, 0.16); border-radius: var(--radius); font: inherit; font-size: 1.1rem; color: #f8fafc; background: rgba(255, 255, 255, 0.08); transition: border-color 0.2s ease, box-shadow 0.2s ease; box-sizing: border-box;">
-                </div>
-                <div class="field">
-                    <label for="volunteerAddress" style="font-size: 1.1rem; color: rgba(255, 255, 255, 0.8); font-weight: 500;">Home Address *</label>
-                    <input id="volunteerAddress" name="address" type="text" required style="width: 100%; padding: 1.15rem 1.5rem; border: 1px solid rgba(255, 255, 255, 0.16); border-radius: var(--radius); font: inherit; font-size: 1.1rem; color: #f8fafc; background: rgba(255, 255, 255, 0.08); transition: border-color 0.2s ease, box-shadow 0.2s ease; box-sizing: border-box;">
-                </div>
-                <div class="field">
-                    <label for="volunteerCategory" style="font-size: 1.1rem; color: rgba(255, 255, 255, 0.8); font-weight: 500;">Volunteer Category *</label>
-                    <select id="volunteerCategory" name="category" required style="width: 100%; padding: 1.15rem 1.5rem; border: 1px solid rgba(255, 255, 255, 0.16); border-radius: var(--radius); font: inherit; font-size: 1.1rem; color: #f8fafc; background: rgba(255, 255, 255, 0.08); transition: border-color 0.2s ease, box-shadow 0.2s ease; box-sizing: border-box; cursor: pointer;">
-                        <option value="" style="background: var(--tertiary-color); color: #f8fafc;">Select category</option>
-                        <option value="Community Outreach" style="background: var(--tertiary-color); color: #f8fafc;">Community Outreach</option>
-                        <option value="Emergency Response" style="background: var(--tertiary-color); color: #f8fafc;">Emergency Response</option>
-                        <option value="Event Management" style="background: var(--tertiary-color); color: #f8fafc;">Event Management</option>
-                        <option value="Training and Education" style="background: var(--tertiary-color); color: #f8fafc;">Training and Education</option>
-                        <option value="Administrative Support" style="background: var(--tertiary-color); color: #f8fafc;">Administrative Support</option>
-                    </select>
-                </div>
-                <div class="field">
-                    <label for="volunteerSkills" style="font-size: 1.1rem; color: rgba(255, 255, 255, 0.8); font-weight: 500;">Skills *</label>
-                    <textarea id="volunteerSkills" name="skills" required style="width: 100%; padding: 1.15rem 1.5rem; border: 1px solid rgba(255, 255, 255, 0.16); border-radius: var(--radius); font: inherit; font-size: 1.1rem; color: #f8fafc; background: rgba(255, 255, 255, 0.08); min-height: 80px; resize: vertical; transition: border-color 0.2s ease, box-shadow 0.2s ease; box-sizing: border-box; font-family: inherit;"></textarea>
-                </div>
-                <div class="field">
-                    <label for="volunteerAvailability" style="font-size: 1.1rem; color: rgba(255, 255, 255, 0.8); font-weight: 500;">Availability *</label>
-                    <select id="volunteerAvailability" name="availability" required style="width: 100%; padding: 1.15rem 1.5rem; border: 1px solid rgba(255, 255, 255, 0.16); border-radius: var(--radius); font: inherit; font-size: 1.1rem; color: #f8fafc; background: rgba(255, 255, 255, 0.08); transition: border-color 0.2s ease, box-shadow 0.2s ease; box-sizing: border-box; cursor: pointer;">
-                        <option value="" style="background: var(--tertiary-color); color: #f8fafc;">Select availability</option>
-                        <option value="Weekdays" style="background: var(--tertiary-color); color: #f8fafc;">Weekdays</option>
-                        <option value="Weekends" style="background: var(--tertiary-color); color: #f8fafc;">Weekends</option>
-                        <option value="Both" style="background: var(--tertiary-color); color: #f8fafc;">Both</option>
-                        <option value="Flexible" style="background: var(--tertiary-color); color: #f8fafc;">Flexible</option>
-                    </select>
-                </div>
-                <div class="field">
-                    <label for="volunteerEmergencyName" style="font-size: 1.1rem; color: rgba(255, 255, 255, 0.8); font-weight: 500;">Emergency Contact Full Name *</label>
-                    <input id="volunteerEmergencyName" name="emergencyName" type="text" required style="width: 100%; padding: 1.15rem 1.5rem; border: 1px solid rgba(255, 255, 255, 0.16); border-radius: var(--radius); font: inherit; font-size: 1.1rem; color: #f8fafc; background: rgba(255, 255, 255, 0.08); transition: border-color 0.2s ease, box-shadow 0.2s ease; box-sizing: border-box;">
-                </div>
-                <div class="field">
-                    <label for="volunteerEmergencyContact" style="font-size: 1.1rem; color: rgba(255, 255, 255, 0.8); font-weight: 500;">Emergency Contact Number *</label>
-                    <input id="volunteerEmergencyContact" name="emergencyContact" type="text" required style="width: 100%; padding: 1.15rem 1.5rem; border: 1px solid rgba(255, 255, 255, 0.16); border-radius: var(--radius); font: inherit; font-size: 1.1rem; color: #f8fafc; background: rgba(255, 255, 255, 0.08); transition: border-color 0.2s ease, box-shadow 0.2s ease; box-sizing: border-box;">
-                </div>
-                <div class="field">
-                    <label for="volunteerPhoto" style="font-size: 1.1rem; color: rgba(255, 255, 255, 0.8); font-weight: 500;">Volunteer Photo *</label>
-                    <input id="volunteerPhoto" name="photo" type="file" accept="image/*" required onchange="previewVolunteerImage(this, 'volunteerPhotoPreview')" style="width: 100%; padding: 1.15rem 1.5rem; border: 1px solid rgba(255, 255, 255, 0.16); border-radius: var(--radius); font: inherit; font-size: 1.1rem; color: #f8fafc; background: rgba(255, 255, 255, 0.08); transition: border-color 0.2s ease, box-shadow 0.2s ease; box-sizing: border-box; cursor: pointer;">
-                    <div id="volunteerPhotoPreview" style="margin-top: 0.5rem; display: none;"></div>
-                </div>
-                <div class="field">
-                    <label for="volunteerPhotoId" style="font-size: 1.1rem; color: rgba(255, 255, 255, 0.8); font-weight: 500;">Volunteer Valid ID *</label>
-                    <input id="volunteerPhotoId" name="photoId" type="file" accept="image/*" required onchange="previewVolunteerImage(this, 'volunteerPhotoIdPreview')" style="width: 100%; padding: 1.15rem 1.5rem; border: 1px solid rgba(255, 255, 255, 0.16); border-radius: var(--radius); font: inherit; font-size: 1.1rem; color: #f8fafc; background: rgba(255, 255, 255, 0.08); transition: border-color 0.2s ease, box-shadow 0.2s ease; box-sizing: border-box; cursor: pointer;">
-                    <div id="volunteerPhotoIdPreview" style="margin-top: 0.5rem; display: none;"></div>
-                </div>
-                <div class="field">
-                    <label for="volunteerCertifications" style="font-size: 1.1rem; color: rgba(255, 255, 255, 0.8); font-weight: 500;">Certifications</label>
-                    <input id="volunteerCertifications" name="certifications" type="file" accept=".jpeg,.jpg,.png,.pdf" multiple onchange="handleCertificationUpload(this)" style="width: 100%; padding: 1.15rem 1.5rem; border: 1px solid rgba(255, 255, 255, 0.16); border-radius: var(--radius); font: inherit; font-size: 1.1rem; color: #f8fafc; background: rgba(255, 255, 255, 0.08); transition: border-color 0.2s ease, box-shadow 0.2s ease; box-sizing: border-box; cursor: pointer;">
-                    <div id="volunteerCertificationsPreview" style="margin-top: 0.5rem; display: none;"></div>
-                </div>
-                <div class="field">
-                    <label for="volunteerCertificationsDescription" style="font-size: 1.1rem; color: rgba(255, 255, 255, 0.8); font-weight: 500;">Certification Details</label>
-                    <textarea id="volunteerCertificationsDescription" name="certDescription" style="width: 100%; padding: 1.15rem 1.5rem; border: 1px solid rgba(255, 255, 255, 0.16); border-radius: var(--radius); font: inherit; font-size: 1.1rem; color: #f8fafc; background: rgba(255, 255, 255, 0.08); min-height: 80px; resize: vertical; transition: border-color 0.2s ease, box-shadow 0.2s ease; box-sizing: border-box; font-family: inherit;"></textarea>
-                </div>
-                <div class="button-group" style="margin-top: 0.5rem;">
-                    <button type="button" class="btn btn-secondary" onclick="closeVolunteerModal()" style="flex: 1;">Cancel</button>
-                    <button type="submit" class="btn" style="flex: 1;">Submit Registration</button>
-                </div>
-            </form>
-        </div>
-    </div>
-
     <script>
-        let selectedCertFiles = [];
-
-        function closeEntryOverlay() {
-            const overlay = document.getElementById('entryOverlay');
-            if (overlay) overlay.classList.add('is-hidden');
-        }
-
-        function openTipModal() {
-            closeEntryOverlay();
-            document.getElementById('tipModal').style.display = 'flex';
-        }
-
-        function closeTipModal() {
-            document.getElementById('tipModal').style.display = 'none';
-            document.getElementById('tipForm').reset();
-        }
-
         function showSuccessModal(title, message, isError = false) {
             const modal = document.getElementById('successModal');
             const titleElement = modal.querySelector('h2');
@@ -782,13 +1006,9 @@ if (isset($_SESSION['admin_logged_in']) && $_SESSION['admin_logged_in'] === true
             const iconElement = modal.querySelector('i');
             const modalContent = modal.querySelector('.modal-content');
             
-            // Update title
             titleElement.textContent = title;
-            
-            // Update message
             messageElement.innerHTML = message;
             
-            // Change styling if error
             if (isError) {
                 modalContent.style.background = 'linear-gradient(145deg, #ef4444, #dc2626)';
                 iconElement.className = 'fas fa-exclamation-circle';
@@ -804,313 +1024,235 @@ if (isset($_SESSION['admin_logged_in']) && $_SESSION['admin_logged_in'] === true
             document.getElementById('successModal').style.display = 'none';
         }
 
-        function openVolunteerModal() {
-            closeEntryOverlay();
-            document.getElementById('volunteerModal').style.display = 'flex';
+        // Forgot Password Functions
+        function openForgotPasswordModal() {
+            document.getElementById('forgotPasswordModal').style.display = 'flex';
+            resetForgotPasswordModal();
         }
 
-        function closeVolunteerModal() {
-            document.getElementById('volunteerModal').style.display = 'none';
-            document.getElementById('volunteerForm').reset();
-            document.getElementById('volunteerPhotoPreview').style.display = 'none';
-            document.getElementById('volunteerPhotoIdPreview').style.display = 'none';
-            document.getElementById('volunteerCertificationsPreview').style.display = 'none';
-            document.getElementById('volunteerPhotoPreview').innerHTML = '';
-            document.getElementById('volunteerPhotoIdPreview').innerHTML = '';
-            document.getElementById('volunteerCertificationsPreview').innerHTML = '';
-            selectedCertFiles = [];
+        function closeForgotPasswordModal() {
+            document.getElementById('forgotPasswordModal').style.display = 'none';
+            resetForgotPasswordModal();
         }
 
-        function submitTip(event) {
+        function resetForgotPasswordModal() {
+            document.getElementById('forgotPasswordStep1').style.display = 'block';
+            document.getElementById('forgotPasswordStep2').style.display = 'none';
+            document.getElementById('forgotPasswordStep3').style.display = 'none';
+            document.getElementById('forgotPasswordForm1').reset();
+            document.getElementById('forgotPasswordForm2').reset();
+            document.getElementById('forgotPasswordForm3').reset();
+            document.getElementById('forgotPasswordMessage').style.display = 'none';
+            document.getElementById('forgotPasswordMessage2').style.display = 'none';
+            document.getElementById('forgotPasswordMessage3').style.display = 'none';
+            document.getElementById('forgotPasswordTitle').textContent = 'Forgot Password';
+        }
+
+        function backToStep1() {
+            document.getElementById('forgotPasswordStep1').style.display = 'block';
+            document.getElementById('forgotPasswordStep2').style.display = 'none';
+            document.getElementById('forgotPasswordTitle').textContent = 'Forgot Password';
+        }
+
+        function backToStep2() {
+            document.getElementById('forgotPasswordStep2').style.display = 'block';
+            document.getElementById('forgotPasswordStep3').style.display = 'none';
+            document.getElementById('forgotPasswordTitle').textContent = 'Verify OTP';
+        }
+
+        async function requestOTP(event) {
             event.preventDefault();
+            const username = document.getElementById('forgotUsername').value.trim();
+            const messageDiv = document.getElementById('forgotPasswordMessage');
             
-            const location = document.getElementById('tipLocation').value.trim();
-            const description = document.getElementById('tipDescription').value.trim();
-            
-            if (!location || !description) {
-                showSuccessModal('Validation Error', 'Please fill in all required fields.', true);
+            if (!username) {
+                messageDiv.textContent = 'Please enter your username.';
+                messageDiv.style.display = 'block';
+                messageDiv.style.color = '#ef4444';
+                messageDiv.style.background = 'rgba(239, 68, 68, 0.1)';
+                messageDiv.style.border = '1px solid rgba(239, 68, 68, 0.2)';
                 return;
             }
             
-            // Submit to database
-            fetch('api/tips.php', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    action: 'create',
-                    location: location,
-                    description: description
-                })
-            })
-            .then(res => res.json())
-            .then(result => {
-                if (!result.success) {
-                    showSuccessModal('Error', result.message || 'Failed to submit tip. Please try again.', true);
-                    return;
-                }
+            try {
+                const response = await fetch('api/forgot-password.php?action=request', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username })
+                });
                 
-                const message = 'Your tip ID is: <strong style="font-size: 1.2em; color: #fff;">' + result.data.tip_id + '</strong><br><br>Your tip has been received and will be reviewed.';
-                showSuccessModal('Tip Submitted Successfully!', message, false);
-                document.getElementById('tipForm').reset();
-                closeTipModal();
-            })
-            .catch(err => {
-                console.error('Error submitting tip:', err);
-                showSuccessModal('Error', 'Error submitting tip. Please try again.', true);
-            });
-        }
-
-        function previewVolunteerImage(input, previewId) {
-            const preview = document.getElementById(previewId);
-            if (!preview) return;
-            
-            preview.innerHTML = '';
-            if (input.files && input.files[0]) {
-                const file = input.files[0];
-                if (file.type.startsWith('image/')) {
-                    const img = document.createElement('img');
-                    img.style.cssText = 'max-width: 100%; max-height: 200px; border-radius: 8px; border: 2px solid rgba(255, 255, 255, 0.2); object-fit: cover; cursor: pointer; transition: transform 0.2s ease;';
-                    img.alt = file.name;
-                    img.onmouseover = function() { this.style.transform = 'scale(1.02)'; };
-                    img.onmouseout = function() { this.style.transform = 'scale(1)'; };
-                    img.onclick = function() { viewPhoto(img.src); };
+                const result = await response.json();
+                
+                if (result.success) {
+                    messageDiv.textContent = result.message;
+                    messageDiv.style.display = 'block';
+                    messageDiv.style.color = '#10b981';
+                    messageDiv.style.background = 'rgba(16, 185, 129, 0.1)';
+                    messageDiv.style.border = '1px solid rgba(16, 185, 129, 0.2)';
                     
-                    const reader = new FileReader();
-                    reader.onload = function (e) {
-                        img.src = e.target.result;
-                    };
-                    reader.readAsDataURL(file);
-                    preview.appendChild(img);
+                    // Move to step 2
+                    setTimeout(() => {
+                        document.getElementById('forgotPasswordStep1').style.display = 'none';
+                        document.getElementById('forgotPasswordStep2').style.display = 'block';
+                        document.getElementById('forgotPasswordTitle').textContent = 'Verify OTP';
+                        document.getElementById('forgotOTP').focus();
+                    }, 1000);
                 } else {
-                    const label = document.createElement('div');
-                    label.textContent = file.name;
-                    label.style.cssText = 'color: #f8fafc; padding: 0.5rem; background: rgba(255, 255, 255, 0.05); border-radius: 6px;';
-                    preview.appendChild(label);
+                    messageDiv.textContent = result.message;
+                    messageDiv.style.display = 'block';
+                    messageDiv.style.color = '#ef4444';
+                    messageDiv.style.background = 'rgba(239, 68, 68, 0.1)';
+                    messageDiv.style.border = '1px solid rgba(239, 68, 68, 0.2)';
                 }
-                preview.style.display = 'block';
-            } else {
-                preview.style.display = 'none';
+            } catch (err) {
+                console.error('Error requesting OTP:', err);
+                messageDiv.textContent = 'An error occurred. Please try again.';
+                messageDiv.style.display = 'block';
+                messageDiv.style.color = '#ef4444';
+                messageDiv.style.background = 'rgba(239, 68, 68, 0.1)';
+                messageDiv.style.border = '1px solid rgba(239, 68, 68, 0.2)';
             }
         }
 
-        function handleCertificationUpload(input) {
-            if (input.files && input.files.length > 0) {
-                const existing = new Set(selectedCertFiles.map(f => `${f.name}|${f.size}`));
-                Array.from(input.files).forEach(file => {
-                    const key = `${file.name}|${file.size}`;
-                    if (!existing.has(key)) {
-                        selectedCertFiles.push(file);
-                        existing.add(key);
-                    }
-                });
-            }
-            
-            renderCertificationsPreview(input, document.getElementById('volunteerCertificationsPreview'));
-        }
-
-        function renderCertificationsPreview(input, preview) {
-            preview.innerHTML = '';
-            
-            if (selectedCertFiles.length > 0) {
-                selectedCertFiles.forEach((file, index) => {
-                    const wrapper = document.createElement('div');
-                    wrapper.style.cssText = 'display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.75rem; padding: 0.75rem; background: rgba(255, 255, 255, 0.08); border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.1); transition: background 0.2s ease;';
-                    wrapper.onmouseover = function() { this.style.background = 'rgba(255, 255, 255, 0.12)'; };
-                    wrapper.onmouseout = function() { this.style.background = 'rgba(255, 255, 255, 0.08)'; };
-                    
-                    if (file.type.startsWith('image/')) {
-                        const img = document.createElement('img');
-                        img.style.cssText = 'width: 60px; height: 60px; object-fit: cover; border-radius: 6px; border: 2px solid rgba(255, 255, 255, 0.2); cursor: pointer; transition: transform 0.2s ease;';
-                        img.alt = file.name;
-                        img.onmouseover = function() { this.style.transform = 'scale(1.1)'; };
-                        img.onmouseout = function() { this.style.transform = 'scale(1)'; };
-                        img.onclick = function() { viewPhoto(img.src); };
-                        
-                        const reader = new FileReader();
-                        reader.onload = function (e) {
-                            img.src = e.target.result;
-                        };
-                        reader.readAsDataURL(file);
-                        wrapper.appendChild(img);
-                    } else {
-                        const fileIcon = document.createElement('div');
-                        fileIcon.style.cssText = 'width: 60px; height: 60px; display: flex; align-items: center; justify-content: center; background: rgba(255, 255, 255, 0.1); border-radius: 6px; border: 2px solid rgba(255, 255, 255, 0.2);';
-                        fileIcon.innerHTML = '<i class="fas fa-file-pdf" style="font-size: 1.5rem; color: rgba(255, 255, 255, 0.8);"></i>';
-                        wrapper.appendChild(fileIcon);
-                    }
-                    
-                    const label = document.createElement('div');
-                    label.textContent = file.name;
-                    label.style.cssText = 'flex: 1; font-size: 0.85rem; color: #f8fafc; padding: 0 0.5rem; word-break: break-word;';
-                    wrapper.appendChild(label);
-                    
-                    const removeBtn = document.createElement('button');
-                    removeBtn.type = 'button';
-                    removeBtn.textContent = 'Remove';
-                    removeBtn.style.cssText = 'padding: 0.4rem 0.75rem; font-size: 0.75rem; border-radius: 6px; border: 1px solid rgba(255, 255, 255, 0.3); cursor: pointer; background: rgba(239, 68, 68, 0.2); color: #f8fafc; transition: all 0.2s ease;';
-                    removeBtn.onmouseover = function() { this.style.background = 'rgba(239, 68, 68, 0.4)'; this.style.borderColor = 'rgba(255, 255, 255, 0.5)'; };
-                    removeBtn.onmouseout = function() { this.style.background = 'rgba(239, 68, 68, 0.2)'; this.style.borderColor = 'rgba(255, 255, 255, 0.3)'; };
-                    removeBtn.onclick = function (e) {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        selectedCertFiles = selectedCertFiles.filter(f => f !== file);
-                        const dt = new DataTransfer();
-                        selectedCertFiles.forEach(f => dt.items.add(f));
-                        input.files = dt.files;
-                        renderCertificationsPreview(input, preview);
-                    };
-                    wrapper.appendChild(removeBtn);
-                    
-                    preview.appendChild(wrapper);
-                });
-                preview.style.display = 'block';
-            } else {
-                preview.style.display = 'none';
-            }
-        }
-
-        function submitVolunteer(event) {
+        async function verifyOTP(event) {
             event.preventDefault();
+            const otp = document.getElementById('forgotOTP').value.trim();
+            const messageDiv = document.getElementById('forgotPasswordMessage2');
             
-            const name = document.getElementById('volunteerName').value.trim();
-            const contact = document.getElementById('volunteerContact').value.trim();
-            const email = document.getElementById('volunteerEmail').value.trim();
-            const address = document.getElementById('volunteerAddress').value.trim();
-            const category = document.getElementById('volunteerCategory').value;
-            const skills = document.getElementById('volunteerSkills').value.trim();
-            const availability = document.getElementById('volunteerAvailability').value;
-            const emergencyName = document.getElementById('volunteerEmergencyName').value.trim();
-            const emergencyContact = document.getElementById('volunteerEmergencyContact').value.trim();
-            const photoFile = document.getElementById('volunteerPhoto').files[0];
-            const photoIdFile = document.getElementById('volunteerPhotoId').files[0];
-            const certDescription = document.getElementById('volunteerCertificationsDescription').value.trim();
-            
-            if (!name || !contact || !email || !address || !category || !skills || !availability || !emergencyName || !emergencyContact || !photoFile || !photoIdFile) {
-                alert('Please fill in all required fields.');
+            if (!otp || otp.length !== 6) {
+                messageDiv.textContent = 'Please enter a valid 6-digit OTP code.';
+                messageDiv.style.display = 'block';
+                messageDiv.style.color = '#ef4444';
+                messageDiv.style.background = 'rgba(239, 68, 68, 0.1)';
+                messageDiv.style.border = '1px solid rgba(239, 68, 68, 0.2)';
                 return;
             }
             
-            // Process certifications
-            let certificationsData = [];
-            const certPromises = selectedCertFiles.map(file => {
-                return new Promise(resolve => {
-                    const reader = new FileReader();
-                    reader.onload = e => {
-                        certificationsData.push({
-                            name: file.name,
-                            data: e.target.result,
-                            type: file.type
-                        });
-                        resolve();
-                    };
-                    reader.readAsDataURL(file);
+            try {
+                const response = await fetch('api/forgot-password.php?action=verify', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ otp })
                 });
-            });
-            
-            // Read photo files as base64
-            const reader1 = new FileReader();
-            reader1.onload = function(e1) {
-                const photoSrc = e1.target.result;
                 
-                const reader2 = new FileReader();
-                reader2.onload = function(e2) {
-                    const photoIdSrc = e2.target.result;
-                    
-                    // Wait for all certifications to be processed
-                    Promise.all(certPromises).then(() => {
-                        // Send to API
-                        const formData = {
-                            action: 'create',
-                            name: name,
-                            contact: contact,
-                            email: email,
-                            address: address,
-                            category: category,
-                            skills: skills,
-                            availability: availability,
-                            status: 'Pending',
-                            notes: '',
-                            photo: photoSrc,
-                            photo_id: photoIdSrc,
-                            certifications: certificationsData,
-                            certifications_description: certDescription,
-                            emergency_contact_name: emergencyName,
-                            emergency_contact_number: emergencyContact
-                        };
-                        
-                        fetch('api/volunteers.php', {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json'
-                            },
-                            body: JSON.stringify(formData)
-                        })
-                        .then(res => res.json())
-                        .then(result => {
-                            if (!result.success) {
-                                alert(result.message || 'Failed to submit registration. Please try again.');
-                                return;
-                            }
-                            
-                            closeVolunteerModal();
-                            // Show beautiful success modal
-                            setTimeout(() => {
-                                showRegistrationSuccessModal();
-                            }, 300);
-                        })
-                        .catch(err => {
-                            console.error('Error submitting volunteer registration:', err);
-                            alert('Error submitting registration. Please try again.');
-                        });
-                    });
-                };
-                reader2.readAsDataURL(photoIdFile);
-            };
-            reader1.readAsDataURL(photoFile);
+                const result = await response.json();
+                
+                if (result.success) {
+                    // Move to step 3
+                    document.getElementById('forgotPasswordStep2').style.display = 'none';
+                    document.getElementById('forgotPasswordStep3').style.display = 'block';
+                    document.getElementById('forgotPasswordTitle').textContent = 'Reset Password';
+                    document.getElementById('newPassword').focus();
+                } else {
+                    messageDiv.textContent = result.message;
+                    messageDiv.style.display = 'block';
+                    messageDiv.style.color = '#ef4444';
+                    messageDiv.style.background = 'rgba(239, 68, 68, 0.1)';
+                    messageDiv.style.border = '1px solid rgba(239, 68, 68, 0.2)';
+                }
+            } catch (err) {
+                console.error('Error verifying OTP:', err);
+                messageDiv.textContent = 'An error occurred. Please try again.';
+                messageDiv.style.display = 'block';
+                messageDiv.style.color = '#ef4444';
+                messageDiv.style.background = 'rgba(239, 68, 68, 0.1)';
+                messageDiv.style.border = '1px solid rgba(239, 68, 68, 0.2)';
+            }
         }
 
-        function showRegistrationSuccessModal() {
-            document.getElementById('registrationSuccessModal').classList.add('active');
-        }
-
-        function closeRegistrationSuccessModal() {
-            document.getElementById('registrationSuccessModal').classList.remove('active');
-        }
-
-        function viewPhoto(src) {
-            const modal = document.createElement('div');
-            modal.style.cssText = 'position: fixed; z-index: 3000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.9); display: flex; align-items: center; justify-content: center;';
-            modal.onclick = function() { document.body.removeChild(modal); };
+        async function resetPassword(event) {
+            event.preventDefault();
+            const newPassword = document.getElementById('newPassword').value;
+            const confirmPassword = document.getElementById('confirmPassword').value;
+            const messageDiv = document.getElementById('forgotPasswordMessage3');
             
-            const img = document.createElement('img');
-            img.src = src;
-            img.style.cssText = 'max-width: 90%; max-height: 90%; border-radius: 8px; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);';
-            img.onclick = function(e) { e.stopPropagation(); };
+            if (!newPassword || !confirmPassword) {
+                messageDiv.textContent = 'Please fill in all fields.';
+                messageDiv.style.display = 'block';
+                messageDiv.style.color = '#ef4444';
+                messageDiv.style.background = 'rgba(239, 68, 68, 0.1)';
+                messageDiv.style.border = '1px solid rgba(239, 68, 68, 0.2)';
+                return;
+            }
             
-            modal.appendChild(img);
-            document.body.appendChild(modal);
+            if (newPassword !== confirmPassword) {
+                messageDiv.textContent = 'Passwords do not match.';
+                messageDiv.style.display = 'block';
+                messageDiv.style.color = '#ef4444';
+                messageDiv.style.background = 'rgba(239, 68, 68, 0.1)';
+                messageDiv.style.border = '1px solid rgba(239, 68, 68, 0.2)';
+                return;
+            }
+            
+            if (newPassword.length < 6) {
+                messageDiv.textContent = 'Password must be at least 6 characters long.';
+                messageDiv.style.display = 'block';
+                messageDiv.style.color = '#ef4444';
+                messageDiv.style.background = 'rgba(239, 68, 68, 0.1)';
+                messageDiv.style.border = '1px solid rgba(239, 68, 68, 0.2)';
+                return;
+            }
+            
+            try {
+                const response = await fetch('api/forgot-password.php?action=reset', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ new_password: newPassword, confirm_password: confirmPassword })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    closeForgotPasswordModal();
+                    showSuccessModal('Password Reset Successful!', result.message, false);
+                    setTimeout(() => {
+                        window.location.href = 'login.php';
+                    }, 2000);
+                } else {
+                    messageDiv.textContent = result.message;
+                    messageDiv.style.display = 'block';
+                    messageDiv.style.color = '#ef4444';
+                    messageDiv.style.background = 'rgba(239, 68, 68, 0.1)';
+                    messageDiv.style.border = '1px solid rgba(239, 68, 68, 0.2)';
+                }
+            } catch (err) {
+                console.error('Error resetting password:', err);
+                messageDiv.textContent = 'An error occurred. Please try again.';
+                messageDiv.style.display = 'block';
+                messageDiv.style.color = '#ef4444';
+                messageDiv.style.background = 'rgba(239, 68, 68, 0.1)';
+                messageDiv.style.border = '1px solid rgba(239, 68, 68, 0.2)';
+            }
         }
+
+        // Auto-format OTP input
+        document.addEventListener('DOMContentLoaded', function() {
+            const otpInput = document.getElementById('forgotOTP');
+            if (otpInput) {
+                otpInput.addEventListener('input', function(e) {
+                    e.target.value = e.target.value.replace(/\D/g, '').slice(0, 6);
+                });
+            }
+        });
 
         // Close modals when clicking outside
         window.onclick = function(event) {
-            const tipModal = document.getElementById('tipModal');
-            const volunteerModal = document.getElementById('volunteerModal');
-            const successModal = document.getElementById('registrationSuccessModal');
-            if (event.target === tipModal) {
-                closeTipModal();
-            }
-            if (event.target === volunteerModal) {
-                closeVolunteerModal();
+            const forgotPasswordModal = document.getElementById('forgotPasswordModal');
+            const successModal = document.getElementById('successModal');
+            
+            if (event.target === forgotPasswordModal) {
+                closeForgotPasswordModal();
             }
             if (event.target === successModal) {
-                closeRegistrationSuccessModal();
-            }
-            const tipSuccessModal = document.getElementById('successModal');
-            if (event.target === tipSuccessModal && !tipSuccessModal.querySelector('.modal-content').contains(event.target)) {
                 closeSuccessModal();
             }
+        });
+        
+        // Check if reset=1 is in URL and open forgot password modal
+        if (window.location.search.includes('reset=1')) {
+            openForgotPasswordModal();
+            // Remove reset=1 from URL without reload
+            window.history.replaceState({}, document.title, window.location.pathname);
         }
     </script>
 </body>
