@@ -85,7 +85,10 @@ function sendAccountLockEmail($email, $username, $lockedUntil) {
         return false;
     }
     
-    $unlockTime = date('F j, Y \a\t g:i A', strtotime($lockedUntil));
+    // Format unlock time in Philippines timezone
+    $dateTime = new DateTime($lockedUntil, new DateTimeZone('UTC'));
+    $dateTime->setTimezone(new DateTimeZone('Asia/Manila'));
+    $unlockTime = $dateTime->format('F j, Y \a\t g:i A');
     
     if (class_exists('PHPMailer\\PHPMailer\\PHPMailer')) {
         try {
@@ -274,6 +277,86 @@ function sendLoginSuccessEmail($email, $username, $loginTime, $ipAddress) {
 }
 
 // Get client IP address
+function logLoginHistory(PDO $pdo, $userId, $username, $status, $ipAddress = null) {
+    try {
+        // Ensure login_history table exists
+        $pdo->exec("CREATE TABLE IF NOT EXISTS login_history (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            user_id INT NOT NULL,
+            username VARCHAR(100) NOT NULL,
+            login_time DATETIME NOT NULL,
+            ip_address VARCHAR(45) DEFAULT NULL,
+            status VARCHAR(20) NOT NULL DEFAULT 'Success',
+            logout_time DATETIME DEFAULT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_user_id (user_id),
+            INDEX idx_username (username),
+            INDEX idx_login_time (login_time),
+            INDEX idx_status (status)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+        
+        // Insert login history
+        $stmt = $pdo->prepare('INSERT INTO login_history (user_id, username, login_time, ip_address, status) VALUES (:user_id, :username, NOW(), :ip_address, :status)');
+        $stmt->execute([
+            ':user_id' => $userId,
+            ':username' => $username,
+            ':ip_address' => $ipAddress,
+            ':status' => $status
+        ]);
+        
+        // Get the inserted login history ID
+        $loginHistoryId = $pdo->lastInsertId();
+        
+        // Create notification for successful logins only
+        if ($status === 'Success') {
+            // Ensure notifications table exists
+            $pdo->exec("CREATE TABLE IF NOT EXISTS notifications (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                user_id INT DEFAULT NULL,
+                type VARCHAR(50) NOT NULL,
+                title VARCHAR(255) NOT NULL,
+                message TEXT NOT NULL,
+                link VARCHAR(255) DEFAULT NULL,
+                is_read TINYINT(1) DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                INDEX idx_user_id (user_id),
+                INDEX idx_is_read (is_read),
+                INDEX idx_created_at (created_at)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+            
+            // Format login time
+            $loginTime = date('M j, Y g:i:s A');
+            $message = "User {$username} logged in from IP {$ipAddress} at {$loginTime}";
+            
+            // Create notification for the user who logged in (user_id = userId)
+            $notifStmt = $pdo->prepare('INSERT INTO notifications (user_id, type, title, message, link, created_at) VALUES (:user_id, :type, :title, :message, :link, NOW())');
+            $notifStmt->execute([
+                ':user_id' => $userId,
+                ':type' => 'login',
+                ':title' => 'Login Successful',
+                ':message' => $message,
+                ':link' => 'login-history.php'
+            ]);
+            
+            // Also create a notification for admins (user_id = NULL means visible to all admins)
+            // This will be filtered in the API based on role
+            $adminNotifStmt = $pdo->prepare('INSERT INTO notifications (user_id, type, title, message, link, created_at) VALUES (NULL, :type, :title, :message, :link, NOW())');
+            $adminNotifStmt->execute([
+                ':type' => 'login',
+                ':title' => 'User Login',
+                ':message' => $message,
+                ':link' => 'login-history.php'
+            ]);
+        }
+        
+        return $loginHistoryId;
+    } catch (PDOException $e) {
+        // Log error but don't break login flow
+        error_log('Failed to log login history: ' . $e->getMessage());
+        return null;
+    }
+}
+
 function getClientIP() {
     $ip = $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1';
     
@@ -302,7 +385,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($error)) {
     if ($username === '' || $password === '') {
         $error = 'Please enter both username and password';
     } else {
-        $stmt = $pdo->prepare('SELECT id, username, password_hash, full_name, status, email, failed_attempts, last_failed_at, locked_until FROM admins WHERE username = :u LIMIT 1');
+        $stmt = $pdo->prepare('SELECT id, username, password_hash, full_name, status, email, role, failed_attempts, last_failed_at, locked_until FROM admins WHERE username = :u LIMIT 1');
         $stmt->execute([':u' => $username]);
         $admin = $stmt->fetch();
         
@@ -345,11 +428,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($error)) {
                     // Check password
                     $passwordCorrect = password_verify($password, $admin['password_hash']);
                     
-                    // If account has 5 or more failed attempts, lock it even if password is correct
-                    if ($failedAttempts >= 5) {
+                    // If account has 3 or more failed attempts, lock it even if password is correct
+                    if ($failedAttempts >= 3) {
                         // If account is already locked, use existing locked_until (don't extend it)
                         if ($lockedUntil && strtotime($lockedUntil) > time()) {
                             // Account is already locked, don't update anything
+                            // Log locked login attempt
+                            $ipAddress = getClientIP();
+                            logLoginHistory($pdo, $admin['id'], $admin['username'], 'Locked', $ipAddress);
                             $error = "Your account has been temporarily locked due to multiple failed login attempts. It will be unlocked after 30 minutes.";
                         } else {
                             // Calculate lockout time as 30 minutes from last_failed_at (or now if last_failed_at is null)
@@ -362,6 +448,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($error)) {
                                 ':last_failed' => $now,
                                 ':id' => $admin['id']
                             ]);
+                            
+                            // Log locked login attempt
+                            $ipAddress = getClientIP();
+                            logLoginHistory($pdo, $admin['id'], $admin['username'], 'Locked', $ipAddress);
                             
                             // Send lockout email
                             if (!empty($admin['email'])) {
@@ -377,11 +467,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($error)) {
                         
                         $_SESSION['admin_logged_in'] = true;
                         $_SESSION['username'] = $admin['full_name'] ?: $admin['username'];
+                        $_SESSION['user_role'] = $admin['role'] ?? 'User';
+                        $_SESSION['user_id'] = $admin['id'];
+                        
+                        // Log successful login
+                        $ipAddress = getClientIP();
+                        logLoginHistory($pdo, $admin['id'], $admin['username'], 'Success', $ipAddress);
                         
                         // Send successful login email
                         if (!empty($admin['email'])) {
-                            $loginTime = date('F j, Y \a\t g:i A');
-                            $ipAddress = getClientIP();
+                            // Use Philippines timezone
+                            $dateTime = new DateTime('now', new DateTimeZone('Asia/Manila'));
+                            $loginTime = $dateTime->format('F j, Y \a\t g:i A');
                             sendLoginSuccessEmail($admin['email'], $admin['username'], $loginTime, $ipAddress);
                         }
                         
@@ -392,17 +489,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($error)) {
                         // Wrong password - increment failed attempts
                         $newFailedAttempts = $failedAttempts + 1;
                         $lockedUntil = null;
+                        $status = 'Failed';
                         
-                        // Lock account after 5 failed attempts
-                        if ($newFailedAttempts >= 5) {
+                        // Lock account after 3 failed attempts
+                        if ($newFailedAttempts >= 3) {
                             // Calculate lockout time as 30 minutes from the current failed attempt (now)
                             $lockedUntil = date('Y-m-d H:i:s', strtotime($now . ' +30 minutes'));
+                            $status = 'Locked';
                             
                             // Send lockout email
                             if (!empty($admin['email'])) {
                                 sendAccountLockEmail($admin['email'], $admin['username'], $lockedUntil);
                             }
                         }
+                        
+                        // Log failed login attempt
+                        $ipAddress = getClientIP();
+                        logLoginHistory($pdo, $admin['id'], $admin['username'], $status, $ipAddress);
                         
                         $stmt = $pdo->prepare('UPDATE admins SET failed_attempts = :attempts, last_failed_at = :last_failed, locked_until = :locked_until WHERE id = :id');
                         $stmt->execute([
@@ -412,8 +515,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($error)) {
                             ':id' => $admin['id']
                         ]);
                         
-                        $attemptsRemaining = max(0, 5 - $newFailedAttempts);
-                        if ($newFailedAttempts >= 5) {
+                        $attemptsRemaining = max(0, 3 - $newFailedAttempts);
+                        if ($newFailedAttempts >= 3) {
                             $error = "Your account has been temporarily locked due to multiple failed login attempts. It will be unlocked after 30 minutes.";
                         } else {
                             $error = 'Invalid username or password';
@@ -438,7 +541,7 @@ if (!isset($attemptsRemaining) && isset($_POST['username'])) {
             $lockedUntil = $admin['locked_until'] ?? null;
             if (!$lockedUntil || strtotime($lockedUntil) <= time()) {
                 $failedAttempts = (int)($admin['failed_attempts'] ?? 0);
-                $attemptsRemaining = max(0, 5 - $failedAttempts);
+                $attemptsRemaining = max(0, 3 - $failedAttempts);
             }
         }
     }
@@ -863,7 +966,7 @@ if (isset($_SESSION['admin_logged_in']) && $_SESSION['admin_logged_in'] === true
                         <?php echo htmlspecialchars($error); ?>
                     </div>
                 <?php endif; ?>
-                <?php if (isset($attemptsRemaining) && $attemptsRemaining > 0 && $attemptsRemaining < 5): ?>
+                <?php if (isset($attemptsRemaining) && $attemptsRemaining > 0 && $attemptsRemaining < 3): ?>
                     <div style="color: #f59e0b; font-size: 0.9rem; padding: 0.75rem; background: rgba(245, 158, 11, 0.1); border-radius: 6px; margin-bottom: 1rem; border: 1px solid rgba(245, 158, 11, 0.2);">
                         <i class="fas fa-exclamation-triangle" style="margin-right: 0.5rem;"></i>
                         You have <?php echo $attemptsRemaining; ?> more <?php echo $attemptsRemaining === 1 ? 'attempt' : 'attempts'; ?> before your account is locked.

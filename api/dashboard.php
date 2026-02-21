@@ -192,12 +192,12 @@ try {
     
     // Recent Complaints
     if (tableExists($pdo, 'complaints')) {
-        $stmt = $pdo->query("SELECT complaint_id, complainant_name, complaint_type, location, submitted_at FROM complaints ORDER BY submitted_at DESC LIMIT 5");
+        $stmt = $pdo->query("SELECT complaint_id, complainant_name, complaint_type, location, submitted_at FROM complaints ORDER BY submitted_at DESC LIMIT 10");
         while ($row = $stmt->fetch()) {
             $recentActivity[] = [
                 'type' => 'complaint',
                 'title' => 'New Complaint Submitted',
-                'details' => 'Complaint #' . $row['complaint_id'] . ' - ' . ($row['complaint_type'] ?? 'Unknown') . ' reported at ' . ($row['location'] ?? 'Unknown location'),
+                'details' => 'Complaint #' . $row['complaint_id'] . ' - ' . ($row['complaint_type'] ?? 'Unknown') . ($row['location'] ? ' reported at ' . $row['location'] : ''),
                 'time' => $row['submitted_at']
             ];
         }
@@ -205,22 +205,91 @@ try {
     
     // Recent Tips
     if (tableExists($pdo, 'tips')) {
-        $stmt = $pdo->query("SELECT tip_id, location, description, submitted_at FROM tips ORDER BY submitted_at DESC LIMIT 5");
+        $stmt = $pdo->query("SELECT tip_id, location, description, submitted_at FROM tips ORDER BY submitted_at DESC LIMIT 10");
         while ($row = $stmt->fetch()) {
+            $location = $row['location'] ?? 'Unknown location';
             $recentActivity[] = [
                 'type' => 'tip',
                 'title' => 'New Tip Received',
-                'details' => 'Tip #' . $row['tip_id'] . ' - ' . ($row['location'] ?? 'Unknown location'),
+                'details' => 'Tip #' . $row['tip_id'] . ' - ' . $location,
                 'time' => $row['submitted_at']
             ];
         }
     }
     
+    // Recent Events
+    if (tableExists($pdo, 'events')) {
+        $stmt = $pdo->query("SELECT event_name, event_date, event_time, location, created_at FROM events ORDER BY created_at DESC LIMIT 10");
+        while ($row = $stmt->fetch()) {
+            $eventDate = $row['event_date'] ? date('F j, Y', strtotime($row['event_date'])) : '';
+            $location = $row['location'] ?? 'Community Center';
+            $recentActivity[] = [
+                'type' => 'event',
+                'title' => 'Community Meeting Scheduled',
+                'details' => $row['event_name'] . ($eventDate ? ' - ' . $eventDate : '') . ' at ' . $location,
+                'time' => $row['created_at']
+            ];
+        }
+    }
+    
+    // Recent Members
+    if (tableExists($pdo, 'members')) {
+        $stmt = $pdo->query("SELECT name, created_at FROM members ORDER BY created_at DESC LIMIT 10");
+        while ($row = $stmt->fetch()) {
+            $recentActivity[] = [
+                'type' => 'member',
+                'title' => 'New Member Registered',
+                'details' => $row['name'] . ' joined the Neighborhood Watch program',
+                'time' => $row['created_at']
+            ];
+        }
+    }
+    
+    // Recent Volunteers
+    if (tableExists($pdo, 'volunteers')) {
+        $stmt = $pdo->query("SELECT name, status, created_at FROM volunteers ORDER BY created_at DESC LIMIT 10");
+        while ($row = $stmt->fetch()) {
+            $recentActivity[] = [
+                'type' => 'volunteer',
+                'title' => 'New Volunteer Registration',
+                'details' => $row['name'] . ' registered as volunteer (Status: ' . ($row['status'] ?? 'Pending') . ')',
+                'time' => $row['created_at']
+            ];
+        }
+    }
+    
+    // Check for patrol_logs table (if it exists)
+    try {
+        $stmt = $pdo->query("SHOW TABLES LIKE 'patrol_logs'");
+        if ($stmt->rowCount() > 0) {
+            $stmt = $pdo->query("SELECT officer_name, route, date, time, status, created_at FROM patrol_logs WHERE status = 'Completed' ORDER BY created_at DESC LIMIT 10");
+            while ($row = $stmt->fetch()) {
+                $route = $row['route'] ?? 'Unknown route';
+                $recentActivity[] = [
+                    'type' => 'patrol',
+                    'title' => 'Patrol Completed',
+                    'details' => ($row['officer_name'] ?? 'Officer') . ' completed patrol route - ' . $route,
+                    'time' => $row['created_at'] ?? $row['date'] . ' ' . ($row['time'] ?? '')
+                ];
+            }
+        }
+    } catch (PDOException $e) {
+        // Table doesn't exist, skip
+    }
+    
     // Sort by time (most recent first) and limit to 5
     usort($recentActivity, function($a, $b) {
-        return strtotime($b['time']) - strtotime($a['time']);
+        $timeA = strtotime($a['time'] ?? '1970-01-01');
+        $timeB = strtotime($b['time'] ?? '1970-01-01');
+        return $timeB - $timeA;
     });
     $recentActivity = array_slice($recentActivity, 0, 5);
+    
+    // Format time for each activity
+    foreach ($recentActivity as &$activity) {
+        $activity['time_ago'] = getTimeAgo($activity['time']);
+    }
+    unset($activity);
     
     $response['recentActivity'] = $recentActivity;
     
@@ -231,5 +300,39 @@ try {
     ob_clean();
     http_response_code(500);
     echo json_encode(['success' => false, 'error' => 'Database error: ' . $e->getMessage()]);
+}
+
+/**
+ * Get time ago string (e.g., "2 hours ago", "1 day ago")
+ */
+function getTimeAgo($datetime) {
+    if (empty($datetime)) {
+        return 'Unknown time';
+    }
+    
+    $timestamp = strtotime($datetime);
+    if ($timestamp === false) {
+        return 'Unknown time';
+    }
+    
+    $diff = time() - $timestamp;
+    
+    if ($diff < 60) {
+        return 'Just now';
+    } elseif ($diff < 3600) {
+        $mins = floor($diff / 60);
+        return $mins . ' minute' . ($mins > 1 ? 's' : '') . ' ago';
+    } elseif ($diff < 86400) {
+        $hours = floor($diff / 3600);
+        return $hours . ' hour' . ($hours > 1 ? 's' : '') . ' ago';
+    } elseif ($diff < 604800) {
+        $days = floor($diff / 86400);
+        return $days . ' day' . ($days > 1 ? 's' : '') . ' ago';
+    } elseif ($diff < 2592000) {
+        $weeks = floor($diff / 604800);
+        return $weeks . ' week' . ($weeks > 1 ? 's' : '') . ' ago';
+    } else {
+        return date('M j, Y', $timestamp);
+    }
 }
 

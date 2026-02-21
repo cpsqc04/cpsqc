@@ -31,6 +31,7 @@ function ensureTipsTable(PDO $pdo): void
             tip_id VARCHAR(255) UNIQUE NOT NULL,
             location TEXT NOT NULL,
             description TEXT NOT NULL,
+            photo_data LONGTEXT NULL,
             status VARCHAR(50) NOT NULL DEFAULT 'Under Review',
             outcome VARCHAR(100) DEFAULT 'No Outcome Yet',
             submitted_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -49,8 +50,11 @@ function ensureTipsTable(PDO $pdo): void
     if (!isset($columns['description'])) {
         $pdo->exec('ALTER TABLE tips ADD COLUMN description TEXT NOT NULL DEFAULT "" AFTER location');
     }
+    if (!isset($columns['photo_data'])) {
+        $pdo->exec('ALTER TABLE tips ADD COLUMN photo_data LONGTEXT NULL AFTER description');
+    }
     if (!isset($columns['status'])) {
-        $pdo->exec('ALTER TABLE tips ADD COLUMN status VARCHAR(50) NOT NULL DEFAULT "Under Review" AFTER description');
+        $pdo->exec('ALTER TABLE tips ADD COLUMN status VARCHAR(50) NOT NULL DEFAULT "Under Review" AFTER photo_data');
     }
     if (!isset($columns['outcome'])) {
         $pdo->exec('ALTER TABLE tips ADD COLUMN outcome VARCHAR(100) DEFAULT "No Outcome Yet" AFTER status');
@@ -86,8 +90,11 @@ if ($action !== 'create' && (!isset($_SESSION['admin_logged_in']) || $_SESSION['
 if ($method === 'GET') {
     // Return all tips
     try {
-        $stmt = $pdo->query('SELECT id, tip_id, location, description, status, outcome, submitted_at FROM tips ORDER BY id DESC');
-        $tips = $stmt->fetchAll();
+        $stmt = $pdo->query('SELECT id, tip_id, location, description, photo_data, status, outcome, submitted_at FROM tips ORDER BY id DESC');
+        $tips = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        // Include photo_data for display in the review table
+        // Note: This may increase payload size, but necessary for displaying photos
 
         echo json_encode([
             'success' => true,
@@ -104,10 +111,11 @@ if ($method === 'POST') {
     if ($action === 'create') {
         $location = trim($input['location'] ?? '');
         $description = trim($input['description'] ?? '');
+        $photoData = $input['photo'] ?? null;
 
-        if ($location === '' || $description === '') {
+        if ($location === '' || $description === '' || empty($photoData)) {
             http_response_code(400);
-            echo json_encode(['success' => false, 'message' => 'Location and description are required.']);
+            echo json_encode(['success' => false, 'message' => 'Location, description, and photo are required.']);
             exit;
         }
 
@@ -119,11 +127,12 @@ if ($method === 'POST') {
         $tipId = "TIP-{$year}-" . str_pad($nextNum, 3, '0', STR_PAD_LEFT);
 
         try {
-            $stmt = $pdo->prepare('INSERT INTO tips (tip_id, location, description, status, outcome) VALUES (:tip_id, :location, :description, :status, :outcome)');
+            $stmt = $pdo->prepare('INSERT INTO tips (tip_id, location, description, photo_data, status, outcome) VALUES (:tip_id, :location, :description, :photo_data, :status, :outcome)');
             $stmt->execute([
                 ':tip_id' => $tipId,
                 ':location' => $location,
                 ':description' => $description,
+                ':photo_data' => $photoData,
                 ':status' => 'Under Review',
                 ':outcome' => 'No Outcome Yet',
             ]);

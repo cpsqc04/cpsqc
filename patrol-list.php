@@ -27,8 +27,14 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
         .logo-container a:hover { opacity: 0.8; transform: scale(1.05); }
         .logo-container img { height: 130px; width: 130px; object-fit: contain; transition: all 0.3s ease; }
         .sidebar.collapsed .logo-container img { height: 70px; width: 70px; }
-        .sidebar-nav { padding: 0.5rem 0; overflow: visible; flex: 1; display: flex; flex-direction: column; min-height: 0; }
-        .sidebar.collapsed .sidebar-nav { overflow: visible; display: flex !important; flex-direction: column; }
+        .user-name-display { color: rgba(255, 255, 255, 0.9); font-size: 0.95rem; font-weight: 500; text-align: center; padding: 0.5rem 1rem; transition: all 0.3s ease; word-break: break-word; max-width: 100%; }
+        .sidebar.collapsed .user-name-display { opacity: 0; height: 0; padding: 0; overflow: hidden; font-size: 0; }
+        .sidebar-nav { padding: 0.5rem 0; overflow-y: auto; overflow-x: hidden; flex: 1; display: flex; flex-direction: column; min-height: 0; scrollbar-width: thin; scrollbar-color: rgba(255, 255, 255, 0.3) transparent; }
+        .sidebar-nav::-webkit-scrollbar { width: 6px; }
+        .sidebar-nav::-webkit-scrollbar-track { background: transparent; }
+        .sidebar-nav::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.3); border-radius: 3px; }
+        .sidebar-nav::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.5); }
+        .sidebar.collapsed .sidebar-nav { overflow-y: auto; overflow-x: hidden; display: flex !important; flex-direction: column; }
         .nav-module { margin-bottom: 0.125rem; display: block !important; visibility: visible !important; }
         .sidebar.collapsed .nav-module { display: block !important; visibility: visible !important; }
         .nav-module-header { display: flex; align-items: center; justify-content: space-between; padding: 0.875rem 1.5rem; color: rgba(255, 255, 255, 0.9); cursor: pointer; transition: background-color 0.2s ease, padding 0.3s ease; font-weight: 500; user-select: none; white-space: normal; overflow: visible; font-size: 0.9rem; position: relative; gap: 0.75rem; line-height: 1.4; }
@@ -76,7 +82,248 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
         .top-header-content { flex: 1; display: flex; align-items: center; gap: 1rem; }
         .user-info { display: flex; align-items: center; gap: 1rem; margin-left: 2rem; }
         .user-info span { color: var(--text-color); font-weight: 500; }
-        .logout-btn { padding: 0.5rem 1rem; background: var(--primary-color); color: #fff; text-decoration: none; border-radius: 6px; font-size: 0.9rem; transition: background 0.2s ease; }
+        
+        /* Notification Bell */
+        .notification-container {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+        
+        .notification-bell {
+            position: relative;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: transparent;
+            border: none;
+            color: var(--text-color);
+            font-size: 1.25rem;
+            cursor: pointer;
+            border-radius: 8px;
+            transition: all 0.2s ease;
+        }
+        
+        .notification-bell:hover {
+            background: rgba(28, 37, 65, 0.05);
+            color: var(--primary-color);
+        }
+        
+        .notification-badge {
+            position: absolute;
+            top: 4px;
+            right: 4px;
+            background: #ef4444;
+            color: white;
+            font-size: 0.7rem;
+            font-weight: 600;
+            padding: 2px 6px;
+            border-radius: 10px;
+            min-width: 18px;
+            text-align: center;
+            display: none;
+        }
+        
+        .notification-badge.show {
+            display: block;
+        }
+        
+        .notification-dropdown {
+            position: absolute;
+            top: calc(100% + 10px);
+            right: 0;
+            width: 380px;
+            max-height: 500px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+            display: none;
+            flex-direction: column;
+            z-index: 1000;
+            overflow: hidden;
+        }
+        
+        .notification-dropdown.show {
+            display: flex;
+        }
+        
+        .notification-header {
+            padding: 1.25rem;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: var(--header-bg);
+        }
+        
+        .notification-header h3 {
+            margin: 0;
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--text-color);
+        }
+        
+        .notification-header button {
+            background: transparent;
+            border: none;
+            color: var(--primary-color);
+            font-size: 0.85rem;
+            cursor: pointer;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            transition: background 0.2s ease;
+        }
+        
+        .notification-header button:hover {
+            background: rgba(76, 138, 137, 0.1);
+        }
+        
+        .notification-list {
+            flex: 1;
+            overflow-y: auto;
+            max-height: 400px;
+        }
+        
+        .notification-item {
+            padding: 1rem 1.25rem;
+            border-bottom: 1px solid var(--border-color);
+            cursor: pointer;
+            transition: background 0.2s ease;
+            display: flex;
+            gap: 0.75rem;
+            position: relative;
+        }
+        
+        .notification-item:hover {
+            background: #f8f9fa;
+        }
+        
+        .notification-item.unread {
+            background: #f0f9ff;
+            border-left: 3px solid var(--primary-color);
+        }
+        
+        .notification-item.unread::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 6px;
+            height: 6px;
+            background: var(--primary-color);
+            border-radius: 50%;
+        }
+        
+        .notification-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.1rem;
+            flex-shrink: 0;
+        }
+        
+        .notification-icon.complaint {
+            background: #fee2e2;
+            color: #dc2626;
+        }
+        
+        .notification-icon.tip {
+            background: #fef3c7;
+            color: #d97706;
+        }
+        
+        .notification-icon.volunteer {
+            background: #dbeafe;
+            color: #2563eb;
+        }
+        
+        .notification-icon.event {
+            background: #d1fae5;
+            color: #059669;
+        }
+        
+        .notification-icon.login {
+            background: #dbeafe;
+            color: #2563eb;
+        }
+        
+        .notification-icon.logout {
+            background: #e0e7ff;
+            color: #6366f1;
+        }
+        
+        .notification-content {
+            flex: 1;
+            min-width: 0;
+        }
+        
+        .notification-title {
+            font-weight: 600;
+            color: var(--text-color);
+            font-size: 0.95rem;
+            margin: 0 0 0.25rem 0;
+        }
+        
+        .notification-message {
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+            margin: 0 0 0.5rem 0;
+            line-height: 1.4;
+        }
+        
+        .notification-time {
+            color: var(--text-secondary);
+            font-size: 0.75rem;
+        }
+        
+        .notification-empty {
+            padding: 3rem 1.5rem;
+            text-align: center;
+            color: var(--text-secondary);
+        }
+        
+        .notification-empty i {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            opacity: 0.3;
+        }
+        
+        /* Date and Time Display */
+        .datetime-display {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            color: var(--text-color);
+            font-size: 0.9rem;
+            font-weight: 500;
+            margin-right: 1rem;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        .datetime-display .date-part {
+            color: var(--text-secondary);
+        }
+        
+        .datetime-display .time-part {
+            color: var(--text-color);
+            font-weight: 600;
+        }
+        
+        /* Sidebar Logout Button */
+        .sidebar-footer { margin-top: auto; padding: 1rem; border-top: 1px solid rgba(255, 255, 255, 0.1); }
+        .sidebar-logout-btn { display: flex; align-items: center; gap: 0.75rem; padding: 0.875rem 1.5rem; background: rgba(239, 68, 68, 0.1); color: rgba(255, 255, 255, 0.9); text-decoration: none; border-radius: 8px; font-size: 1rem; font-weight: 500; transition: all 0.2s ease; border: 1px solid rgba(239, 68, 68, 0.2); width: 100%; box-sizing: border-box; }
+        .sidebar-logout-btn:hover { background: rgba(239, 68, 68, 0.2); border-color: rgba(239, 68, 68, 0.4); color: #fff; }
+        .sidebar-logout-btn i { font-size: 1.1rem; flex-shrink: 0; }
+        .sidebar-logout-btn span { flex: 1; transition: opacity 0.3s ease; }
+        .sidebar.collapsed .sidebar-logout-btn span { opacity: 0; width: 0; overflow: hidden; }
+        .sidebar.collapsed .sidebar-logout-btn { justify-content: center; padding: 0.875rem; }
+        .logout-btn { padding: 0.5rem 1rem; background: var(--primary-color); color: #fff; text-decoration: none; border-radius: 6px; font-size: 0.9rem; transition: background 0.2s ease; display: none; }
         .logout-btn:hover { background: #4ca8a6; }
         .content-area { padding: 2rem; flex: 1; background: #f5f5f5; }
         .content-burger-btn { background: transparent; border: none; color: var(--tertiary-color); width: 40px; height: 40px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s ease; flex-shrink: 0; padding: 0; }
@@ -139,6 +386,9 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                 <a href="index.php" style="display: block; cursor: pointer;">
                     <img src="images/tara.png" alt="Alertara Logo" style="display: block;">
                 </a>
+                <div class="user-name-display">
+                    <?php echo htmlspecialchars($_SESSION['username'] ?? 'Admin'); ?>
+                </div>
             </div>
         </div>
         <nav class="sidebar-nav">
@@ -148,11 +398,26 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                 <span class="nav-module-header-text">Dashboard</span>
             </a>
             
-            <!-- User Management Link -->
-            <a href="user-management.php" class="nav-module-header" data-tooltip="User Management" style="text-decoration: none; display: flex; align-items: center; justify-content: space-between; padding: 0.875rem 1.5rem; color: rgba(255, 255, 255, 0.9); cursor: pointer; transition: background-color 0.2s ease; font-weight: 500; user-select: none; gap: 0.75rem; <?php echo basename($_SERVER['PHP_SELF']) == 'user-management.php' ? 'background: rgba(76, 138, 137, 0.25); border-left: 3px solid #4c8a89;' : ''; ?>">
-                <span class="nav-module-icon"><i class="fas fa-users-cog"></i></span>
-                <span class="nav-module-header-text">User Management</span>
-            </a>
+            <!-- User Management Module (Admin Only) -->
+            <?php if (isset($_SESSION['user_role']) && $_SESSION['user_role'] === 'Admin'): ?>
+            <div class="nav-module <?php echo (basename($_SERVER['PHP_SELF']) == 'users.php' || basename($_SERVER['PHP_SELF']) == 'login-history.php') ? 'active' : ''; ?>">
+                <div class="nav-module-header" onclick="toggleModule(this)" data-tooltip="User Management">
+                    <span class="nav-module-icon"><i class="fas fa-users-cog"></i></span>
+                    <span class="nav-module-header-text">User Management</span>
+                    <span class="arrow">▶</span>
+                </div>
+                <div class="nav-submodules">
+                    <a href="users.php" class="nav-submodule <?php echo basename($_SERVER['PHP_SELF']) == 'users.php' ? 'active' : ''; ?>" data-tooltip="Users">
+                        <span class="nav-submodule-icon"><i class="fas fa-users"></i></span>
+                        <span class="nav-submodule-text">Users</span>
+                    </a>
+                    <a href="login-history.php" class="nav-submodule <?php echo basename($_SERVER['PHP_SELF']) == 'login-history.php' ? 'active' : ''; ?>" data-tooltip="Login History">
+                        <span class="nav-submodule-icon"><i class="fas fa-history"></i></span>
+                        <span class="nav-submodule-text">Login History</span>
+                    </a>
+                </div>
+            </div>
+            <?php endif; ?>
             
             <div class="nav-module">
                 <div class="nav-module-header" onclick="toggleModule(this)" data-tooltip="Neighborhood Watch Coordination">
@@ -274,6 +539,14 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                 </div>
             </div>
         </nav>
+        
+        <!-- Sidebar Footer with Logout -->
+        <div class="sidebar-footer">
+            <a href="logout.php" class="sidebar-logout-btn" data-tooltip="Logout">
+                <i class="fas fa-sign-out-alt"></i>
+                <span>Logout</span>
+            </a>
+        </div>
     </aside>
     <div class="main-wrapper">
         <header class="top-header">
@@ -284,8 +557,28 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                 <h1 class="page-title">Patrol List</h1>
             </div>
             <div class="user-info">
-                <span>Welcome, <?php echo htmlspecialchars($_SESSION['username'] ?? 'Admin'); ?></span>
-                <a href="logout.php" class="logout-btn">Logout</a>
+                <div class="datetime-display">
+                    <span class="date-part" id="currentDate"></span>
+                    <span class="time-part" id="currentTime"></span>
+                </div>
+                <div class="notification-container">
+                    <button class="notification-bell" onclick="toggleNotifications()" aria-label="Notifications">
+                        <i class="fas fa-bell"></i>
+                        <span class="notification-badge" id="notificationBadge"></span>
+                    </button>
+                    <div class="notification-dropdown" id="notificationDropdown">
+                        <div class="notification-header">
+                            <h3>Notifications</h3>
+                            <button onclick="markAllAsRead()">Mark all as read</button>
+                        </div>
+                        <div class="notification-list" id="notificationList">
+                            <div class="notification-empty">
+                                <i class="fas fa-bell-slash"></i>
+                                <p>No notifications</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </header>
         <main class="content-area">
@@ -758,6 +1051,193 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             if (event.target === editModal) {
                 closeEditOfficerModal();
             }
+        }
+        
+        // Date and Time Display
+        function updateDateTime() {
+            const now = new Date();
+            const dateOptions = { 
+                weekday: 'short', 
+                year: 'numeric', 
+                month: 'short', 
+                day: 'numeric' 
+            };
+            const timeOptions = { 
+                hour: '2-digit', 
+                minute: '2-digit', 
+                second: '2-digit',
+                hour12: true 
+            };
+            
+            const dateStr = now.toLocaleDateString('en-US', dateOptions);
+            const timeStr = now.toLocaleTimeString('en-US', timeOptions);
+            
+            const dateEl = document.getElementById('currentDate');
+            const timeEl = document.getElementById('currentTime');
+            
+            if (dateEl) dateEl.textContent = dateStr;
+            if (timeEl) timeEl.textContent = timeStr;
+        }
+        
+        // Update date/time immediately and then every second
+        updateDateTime();
+        setInterval(updateDateTime, 1000);
+        
+        // Notification System
+        let notificationDropdown = null;
+        let notificationBadge = null;
+        let notificationList = null;
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            notificationDropdown = document.getElementById('notificationDropdown');
+            notificationBadge = document.getElementById('notificationBadge');
+            notificationList = document.getElementById('notificationList');
+            
+            if (notificationDropdown && notificationBadge && notificationList) {
+                loadNotifications();
+                // Refresh notifications every 30 seconds
+                setInterval(loadNotifications, 30000);
+                
+                // Close dropdown when clicking outside
+                document.addEventListener('click', function(event) {
+                    if (notificationDropdown && !event.target.closest('.notification-container')) {
+                        notificationDropdown.classList.remove('show');
+                    }
+                });
+            }
+        });
+        
+        function toggleNotifications() {
+            if (notificationDropdown) {
+                notificationDropdown.classList.toggle('show');
+                if (notificationDropdown.classList.contains('show')) {
+                    loadNotifications();
+                }
+            }
+        }
+        
+        async function loadNotifications() {
+            try {
+                // Sync activities first
+                await fetch('api/notifications.php?action=sync');
+                
+                // Then load notifications
+                const response = await fetch('api/notifications.php?action=list');
+                const data = await response.json();
+                
+                if (data.success) {
+                    updateNotificationBadge(data.unread_count);
+                    renderNotifications(data.notifications);
+                }
+            } catch (error) {
+                console.error('Error loading notifications:', error);
+            }
+        }
+        
+        function updateNotificationBadge(count) {
+            if (notificationBadge) {
+                if (count > 0) {
+                    notificationBadge.textContent = count > 99 ? '99+' : count;
+                    notificationBadge.classList.add('show');
+                } else {
+                    notificationBadge.classList.remove('show');
+                }
+            }
+        }
+        
+        function renderNotifications(notifications) {
+            if (!notificationList) return;
+            
+            if (notifications.length === 0) {
+                notificationList.innerHTML = `
+                    <div class="notification-empty">
+                        <i class="fas fa-bell-slash"></i>
+                        <p>No notifications</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            notificationList.innerHTML = notifications.map(notif => {
+                let iconClass, icon;
+                if (notif.type === 'complaint' || notif.type === 'incident') {
+                    iconClass = 'complaint';
+                    icon = 'fa-file-alt';
+                } else if (notif.type === 'tip') {
+                    iconClass = 'tip';
+                    icon = 'fa-comments';
+                } else if (notif.type === 'volunteer' || notif.type === 'volunteer_request') {
+                    iconClass = 'volunteer';
+                    icon = 'fa-handshake';
+                } else if (notif.type === 'login') {
+                    iconClass = 'login';
+                    icon = 'fa-sign-in-alt';
+                } else if (notif.type === 'logout') {
+                    iconClass = 'logout';
+                    icon = 'fa-sign-out-alt';
+                } else if (notif.type === 'event' || notif.type === 'event_report' || notif.type === 'patrol') {
+                    iconClass = 'event';
+                    icon = 'fa-bullhorn';
+                } else {
+                    iconClass = 'event';
+                    icon = 'fa-bullhorn';
+                }
+                
+                const safeLink = (notif.link || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+                
+                return `
+                    <div class="notification-item ${notif.is_read ? '' : 'unread'}" 
+                         onclick="handleNotificationClick(${notif.id}, '${safeLink}')">
+                        <div class="notification-icon ${iconClass}">
+                            <i class="fas ${icon}"></i>
+                        </div>
+                        <div class="notification-content">
+                            <div class="notification-title">${escapeHtml(notif.title)}</div>
+                            <div class="notification-message">${escapeHtml(notif.message)}</div>
+                            <div class="notification-time">${notif.time_ago}</div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+        
+        function handleNotificationClick(id, link) {
+            // Mark as read
+            fetch('api/notifications.php?action=mark_read', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: 'id=' + id
+            });
+            
+            // Remove unread class
+            const item = event.currentTarget;
+            item.classList.remove('unread');
+            
+            // Navigate if link exists
+            if (link && link !== '') {
+                window.location.href = link;
+            }
+            
+            // Reload notifications to update badge
+            loadNotifications();
+        }
+        
+        async function markAllAsRead() {
+            try {
+                await fetch('api/notifications.php?action=mark_read', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+                });
+                loadNotifications();
+            } catch (error) {
+                console.error('Error marking all as read:', error);
+            }
+        }
+        
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
         }
     </script>
 </body>

@@ -153,10 +153,15 @@ session_start();
                 <h2 style="margin: 0; color: #f8fafc; font-size: 1.75rem; font-weight: 600;">Submit Anonymous Tip</h2>
                 <span class="close" onclick="closeTipModal()" style="color: rgba(255, 255, 255, 0.8); font-size: 1.75rem; cursor: pointer; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; border-radius: 6px; transition: all 0.2s ease; line-height: 1;">&times;</span>
             </div>
-            <form id="tipForm" onsubmit="submitTip(event)" style="display: grid; gap: 1.75rem;">
+            <form id="tipForm" onsubmit="submitTip(event)" style="display: grid; gap: 1.75rem;" enctype="multipart/form-data">
                 <div class="field">
                     <label for="tipLocation" style="font-size: 1.1rem; color: rgba(255, 255, 255, 0.8); font-weight: 500;">Location *</label>
                     <input id="tipLocation" name="location" type="text" placeholder="Enter location where the incident occurred" required style="width: 100%; padding: 1.15rem 1.5rem; border: 1px solid rgba(255, 255, 255, 0.16); border-radius: var(--radius); font: inherit; font-size: 1.1rem; color: #f8fafc; background: rgba(255, 255, 255, 0.08); transition: border-color 0.2s ease, box-shadow 0.2s ease; box-sizing: border-box;">
+                </div>
+                <div class="field">
+                    <label for="tipPhoto" style="font-size: 1.1rem; color: rgba(255, 255, 255, 0.8); font-weight: 500;">Photo *</label>
+                    <input id="tipPhoto" name="photo" type="file" accept="image/*" required onchange="previewTipPhoto(this)" style="width: 100%; padding: 1.15rem 1.5rem; border: 1px solid rgba(255, 255, 255, 0.16); border-radius: var(--radius); font: inherit; font-size: 1.1rem; color: #f8fafc; background: rgba(255, 255, 255, 0.08); transition: border-color 0.2s ease, box-shadow 0.2s ease; box-sizing: border-box; cursor: pointer;">
+                    <div id="tipPhotoPreview" style="margin-top: 0.5rem; display: none;"></div>
                 </div>
                 <div class="field">
                     <label for="tipDescription" style="font-size: 1.1rem; color: rgba(255, 255, 255, 0.8); font-weight: 500;">Tip Description *</label>
@@ -296,6 +301,11 @@ session_start();
         function closeTipModal() {
             document.getElementById('tipModal').classList.remove('active');
             document.getElementById('tipForm').reset();
+            const preview = document.getElementById('tipPhotoPreview');
+            if (preview) {
+                preview.style.display = 'none';
+                preview.innerHTML = '';
+            }
         }
 
         function showSuccessModal(title, message, isError = false) {
@@ -341,42 +351,83 @@ session_start();
             selectedCertFiles = [];
         }
 
+        function previewTipPhoto(input) {
+            const preview = document.getElementById('tipPhotoPreview');
+            if (!preview) return;
+            
+            preview.innerHTML = '';
+            if (input.files && input.files[0]) {
+                const file = input.files[0];
+                if (file.type.startsWith('image/')) {
+                    const img = document.createElement('img');
+                    img.style.cssText = 'max-width: 100%; max-height: 200px; border-radius: 8px; border: 2px solid rgba(255, 255, 255, 0.2); object-fit: cover; cursor: pointer; transition: transform 0.2s ease;';
+                    img.alt = file.name;
+                    img.onmouseover = function() { this.style.transform = 'scale(1.02)'; };
+                    img.onmouseout = function() { this.style.transform = 'scale(1)'; };
+                    img.onclick = function() { viewPhoto(img.src); };
+                    
+                    const reader = new FileReader();
+                    reader.onload = function (e) {
+                        img.src = e.target.result;
+                    };
+                    reader.readAsDataURL(file);
+                    preview.appendChild(img);
+                    preview.style.display = 'block';
+                } else {
+                    preview.style.display = 'none';
+                }
+            } else {
+                preview.style.display = 'none';
+            }
+        }
+
         function submitTip(event) {
             event.preventDefault();
             
             const location = document.getElementById('tipLocation').value.trim();
             const description = document.getElementById('tipDescription').value.trim();
+            const photoFile = document.getElementById('tipPhoto').files[0];
             
-            if (!location || !description) {
-                showSuccessModal('Validation Error', 'Please fill in all required fields.', true);
+            if (!location || !description || !photoFile) {
+                showSuccessModal('Validation Error', 'Please fill in all required fields including the photo.', true);
                 return;
             }
             
-            fetch('api/tips.php', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    action: 'create',
-                    location: location,
-                    description: description
-                })
-            })
-            .then(res => res.json())
-            .then(result => {
-                if (!result.success) {
-                    showSuccessModal('Error', result.message || 'Failed to submit tip. Please try again.', true);
-                    return;
-                }
+            // Read photo as base64
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const photoData = e.target.result;
                 
-                const message = 'Your tip ID is: <strong style="font-size: 1.2em; color: #fff;">' + result.data.tip_id + '</strong><br><br>Your tip has been received and will be reviewed.';
-                showSuccessModal('Tip Submitted Successfully!', message, false);
-                document.getElementById('tipForm').reset();
-                closeTipModal();
-            })
-            .catch(err => {
-                console.error('Error submitting tip:', err);
-                showSuccessModal('Error', 'Error submitting tip. Please try again.', true);
-            });
+                fetch('api/tips.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        action: 'create',
+                        location: location,
+                        description: description,
+                        photo: photoData
+                    })
+                })
+                .then(res => res.json())
+                .then(result => {
+                    if (!result.success) {
+                        showSuccessModal('Error', result.message || 'Failed to submit tip. Please try again.', true);
+                        return;
+                    }
+                    
+                    const message = 'Your tip ID is: <strong style="font-size: 1.2em; color: #fff;">' + result.data.tip_id + '</strong><br><br>Your tip has been received and will be reviewed.';
+                    showSuccessModal('Tip Submitted Successfully!', message, false);
+                    document.getElementById('tipForm').reset();
+                    document.getElementById('tipPhotoPreview').style.display = 'none';
+                    document.getElementById('tipPhotoPreview').innerHTML = '';
+                    closeTipModal();
+                })
+                .catch(err => {
+                    console.error('Error submitting tip:', err);
+                    showSuccessModal('Error', 'Error submitting tip. Please try again.', true);
+                });
+            };
+            reader.readAsDataURL(photoFile);
         }
 
         function previewVolunteerImage(input, previewId) {

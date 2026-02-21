@@ -6,13 +6,43 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
     header('Location: login.php');
     exit;
 }
+
+// Check if user is admin
+if (!isset($_SESSION['user_role']) || $_SESSION['user_role'] !== 'Admin') {
+    header('Location: index.php');
+    exit;
+}
+
+require_once __DIR__ . '/db.php';
+
+// Ensure login_history table exists
+try {
+    $pdo->exec("CREATE TABLE IF NOT EXISTS login_history (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        user_id INT NOT NULL,
+        username VARCHAR(100) NOT NULL,
+        login_time DATETIME NOT NULL,
+        ip_address VARCHAR(45) DEFAULT NULL,
+        status VARCHAR(20) NOT NULL DEFAULT 'Success',
+        logout_time DATETIME DEFAULT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_user_id (user_id),
+        INDEX idx_username (username),
+        INDEX idx_login_time (login_time),
+        INDEX idx_status (status),
+        FOREIGN KEY (user_id) REFERENCES admins(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+} catch (PDOException $e) {
+    // Table might already exist, continue
+}
+
 ?>
 <!doctype html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Submit Complaint - Alertara</title>
+    <title>Login History</title>
     <link rel="icon" type="image/x-icon" href="images/favicon.ico">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="css/theme.css">
@@ -26,7 +56,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             min-height: 100vh;
         }
         
-        /* Sidebar Navigation */
+        /* Sidebar Navigation - Same as users.php */
         .sidebar {
             width: 320px;
             background: var(--tertiary-color);
@@ -41,15 +71,6 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             transition: width 0.3s ease;
             display: flex;
             flex-direction: column;
-        }
-        
-        .sidebar::-webkit-scrollbar {
-            display: none;
-        }
-        
-        .sidebar {
-            -ms-overflow-style: none;
-            scrollbar-width: none;
         }
         
         .sidebar.collapsed {
@@ -151,17 +172,8 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             overflow-x: hidden;
             display: flex !important;
             flex-direction: column;
-        }
-        
-        .nav-module {
-            margin-bottom: 0.125rem;
-            display: block !important;
-            visibility: visible !important;
-        }
-        
-        .sidebar.collapsed .nav-module {
-            display: block !important;
-            visibility: visible !important;
+            padding: 0.5rem 0;
+            position: relative;
         }
         
         .nav-module-header {
@@ -195,8 +207,14 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             position: relative;
         }
         
-        .sidebar.collapsed .nav-module-header:hover {
-            background: rgba(255, 255, 255, 0.1);
+        .nav-module-header:hover {
+            background: rgba(255, 255, 255, 0.08);
+            color: #fff;
+        }
+        
+        .nav-module-header.active {
+            background: rgba(76, 138, 137, 0.25);
+            border-left: 3px solid #4c8a89;
         }
         
         .nav-module-icon {
@@ -250,9 +268,8 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             overflow: hidden;
         }
         
-        .nav-module-header:hover {
-            background: rgba(255, 255, 255, 0.08);
-            color: #fff;
+        .nav-module {
+            margin-bottom: 0.125rem;
         }
         
         .nav-module-header .arrow {
@@ -261,13 +278,6 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             color: rgba(255, 255, 255, 0.6);
             flex-shrink: 0;
             margin-left: 0.5rem;
-        }
-        
-        .sidebar.collapsed .nav-module-header .arrow {
-            opacity: 0;
-            width: 0;
-            overflow: hidden;
-            margin: 0;
         }
         
         .nav-module.active .nav-module-header .arrow {
@@ -290,14 +300,6 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             max-height: 500px;
         }
         
-        .sidebar.collapsed .nav-submodules {
-            display: none !important;
-        }
-        
-        .sidebar.collapsed .nav-module.active .nav-submodules {
-            display: none !important;
-        }
-        
         .nav-submodule {
             padding: 0.75rem 1.5rem 0.75rem 3.5rem;
             color: rgba(255, 255, 255, 0.75);
@@ -312,10 +314,17 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             position: relative;
         }
         
-        .sidebar.collapsed .nav-submodule {
-            padding: 0.75rem;
-            justify-content: center;
-            min-height: 44px;
+        .nav-submodule:hover {
+            background: rgba(255, 255, 255, 0.05);
+            color: #fff;
+            padding-left: 4rem;
+        }
+        
+        .nav-submodule.active {
+            background: rgba(76, 138, 137, 0.25);
+            color: #4c8a89;
+            border-left: 3px solid #4c8a89;
+            font-weight: 500;
         }
         
         .nav-submodule-icon {
@@ -326,8 +335,6 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             align-items: center;
             justify-content: center;
             flex-shrink: 0;
-            transition: all 0.3s ease;
-            opacity: 1;
         }
         
         .nav-submodule-icon i {
@@ -335,144 +342,8 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             color: rgba(255, 255, 255, 0.75);
         }
         
-        .sidebar.collapsed .nav-submodule-icon {
-            font-size: 1.4rem;
-            width: auto;
-            height: auto;
-            margin: 0;
-            display: flex !important;
-            opacity: 1 !important;
-            visibility: visible !important;
-        }
-        
-        .sidebar.collapsed .nav-submodule-icon i {
-            font-size: 1.2rem;
-        }
-        
         .nav-submodule-text {
             flex: 1;
-            transition: opacity 0.3s ease;
-            opacity: 1;
-        }
-        
-        .sidebar.collapsed .nav-submodule-text {
-            opacity: 0;
-            width: 0;
-            overflow: hidden;
-            display: none;
-        }
-        
-        .sidebar.collapsed .nav-module-header::after,
-        .sidebar.collapsed .nav-submodule::after {
-            content: attr(data-tooltip);
-            position: absolute;
-            left: 100%;
-            top: 50%;
-            transform: translateY(-50%);
-            background: rgba(0, 0, 0, 0.9);
-            color: #fff;
-            padding: 0.5rem 0.75rem;
-            border-radius: 6px;
-            font-size: 0.85rem;
-            white-space: nowrap;
-            opacity: 0;
-            pointer-events: none;
-            transition: opacity 0.2s ease;
-            margin-left: 0.75rem;
-            z-index: 2000;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-        }
-        
-        .sidebar.collapsed .nav-module-header::before,
-        .sidebar.collapsed .nav-submodule::before {
-            content: '';
-            position: absolute;
-            left: 100%;
-            top: 50%;
-            transform: translateY(-50%);
-            border: 6px solid transparent;
-            border-right-color: rgba(0, 0, 0, 0.9);
-            opacity: 0;
-            pointer-events: none;
-            transition: opacity 0.2s ease;
-            margin-left: 0.5rem;
-            z-index: 2001;
-        }
-        
-        .sidebar.collapsed .nav-module-header:hover::after,
-        .sidebar.collapsed .nav-submodule:hover::after {
-            opacity: 1;
-        }
-        
-        .sidebar.collapsed .nav-module-header:hover::before,
-        .sidebar.collapsed .nav-submodule:hover::before {
-            opacity: 1;
-        }
-        
-        .sidebar.collapsed .nav-module {
-            margin-bottom: 0.25rem;
-            display: block !important;
-            visibility: visible !important;
-            opacity: 1 !important;
-            height: auto !important;
-            position: relative;
-        }
-        
-        .sidebar.collapsed .nav-module-header {
-            border-radius: 8px;
-            margin: 0.25rem 0.5rem;
-            padding: 0.75rem;
-            min-height: 48px;
-            max-height: 48px;
-            cursor: pointer;
-            display: flex !important;
-            visibility: visible !important;
-            opacity: 1 !important;
-            justify-content: center;
-            align-items: center;
-            position: relative;
-            box-sizing: border-box;
-        }
-        
-        .sidebar.collapsed .nav-module-header:hover {
-            background: rgba(255, 255, 255, 0.15);
-        }
-        
-        .sidebar.collapsed .nav-module.active .nav-module-header {
-            background: rgba(76, 138, 137, 0.4);
-        }
-        
-        .sidebar.collapsed .nav-module-icon {
-            display: flex !important;
-            visibility: visible !important;
-            opacity: 1 !important;
-            font-size: 1.5rem;
-            position: relative;
-            margin: 0;
-            padding: 0;
-            transform: none;
-        }
-        
-        .nav-submodule:hover {
-            background: rgba(255, 255, 255, 0.05);
-            color: #fff;
-            padding-left: 4rem;
-        }
-        
-        .sidebar.collapsed .nav-submodule:hover {
-            padding-left: 1rem;
-        }
-        
-        .nav-submodule.active {
-            background: rgba(76, 138, 137, 0.25);
-            color: #4c8a89;
-            border-left: 3px solid #4c8a89;
-            font-weight: 500;
-        }
-        
-        .sidebar.collapsed .nav-submodule.active {
-            border-left: none;
-            border-top: 3px solid #4c8a89;
         }
         
         .main-wrapper {
@@ -480,7 +351,6 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             flex: 1;
             display: flex;
             flex-direction: column;
-            min-height: 100vh;
             transition: margin-left 0.3s ease;
         }
         
@@ -520,236 +390,36 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
         }
         
         /* Notification Bell */
-        .notification-container {
-            position: relative;
-            display: flex;
-            align-items: center;
-        }
-        
-        .notification-bell {
-            position: relative;
-            width: 40px;
-            height: 40px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: transparent;
-            border: none;
-            color: var(--text-color);
-            font-size: 1.25rem;
-            cursor: pointer;
-            border-radius: 8px;
-            transition: all 0.2s ease;
-        }
-        
-        .notification-bell:hover {
-            background: rgba(28, 37, 65, 0.05);
-            color: var(--primary-color);
-        }
-        
-        .notification-badge {
-            position: absolute;
-            top: 4px;
-            right: 4px;
-            background: #ef4444;
-            color: white;
-            font-size: 0.7rem;
-            font-weight: 600;
-            padding: 2px 6px;
-            border-radius: 10px;
-            min-width: 18px;
-            text-align: center;
-            display: none;
-        }
-        
-        .notification-badge.show {
-            display: block;
-        }
-        
-        .notification-dropdown {
-            position: absolute;
-            top: calc(100% + 10px);
-            right: 0;
-            width: 380px;
-            max-height: 500px;
-            background: white;
-            border-radius: 12px;
-            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
-            display: none;
-            flex-direction: column;
-            z-index: 1000;
-            overflow: hidden;
-        }
-        
-        .notification-dropdown.show {
-            display: flex;
-        }
-        
-        .notification-header {
-            padding: 1.25rem;
-            border-bottom: 1px solid var(--border-color);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            background: var(--header-bg);
-        }
-        
-        .notification-header h3 {
-            margin: 0;
-            font-size: 1.1rem;
-            font-weight: 600;
-            color: var(--text-color);
-        }
-        
-        .notification-header button {
-            background: transparent;
-            border: none;
-            color: var(--primary-color);
-            font-size: 0.85rem;
-            cursor: pointer;
-            padding: 0.25rem 0.5rem;
-            border-radius: 4px;
-            transition: background 0.2s ease;
-        }
-        
-        .notification-header button:hover {
-            background: rgba(76, 138, 137, 0.1);
-        }
-        
-        .notification-list {
-            flex: 1;
-            overflow-y: auto;
-            max-height: 400px;
-        }
-        
-        .notification-item {
-            padding: 1rem 1.25rem;
-            border-bottom: 1px solid var(--border-color);
-            cursor: pointer;
-            transition: background 0.2s ease;
-            display: flex;
-            gap: 0.75rem;
-            position: relative;
-        }
-        
-        .notification-item:hover {
-            background: #f8f9fa;
-        }
-        
-        .notification-item.unread {
-            background: #f0f9ff;
-            border-left: 3px solid var(--primary-color);
-        }
-        
-        .notification-item.unread::before {
-            content: '';
-            position: absolute;
-            left: 0;
-            top: 50%;
-            transform: translateY(-50%);
-            width: 6px;
-            height: 6px;
-            background: var(--primary-color);
-            border-radius: 50%;
-        }
-        
-        .notification-icon {
-            width: 40px;
-            height: 40px;
-            border-radius: 8px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.1rem;
-            flex-shrink: 0;
-        }
-        
-        .notification-icon.complaint {
-            background: #fee2e2;
-            color: #dc2626;
-        }
-        
-        .notification-icon.tip {
-            background: #fef3c7;
-            color: #d97706;
-        }
-        
-        .notification-icon.volunteer {
-            background: #dbeafe;
-            color: #2563eb;
-        }
-        
-        .notification-icon.event {
-            background: #d1fae5;
-            color: #059669;
-        }
-        
-        .notification-icon.login {
-            background: #dbeafe;
-            color: #2563eb;
-        }
-        
-        .notification-icon.logout {
-            background: #e0e7ff;
-            color: #6366f1;
-        }
-        
-        .notification-content {
-            flex: 1;
-            min-width: 0;
-        }
-        
-        .notification-title {
-            font-weight: 600;
-            color: var(--text-color);
-            font-size: 0.95rem;
-            margin: 0 0 0.25rem 0;
-        }
-        
-        .notification-message {
-            color: var(--text-secondary);
-            font-size: 0.85rem;
-            margin: 0 0 0.5rem 0;
-            line-height: 1.4;
-        }
-        
-        .notification-time {
-            color: var(--text-secondary);
-            font-size: 0.75rem;
-        }
-        
-        .notification-empty {
-            padding: 3rem 1.5rem;
-            text-align: center;
-            color: var(--text-secondary);
-        }
-        
-        .notification-empty i {
-            font-size: 3rem;
-            margin-bottom: 1rem;
-            opacity: 0.3;
-        }
-        
-        /* Date and Time Display */
-        .datetime-display {
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            color: var(--text-color);
-            font-size: 0.9rem;
-            font-weight: 500;
-            margin-right: 1rem;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        }
-        
-        .datetime-display .date-part {
-            color: var(--text-secondary);
-        }
-        
-        .datetime-display .time-part {
-            color: var(--text-color);
-            font-weight: 600;
-        }
+        .notification-container { position: relative; display: flex; align-items: center; }
+        .notification-bell { position: relative; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; background: transparent; border: none; color: var(--text-color); font-size: 1.25rem; cursor: pointer; border-radius: 8px; transition: all 0.2s ease; }
+        .notification-bell:hover { background: rgba(28, 37, 65, 0.05); color: var(--primary-color); }
+        .notification-badge { position: absolute; top: 4px; right: 4px; background: #ef4444; color: white; font-size: 0.7rem; font-weight: 600; padding: 2px 6px; border-radius: 10px; min-width: 18px; text-align: center; display: none; }
+        .notification-badge.show { display: block; }
+        .notification-dropdown { position: absolute; top: calc(100% + 10px); right: 0; width: 380px; max-height: 500px; background: white; border-radius: 12px; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15); display: none; flex-direction: column; z-index: 1000; overflow: hidden; }
+        .notification-dropdown.show { display: flex; }
+        .notification-header { padding: 1.25rem; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; background: var(--header-bg); }
+        .notification-header h3 { margin: 0; font-size: 1.1rem; font-weight: 600; color: var(--text-color); }
+        .notification-header button { background: transparent; border: none; color: var(--primary-color); font-size: 0.85rem; cursor: pointer; padding: 0.25rem 0.5rem; border-radius: 4px; transition: background 0.2s ease; }
+        .notification-header button:hover { background: rgba(76, 138, 137, 0.1); }
+        .notification-list { flex: 1; overflow-y: auto; max-height: 400px; }
+        .notification-item { padding: 1rem 1.25rem; border-bottom: 1px solid var(--border-color); cursor: pointer; transition: background 0.2s ease; display: flex; gap: 0.75rem; position: relative; }
+        .notification-item:hover { background: #f8f9fa; }
+        .notification-item.unread { background: #f0f9ff; border-left: 3px solid var(--primary-color); }
+        .notification-item.unread::before { content: ''; position: absolute; left: 0; top: 50%; transform: translateY(-50%); width: 6px; height: 6px; background: var(--primary-color); border-radius: 50%; }
+        .notification-icon { width: 40px; height: 40px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; flex-shrink: 0; }
+        .notification-icon.complaint { background: #fee2e2; color: #dc2626; }
+        .notification-icon.tip { background: #fef3c7; color: #d97706; }
+        .notification-icon.volunteer { background: #dbeafe; color: #2563eb; }
+        .notification-icon.event { background: #d1fae5; color: #059669; }
+        .notification-content { flex: 1; min-width: 0; }
+        .notification-title { font-weight: 600; color: var(--text-color); font-size: 0.95rem; margin: 0 0 0.25rem 0; }
+        .notification-message { color: var(--text-secondary); font-size: 0.85rem; margin: 0 0 0.5rem 0; line-height: 1.4; }
+        .notification-time { color: var(--text-secondary); font-size: 0.75rem; }
+        .notification-empty { padding: 3rem 1.5rem; text-align: center; color: var(--text-secondary); }
+        .notification-empty i { font-size: 3rem; margin-bottom: 1rem; opacity: 0.3; }
+        .datetime-display { display: flex; align-items: center; gap: 0.75rem; color: var(--text-color); font-size: 0.9rem; font-weight: 500; margin-right: 1rem; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        .datetime-display .date-part { color: var(--text-secondary); }
+        .datetime-display .time-part { color: var(--text-color); font-weight: 600; }
         
         /* Sidebar Logout Button */
         .sidebar-footer {
@@ -800,27 +470,6 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
         .sidebar.collapsed .sidebar-logout-btn {
             justify-content: center;
             padding: 0.875rem;
-        }
-        
-        .logout-btn {
-            padding: 0.5rem 1rem;
-            background: var(--primary-color);
-            color: #fff;
-            text-decoration: none;
-            border-radius: 6px;
-            font-size: 0.9rem;
-            transition: background 0.2s ease;
-            display: none;
-        }
-        
-        .logout-btn:hover {
-            background: #4ca8a6;
-        }
-        
-        .content-area {
-            padding: 2rem;
-            flex: 1;
-            background: #f5f5f5;
         }
         
         .content-burger-btn {
@@ -877,6 +526,13 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             margin: 0;
         }
         
+        .content-area {
+            flex: 1;
+            padding: 2rem;
+            overflow-y: auto;
+            background: #f5f5f5;
+        }
+        
         .page-content {
             background: var(--card-bg);
             border: 1px solid var(--border-color);
@@ -886,227 +542,66 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             margin-top: 1.5rem;
         }
         
-        .form-group {
-            margin-bottom: 1.25rem;
-        }
-        
-        .form-group label {
-            display: block;
-            margin-bottom: 0.5rem;
-            color: var(--text-color);
-            font-weight: 500;
-            font-size: 0.9rem;
-        }
-        
-        .form-group input,
-        .form-group select,
-        .form-group textarea {
-            width: 100%;
-            padding: 0.75rem;
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
-            font-size: 0.95rem;
-            font-family: var(--font-family);
-            transition: all 0.2s ease;
-            box-sizing: border-box;
-        }
-        
-        .form-group input:focus,
-        .form-group select:focus,
-        .form-group textarea:focus {
-            outline: none;
-            border-color: var(--primary-color);
-            box-shadow: 0 0 0 3px rgba(76, 138, 137, 0.1);
-        }
-        
-        .form-group textarea {
-            resize: vertical;
-            min-height: 120px;
-        }
-        
-        .form-actions {
-            display: flex;
-            gap: 1rem;
-            justify-content: flex-end;
-            margin-top: 2rem;
-            padding-top: 1.5rem;
-            border-top: 1px solid var(--border-color);
-        }
-        
-        .btn-cancel, .btn-submit {
-            padding: 0.75rem 1.5rem;
-            border: none;
-            border-radius: 8px;
-            font-size: 0.95rem;
-            font-weight: 500;
-            cursor: pointer;
-            transition: all 0.2s ease;
-        }
-        
-        .btn-cancel {
-            background: #e5e5e5;
-            color: var(--text-color);
-        }
-        
-        .btn-cancel:hover {
-            background: #d5d5d5;
-        }
-        
-        .btn-submit {
-            background: var(--primary-color);
-            color: #fff;
-        }
-        
-        .btn-submit:hover {
-            background: #4ca8a6;
-        }
-        
-        .btn-submit:disabled {
-            background: #ccc;
-            cursor: not-allowed;
-        }
-        
-        .form-row {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 1rem;
-        }
-        
-        /* Success Modal */
-        .success-modal {
-            display: none;
-            position: fixed;
-            z-index: 2000;
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.5);
-            backdrop-filter: blur(4px);
-        }
-        
-        .success-modal.active {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        
-        .success-modal-content {
+        .table-container {
             background: var(--card-bg);
-            border-radius: 12px;
-            padding: 2rem;
-            max-width: 500px;
-            width: 90%;
-            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
-            text-align: center;
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            overflow: hidden;
+            box-shadow: 0 2px 8px var(--shadow);
         }
         
-        .success-icon {
-            width: 80px;
-            height: 80px;
-            margin: 0 auto 1.5rem;
-            background: #d1e7dd;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 2.5rem;
-            color: #0f5132;
+        table {
+            width: 100%;
+            border-collapse: collapse;
         }
         
-        .success-modal-content h2 {
-            color: var(--tertiary-color);
-            margin-bottom: 1rem;
-        }
-        
-        .success-modal-content p {
-            color: var(--text-color);
-            margin-bottom: 0.5rem;
-        }
-        
-        .complaint-id-display {
-            background: #f9f9f9;
-            padding: 1rem;
-            border-radius: 8px;
-            margin: 1rem 0;
-            font-size: 1.1rem;
-            font-weight: 600;
-            color: var(--primary-color);
-        }
-        
-        .success-modal-actions {
-            display: flex;
-            gap: 1rem;
-            justify-content: center;
-            margin-top: 1.5rem;
-        }
-        
-        .btn-secondary {
-            padding: 0.75rem 1.5rem;
-            border: none;
-            border-radius: 8px;
-            font-size: 0.95rem;
-            font-weight: 500;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            background: #e5e5e5;
-            color: var(--text-color);
-        }
-        
-        .btn-secondary:hover {
-            background: #d5d5d5;
-        }
-        
-        .btn-primary {
-            padding: 0.75rem 1.5rem;
-            border: none;
-            border-radius: 8px;
-            font-size: 0.95rem;
-            font-weight: 500;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            background: var(--primary-color);
+        thead {
+            background: var(--tertiary-color);
             color: #fff;
-            text-decoration: none;
-            display: inline-block;
         }
         
-        .btn-primary:hover {
-            background: #4ca8a6;
+        th {
+            padding: 1rem;
+            text-align: left;
+            font-weight: 600;
+            font-size: 0.95rem;
         }
         
-        @media (max-width: 768px) {
-            .sidebar {
-                width: 320px;
-                transform: translateX(-100%);
-                transition: transform 0.3s ease;
-            }
-            
-            .sidebar.mobile-open {
-                transform: translateX(0);
-            }
-            
-            .sidebar.collapsed {
-                width: 80px;
-                transform: translateX(0);
-            }
-            
-            .main-wrapper {
-                margin-left: 0;
-            }
-            
-            body.sidebar-collapsed .main-wrapper {
-                margin-left: 80px;
-            }
-            
-            .form-row {
-                grid-template-columns: 1fr;
-            }
+        td {
+            padding: 1rem;
+            border-top: 1px solid var(--border-color);
+            color: var(--text-color);
+        }
+        
+        tbody tr:hover {
+            background: rgba(76, 138, 137, 0.05);
+        }
+        
+        .status-badge {
+            padding: 0.25rem 0.75rem;
+            border-radius: 12px;
+            font-size: 0.875rem;
+            font-weight: 500;
+        }
+        
+        .status-success {
+            background: #d1fae5;
+            color: #065f46;
+        }
+        
+        .status-failed {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+        
+        .status-locked {
+            background: #fef3c7;
+            color: #92400e;
         }
     </style>
 </head>
 <body>
-    <!-- Sidebar Navigation -->
+    <!-- Sidebar -->
     <aside class="sidebar" id="sidebar">
         <div class="sidebar-header">
             <div class="logo-container">
@@ -1182,14 +677,14 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                 </div>
             </div>
             
-            <div class="nav-module active">
+            <div class="nav-module">
                 <div class="nav-module-header" onclick="toggleModule(this)" data-tooltip="Community Complaint Logging and Resolution">
                     <span class="nav-module-icon"><i class="fas fa-file-alt"></i></span>
                     <span class="nav-module-header-text">Community Complaint Logging and Resolution</span>
                     <span class="arrow">▶</span>
                 </div>
                 <div class="nav-submodules">
-                    <a href="submit-complaint.php" class="nav-submodule active" data-tooltip="Submit Complaint">
+                    <a href="submit-complaint.php" class="nav-submodule" data-tooltip="Submit Complaint">
                         <span class="nav-submodule-icon"><i class="fas fa-edit"></i></span>
                         <span class="nav-submodule-text">Submit Complaint</span>
                     </a>
@@ -1282,14 +777,14 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
         </div>
     </aside>
     
-    <!-- Main Content Area -->
+    <!-- Main Content -->
     <div class="main-wrapper">
         <header class="top-header">
             <div class="top-header-content">
                 <button class="content-burger-btn" onclick="toggleSidebar()" aria-label="Toggle sidebar">
                     <span></span>
                 </button>
-                <h1 class="page-title">Submit Complaint</h1>
+                <h1 class="page-title">Login History</h1>
             </div>
             <div class="user-info">
                 <div class="datetime-display">
@@ -1319,94 +814,46 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
         
         <main class="content-area">
             <div class="page-content">
-                <form id="complaintForm" onsubmit="submitComplaint(event)">
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="complainantName">Complainant Name *</label>
-                            <input type="text" id="complainantName" name="complainantName" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="complainantContact">Contact Number *</label>
-                            <input type="tel" id="complainantContact" name="complainantContact" required>
-                        </div>
-                    </div>
-                    
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="complainantAddress">Address *</label>
-                            <input type="text" id="complainantAddress" name="complainantAddress" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="complaintDate">Date of Incident *</label>
-                            <input type="date" id="complaintDate" name="complaintDate" required>
-                        </div>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="complaintType">Complaint Type *</label>
-                        <select id="complaintType" name="complaintType" required>
-                            <option value="">Select Type</option>
-                            <option value="Noise">Noise Complaint</option>
-                            <option value="Vandalism">Vandalism</option>
-                            <option value="Trespassing">Trespassing</option>
-                            <option value="Safety">Safety Concern</option>
-                            <option value="Other">Other</option>
-                        </select>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="complaintLocation">Location of Incident *</label>
-                        <input type="text" id="complaintLocation" name="complaintLocation" required>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="complaintDescription">Description of Complaint *</label>
-                        <textarea id="complaintDescription" name="complaintDescription" required placeholder="Please provide detailed information about your complaint..."></textarea>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="complaintPriority">Priority Level *</label>
-                        <select id="complaintPriority" name="complaintPriority" required>
-                            <option value="">Select Priority</option>
-                            <option value="Low">Low</option>
-                            <option value="Medium">Medium</option>
-                            <option value="High">High</option>
-                            <option value="Urgent">Urgent</option>
-                        </select>
-                    </div>
-                    
-                    <div class="form-actions">
-                        <button type="button" class="btn-cancel" onclick="resetForm()">Reset</button>
-                        <button type="submit" class="btn-submit">Submit Complaint</button>
-                    </div>
-                </form>
+                <div class="table-container">
+                    <table id="loginHistoryTable">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Username</th>
+                                <th>Login Date</th>
+                                <th>IP Address</th>
+                                <th>Status</th>
+                                <th>Logout Date</th>
+                            </tr>
+                        </thead>
+                        <tbody id="loginHistoryTableBody">
+                            <!-- Login history will be loaded here -->
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </main>
     </div>
     
-    <!-- Success Modal -->
-    <div id="successModal" class="success-modal">
-        <div class="success-modal-content">
-            <div class="success-icon">✓</div>
-            <h2>Complaint Submitted Successfully!</h2>
-            <p>Your complaint has been received and will be processed.</p>
-            <div class="complaint-id-display" id="complaintIdDisplay"></div>
-            <p style="font-size: 0.9rem; color: var(--text-secondary);">Please save this Complaint ID for tracking purposes.</p>
-            <div class="success-modal-actions">
-                <button type="button" class="btn-secondary" onclick="closeSuccessModal()">Submit Another</button>
-                <a href="track-complaint.php" class="btn-primary">Track Complaint</a>
-            </div>
-        </div>
-    </div>
-    
     <script>
+        // Load login history on page load
         document.addEventListener('DOMContentLoaded', function() {
+            loadLoginHistory();
+            
+            // Ensure sidebar is expanded
             const sidebar = document.getElementById('sidebar');
-            const savedState = localStorage.getItem('sidebarCollapsed');
-            if (savedState === 'true') {
-                sidebar.classList.add('collapsed');
-                document.body.classList.add('sidebar-collapsed');
-            }
+            sidebar.classList.remove('collapsed');
+            document.body.classList.remove('sidebar-collapsed');
+            localStorage.setItem('sidebarCollapsed', 'false');
+            
+            // Expand User Management module
+            const allModules = document.querySelectorAll('.nav-module');
+            allModules.forEach(module => {
+                const headerText = module.querySelector('.nav-module-header-text');
+                if (headerText && headerText.textContent.trim() === 'User Management') {
+                    module.classList.add('active');
+                }
+            });
         });
         
         function toggleSidebar() {
@@ -1456,111 +903,53 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             }
         }
         
-        // Generate unique complaint ID
-        function generateComplaintId() {
-            const year = new Date().getFullYear();
-            const timestamp = Date.now();
-            const random = Math.floor(Math.random() * 1000);
-            return `COMP-${year}-${String(random).padStart(3, '0')}`;
+        async function loadLoginHistory() {
+            try {
+                const response = await fetch('api/login-history.php');
+                const result = await response.json();
+                
+                if (result.success) {
+                    displayLoginHistory(result.history);
+                } else {
+                    console.error('Failed to load login history:', result.error);
+                }
+            } catch (error) {
+                console.error('Error loading login history:', error);
+            }
         }
         
-        
-        function submitComplaint(event) {
-            event.preventDefault();
+        function displayLoginHistory(history) {
+            const tbody = document.getElementById('loginHistoryTableBody');
+            tbody.innerHTML = '';
             
-            // Disable submit button to prevent double submission
-            const submitBtn = event.target.querySelector('.btn-submit');
-            submitBtn.disabled = true;
-            submitBtn.textContent = 'Submitting...';
+            if (history.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 2rem; color: var(--text-secondary);">No login history found</td></tr>';
+                return;
+            }
             
-            // Get form values
-            const complaintId = generateComplaintId();
-            const formData = {
-                action: 'create',
-                complaint_id: complaintId,
-                complainant_name: document.getElementById('complainantName').value.trim(),
-                contact_number: document.getElementById('complainantContact').value.trim(),
-                address: document.getElementById('complainantAddress').value.trim(),
-                incident_date: document.getElementById('complaintDate').value,
-                complaint_type: document.getElementById('complaintType').value,
-                location: document.getElementById('complaintLocation').value.trim(),
-                description: document.getElementById('complaintDescription').value.trim(),
-                priority: document.getElementById('complaintPriority').value,
-                status: 'Pending',
-                assigned_to: 'Pending Assignment',
-                notes: 'Complaint submitted and awaiting review.'
-            };
-            
-            // Send to API
-            fetch('api/complaints.php', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(formData)
-            })
-            .then(res => res.json())
-            .then(result => {
-                if (!result.success) {
-                    alert(result.message || 'Failed to submit complaint.');
-                    submitBtn.disabled = false;
-                    submitBtn.textContent = 'Submit Complaint';
-                    return;
-                }
+            history.forEach(entry => {
+                const tr = document.createElement('tr');
+                const statusClass = entry.status === 'Success' ? 'status-success' : 
+                                   entry.status === 'Failed' ? 'status-failed' : 'status-locked';
                 
-                // Show success modal
-                document.getElementById('complaintIdDisplay').textContent = complaintId;
-                document.getElementById('successModal').classList.add('active');
+                tr.innerHTML = `
+                    <td>${entry.id}</td>
+                    <td>${entry.username}</td>
+                    <td>${entry.login_datetime || '-'}</td>
+                    <td>${entry.ip_address || '-'}</td>
+                    <td><span class="status-badge ${statusClass}">${entry.status}</span></td>
+                    <td>${entry.logout_datetime || '-'}</td>
+                `;
                 
-                // Reset form
-                document.getElementById('complaintForm').reset();
-                
-                // Re-enable submit button
-                submitBtn.disabled = false;
-                submitBtn.textContent = 'Submit Complaint';
-            })
-            .catch(err => {
-                console.error('Error submitting complaint:', err);
-                alert('Error submitting complaint. Please try again.');
-                submitBtn.disabled = false;
-                submitBtn.textContent = 'Submit Complaint';
+                tbody.appendChild(tr);
             });
         }
-        
-        function closeSuccessModal() {
-            document.getElementById('successModal').classList.remove('active');
-        }
-        
-        function resetForm() {
-            if (confirm('Are you sure you want to reset the form? All entered data will be lost.')) {
-                document.getElementById('complaintForm').reset();
-            }
-        }
-        
-        // Set default date to today
-        document.addEventListener('DOMContentLoaded', function() {
-            const dateInput = document.getElementById('complaintDate');
-            if (dateInput) {
-                const today = new Date().toISOString().split('T')[0];
-                dateInput.setAttribute('max', today); // Prevent future dates
-            }
-        });
         
         // Date and Time Display
         function updateDateTime() {
             const now = new Date();
-            const dateOptions = { 
-                weekday: 'short', 
-                year: 'numeric', 
-                month: 'short', 
-                day: 'numeric' 
-            };
-            const timeOptions = { 
-                hour: '2-digit', 
-                minute: '2-digit', 
-                second: '2-digit',
-                hour12: true 
-            };
+            const dateOptions = { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' };
+            const timeOptions = { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true };
             
             const dateStr = now.toLocaleDateString('en-US', dateOptions);
             const timeStr = now.toLocaleTimeString('en-US', timeOptions);
@@ -1572,7 +961,6 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             if (timeEl) timeEl.textContent = timeStr;
         }
         
-        // Update date/time immediately and then every second
         updateDateTime();
         setInterval(updateDateTime, 1000);
         
@@ -1586,12 +974,10 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             notificationBadge = document.getElementById('notificationBadge');
             notificationList = document.getElementById('notificationList');
             
-            if (notificationDropdown && notificationBadge && notificationList) {
+            if (notificationDropdown) {
                 loadNotifications();
-                // Refresh notifications every 30 seconds
                 setInterval(loadNotifications, 30000);
                 
-                // Close dropdown when clicking outside
                 document.addEventListener('click', function(event) {
                     if (notificationDropdown && !event.target.closest('.notification-container')) {
                         notificationDropdown.classList.remove('show');
@@ -1611,10 +997,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
         
         async function loadNotifications() {
             try {
-                // Sync activities first
                 await fetch('api/notifications.php?action=sync');
-                
-                // Then load notifications
                 const response = await fetch('api/notifications.php?action=list');
                 const data = await response.json();
                 
@@ -1642,76 +1025,39 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             if (!notificationList) return;
             
             if (notifications.length === 0) {
-                notificationList.innerHTML = `
-                    <div class="notification-empty">
-                        <i class="fas fa-bell-slash"></i>
-                        <p>No notifications</p>
-                    </div>
-                `;
+                notificationList.innerHTML = '<div class="notification-empty"><i class="fas fa-bell-slash"></i><p>No notifications</p></div>';
                 return;
             }
             
             notificationList.innerHTML = notifications.map(notif => {
-                let iconClass, icon;
-                if (notif.type === 'complaint' || notif.type === 'incident') {
-                    iconClass = 'complaint';
-                    icon = 'fa-file-alt';
-                } else if (notif.type === 'tip') {
-                    iconClass = 'tip';
-                    icon = 'fa-comments';
-                } else if (notif.type === 'volunteer' || notif.type === 'volunteer_request') {
-                    iconClass = 'volunteer';
-                    icon = 'fa-handshake';
-                } else if (notif.type === 'login') {
-                    iconClass = 'login';
-                    icon = 'fa-sign-in-alt';
-                } else if (notif.type === 'logout') {
-                    iconClass = 'logout';
-                    icon = 'fa-sign-out-alt';
-                } else if (notif.type === 'event' || notif.type === 'event_report' || notif.type === 'patrol') {
-                    iconClass = 'event';
-                    icon = 'fa-bullhorn';
-                } else {
-                    iconClass = 'event';
-                    icon = 'fa-bullhorn';
-                }
+                const iconClass = notif.type === 'complaint' ? 'complaint' : notif.type === 'tip' ? 'tip' : notif.type === 'volunteer' ? 'volunteer' : 'event';
+                const icon = notif.type === 'complaint' ? 'fa-file-alt' : notif.type === 'tip' ? 'fa-comments' : notif.type === 'volunteer' ? 'fa-handshake' : 'fa-bullhorn';
                 
-                const safeLink = (notif.link || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
-                
-                return `
-                    <div class="notification-item ${notif.is_read ? '' : 'unread'}" 
-                         onclick="handleNotificationClick(${notif.id}, '${safeLink}')">
-                        <div class="notification-icon ${iconClass}">
-                            <i class="fas ${icon}"></i>
-                        </div>
-                        <div class="notification-content">
-                            <div class="notification-title">${escapeHtml(notif.title)}</div>
-                            <div class="notification-message">${escapeHtml(notif.message)}</div>
-                            <div class="notification-time">${notif.time_ago}</div>
-                        </div>
+                return `<div class="notification-item ${notif.is_read ? '' : 'unread'}" onclick="handleNotificationClick(${notif.id}, '${notif.link || ''}')">
+                    <div class="notification-icon ${iconClass}"><i class="fas ${icon}"></i></div>
+                    <div class="notification-content">
+                        <div class="notification-title">${escapeHtml(notif.title)}</div>
+                        <div class="notification-message">${escapeHtml(notif.message)}</div>
+                        <div class="notification-time">${notif.time_ago}</div>
                     </div>
-                `;
+                </div>`;
             }).join('');
         }
         
         function handleNotificationClick(id, link) {
-            // Mark as read
             fetch('api/notifications.php?action=mark_read', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                 body: 'id=' + id
             });
             
-            // Remove unread class
             const item = event.currentTarget;
             item.classList.remove('unread');
             
-            // Navigate if link exists
-            if (link && link !== '') {
+            if (link) {
                 window.location.href = link;
             }
             
-            // Reload notifications to update badge
             loadNotifications();
         }
         
@@ -1735,5 +1081,4 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
     </script>
 </body>
 </html>
-
 

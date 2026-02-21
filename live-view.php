@@ -27,8 +27,14 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
         .logo-container a:hover { opacity: 0.8; transform: scale(1.05); }
         .logo-container img { height: 130px; width: 130px; object-fit: contain; transition: all 0.3s ease; }
         .sidebar.collapsed .logo-container img { height: 70px; width: 70px; }
-        .sidebar-nav { padding: 0.5rem 0; overflow: visible; flex: 1; display: flex; flex-direction: column; min-height: 0; }
-        .sidebar.collapsed .sidebar-nav { overflow: visible; display: flex !important; flex-direction: column; }
+        .user-name-display { color: rgba(255, 255, 255, 0.9); font-size: 0.95rem; font-weight: 500; text-align: center; padding: 0.5rem 1rem; transition: all 0.3s ease; word-break: break-word; max-width: 100%; }
+        .sidebar.collapsed .user-name-display { opacity: 0; height: 0; padding: 0; overflow: hidden; font-size: 0; }
+        .sidebar-nav { padding: 0.5rem 0; overflow-y: auto; overflow-x: hidden; flex: 1; display: flex; flex-direction: column; min-height: 0; scrollbar-width: thin; scrollbar-color: rgba(255, 255, 255, 0.3) transparent; }
+        .sidebar-nav::-webkit-scrollbar { width: 6px; }
+        .sidebar-nav::-webkit-scrollbar-track { background: transparent; }
+        .sidebar-nav::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.3); border-radius: 3px; }
+        .sidebar-nav::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.5); }
+        .sidebar.collapsed .sidebar-nav { overflow-y: auto; overflow-x: hidden; display: flex !important; flex-direction: column; }
         .nav-module { margin-bottom: 0.125rem; display: block !important; visibility: visible !important; }
         .sidebar.collapsed .nav-module { display: block !important; visibility: visible !important; }
         .nav-module-header { display: flex; align-items: center; justify-content: space-between; padding: 0.875rem 1.5rem; color: rgba(255, 255, 255, 0.9); cursor: pointer; transition: background-color 0.2s ease, padding 0.3s ease; font-weight: 500; user-select: none; white-space: normal; overflow: visible; font-size: 0.9rem; position: relative; gap: 0.75rem; line-height: 1.4; }
@@ -76,7 +82,15 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
         .top-header-content { flex: 1; display: flex; align-items: center; gap: 1rem; }
         .user-info { display: flex; align-items: center; gap: 1rem; margin-left: 2rem; }
         .user-info span { color: var(--text-color); font-weight: 500; }
-        .logout-btn { padding: 0.5rem 1rem; background: var(--primary-color); color: #fff; text-decoration: none; border-radius: 6px; font-size: 0.9rem; transition: background 0.2s ease; }
+        /* Sidebar Logout Button */
+        .sidebar-footer { margin-top: auto; padding: 1rem; border-top: 1px solid rgba(255, 255, 255, 0.1); }
+        .sidebar-logout-btn { display: flex; align-items: center; gap: 0.75rem; padding: 0.875rem 1.5rem; background: rgba(239, 68, 68, 0.1); color: rgba(255, 255, 255, 0.9); text-decoration: none; border-radius: 8px; font-size: 1rem; font-weight: 500; transition: all 0.2s ease; border: 1px solid rgba(239, 68, 68, 0.2); width: 100%; box-sizing: border-box; }
+        .sidebar-logout-btn:hover { background: rgba(239, 68, 68, 0.2); border-color: rgba(239, 68, 68, 0.4); color: #fff; }
+        .sidebar-logout-btn i { font-size: 1.1rem; flex-shrink: 0; }
+        .sidebar-logout-btn span { flex: 1; transition: opacity 0.3s ease; }
+        .sidebar.collapsed .sidebar-logout-btn span { opacity: 0; width: 0; overflow: hidden; }
+        .sidebar.collapsed .sidebar-logout-btn { justify-content: center; padding: 0.875rem; }
+        .logout-btn { padding: 0.5rem 1rem; background: var(--primary-color); color: #fff; text-decoration: none; border-radius: 6px; font-size: 0.9rem; transition: background 0.2s ease; display: none; }
         .logout-btn:hover { background: #4ca8a6; }
         .content-area { padding: 2rem; flex: 1; background: #f5f5f5; }
         .content-burger-btn { background: transparent; border: none; color: var(--tertiary-color); width: 40px; height: 40px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s ease; flex-shrink: 0; padding: 0; }
@@ -375,6 +389,9 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                 <a href="index.php" style="display: block; cursor: pointer;">
                     <img src="images/tara.png" alt="Alertara Logo" style="display: block;">
                 </a>
+                <div class="user-name-display">
+                    <?php echo htmlspecialchars($_SESSION['username'] ?? 'Admin'); ?>
+                </div>
             </div>
         </div>
         <nav class="sidebar-nav">
@@ -384,11 +401,26 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                 <span class="nav-module-header-text">Dashboard</span>
             </a>
             
-            <!-- User Management Link -->
-            <a href="user-management.php" class="nav-module-header" data-tooltip="User Management" style="text-decoration: none; display: flex; align-items: center; justify-content: space-between; padding: 0.875rem 1.5rem; color: rgba(255, 255, 255, 0.9); cursor: pointer; transition: background-color 0.2s ease; font-weight: 500; user-select: none; gap: 0.75rem; <?php echo basename($_SERVER['PHP_SELF']) == 'user-management.php' ? 'background: rgba(76, 138, 137, 0.25); border-left: 3px solid #4c8a89;' : ''; ?>">
-                <span class="nav-module-icon"><i class="fas fa-users-cog"></i></span>
-                <span class="nav-module-header-text">User Management</span>
-            </a>
+            <!-- User Management Module (Admin Only) -->
+            <?php if (isset($_SESSION['user_role']) && $_SESSION['user_role'] === 'Admin'): ?>
+            <div class="nav-module <?php echo (basename($_SERVER['PHP_SELF']) == 'users.php' || basename($_SERVER['PHP_SELF']) == 'login-history.php') ? 'active' : ''; ?>">
+                <div class="nav-module-header" onclick="toggleModule(this)" data-tooltip="User Management">
+                    <span class="nav-module-icon"><i class="fas fa-users-cog"></i></span>
+                    <span class="nav-module-header-text">User Management</span>
+                    <span class="arrow">▶</span>
+                </div>
+                <div class="nav-submodules">
+                    <a href="users.php" class="nav-submodule <?php echo basename($_SERVER['PHP_SELF']) == 'users.php' ? 'active' : ''; ?>" data-tooltip="Users">
+                        <span class="nav-submodule-icon"><i class="fas fa-users"></i></span>
+                        <span class="nav-submodule-text">Users</span>
+                    </a>
+                    <a href="login-history.php" class="nav-submodule <?php echo basename($_SERVER['PHP_SELF']) == 'login-history.php' ? 'active' : ''; ?>" data-tooltip="Login History">
+                        <span class="nav-submodule-icon"><i class="fas fa-history"></i></span>
+                        <span class="nav-submodule-text">Login History</span>
+                    </a>
+                </div>
+            </div>
+            <?php endif; ?>
             
             <div class="nav-module">
                 <div class="nav-module-header" onclick="toggleModule(this)" data-tooltip="Neighborhood Watch Coordination">
@@ -510,6 +542,14 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                 </div>
             </div>
         </nav>
+        
+        <!-- Sidebar Footer with Logout -->
+        <div class="sidebar-footer">
+            <a href="logout.php" class="sidebar-logout-btn" data-tooltip="Logout">
+                <i class="fas fa-sign-out-alt"></i>
+                <span>Logout</span>
+            </a>
+        </div>
     </aside>
     <div class="main-wrapper">
         <header class="top-header">
@@ -520,8 +560,6 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                 <h1 class="page-title">Live View - CCTV Monitoring</h1>
             </div>
             <div class="user-info">
-                <span>Welcome, <?php echo htmlspecialchars($_SESSION['username'] ?? 'Admin'); ?></span>
-                <a href="logout.php" class="logout-btn">Logout</a>
             </div>
         </header>
         <main class="content-area">
@@ -668,13 +706,15 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                 weekday: 'long', 
                 year: 'numeric', 
                 month: 'long', 
-                day: 'numeric' 
+                day: 'numeric',
+                timeZone: 'Asia/Manila'
             });
             const timeStr = now.toLocaleTimeString('en-US', { 
-                hour12: false,
+                hour12: true,
                 hour: '2-digit',
                 minute: '2-digit',
-                second: '2-digit'
+                second: '2-digit',
+                timeZone: 'Asia/Manila'
             });
             document.getElementById('currentDate').textContent = dateStr;
             document.getElementById('currentTime').textContent = timeStr;
@@ -864,9 +904,14 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                         const badgeText = category.charAt(0).toUpperCase() + category.slice(1);
                         
                         // Get emoji/icon for category
-                        // Format timestamp
+                        // Format timestamp in Philippines timezone
                         const detectionTime = new Date(detection.timestamp || Date.now());
-                        const timeStr = detectionTime.toLocaleTimeString();
+                        const timeStr = detectionTime.toLocaleTimeString('en-US', {
+                            hour12: true,
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            timeZone: 'Asia/Manila'
+                        });
                         
                         // Use actual detected object image if available, otherwise use emoji placeholder
                         let imageHTML = '';

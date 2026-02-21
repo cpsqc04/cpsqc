@@ -3,6 +3,9 @@
 // All modules should include this file (require_once 'db.php') to use the same PDO instance.
 // Uses .env file for configuration with automatic environment detection.
 
+// Set default timezone to Philippines (Asia/Manila)
+date_default_timezone_set('Asia/Manila');
+
 /**
  * Load environment variables from .env file
  */
