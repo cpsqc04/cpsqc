@@ -367,44 +367,62 @@ function logLoginHistory(PDO $pdo, $userId, $username, $status, $ipAddress = nul
         
         // Create notification for successful logins only
         if ($status === 'Success') {
-            // Ensure notifications table exists
-            $pdo->exec("CREATE TABLE IF NOT EXISTS notifications (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                user_id INT DEFAULT NULL,
-                type VARCHAR(50) NOT NULL,
-                title VARCHAR(255) NOT NULL,
-                message TEXT NOT NULL,
-                link VARCHAR(255) DEFAULT NULL,
-                is_read TINYINT(1) DEFAULT 0,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                INDEX idx_user_id (user_id),
-                INDEX idx_is_read (is_read),
-                INDEX idx_created_at (created_at)
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
-            
-            // Format login time
-            $loginTime = date('M j, Y g:i:s A');
-            $message = "User {$username} logged in from IP {$ipAddress} at {$loginTime}";
-            
-            // Create notification for the user who logged in (user_id = userId)
-            $notifStmt = $pdo->prepare('INSERT INTO notifications (user_id, type, title, message, link, created_at) VALUES (:user_id, :type, :title, :message, :link, NOW())');
-            $notifStmt->execute([
-                ':user_id' => $userId,
-                ':type' => 'login',
-                ':title' => 'Login Successful',
-                ':message' => $message,
-                ':link' => 'login-history.php'
-            ]);
-            
-            // Also create a notification for admins (user_id = NULL means visible to all admins)
-            // This will be filtered in the API based on role
-            $adminNotifStmt = $pdo->prepare('INSERT INTO notifications (user_id, type, title, message, link, created_at) VALUES (NULL, :type, :title, :message, :link, NOW())');
-            $adminNotifStmt->execute([
-                ':type' => 'login',
-                ':title' => 'User Login',
-                ':message' => $message,
-                ':link' => 'login-history.php'
-            ]);
+            try {
+                // Ensure notifications table exists
+                $pdo->exec("CREATE TABLE IF NOT EXISTS notifications (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    user_id INT DEFAULT NULL,
+                    type VARCHAR(50) NOT NULL,
+                    title VARCHAR(255) NOT NULL,
+                    message TEXT NOT NULL,
+                    link VARCHAR(255) DEFAULT NULL,
+                    is_read TINYINT(1) DEFAULT 0,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    INDEX idx_user_id (user_id),
+                    INDEX idx_is_read (is_read),
+                    INDEX idx_created_at (created_at)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+                
+                // Format login time
+                $loginTime = date('M j, Y g:i:s A');
+                $message = "User {$username} logged in from IP {$ipAddress} at {$loginTime}";
+                
+                // Create notification for the user who logged in (user_id = userId)
+                try {
+                    $notifStmt = $pdo->prepare('INSERT INTO notifications (user_id, type, title, message, link, created_at) VALUES (:user_id, :type, :title, :message, :link, NOW())');
+                    $notifStmt->execute([
+                        ':user_id' => $userId,
+                        ':type' => 'login',
+                        ':title' => 'Login Successful',
+                        ':message' => $message,
+                        ':link' => 'login-history.php'
+                    ]);
+                    error_log("Login notification created successfully for user_id: {$userId}");
+                } catch (PDOException $notifError) {
+                    error_log('Failed to create user login notification: ' . $notifError->getMessage());
+                    error_log('Notification insert params - user_id: ' . $userId . ', type: login, title: Login Successful');
+                    // Continue to try admin notification
+                }
+                
+                // Also create a notification for admins (user_id = NULL means visible to all admins)
+                // This will be filtered in the API based on role
+                try {
+                    $adminNotifStmt = $pdo->prepare('INSERT INTO notifications (user_id, type, title, message, link, created_at) VALUES (NULL, :type, :title, :message, :link, NOW())');
+                    $adminNotifStmt->execute([
+                        ':type' => 'login',
+                        ':title' => 'User Login',
+                        ':message' => $message,
+                        ':link' => 'login-history.php'
+                    ]);
+                    error_log("Admin login notification created successfully");
+                } catch (PDOException $adminNotifError) {
+                    error_log('Failed to create admin login notification: ' . $adminNotifError->getMessage());
+                    error_log('Admin notification insert params - user_id: NULL, type: login, title: User Login');
+                }
+            } catch (PDOException $notifTableError) {
+                error_log('Failed to create notifications table or insert notifications: ' . $notifTableError->getMessage());
+                error_log('Notifications table creation error details: ' . print_r($notifTableError->errorInfo, true));
+            }
         }
         
         return $loginHistoryId;
