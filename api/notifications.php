@@ -3,6 +3,33 @@
 header('Content-Type: application/json');
 ob_start();
 
+// Helper function - define early to avoid issues
+function getTimeAgo($datetime) {
+    if (empty($datetime)) {
+        return 'Unknown';
+    }
+    $timestamp = strtotime($datetime);
+    if ($timestamp === false) {
+        return 'Invalid date';
+    }
+    $diff = time() - $timestamp;
+    
+    if ($diff < 60) {
+        return 'Just now';
+    } elseif ($diff < 3600) {
+        $mins = floor($diff / 60);
+        return $mins . ' minute' . ($mins > 1 ? 's' : '') . ' ago';
+    } elseif ($diff < 86400) {
+        $hours = floor($diff / 3600);
+        return $hours . ' hour' . ($hours > 1 ? 's' : '') . ' ago';
+    } elseif ($diff < 604800) {
+        $days = floor($diff / 86400);
+        return $days . ' day' . ($days > 1 ? 's' : '') . ' ago';
+    } else {
+        return date('M j, Y', $timestamp);
+    }
+}
+
 // Start session if not already started
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
@@ -16,7 +43,23 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
     exit;
 }
 
-require_once __DIR__ . '/../db.php';
+// Load database connection with error handling
+try {
+    require_once __DIR__ . '/../db.php';
+    if (!isset($pdo)) {
+        throw new Exception('Database connection not available');
+    }
+} catch (Exception $e) {
+    ob_clean();
+    http_response_code(500);
+    error_log('Notifications API - Database connection failed: ' . $e->getMessage());
+    echo json_encode([
+        'success' => false, 
+        'error' => 'Database connection failed',
+        'message' => 'Unable to connect to database. Please contact administrator.'
+    ]);
+    exit;
+}
 
 // Ensure notifications table exists
 try {
@@ -493,23 +536,5 @@ try {
     ]);
 }
 
-function getTimeAgo($datetime) {
-    $timestamp = strtotime($datetime);
-    $diff = time() - $timestamp;
-    
-    if ($diff < 60) {
-        return 'Just now';
-    } elseif ($diff < 3600) {
-        $mins = floor($diff / 60);
-        return $mins . ' minute' . ($mins > 1 ? 's' : '') . ' ago';
-    } elseif ($diff < 86400) {
-        $hours = floor($diff / 3600);
-        return $hours . ' hour' . ($hours > 1 ? 's' : '') . ' ago';
-    } elseif ($diff < 604800) {
-        $days = floor($diff / 86400);
-        return $days . ' day' . ($days > 1 ? 's' : '') . ' ago';
-    } else {
-        return date('M j, Y', $timestamp);
-    }
-}
+// getTimeAgo function is now defined at the top of the file
 

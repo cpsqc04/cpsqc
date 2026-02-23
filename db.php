@@ -107,5 +107,10 @@ try {
         PDO::ATTR_EMULATE_PREPARES   => false,
     ]);
 } catch (PDOException $e) {
-    die('Database connection failed: ' . htmlspecialchars($e->getMessage()));
+    // Log error instead of dying to allow graceful error handling
+    error_log('Database connection failed: ' . $e->getMessage());
+    // Set $pdo to null so calling code can check and handle gracefully
+    $pdo = null;
+    // Don't die() - let the calling code handle the error
+    // This prevents 500 errors and allows proper error responses
 }
