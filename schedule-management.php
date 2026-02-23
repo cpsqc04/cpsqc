@@ -487,9 +487,9 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                         <span class="nav-submodule-icon"><i class="fas fa-user"></i></span>
                         <span class="nav-submodule-text">Volunteer List</span>
                     </a>
-                    <a href="schedule-management.php" class="nav-submodule active" data-tooltip="Schedule Management">
+                    <a href="schedule-management.php" class="nav-submodule active" data-tooltip="Volunteer Request">
                         <span class="nav-submodule-icon"><i class="fas fa-calendar"></i></span>
-                        <span class="nav-submodule-text">Schedule Management</span>
+                        <span class="nav-submodule-text">Volunteer Request</span>
                     </a>
                 </div>
             </div>
@@ -560,7 +560,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                 <button class="content-burger-btn" onclick="toggleSidebar()" aria-label="Toggle sidebar">
                     <span></span>
                 </button>
-                <h1 class="page-title">Schedule Management</h1>
+                <h1 class="page-title">Volunteer Request</h1>
             </div>
             <div class="user-info">
                 <div class="datetime-display">

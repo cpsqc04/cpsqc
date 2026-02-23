@@ -480,9 +480,9 @@ $launcher_exists = file_exists('start_cctv_app.bat') || file_exists('start_detec
                         <span class="nav-submodule-icon"><i class="fas fa-user"></i></span>
                         <span class="nav-submodule-text">Volunteer List</span>
                     </a>
-                    <a href="schedule-management.php" class="nav-submodule" data-tooltip="Schedule Management">
+                    <a href="schedule-management.php" class="nav-submodule" data-tooltip="Volunteer Request">
                         <span class="nav-submodule-icon"><i class="fas fa-calendar"></i></span>
-                        <span class="nav-submodule-text">Schedule Management</span>
+                        <span class="nav-submodule-text">Volunteer Request</span>
                     </a>
                 </div>
             </div>
