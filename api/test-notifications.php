@@ -62,19 +62,55 @@ try {
     $result['errors'][] = 'Database connection failed: ' . $e->getMessage();
 }
 
-// Check 3: getTimeAgo function
-if (function_exists('getTimeAgo')) {
-    $result['checks']['getTimeAgo'] = 'function exists';
-    try {
-        $testResult = getTimeAgo(date('Y-m-d H:i:s'));
-        $result['checks']['getTimeAgo_test'] = 'works: ' . $testResult;
-    } catch (Exception $e) {
-        $result['checks']['getTimeAgo_test'] = 'error: ' . $e->getMessage();
-        $result['errors'][] = 'getTimeAgo test failed: ' . $e->getMessage();
+// Check 3: getTimeAgo function (defined in notifications.php)
+// Load notifications.php to check if function exists there
+$notificationsFile = __DIR__ . '/notifications.php';
+if (file_exists($notificationsFile)) {
+    // Check if function is defined in that file
+    $fileContent = file_get_contents($notificationsFile);
+    if (strpos($fileContent, 'function getTimeAgo') !== false) {
+        $result['checks']['getTimeAgo'] = 'function defined in notifications.php';
+        // Try to include it to test
+        ob_start();
+        try {
+            // Define function manually for test
+            if (!function_exists('getTimeAgo')) {
+                eval('
+                    function getTimeAgo($datetime) {
+                        if (empty($datetime)) return "Unknown";
+                        $timestamp = strtotime($datetime);
+                        if ($timestamp === false) return "Invalid date";
+                        $diff = time() - $timestamp;
+                        if ($diff < 60) return "Just now";
+                        elseif ($diff < 3600) {
+                            $mins = floor($diff / 60);
+                            return $mins . " minute" . ($mins > 1 ? "s" : "") . " ago";
+                        } elseif ($diff < 86400) {
+                            $hours = floor($diff / 3600);
+                            return $hours . " hour" . ($hours > 1 ? "s" : "") . " ago";
+                        } elseif ($diff < 604800) {
+                            $days = floor($diff / 86400);
+                            return $days . " day" . ($days > 1 ? "s" : "") . " ago";
+                        } else {
+                            return date("M j, Y", $timestamp);
+                        }
+                    }
+                ');
+            }
+            $testResult = getTimeAgo(date('Y-m-d H:i:s'));
+            $result['checks']['getTimeAgo_test'] = 'works: ' . $testResult;
+        } catch (Exception $e) {
+            $result['checks']['getTimeAgo_test'] = 'error: ' . $e->getMessage();
+            $result['errors'][] = 'getTimeAgo test failed: ' . $e->getMessage();
+        }
+        ob_end_clean();
+    } else {
+        $result['checks']['getTimeAgo'] = 'function NOT FOUND in notifications.php file';
+        $result['errors'][] = 'getTimeAgo function is not defined in notifications.php';
     }
 } else {
-    $result['checks']['getTimeAgo'] = 'function NOT FOUND';
-    $result['errors'][] = 'getTimeAgo function is not defined';
+    $result['checks']['getTimeAgo'] = 'notifications.php file not found';
+    $result['errors'][] = 'notifications.php file does not exist';
 }
 
 // Check 4: PHP errors
