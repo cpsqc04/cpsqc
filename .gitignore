@@ -1,0 +1,43 @@
+# OS Files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Logs
+*.log
+logs/
+
+# Environment variables
+.env
+.env.local
+
+# Dependencies (if using package managers)
+node_modules/
+vendor/
+
+# Temporary files
+*.tmp
+*.temp
+*.cache
+
+# Python caches
+__pycache__/
+*.pyc
+
+# CCTV / detection generated artifacts (keep local, don't commit)
+recordings/
+detected_objects/
+current_frame*.jpg
+detect.lock
+detections.json
+
+# ML model weights (large; download separately)
+*.pt
+
