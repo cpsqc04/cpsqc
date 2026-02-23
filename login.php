@@ -72,6 +72,7 @@ try {
 
 // Email sending functions
 function sendAccountLockEmail($email, $username, $lockedUntil) {
+    // Load email config with fallback to direct .env file read
     $mailHost = $_ENV['MAIL_HOST'] ?? 'smtp.gmail.com';
     $mailPort = (int)($_ENV['MAIL_PORT'] ?? 465);
     $mailUser = $_ENV['MAIL_USERNAME'] ?? '';
@@ -79,6 +80,30 @@ function sendAccountLockEmail($email, $username, $lockedUntil) {
     $mailFrom = $_ENV['MAIL_FROM_ADDRESS'] ?? $mailUser;
     $mailFromName = $_ENV['MAIL_FROM_NAME'] ?? 'AlerTara QC';
     $mailEncryption = $_ENV['MAIL_ENCRYPTION'] ?? 'ssl';
+    
+    // If credentials are empty, try to load from .env file directly
+    if (empty($mailUser) || empty($mailPass)) {
+        $envPath = __DIR__ . DIRECTORY_SEPARATOR . '.env';
+        if (file_exists($envPath)) {
+            $lines = file($envPath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+            foreach ($lines as $line) {
+                if (strpos(trim($line), '#') === 0) continue;
+                if (strpos($line, '=') !== false) {
+                    list($key, $value) = explode('=', $line, 2);
+                    $key = trim($key);
+                    $value = trim($value);
+                    $value = trim($value, '"\'');
+                    if ($key === 'MAIL_USERNAME' && empty($mailUser)) $mailUser = $value;
+                    if ($key === 'MAIL_PASSWORD' && empty($mailPass)) $mailPass = $value;
+                    if ($key === 'MAIL_HOST' && empty($mailHost)) $mailHost = $value;
+                    if ($key === 'MAIL_PORT' && empty($mailPort)) $mailPort = (int)$value;
+                    if ($key === 'MAIL_FROM_ADDRESS' && empty($mailFrom)) $mailFrom = $value;
+                    if ($key === 'MAIL_FROM_NAME' && empty($mailFromName)) $mailFromName = $value;
+                    if ($key === 'MAIL_ENCRYPTION' && empty($mailEncryption)) $mailEncryption = $value;
+                }
+            }
+        }
+    }
     
     if (empty($mailUser) || empty($mailPass) || empty($email)) {
         error_log('Account lock email failed: Email credentials or recipient email not set. MAIL_USERNAME: ' . (!empty($mailUser) ? 'set' : 'empty') . ', MAIL_PASSWORD: ' . (!empty($mailPass) ? 'set' : 'empty') . ', Recipient: ' . ($email ?: 'empty'));
@@ -176,6 +201,7 @@ function sendAccountLockEmail($email, $username, $lockedUntil) {
 }
 
 function sendLoginSuccessEmail($email, $username, $loginTime, $ipAddress) {
+    // Load email config with fallback to direct .env file read
     $mailHost = $_ENV['MAIL_HOST'] ?? 'smtp.gmail.com';
     $mailPort = (int)($_ENV['MAIL_PORT'] ?? 465);
     $mailUser = $_ENV['MAIL_USERNAME'] ?? '';
@@ -183,6 +209,30 @@ function sendLoginSuccessEmail($email, $username, $loginTime, $ipAddress) {
     $mailFrom = $_ENV['MAIL_FROM_ADDRESS'] ?? $mailUser;
     $mailFromName = $_ENV['MAIL_FROM_NAME'] ?? 'AlerTara QC';
     $mailEncryption = $_ENV['MAIL_ENCRYPTION'] ?? 'ssl';
+    
+    // If credentials are empty, try to load from .env file directly
+    if (empty($mailUser) || empty($mailPass)) {
+        $envPath = __DIR__ . DIRECTORY_SEPARATOR . '.env';
+        if (file_exists($envPath)) {
+            $lines = file($envPath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+            foreach ($lines as $line) {
+                if (strpos(trim($line), '#') === 0) continue;
+                if (strpos($line, '=') !== false) {
+                    list($key, $value) = explode('=', $line, 2);
+                    $key = trim($key);
+                    $value = trim($value);
+                    $value = trim($value, '"\'');
+                    if ($key === 'MAIL_USERNAME' && empty($mailUser)) $mailUser = $value;
+                    if ($key === 'MAIL_PASSWORD' && empty($mailPass)) $mailPass = $value;
+                    if ($key === 'MAIL_HOST' && empty($mailHost)) $mailHost = $value;
+                    if ($key === 'MAIL_PORT' && empty($mailPort)) $mailPort = (int)$value;
+                    if ($key === 'MAIL_FROM_ADDRESS' && empty($mailFrom)) $mailFrom = $value;
+                    if ($key === 'MAIL_FROM_NAME' && empty($mailFromName)) $mailFromName = $value;
+                    if ($key === 'MAIL_ENCRYPTION' && empty($mailEncryption)) $mailEncryption = $value;
+                }
+            }
+        }
+    }
     
     if (empty($mailUser) || empty($mailPass) || empty($email)) {
         error_log('Login success email failed: Email credentials or recipient email not set. MAIL_USERNAME: ' . (!empty($mailUser) ? 'set' : 'empty') . ', MAIL_PASSWORD: ' . (!empty($mailPass) ? 'set' : 'empty') . ', Recipient: ' . ($email ?: 'empty'));

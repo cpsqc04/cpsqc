@@ -2,12 +2,31 @@
 session_start();
 ob_start();
 header('Content-Type: application/json');
+
+// Load database connection (this also loads .env file)
 require_once __DIR__ . '/../db.php';
 
 // Load PHPMailer via Composer autoloader
 $autoloadPath = __DIR__ . '/../vendor/autoload.php';
 if (file_exists($autoloadPath)) {
     require_once $autoloadPath;
+}
+
+// Ensure $_ENV is populated (db.php should load it, but double-check)
+if (empty($_ENV) && file_exists(__DIR__ . '/../.env')) {
+    // Fallback: load .env manually if not loaded
+    $envPath = __DIR__ . '/../.env';
+    $lines = file($envPath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+    foreach ($lines as $line) {
+        if (strpos(trim($line), '#') === 0) continue;
+        if (strpos($line, '=') !== false) {
+            list($key, $value) = explode('=', $line, 2);
+            $key = trim($key);
+            $value = trim($value);
+            $value = trim($value, '"\'');
+            $_ENV[$key] = $value;
+        }
+    }
 }
 
 $action = $_GET['action'] ?? $_POST['action'] ?? '';
@@ -19,18 +38,43 @@ function generateOTP() {
 
 // Send OTP via email (using PHPMailer if available, otherwise use native mail)
 function sendOTPEmail($email, $otp) {
-    // Get email credentials from .env
+    // Get email credentials from .env (with fallback to direct file read)
     $mailHost = $_ENV['MAIL_HOST'] ?? 'smtp.gmail.com';
     $mailPort = (int)($_ENV['MAIL_PORT'] ?? 465);
-    $mailUser = $_ENV['MAIL_USERNAME'] ?? 'cpsqc04@gmail.com';
-    $mailPass = $_ENV['MAIL_PASSWORD'] ?? 'izoanendvacbwftf';
+    $mailUser = $_ENV['MAIL_USERNAME'] ?? '';
+    $mailPass = $_ENV['MAIL_PASSWORD'] ?? '';
     $mailFrom = $_ENV['MAIL_FROM_ADDRESS'] ?? $mailUser;
     $mailFromName = $_ENV['MAIL_FROM_NAME'] ?? 'AlerTara QC';
     $mailEncryption = $_ENV['MAIL_ENCRYPTION'] ?? 'ssl';
     
+    // If credentials are empty, try to load from .env file directly
+    if (empty($mailUser) || empty($mailPass)) {
+        $envPath = __DIR__ . '/../.env';
+        if (file_exists($envPath)) {
+            $lines = file($envPath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+            foreach ($lines as $line) {
+                if (strpos(trim($line), '#') === 0) continue;
+                if (strpos($line, '=') !== false) {
+                    list($key, $value) = explode('=', $line, 2);
+                    $key = trim($key);
+                    $value = trim($value);
+                    $value = trim($value, '"\'');
+                    if ($key === 'MAIL_USERNAME' && empty($mailUser)) $mailUser = $value;
+                    if ($key === 'MAIL_PASSWORD' && empty($mailPass)) $mailPass = $value;
+                    if ($key === 'MAIL_HOST' && empty($mailHost)) $mailHost = $value;
+                    if ($key === 'MAIL_PORT' && empty($mailPort)) $mailPort = (int)$value;
+                    if ($key === 'MAIL_FROM_ADDRESS' && empty($mailFrom)) $mailFrom = $value;
+                    if ($key === 'MAIL_FROM_NAME' && empty($mailFromName)) $mailFromName = $value;
+                    if ($key === 'MAIL_ENCRYPTION' && empty($mailEncryption)) $mailEncryption = $value;
+                }
+            }
+        }
+    }
+    
     if (empty($mailUser) || empty($mailPass)) {
         error_log('OTP email failed: Email credentials not set in .env - MAIL_USERNAME: ' . (!empty($mailUser) ? 'set' : 'empty') . ', MAIL_PASSWORD: ' . (!empty($mailPass) ? 'set' : 'empty'));
         error_log('Email config check - Host: ' . $mailHost . ', Port: ' . $mailPort . ', Encryption: ' . $mailEncryption);
+        error_log('ENV vars available: ' . implode(', ', array_keys($_ENV)));
         return false;
     }
     
@@ -65,6 +109,12 @@ function sendOTPEmail($email, $otp) {
                     'allow_self_signed' => true,
                 ],
             ];
+            
+            // Enable verbose debug output (only in development)
+            $debugMode = isset($_ENV['ENVIRONMENT']) && $_ENV['ENVIRONMENT'] !== 'production';
+            if ($debugMode) {
+                $mail->SMTPDebug = 2; // Enable verbose debug output
+            }
             
             // Recipients
             $mail->setFrom($mailFrom, $mailFromName);
