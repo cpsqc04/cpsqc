@@ -81,7 +81,7 @@ function sendAccountLockEmail($email, $username, $lockedUntil) {
     $mailEncryption = $_ENV['MAIL_ENCRYPTION'] ?? 'ssl';
     
     if (empty($mailUser) || empty($mailPass) || empty($email)) {
-        error_log('Email credentials or recipient email not set');
+        error_log('Account lock email failed: Email credentials or recipient email not set. MAIL_USERNAME: ' . (!empty($mailUser) ? 'set' : 'empty') . ', MAIL_PASSWORD: ' . (!empty($mailPass) ? 'set' : 'empty') . ', Recipient: ' . ($email ?: 'empty'));
         return false;
     }
     
@@ -157,9 +157,13 @@ function sendAccountLockEmail($email, $username, $lockedUntil) {
             ";
             
             $mail->send();
+            error_log("Account lock email sent successfully to {$email} for user {$username}");
             return true;
         } catch (Exception $e) {
-            error_log('Account lock email send failed: ' . $mail->ErrorInfo);
+            $errorMsg = 'Account lock email send failed: ' . ($mail->ErrorInfo ?? $e->getMessage());
+            error_log($errorMsg);
+            error_log('PHPMailer Exception details: ' . $e->getMessage());
+            error_log('Email config - Host: ' . $mailHost . ', Port: ' . $mailPort . ', User: ' . ($mailUser ? 'set' : 'empty') . ', Encryption: ' . $mailEncryption);
             return false;
         }
     }
@@ -181,7 +185,7 @@ function sendLoginSuccessEmail($email, $username, $loginTime, $ipAddress) {
     $mailEncryption = $_ENV['MAIL_ENCRYPTION'] ?? 'ssl';
     
     if (empty($mailUser) || empty($mailPass) || empty($email)) {
-        error_log('Email credentials or recipient email not set');
+        error_log('Login success email failed: Email credentials or recipient email not set. MAIL_USERNAME: ' . (!empty($mailUser) ? 'set' : 'empty') . ', MAIL_PASSWORD: ' . (!empty($mailPass) ? 'set' : 'empty') . ', Recipient: ' . ($email ?: 'empty'));
         return false;
     }
     
@@ -262,9 +266,13 @@ function sendLoginSuccessEmail($email, $username, $loginTime, $ipAddress) {
             ";
             
             $mail->send();
+            error_log("Login success email sent successfully to {$email} for user {$username}");
             return true;
         } catch (Exception $e) {
-            error_log('Login success email send failed: ' . $mail->ErrorInfo);
+            $errorMsg = 'Login success email send failed: ' . ($mail->ErrorInfo ?? $e->getMessage());
+            error_log($errorMsg);
+            error_log('PHPMailer Exception details: ' . $e->getMessage());
+            error_log('Email config - Host: ' . $mailHost . ', Port: ' . $mailPort . ', User: ' . ($mailUser ? 'set' : 'empty') . ', Encryption: ' . $mailEncryption);
             return false;
         }
     }
@@ -530,7 +538,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($error)) {
     }
 }
 
-// Get attempts remaining for display (if user exists)
+// Get attempts remaining for display (if user exists and not already set)
 if (!isset($attemptsRemaining) && isset($_POST['username'])) {
     $username = trim($_POST['username'] ?? '');
     if (!empty($username)) {
@@ -542,6 +550,9 @@ if (!isset($attemptsRemaining) && isset($_POST['username'])) {
             if (!$lockedUntil || strtotime($lockedUntil) <= time()) {
                 $failedAttempts = (int)($admin['failed_attempts'] ?? 0);
                 $attemptsRemaining = max(0, 3 - $failedAttempts);
+            } else {
+                // Account is locked
+                $attemptsRemaining = 0;
             }
         }
     }
@@ -967,9 +978,14 @@ if (isset($_SESSION['admin_logged_in']) && $_SESSION['admin_logged_in'] === true
                     </div>
                 <?php endif; ?>
                 <?php if (isset($attemptsRemaining) && $attemptsRemaining > 0 && $attemptsRemaining < 3): ?>
-                    <div style="color: #f59e0b; font-size: 0.9rem; padding: 0.75rem; background: rgba(245, 158, 11, 0.1); border-radius: 6px; margin-bottom: 1rem; border: 1px solid rgba(245, 158, 11, 0.2);">
-                        <i class="fas fa-exclamation-triangle" style="margin-right: 0.5rem;"></i>
-                        You have <?php echo $attemptsRemaining; ?> more <?php echo $attemptsRemaining === 1 ? 'attempt' : 'attempts'; ?> before your account is locked.
+                    <div style="color: #f59e0b; font-size: 0.9rem; padding: 0.75rem; background: rgba(245, 158, 11, 0.1); border-radius: 6px; margin-bottom: 1rem; border: 1px solid rgba(245, 158, 11, 0.2); display: flex; align-items: center; gap: 0.5rem;">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <span><strong>Warning:</strong> You have <?php echo $attemptsRemaining; ?> more <?php echo $attemptsRemaining === 1 ? 'attempt' : 'attempts'; ?> remaining before your account is locked for 30 minutes.</span>
+                    </div>
+                <?php elseif (isset($_POST['username']) && isset($attemptsRemaining) && $attemptsRemaining === 0): ?>
+                    <div style="color: #ef4444; font-size: 0.9rem; padding: 0.75rem; background: rgba(239, 68, 68, 0.1); border-radius: 6px; margin-bottom: 1rem; border: 1px solid rgba(239, 68, 68, 0.2); display: flex; align-items: center; gap: 0.5rem;">
+                        <i class="fas fa-lock"></i>
+                        <span><strong>Account Locked:</strong> Your account has been locked due to multiple failed login attempts. Please wait 30 minutes or contact an administrator.</span>
                     </div>
                 <?php endif; ?>
                 <form method="POST" action="">

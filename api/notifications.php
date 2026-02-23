@@ -3,12 +3,16 @@
 header('Content-Type: application/json');
 ob_start();
 
-session_start();
+// Start session if not already started
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
+// Check authentication
 if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
     ob_clean();
     http_response_code(401);
-    echo json_encode(['success' => false, 'error' => 'Unauthorized']);
+    echo json_encode(['success' => false, 'error' => 'Unauthorized', 'message' => 'Please log in to view notifications']);
     exit;
 }
 
@@ -36,6 +40,12 @@ try {
 $action = $_GET['action'] ?? 'list';
 $userId = $_SESSION['user_id'] ?? null;
 
+// Debug mode - only log in development
+$debugMode = isset($_ENV['ENVIRONMENT']) && $_ENV['ENVIRONMENT'] !== 'production';
+if ($debugMode) {
+    error_log('Notifications API - Action: ' . $action . ', User ID: ' . ($userId ?? 'null') . ', User Role: ' . ($_SESSION['user_role'] ?? 'not set'));
+}
+
 try {
     if ($action === 'list') {
         // Get user role
@@ -61,46 +71,77 @@ try {
                 WHERE (user_id IS NULL OR user_id = :user_id) AND is_read = 0
             ");
             $unreadStmt->execute([':user_id' => $userId]);
+            
+            $notifications = [];
+            while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+                $notifications[] = [
+                    'id' => (int)$row['id'],
+                    'type' => $row['type'],
+                    'title' => $row['title'],
+                    'message' => $row['message'],
+                    'link' => $row['link'],
+                    'is_read' => (bool)$row['is_read'],
+                    'created_at' => $row['created_at'],
+                    'time_ago' => getTimeAgo($row['created_at'])
+                ];
+            }
+            
+            $unreadCount = (int)$unreadStmt->fetch()['count'];
         } else {
             // Regular users only see their own notifications
-            $stmt = $pdo->prepare("
-                SELECT id, type, title, message, link, is_read, created_at 
-                FROM notifications 
-                WHERE user_id = :user_id 
-                ORDER BY created_at DESC 
-                LIMIT 20
-            ");
-            $stmt->execute([':user_id' => $userId]);
-            
-            $unreadStmt = $pdo->prepare("
-                SELECT COUNT(*) as count 
-                FROM notifications 
-                WHERE user_id = :user_id AND is_read = 0
-            ");
-            $unreadStmt->execute([':user_id' => $userId]);
+            if ($userId === null) {
+                // If no user_id, return empty notifications
+                $notifications = [];
+                $unreadCount = 0;
+            } else {
+                $stmt = $pdo->prepare("
+                    SELECT id, type, title, message, link, is_read, created_at 
+                    FROM notifications 
+                    WHERE user_id = :user_id 
+                    ORDER BY created_at DESC 
+                    LIMIT 20
+                ");
+                $stmt->execute([':user_id' => $userId]);
+                
+                $unreadStmt = $pdo->prepare("
+                    SELECT COUNT(*) as count 
+                    FROM notifications 
+                    WHERE user_id = :user_id AND is_read = 0
+                ");
+                $unreadStmt->execute([':user_id' => $userId]);
+                
+                $notifications = [];
+                while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+                    $notifications[] = [
+                        'id' => (int)$row['id'],
+                        'type' => $row['type'],
+                        'title' => $row['title'],
+                        'message' => $row['message'],
+                        'link' => $row['link'],
+                        'is_read' => (bool)$row['is_read'],
+                        'created_at' => $row['created_at'],
+                        'time_ago' => getTimeAgo($row['created_at'])
+                    ];
+                }
+                
+                $unreadCount = (int)$unreadStmt->fetch()['count'];
+            }
         }
         
-        $notifications = [];
-        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
-            $notifications[] = [
-                'id' => (int)$row['id'],
-                'type' => $row['type'],
-                'title' => $row['title'],
-                'message' => $row['message'],
-                'link' => $row['link'],
-                'is_read' => (bool)$row['is_read'],
-                'created_at' => $row['created_at'],
-                'time_ago' => getTimeAgo($row['created_at'])
-            ];
+        // Ensure notifications is always an array
+        if (!isset($notifications) || !is_array($notifications)) {
+            $notifications = [];
         }
-        
-        $unreadCount = (int)$unreadStmt->fetch()['count'];
+        if (!isset($unreadCount)) {
+            $unreadCount = 0;
+        }
         
         ob_clean();
         echo json_encode([
             'success' => true,
             'notifications' => $notifications,
-            'unread_count' => $unreadCount
+            'unread_count' => $unreadCount,
+            'count' => count($notifications)
         ]);
         
     } elseif ($action === 'mark_read') {
@@ -137,76 +178,88 @@ try {
         $synced = 0;
         
         // Sync recent complaints (last 7 days)
-        $stmt = $pdo->query("
-            SELECT complaint_id, complainant_name, complaint_type, location, submitted_at 
-            FROM complaints 
-            WHERE submitted_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
-            ORDER BY submitted_at DESC
-        ");
-        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
-            // Check if notification already exists
-            $checkStmt = $pdo->prepare("SELECT id FROM notifications WHERE type = 'complaint' AND link = :link LIMIT 1");
-            $checkStmt->execute([':link' => 'track-complaint.php?id=' . $row['complaint_id']]);
-            if (!$checkStmt->fetch()) {
-                $insertStmt = $pdo->prepare("
-                    INSERT INTO notifications (type, title, message, link, created_at) 
-                    VALUES ('complaint', 'New Complaint Submitted', :message, :link, :created_at)
-                ");
-                $insertStmt->execute([
-                    ':message' => 'Complaint #' . $row['complaint_id'] . ' - ' . ($row['complaint_type'] ?? 'Unknown') . ' at ' . ($row['location'] ?? 'Unknown location'),
-                    ':link' => 'track-complaint.php?id=' . $row['complaint_id'],
-                    ':created_at' => $row['submitted_at']
-                ]);
-                $synced++;
+        try {
+            $stmt = $pdo->query("
+                SELECT complaint_id, complainant_name, complaint_type, location, submitted_at 
+                FROM complaints 
+                WHERE submitted_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+                ORDER BY submitted_at DESC
+            ");
+            while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+                // Check if notification already exists
+                $checkStmt = $pdo->prepare("SELECT id FROM notifications WHERE type = 'complaint' AND link = :link LIMIT 1");
+                $checkStmt->execute([':link' => 'track-complaint.php?id=' . $row['complaint_id']]);
+                if (!$checkStmt->fetch()) {
+                    $insertStmt = $pdo->prepare("
+                        INSERT INTO notifications (type, title, message, link, created_at) 
+                        VALUES ('complaint', 'New Complaint Submitted', :message, :link, :created_at)
+                    ");
+                    $insertStmt->execute([
+                        ':message' => 'Complaint #' . $row['complaint_id'] . ' - ' . ($row['complaint_type'] ?? 'Unknown') . ' at ' . ($row['location'] ?? 'Unknown location'),
+                        ':link' => 'track-complaint.php?id=' . $row['complaint_id'],
+                        ':created_at' => $row['submitted_at']
+                    ]);
+                    $synced++;
+                }
             }
+        } catch (PDOException $e) {
+            // Complaints table doesn't exist, skip
         }
         
         // Sync recent tips (last 7 days)
-        $stmt = $pdo->query("
-            SELECT tip_id, location, description, submitted_at 
-            FROM tips 
-            WHERE submitted_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
-            ORDER BY submitted_at DESC
-        ");
-        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
-            $checkStmt = $pdo->prepare("SELECT id FROM notifications WHERE type = 'tip' AND link = :link LIMIT 1");
-            $checkStmt->execute([':link' => 'review-tip.php?id=' . $row['tip_id']]);
-            if (!$checkStmt->fetch()) {
-                $insertStmt = $pdo->prepare("
-                    INSERT INTO notifications (type, title, message, link, created_at) 
-                    VALUES ('tip', 'New Tip Received', :message, :link, :created_at)
-                ");
-                $insertStmt->execute([
-                    ':message' => 'Tip #' . $row['tip_id'] . ' - ' . ($row['location'] ?? 'Unknown location'),
-                    ':link' => 'review-tip.php?id=' . $row['tip_id'],
-                    ':created_at' => $row['submitted_at']
-                ]);
-                $synced++;
+        try {
+            $stmt = $pdo->query("
+                SELECT tip_id, location, description, submitted_at 
+                FROM tips 
+                WHERE submitted_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+                ORDER BY submitted_at DESC
+            ");
+            while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+                $checkStmt = $pdo->prepare("SELECT id FROM notifications WHERE type = 'tip' AND link = :link LIMIT 1");
+                $checkStmt->execute([':link' => 'review-tip.php?id=' . $row['tip_id']]);
+                if (!$checkStmt->fetch()) {
+                    $insertStmt = $pdo->prepare("
+                        INSERT INTO notifications (type, title, message, link, created_at) 
+                        VALUES ('tip', 'New Tip Received', :message, :link, :created_at)
+                    ");
+                    $insertStmt->execute([
+                        ':message' => 'Tip #' . $row['tip_id'] . ' - ' . ($row['location'] ?? 'Unknown location'),
+                        ':link' => 'review-tip.php?id=' . $row['tip_id'],
+                        ':created_at' => $row['submitted_at']
+                    ]);
+                    $synced++;
+                }
             }
+        } catch (PDOException $e) {
+            // Tips table doesn't exist, skip
         }
         
         // Sync recent volunteers (last 7 days)
-        $stmt = $pdo->query("
-            SELECT id, name, status, created_at 
-            FROM volunteers 
-            WHERE created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
-            ORDER BY created_at DESC
-        ");
-        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
-            $checkStmt = $pdo->prepare("SELECT id FROM notifications WHERE type = 'volunteer' AND link = :link LIMIT 1");
-            $checkStmt->execute([':link' => 'volunteer-list.php?id=' . $row['id']]);
-            if (!$checkStmt->fetch()) {
-                $insertStmt = $pdo->prepare("
-                    INSERT INTO notifications (type, title, message, link, created_at) 
-                    VALUES ('volunteer', 'New Volunteer Registration', :message, :link, :created_at)
-                ");
-                $insertStmt->execute([
-                    ':message' => $row['name'] . ' registered as volunteer (Status: ' . $row['status'] . ')',
-                    ':link' => 'volunteer-list.php?id=' . $row['id'],
-                    ':created_at' => $row['created_at']
-                ]);
-                $synced++;
+        try {
+            $stmt = $pdo->query("
+                SELECT id, name, status, created_at 
+                FROM volunteers 
+                WHERE created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+                ORDER BY created_at DESC
+            ");
+            while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+                $checkStmt = $pdo->prepare("SELECT id FROM notifications WHERE type = 'volunteer' AND link = :link LIMIT 1");
+                $checkStmt->execute([':link' => 'volunteer-list.php?id=' . $row['id']]);
+                if (!$checkStmt->fetch()) {
+                    $insertStmt = $pdo->prepare("
+                        INSERT INTO notifications (type, title, message, link, created_at) 
+                        VALUES ('volunteer', 'New Volunteer Registration', :message, :link, :created_at)
+                    ");
+                    $insertStmt->execute([
+                        ':message' => $row['name'] . ' registered as volunteer (Status: ' . $row['status'] . ')',
+                        ':link' => 'volunteer-list.php?id=' . $row['id'],
+                        ':created_at' => $row['created_at']
+                    ]);
+                    $synced++;
+                }
             }
+        } catch (PDOException $e) {
+            // Volunteers table doesn't exist, skip
         }
         
         // Sync recent events (last 7 days)
@@ -277,56 +330,64 @@ try {
         try {
             $stmt = $pdo->query("SHOW TABLES LIKE 'incidents'");
             if ($stmt->rowCount() > 0) {
-                $stmt = $pdo->query("
-                    SELECT id, incident_id, location, incident_type, created_at 
-                    FROM incidents 
-                    WHERE created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
-                    ORDER BY created_at DESC
-                ");
-                while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
-                    $checkStmt = $pdo->prepare("SELECT id FROM notifications WHERE type = 'incident' AND link = :link LIMIT 1");
-                    $checkStmt->execute([':link' => 'incident-feed.php?id=' . ($row['incident_id'] ?? $row['id'])]);
-                    if (!$checkStmt->fetch()) {
-                        $insertStmt = $pdo->prepare("
-                            INSERT INTO notifications (type, title, message, link, created_at) 
-                            VALUES ('incident', 'New Incident Report', :message, :link, :created_at)
-                        ");
-                        $insertStmt->execute([
-                            ':message' => 'Incident #' . ($row['incident_id'] ?? $row['id']) . ' - ' . ($row['incident_type'] ?? 'Unknown') . ' at ' . ($row['location'] ?? 'Unknown location') . ' (Requires patrol assignment)',
-                            ':link' => 'patrol-schedule.php?id=' . ($row['incident_id'] ?? $row['id']),
-                            ':created_at' => $row['created_at']
-                        ]);
-                        $synced++;
+                try {
+                    $stmt = $pdo->query("
+                        SELECT id, incident_id, location, incident_type, created_at 
+                        FROM incidents 
+                        WHERE created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+                        ORDER BY created_at DESC
+                    ");
+                    while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+                        $checkStmt = $pdo->prepare("SELECT id FROM notifications WHERE type = 'incident' AND link = :link LIMIT 1");
+                        $checkStmt->execute([':link' => 'incident-feed.php?id=' . ($row['incident_id'] ?? $row['id'])]);
+                        if (!$checkStmt->fetch()) {
+                            $insertStmt = $pdo->prepare("
+                                INSERT INTO notifications (type, title, message, link, created_at) 
+                                VALUES ('incident', 'New Incident Report', :message, :link, :created_at)
+                            ");
+                            $insertStmt->execute([
+                                ':message' => 'Incident #' . ($row['incident_id'] ?? $row['id']) . ' - ' . ($row['incident_type'] ?? 'Unknown') . ' at ' . ($row['location'] ?? 'Unknown location') . ' (Requires patrol assignment)',
+                                ':link' => 'patrol-schedule.php?id=' . ($row['incident_id'] ?? $row['id']),
+                                ':created_at' => $row['created_at']
+                            ]);
+                            $synced++;
+                        }
                     }
+                } catch (PDOException $e) {
+                    // Incidents table structure issue, skip
                 }
             } else {
                 // If no incidents table, check for complaints that need patrol assignment
-                $stmt = $pdo->query("
-                    SELECT complaint_id, complaint_type, location, submitted_at 
-                    FROM complaints 
-                    WHERE submitted_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
-                    AND (assigned_to = 'Pending Assignment' OR assigned_to = '' OR assigned_to IS NULL)
-                    ORDER BY submitted_at DESC
-                ");
-                while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
-                    $checkStmt = $pdo->prepare("SELECT id FROM notifications WHERE type = 'incident' AND link = :link LIMIT 1");
-                    $checkStmt->execute([':link' => 'patrol-schedule.php?id=' . $row['complaint_id']]);
-                    if (!$checkStmt->fetch()) {
-                        $insertStmt = $pdo->prepare("
-                            INSERT INTO notifications (type, title, message, link, created_at) 
-                            VALUES ('incident', 'New Incident Report - Patrol Assignment Needed', :message, :link, :created_at)
-                        ");
-                        $insertStmt->execute([
-                            ':message' => 'Incident #' . $row['complaint_id'] . ' - ' . ($row['complaint_type'] ?? 'Unknown') . ' at ' . ($row['location'] ?? 'Unknown location') . ' requires patrol assignment',
-                            ':link' => 'patrol-schedule.php?id=' . $row['complaint_id'],
-                            ':created_at' => $row['submitted_at']
-                        ]);
-                        $synced++;
+                try {
+                    $stmt = $pdo->query("
+                        SELECT complaint_id, complaint_type, location, submitted_at 
+                        FROM complaints 
+                        WHERE submitted_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+                        AND (assigned_to = 'Pending Assignment' OR assigned_to = '' OR assigned_to IS NULL)
+                        ORDER BY submitted_at DESC
+                    ");
+                    while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+                        $checkStmt = $pdo->prepare("SELECT id FROM notifications WHERE type = 'incident' AND link = :link LIMIT 1");
+                        $checkStmt->execute([':link' => 'patrol-schedule.php?id=' . $row['complaint_id']]);
+                        if (!$checkStmt->fetch()) {
+                            $insertStmt = $pdo->prepare("
+                                INSERT INTO notifications (type, title, message, link, created_at) 
+                                VALUES ('incident', 'New Incident Report - Patrol Assignment Needed', :message, :link, :created_at)
+                            ");
+                            $insertStmt->execute([
+                                ':message' => 'Incident #' . $row['complaint_id'] . ' - ' . ($row['complaint_type'] ?? 'Unknown') . ' at ' . ($row['location'] ?? 'Unknown location') . ' requires patrol assignment',
+                                ':link' => 'patrol-schedule.php?id=' . $row['complaint_id'],
+                                ':created_at' => $row['submitted_at']
+                            ]);
+                            $synced++;
+                        }
                     }
+                } catch (PDOException $e) {
+                    // Complaints table doesn't exist or query failed, skip
                 }
             }
         } catch (PDOException $e) {
-            // Table doesn't exist or error, skip
+            // Table check failed, skip
         }
         
         // Sync volunteer requests for events (last 7 days)
@@ -397,13 +458,39 @@ try {
         // This sync function only handles other activities
         
         ob_clean();
-        echo json_encode(['success' => true, 'synced' => $synced]);
+        echo json_encode([
+            'success' => true, 
+            'synced' => $synced,
+            'message' => "Synced {$synced} notification(s)"
+        ]);
+    } else {
+        // Unknown action
+        ob_clean();
+        http_response_code(400);
+        echo json_encode([
+            'success' => false, 
+            'error' => 'Invalid action',
+            'message' => 'Valid actions are: list, mark_read, sync'
+        ]);
     }
     
 } catch (PDOException $e) {
     ob_clean();
     http_response_code(500);
-    echo json_encode(['success' => false, 'error' => 'Database error: ' . $e->getMessage()]);
+    // Log error for debugging (don't expose sensitive info to client)
+    error_log('Notifications API Error: ' . $e->getMessage());
+    echo json_encode([
+        'success' => false, 
+        'error' => 'Database error occurred. Please check server logs for details.'
+    ]);
+} catch (Exception $e) {
+    ob_clean();
+    http_response_code(500);
+    error_log('Notifications API Error: ' . $e->getMessage());
+    echo json_encode([
+        'success' => false, 
+        'error' => 'An error occurred. Please check server logs for details.'
+    ]);
 }
 
 function getTimeAgo($datetime) {

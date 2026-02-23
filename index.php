@@ -1950,18 +1950,80 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
         async function loadNotifications() {
             try {
                 // Sync activities first
-                await fetch('api/notifications.php?action=sync');
+                const syncResponse = await fetch('api/notifications.php?action=sync');
+                
+                // Check if sync was successful
+                if (!syncResponse.ok) {
+                    console.error('Notification sync failed:', syncResponse.status, syncResponse.statusText);
+                    // Continue anyway to try loading existing notifications
+                } else {
+                    const syncData = await syncResponse.json();
+                    if (!syncData.success) {
+                        console.error('Notification sync returned error:', syncData.error || 'Unknown error');
+                    }
+                }
                 
                 // Then load notifications
                 const response = await fetch('api/notifications.php?action=list');
+                
+                // Check response status before parsing
+                if (!response.ok) {
+                    console.error('Failed to load notifications:', response.status, response.statusText);
+                    if (response.status === 401) {
+                        console.error('Authentication failed - session may have expired');
+                        // Show error state
+                        if (notificationList) {
+                            notificationList.innerHTML = `
+                                <div class="notification-empty">
+                                    <i class="fas fa-exclamation-triangle"></i>
+                                    <p>Session expired. Please refresh the page.</p>
+                                </div>
+                            `;
+                        }
+                    } else {
+                        // Show error state for other errors
+                        if (notificationList) {
+                            notificationList.innerHTML = `
+                                <div class="notification-empty">
+                                    <i class="fas fa-exclamation-triangle"></i>
+                                    <p>Error loading notifications (${response.status})</p>
+                                </div>
+                            `;
+                        }
+                    }
+                    return;
+                }
+                
                 const data = await response.json();
                 
+                // Check if API returned success
                 if (data.success) {
                     updateNotificationBadge(data.unread_count);
                     renderNotifications(data.notifications);
+                } else {
+                    console.error('API returned error:', data.error || 'Unknown error');
+                    // Show empty state if API fails
+                    if (notificationList) {
+                        notificationList.innerHTML = `
+                            <div class="notification-empty">
+                                <i class="fas fa-bell-slash"></i>
+                                <p>No notifications available</p>
+                            </div>
+                        `;
+                    }
                 }
             } catch (error) {
                 console.error('Error loading notifications:', error);
+                // Show error state
+                if (notificationList) {
+                    notificationList.innerHTML = `
+                        <div class="notification-empty">
+                            <i class="fas fa-exclamation-triangle"></i>
+                            <p>Failed to load notifications</p>
+                            <p style="font-size: 0.8rem; margin-top: 0.5rem; color: var(--text-secondary);">Check console for details</p>
+                        </div>
+                    `;
+                }
             }
         }
         

@@ -29,7 +29,13 @@ function sendOTPEmail($email, $otp) {
     $mailEncryption = $_ENV['MAIL_ENCRYPTION'] ?? 'ssl';
     
     if (empty($mailUser) || empty($mailPass)) {
-        error_log('Email credentials not set in .env - MAIL_USERNAME: ' . (!empty($mailUser) ? 'set' : 'empty') . ', MAIL_PASSWORD: ' . (!empty($mailPass) ? 'set' : 'empty'));
+        error_log('OTP email failed: Email credentials not set in .env - MAIL_USERNAME: ' . (!empty($mailUser) ? 'set' : 'empty') . ', MAIL_PASSWORD: ' . (!empty($mailPass) ? 'set' : 'empty'));
+        error_log('Email config check - Host: ' . $mailHost . ', Port: ' . $mailPort . ', Encryption: ' . $mailEncryption);
+        return false;
+    }
+    
+    if (empty($email)) {
+        error_log('OTP email failed: Recipient email address is empty');
         return false;
     }
     
@@ -111,11 +117,14 @@ function sendOTPEmail($email, $otp) {
             ";
             
             $mail->send();
-            error_log("OTP email sent successfully to {$email}");
+            error_log("OTP email sent successfully via PHPMailer to {$email}");
             return true;
         } catch (Exception $e) {
-            error_log('PHPMailer send failed: ' . $mail->ErrorInfo);
-            error_log('Exception: ' . $e->getMessage());
+            $errorMsg = 'PHPMailer send failed: ' . ($mail->ErrorInfo ?? $e->getMessage());
+            error_log($errorMsg);
+            error_log('PHPMailer Exception details: ' . $e->getMessage());
+            error_log('Email config - Host: ' . $mailHost . ', Port: ' . $mailPort . ', User: ' . ($mailUser ? 'set' : 'empty') . ', Encryption: ' . $mailEncryption);
+            error_log('Recipient: ' . $email);
             // Fall through to try native mail()
         }
     }
@@ -175,12 +184,15 @@ function sendOTPEmail($email, $otp) {
         $result = mail($email, $subject, $message, $headers);
         
         if ($result) {
-            error_log("Native mail() sent OTP to {$email}");
+            error_log("OTP email sent successfully via native mail() to {$email}");
             return true;
         } else {
-            error_log("Native mail() failed to send to {$email}");
-            // Log OTP for debugging
-            error_log("OTP for {$email}: {$otp}");
+            error_log("Native mail() failed to send OTP to {$email}");
+            error_log("Email config - From: {$mailFrom} ({$mailFromName}), Host: {$mailHost}, Port: {$mailPort}");
+            // Log OTP for debugging (only in development - remove in production)
+            if (isset($_ENV['ENVIRONMENT']) && $_ENV['ENVIRONMENT'] !== 'production') {
+                error_log("OTP for {$email}: {$otp}");
+            }
             return false;
         }
     } catch (Exception $e) {
@@ -241,11 +253,14 @@ if ($action === 'request') {
                 'email' => substr($user['email'], 0, 3) . '***' . substr($user['email'], strpos($user['email'], '@'))
             ]);
         } else {
-            // For debugging: check error log
-            error_log('Failed to send OTP email. Check error logs for details.');
+            // Log detailed error information
+            error_log('Failed to send OTP email to: ' . $user['email']);
+            error_log('Check PHP error logs for detailed email sending errors.');
+            
+            // Provide user-friendly error message
             echo json_encode([
                 'success' => false, 
-                'message' => 'Failed to send OTP. Please check your email configuration or contact administrator. Check error logs for details.'
+                'message' => 'Failed to send OTP email. This may be due to email configuration issues. Please contact the administrator or check if your email address is correct in your account settings.'
             ]);
         }
         
