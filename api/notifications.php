@@ -95,52 +95,19 @@ try {
         $userRole = $_SESSION['user_role'] ?? 'User';
         $isAdmin = ($userRole === 'Admin');
         
+        // Initialize variables
+        $notifications = [];
+        $unreadCount = 0;
+        
         // Build query based on user role
         // Admins see: all notifications (user_id IS NULL) + their own notifications (user_id = userId)
         // Users see: only their own notifications (user_id = userId)
         if ($isAdmin) {
-            $stmt = $pdo->prepare("
-                SELECT id, type, title, message, link, is_read, created_at 
-                FROM notifications 
-                WHERE user_id IS NULL OR user_id = :user_id 
-                ORDER BY created_at DESC 
-                LIMIT 20
-            ");
-            $stmt->execute([':user_id' => $userId]);
-            
-            $unreadStmt = $pdo->prepare("
-                SELECT COUNT(*) as count 
-                FROM notifications 
-                WHERE (user_id IS NULL OR user_id = :user_id) AND is_read = 0
-            ");
-            $unreadStmt->execute([':user_id' => $userId]);
-            
-            $notifications = [];
-            while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
-                $notifications[] = [
-                    'id' => (int)$row['id'],
-                    'type' => $row['type'],
-                    'title' => $row['title'],
-                    'message' => $row['message'],
-                    'link' => $row['link'],
-                    'is_read' => (bool)$row['is_read'],
-                    'created_at' => $row['created_at'],
-                    'time_ago' => getTimeAgo($row['created_at'])
-                ];
-            }
-            
-            $unreadCount = (int)$unreadStmt->fetch()['count'];
-        } else {
-            // Regular users only see their own notifications
-            if ($userId === null) {
-                // If no user_id, return empty notifications
-                $notifications = [];
-                $unreadCount = 0;
-            } else {
+            try {
                 $stmt = $pdo->prepare("
                     SELECT id, type, title, message, link, is_read, created_at 
                     FROM notifications 
-                    WHERE user_id = :user_id 
+                    WHERE user_id IS NULL OR user_id = :user_id 
                     ORDER BY created_at DESC 
                     LIMIT 20
                 ");
@@ -149,10 +116,17 @@ try {
                 $unreadStmt = $pdo->prepare("
                     SELECT COUNT(*) as count 
                     FROM notifications 
-                    WHERE user_id = :user_id AND is_read = 0
+                    WHERE (user_id IS NULL OR user_id = :user_id) AND is_read = 0
                 ");
                 $unreadStmt->execute([':user_id' => $userId]);
-                
+            } catch (PDOException $e) {
+                error_log('Notifications API - Query error: ' . $e->getMessage());
+                // Return empty result instead of failing
+                $notifications = [];
+                $unreadCount = 0;
+            }
+            
+            if (isset($stmt) && $stmt) {
                 $notifications = [];
                 while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
                     $notifications[] = [
@@ -167,7 +141,57 @@ try {
                     ];
                 }
                 
-                $unreadCount = (int)$unreadStmt->fetch()['count'];
+                if (isset($unreadStmt) && $unreadStmt) {
+                    $unreadResult = $unreadStmt->fetch(PDO::FETCH_ASSOC);
+                    $unreadCount = $unreadResult ? (int)$unreadResult['count'] : 0;
+                }
+            }
+        } else {
+            // Regular users only see their own notifications
+            if ($userId === null) {
+                // If no user_id, return empty notifications
+                $notifications = [];
+                $unreadCount = 0;
+            } else {
+                try {
+                    $stmt = $pdo->prepare("
+                        SELECT id, type, title, message, link, is_read, created_at 
+                        FROM notifications 
+                        WHERE user_id = :user_id 
+                        ORDER BY created_at DESC 
+                        LIMIT 20
+                    ");
+                    $stmt->execute([':user_id' => $userId]);
+                    
+                    $unreadStmt = $pdo->prepare("
+                        SELECT COUNT(*) as count 
+                        FROM notifications 
+                        WHERE user_id = :user_id AND is_read = 0
+                    ");
+                    $unreadStmt->execute([':user_id' => $userId]);
+                    
+                    $notifications = [];
+                    while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+                        $notifications[] = [
+                            'id' => (int)$row['id'],
+                            'type' => $row['type'],
+                            'title' => $row['title'],
+                            'message' => $row['message'],
+                            'link' => $row['link'],
+                            'is_read' => (bool)$row['is_read'],
+                            'created_at' => $row['created_at'],
+                            'time_ago' => getTimeAgo($row['created_at'])
+                        ];
+                    }
+                    
+                    $unreadResult = $unreadStmt->fetch(PDO::FETCH_ASSOC);
+                    $unreadCount = $unreadResult ? (int)$unreadResult['count'] : 0;
+                } catch (PDOException $e) {
+                    error_log('Notifications API - Query error (user): ' . $e->getMessage());
+                    // Return empty result instead of failing
+                    $notifications = [];
+                    $unreadCount = 0;
+                }
             }
         }
         
