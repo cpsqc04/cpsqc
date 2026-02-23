@@ -1415,7 +1415,7 @@ if (isset($_SESSION['admin_logged_in']) && $_SESSION['admin_logged_in'] === true
             if (event.target === successModal) {
                 closeSuccessModal();
             }
-        });
+        };
         
         // Check if reset=1 is in URL and open forgot password modal
         if (window.location.search.includes('reset=1')) {
