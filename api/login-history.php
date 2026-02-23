@@ -22,6 +22,11 @@ if (!isset($_SESSION['user_role']) || $_SESSION['user_role'] !== 'Admin') {
 
 require_once __DIR__ . '/../db.php';
 
+// Display all login/logout times in Philippines timezone
+$displayTz = new DateTimeZone('Asia/Manila');
+// Assume database stores UTC (common on servers); convert to Manila for display
+$dbTz = new DateTimeZone('UTC');
+
 // Ensure login_history table exists
 try {
     $pdo->exec("CREATE TABLE IF NOT EXISTS login_history (
@@ -53,15 +58,30 @@ try {
     
     $history = [];
     while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
-        // Format login date and time
-        $loginDate = $row['login_time'] ? date('M j, Y', strtotime($row['login_time'])) : '-';
-        $loginTime = $row['login_time'] ? date('g:i:s A', strtotime($row['login_time'])) : '-';
-        $loginDateTime = $row['login_time'] ? date('M j, Y g:i:s A', strtotime($row['login_time'])) : '-';
-        
-        // Format logout date and time
-        $logoutDate = $row['logout_time'] ? date('M j, Y', strtotime($row['logout_time'])) : '-';
-        $logoutTime = $row['logout_time'] ? date('g:i:s A', strtotime($row['logout_time'])) : '-';
-        $logoutDateTime = $row['logout_time'] ? date('M j, Y g:i:s A', strtotime($row['logout_time'])) : '-';
+        // Convert from UTC to Philippines (Asia/Manila) for display
+        $formatInManila = function($datetimeStr) use ($dbTz, $displayTz) {
+            if (empty($datetimeStr)) return ['date' => '-', 'time' => '-', 'datetime' => '-'];
+            try {
+                $dt = new DateTime($datetimeStr, $dbTz);
+                $dt->setTimezone($displayTz);
+                return [
+                    'date' => $dt->format('M j, Y'),
+                    'time' => $dt->format('g:i:s A'),
+                    'datetime' => $dt->format('M j, Y g:i:s A')
+                ];
+            } catch (Exception $e) {
+                return ['date' => '-', 'time' => '-', 'datetime' => '-'];
+            }
+        };
+        $loginF = $row['login_time'] ? $formatInManila($row['login_time']) : ['date' => '-', 'time' => '-', 'datetime' => '-'];
+        $logoutF = $row['logout_time'] ? $formatInManila($row['logout_time']) : ['date' => '-', 'time' => '-', 'datetime' => '-'];
+
+        $loginDate = $loginF['date'];
+        $loginTime = $loginF['time'];
+        $loginDateTime = $loginF['datetime'];
+        $logoutDate = $logoutF['date'];
+        $logoutTime = $logoutF['time'];
+        $logoutDateTime = $logoutF['datetime'];
         
         $history[] = [
             'id' => (int)$row['id'],
