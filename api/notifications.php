@@ -531,7 +531,12 @@ try {
         echo json_encode([
             'success' => true, 
             'synced' => $synced,
-            'message' => "Synced {$synced} notification(s)"
+            'message' => "Synced {$synced} notification(s)",
+            'debug' => [
+                'complaints_checked' => isset($activities['complaints']),
+                'tips_checked' => isset($activities['tips']),
+                'volunteers_checked' => isset($activities['volunteers'])
+            ]
         ]);
     } else {
         // Unknown action
