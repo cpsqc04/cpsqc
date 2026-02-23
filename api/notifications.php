@@ -4,29 +4,32 @@ header('Content-Type: application/json');
 ob_start();
 
 // Helper function - define early to avoid issues
-function getTimeAgo($datetime) {
-    if (empty($datetime)) {
-        return 'Unknown';
-    }
-    $timestamp = strtotime($datetime);
-    if ($timestamp === false) {
-        return 'Invalid date';
-    }
-    $diff = time() - $timestamp;
-    
-    if ($diff < 60) {
-        return 'Just now';
-    } elseif ($diff < 3600) {
-        $mins = floor($diff / 60);
-        return $mins . ' minute' . ($mins > 1 ? 's' : '') . ' ago';
-    } elseif ($diff < 86400) {
-        $hours = floor($diff / 3600);
-        return $hours . ' hour' . ($hours > 1 ? 's' : '') . ' ago';
-    } elseif ($diff < 604800) {
-        $days = floor($diff / 86400);
-        return $days . ' day' . ($days > 1 ? 's' : '') . ' ago';
-    } else {
-        return date('M j, Y', $timestamp);
+// Check if function already exists (in case it's defined elsewhere)
+if (!function_exists('getTimeAgo')) {
+    function getTimeAgo($datetime) {
+        if (empty($datetime)) {
+            return 'Unknown';
+        }
+        $timestamp = strtotime($datetime);
+        if ($timestamp === false) {
+            return 'Invalid date';
+        }
+        $diff = time() - $timestamp;
+        
+        if ($diff < 60) {
+            return 'Just now';
+        } elseif ($diff < 3600) {
+            $mins = floor($diff / 60);
+            return $mins . ' minute' . ($mins > 1 ? 's' : '') . ' ago';
+        } elseif ($diff < 86400) {
+            $hours = floor($diff / 3600);
+            return $hours . ' hour' . ($hours > 1 ? 's' : '') . ' ago';
+        } elseif ($diff < 604800) {
+            $days = floor($diff / 86400);
+            return $days . ' day' . ($days > 1 ? 's' : '') . ' ago';
+        } else {
+            return date('M j, Y', $timestamp);
+        }
     }
 }
 
