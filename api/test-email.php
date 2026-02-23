@@ -55,8 +55,23 @@ $mailEncryption = $_ENV['MAIL_ENCRYPTION'] ?? 'ssl';
 
 // Fallback: load from .env file directly
 if (empty($mailUser) || empty($mailPass)) {
-    $envPath = __DIR__ . '/../.env';
-    if (file_exists($envPath)) {
+    // Try multiple possible .env file locations
+    $possiblePaths = [
+        __DIR__ . '/../.env',
+        dirname(__DIR__) . '/.env',
+        $_SERVER['DOCUMENT_ROOT'] . '/.env',
+        '/var/www/html/community_policing_alertaraqc/.env',
+    ];
+    
+    $envPath = null;
+    foreach ($possiblePaths as $path) {
+        if (file_exists($path) && is_readable($path)) {
+            $envPath = $path;
+            break;
+        }
+    }
+    
+    if ($envPath && file_exists($envPath)) {
         $lines = file($envPath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
         foreach ($lines as $line) {
             if (strpos(trim($line), '#') === 0) continue;
@@ -77,6 +92,23 @@ if (empty($mailUser) || empty($mailPass)) {
     }
 }
 
+// Check .env file locations for diagnostics
+$envDiagnostics = [];
+$possiblePaths = [
+    __DIR__ . '/../.env',
+    dirname(__DIR__) . '/.env',
+    $_SERVER['DOCUMENT_ROOT'] . '/.env',
+    '/var/www/html/community_policing_alertaraqc/.env',
+];
+
+foreach ($possiblePaths as $path) {
+    $envDiagnostics[] = [
+        'path' => $path,
+        'exists' => file_exists($path),
+        'readable' => file_exists($path) ? is_readable($path) : false,
+    ];
+}
+
 $result = [
     'success' => false,
     'config' => [
@@ -88,6 +120,8 @@ $result = [
         'from_name' => $mailFromName,
         'encryption' => $mailEncryption,
     ],
+    'env_diagnostics' => $envDiagnostics,
+    'env_vars_available' => array_keys($_ENV),
     'errors' => []
 ];
 
