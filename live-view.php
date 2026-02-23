@@ -1169,8 +1169,8 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
         }
     
         function redirectToAddCamera() {
-            // Redirect to camera management and open add camera modal
-            window.location.href = 'camera-management.php?action=add';
+            // Camera Management removed - do nothing or show message
+            return;
         }
         
         // Close modals on Escape key

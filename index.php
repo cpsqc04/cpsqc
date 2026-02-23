@@ -1627,13 +1627,6 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                             <h4 class="quick-link-title">Submit Complaint</h4>
                         </a>
                         
-                        <a href="live-view.php" class="quick-link-card">
-                            <div class="quick-link-icon">
-                                <i class="fas fa-video"></i>
-                            </div>
-                            <h4 class="quick-link-title">Live CCTV View</h4>
-                        </a>
-                        
                         <a href="patrol-schedule.php" class="quick-link-card">
                             <div class="quick-link-icon">
                                 <i class="fas fa-calendar-alt"></i>

@@ -5,6 +5,10 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
     header('Location: login.php');
     exit;
 }
+
+// Camera Management removed from web - redirect to dashboard
+header('Location: index.php');
+exit;
 ?>
 <!doctype html>
 <html lang="en">
