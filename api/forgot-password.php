@@ -86,43 +86,24 @@ function sendOTPEmail($email, $otp) {
     // Check if PHPMailer is available
     if (class_exists('PHPMailer\\PHPMailer\\PHPMailer')) {
         try {
-            $mail = new \PHPMailer\PHPMailer\PHPMailer(true);
+            $mail = new PHPMailer\PHPMailer\PHPMailer(true);
             
             // Server settings
             $mail->isSMTP();
-            $mail->Host = $mailHost;
+            $mail->Host = 'smtp.gmail.com';
             $mail->SMTPAuth = true;
-            $mail->Username = $mailUser;
-            $mail->Password = $mailPass;
-            
-            if ($mailPort === 587 || strtolower($mailEncryption) === 'tls') {
-                $mail->SMTPSecure = \PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_STARTTLS;
-            } else {
-                $mail->SMTPSecure = \PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_SMTPS;
-            }
-            $mail->Port = $mailPort;
-            $mail->CharSet = 'UTF-8';
-            $mail->SMTPOptions = [
-                'ssl' => [
-                    'verify_peer' => false,
-                    'verify_peer_name' => false,
-                    'allow_self_signed' => true,
-                ],
-            ];
-            
-            // Enable verbose debug output (only in development)
-            $debugMode = isset($_ENV['ENVIRONMENT']) && $_ENV['ENVIRONMENT'] !== 'production';
-            if ($debugMode) {
-                $mail->SMTPDebug = 2; // Enable verbose debug output
-            }
+            $mail->Username = 'alertaraqc@gmail.com'; // Update with your email
+            $mail->Password = 'fyyzywptnqlqemyt'; // Update with your app password
+            $mail->SMTPSecure = PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_STARTTLS;
+            $mail->Port = 587;
             
             // Recipients
-            $mail->setFrom($mailFrom, $mailFromName);
+            $mail->setFrom('noreply@alertaraqc.com', 'AlerTara QC');
             $mail->addAddress($email);
             
             // Content
             $mail->isHTML(true);
-            $mail->Subject = 'AlerTara QC Password Reset Request';
+            $mail->Subject = 'Password Reset OTP - AlerTara QC';
             $mail->Body = "
             <!DOCTYPE html>
             <html>
@@ -256,21 +237,21 @@ function sendOTPEmail($email, $otp) {
 if ($action === 'request') {
     try {
         $data = json_decode(file_get_contents('php://input'), true);
-        $username = trim($data['username'] ?? '');
+        $email = trim($data['email'] ?? '');
         
-        if (empty($username)) {
-            echo json_encode(['success' => false, 'message' => 'Username is required.']);
+        if (empty($email)) {
+            echo json_encode(['success' => false, 'message' => 'Email is required.']);
             exit;
         }
         
-        // Find user by username
-        $stmt = $pdo->prepare('SELECT id, username, email FROM admins WHERE username = :u LIMIT 1');
-        $stmt->execute([':u' => $username]);
+        // Find user by email
+        $stmt = $pdo->prepare('SELECT id, username, email FROM admins WHERE email = :e LIMIT 1');
+        $stmt->execute([':e' => $email]);
         $user = $stmt->fetch();
         
         if (!$user) {
             // Don't reveal if user exists for security
-            echo json_encode(['success' => true, 'message' => 'If the username exists, an OTP has been sent to the registered email.']);
+            echo json_encode(['success' => true, 'message' => 'If the email exists, an OTP has been sent to the registered email.']);
             exit;
         }
         

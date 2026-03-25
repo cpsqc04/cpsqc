@@ -334,6 +334,99 @@ function sendLoginSuccessEmail($email, $username, $loginTime, $ipAddress) {
     return mail($email, $subject, $message, $headers);
 }
 
+function generateLoginOTP(): string {
+    return str_pad((string)rand(0, 999999), 6, '0', STR_PAD_LEFT);
+}
+
+function sendLoginOTPEmail($email, $username, $otp): bool {
+    // Load email config with fallback to direct .env file read
+    $mailHost = $_ENV['MAIL_HOST'] ?? 'smtp.gmail.com';
+    $mailPort = (int)($_ENV['MAIL_PORT'] ?? 465);
+    $mailUser = $_ENV['MAIL_USERNAME'] ?? '';
+    $mailPass = $_ENV['MAIL_PASSWORD'] ?? '';
+    $mailFrom = $_ENV['MAIL_FROM_ADDRESS'] ?? $mailUser;
+    $mailFromName = $_ENV['MAIL_FROM_NAME'] ?? 'AlerTara QC';
+    $mailEncryption = $_ENV['MAIL_ENCRYPTION'] ?? 'ssl';
+    
+    if (empty($mailUser) || empty($mailPass)) {
+        $envPath = __DIR__ . DIRECTORY_SEPARATOR . '.env';
+        if (file_exists($envPath)) {
+            $lines = file($envPath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+            foreach ($lines as $line) {
+                if (strpos(trim($line), '#') === 0) continue;
+                if (strpos($line, '=') !== false) {
+                    list($key, $value) = explode('=', $line, 2);
+                    $key = trim($key);
+                    $value = trim($value);
+                    $value = trim($value, '"\'');
+                    if ($key === 'MAIL_USERNAME' && empty($mailUser)) $mailUser = $value;
+                    if ($key === 'MAIL_PASSWORD' && empty($mailPass)) $mailPass = $value;
+                    if ($key === 'MAIL_HOST' && empty($mailHost)) $mailHost = $value;
+                    if ($key === 'MAIL_PORT' && empty($mailPort)) $mailPort = (int)$value;
+                    if ($key === 'MAIL_FROM_ADDRESS' && empty($mailFrom)) $mailFrom = $value;
+                    if ($key === 'MAIL_FROM_NAME' && empty($mailFromName)) $mailFromName = $value;
+                    if ($key === 'MAIL_ENCRYPTION' && empty($mailEncryption)) $mailEncryption = $value;
+                }
+            }
+        }
+    }
+    
+    if (empty($mailUser) || empty($mailPass) || empty($email)) {
+        error_log('Login OTP email failed: Email credentials or recipient email not set.');
+        return false;
+    }
+    
+    if (class_exists('PHPMailer\\PHPMailer\\PHPMailer')) {
+        try {
+            $mail = new \PHPMailer\PHPMailer\PHPMailer(true);
+            $mail->isSMTP();
+            $mail->Host = $mailHost;
+            $mail->SMTPAuth = true;
+            $mail->Username = $mailUser;
+            $mail->Password = $mailPass;
+            if ($mailPort === 587 || strtolower($mailEncryption) === 'tls') {
+                $mail->SMTPSecure = \PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_STARTTLS;
+            } else {
+                $mail->SMTPSecure = \PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_SMTPS;
+            }
+            $mail->Port = $mailPort;
+            $mail->CharSet = 'UTF-8';
+            $mail->SMTPOptions = [
+                'ssl' => [
+                    'verify_peer' => false,
+                    'verify_peer_name' => false,
+                    'allow_self_signed' => true,
+                ],
+            ];
+
+            $mail->setFrom($mailFrom, $mailFromName);
+            $mail->addAddress($email);
+            $mail->isHTML(true);
+            $mail->Subject = 'AlerTara QC - Login OTP Verification';
+            $mail->Body = "
+            <html><body style='font-family: Arial, sans-serif; color: #333;'>
+                <h2 style='color:#2a5a59;'>Login Verification Required</h2>
+                <p>Hello {$username},</p>
+                <p>Use this OTP to complete your login:</p>
+                <p style='font-size: 30px; font-weight: 700; letter-spacing: 4px; color: #2a5a59;'>{$otp}</p>
+                <p>This code expires in 10 minutes.</p>
+                <p>If this wasn't you, please reset your password immediately.</p>
+            </body></html>
+            ";
+            $mail->send();
+            return true;
+        } catch (Exception $e) {
+            error_log('Login OTP email send failed: ' . ($mail->ErrorInfo ?? $e->getMessage()));
+            return false;
+        }
+    }
+
+    $subject = 'AlerTara QC - Login OTP Verification';
+    $message = "Your login OTP is {$otp}. This code expires in 10 minutes.";
+    $headers = "MIME-Version: 1.0\r\nContent-Type: text/html; charset=UTF-8\r\nFrom: {$mailFromName} <{$mailFrom}>\r\n";
+    return mail($email, $subject, $message, $headers);
+}
+
 // Get client IP address
 function logLoginHistory(PDO $pdo, $userId, $username, $status, $ipAddress = null) {
     try {
@@ -454,20 +547,75 @@ function getClientIP() {
 
 // Database-backed authentication
 $attemptsRemaining = null;
+$otpPrompt = null;
+$showOtpForm = isset($_SESSION['pending_login']);
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($error)) {
-    $username = trim($_POST['username'] ?? '');
-    $password = $_POST['password'] ?? '';
-    
-    if ($username === '' || $password === '') {
-        $error = 'Please enter both username and password';
+    $isOtpVerification = isset($_POST['verify_login_otp']);
+
+    if ($isOtpVerification) {
+        $enteredOtp = trim($_POST['login_otp'] ?? '');
+        $pendingLogin = $_SESSION['pending_login'] ?? null;
+
+        if (!$pendingLogin) {
+            $error = 'No pending login verification found. Please log in again.';
+            $showOtpForm = false;
+        } elseif ($enteredOtp === '' || !preg_match('/^\d{6}$/', $enteredOtp)) {
+            $error = 'Please enter a valid 6-digit OTP.';
+            $showOtpForm = true;
+        } elseif (strtotime($pendingLogin['expires_at']) < time()) {
+            unset($_SESSION['pending_login']);
+            $error = 'OTP has expired. Please log in again.';
+            $showOtpForm = false;
+        } elseif (($pendingLogin['attempts'] ?? 0) >= 5) {
+            unset($_SESSION['pending_login']);
+            $error = 'Too many failed OTP attempts. Please log in again.';
+            $showOtpForm = false;
+        } elseif (!hash_equals((string)$pendingLogin['otp'], $enteredOtp)) {
+            $_SESSION['pending_login']['attempts'] = (int)($pendingLogin['attempts'] ?? 0) + 1;
+            $remainingOtpAttempts = max(0, 5 - (int)$_SESSION['pending_login']['attempts']);
+            if ($remainingOtpAttempts === 0) {
+                unset($_SESSION['pending_login']);
+                $error = 'Too many failed OTP attempts. Please log in again.';
+                $showOtpForm = false;
+            } else {
+                $error = "Invalid OTP. {$remainingOtpAttempts} attempt(s) remaining.";
+                $showOtpForm = true;
+            }
+        } else {
+            $_SESSION['admin_logged_in'] = true;
+            $_SESSION['username'] = $pendingLogin['display_name'] ?: $pendingLogin['username'];
+            $_SESSION['user_role'] = $pendingLogin['role'] ?? 'User';
+            $_SESSION['user_id'] = $pendingLogin['user_id'];
+
+            $ipAddress = $pendingLogin['ip_address'] ?? getClientIP();
+            logLoginHistory($pdo, $pendingLogin['user_id'], $pendingLogin['username'], 'Success', $ipAddress);
+
+            if (!empty($pendingLogin['email'])) {
+                $dateTime = new DateTime('now', new DateTimeZone('Asia/Manila'));
+                $loginTime = $dateTime->format('F j, Y \a\t g:i A');
+                sendLoginSuccessEmail($pendingLogin['email'], $pendingLogin['username'], $loginTime, $ipAddress);
+            }
+
+            unset($_SESSION['pending_login']);
+            header('Location: index.php');
+            exit;
+        }
     } else {
-        $stmt = $pdo->prepare('SELECT id, username, password_hash, full_name, status, email, role, failed_attempts, last_failed_at, locked_until FROM admins WHERE username = :u LIMIT 1');
-        $stmt->execute([':u' => $username]);
-        $admin = $stmt->fetch();
+        $email = trim($_POST['email'] ?? '');
+        $password = $_POST['password'] ?? '';
         
-        if ($admin) {
-            $now = date('Y-m-d H:i:s');
-            $lockedUntil = $admin['locked_until'] ?? null;
+        if ($email === '' || $password === '') {
+            $error = 'Please enter both email and password';
+        } else {
+            // Start a fresh login flow
+            unset($_SESSION['pending_login']);
+            $stmt = $pdo->prepare('SELECT id, username, password_hash, full_name, status, email, role, failed_attempts, last_failed_at, locked_until FROM admins WHERE email = :e LIMIT 1');
+            $stmt->execute([':e' => $email]);
+            $admin = $stmt->fetch();
+        
+            if ($admin) {
+                $now = date('Y-m-d H:i:s');
+                $lockedUntil = $admin['locked_until'] ?? null;
             
             // Check if account is locked
             if ($lockedUntil && strtotime($lockedUntil) > time()) {
@@ -540,27 +688,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($error)) {
                         // Successful login - reset failed attempts
                         $stmt = $pdo->prepare('UPDATE admins SET failed_attempts = 0, locked_until = NULL, last_failed_at = NULL WHERE id = :id');
                         $stmt->execute([':id' => $admin['id']]);
-                        
-                        $_SESSION['admin_logged_in'] = true;
-                        $_SESSION['username'] = $admin['full_name'] ?: $admin['username'];
-                        $_SESSION['user_role'] = $admin['role'] ?? 'User';
-                        $_SESSION['user_id'] = $admin['id'];
-                        
-                        // Log successful login
-                        $ipAddress = getClientIP();
-                        logLoginHistory($pdo, $admin['id'], $admin['username'], 'Success', $ipAddress);
-                        
-                        // Send successful login email
-                        if (!empty($admin['email'])) {
-                            // Use Philippines timezone
-                            $dateTime = new DateTime('now', new DateTimeZone('Asia/Manila'));
-                            $loginTime = $dateTime->format('F j, Y \a\t g:i A');
-                            sendLoginSuccessEmail($admin['email'], $admin['username'], $loginTime, $ipAddress);
+
+                        if (empty($admin['email'])) {
+                            $error = 'This account has no registered email. Please contact an administrator.';
+                        } else {
+                            $otp = generateLoginOTP();
+                            $expiresAt = date('Y-m-d H:i:s', strtotime('+10 minutes'));
+                            $ipAddress = getClientIP();
+
+                            $_SESSION['pending_login'] = [
+                                'user_id' => $admin['id'],
+                                'username' => $admin['username'],
+                                'display_name' => $admin['full_name'] ?: $admin['username'],
+                                'role' => $admin['role'] ?? 'User',
+                                'email' => $admin['email'],
+                                'otp' => $otp,
+                                'expires_at' => $expiresAt,
+                                'attempts' => 0,
+                                'ip_address' => $ipAddress
+                            ];
+
+                            $otpSent = sendLoginOTPEmail($admin['email'], $admin['full_name'] ?: $admin['username'], $otp);
+                            if ($otpSent) {
+                                $otpPrompt = 'A 6-digit OTP has been sent to your registered email. Enter it below to continue.';
+                                $showOtpForm = true;
+                            } else {
+                                unset($_SESSION['pending_login']);
+                                $error = 'Failed to send login OTP. Please contact administrator or try again later.';
+                            }
                         }
-                        
-                        // Redirect to dashboard or home page
-                        header('Location: index.php');
-                        exit;
                     } else {
                         // Wrong password - increment failed attempts
                         $newFailedAttempts = $failedAttempts + 1;
@@ -595,23 +751,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($error)) {
                         if ($newFailedAttempts >= 3) {
                             $error = "Your account has been temporarily locked due to multiple failed login attempts. It will be unlocked after 30 minutes.";
                         } else {
-                            $error = 'Invalid username or password';
+                            $error = 'Invalid email or password';
                         }
                     }
                 }
             }
-        } else {
-            $error = 'Invalid username or password';
+            } else {
+                $error = 'Invalid email or password';
+            }
         }
     }
 }
 
 // Get attempts remaining for display (if user exists and not already set)
-if (!isset($attemptsRemaining) && isset($_POST['username'])) {
-    $username = trim($_POST['username'] ?? '');
-    if (!empty($username)) {
-        $stmt = $pdo->prepare('SELECT failed_attempts, locked_until FROM admins WHERE username = :u LIMIT 1');
-        $stmt->execute([':u' => $username]);
+if (!isset($attemptsRemaining) && isset($_POST['email'])) {
+    $email = trim($_POST['email'] ?? '');
+    if (!empty($email)) {
+        $stmt = $pdo->prepare('SELECT failed_attempts, locked_until FROM admins WHERE email = :e LIMIT 1');
+        $stmt->execute([':e' => $email]);
         $admin = $stmt->fetch();
         if ($admin) {
             $lockedUntil = $admin['locked_until'] ?? null;
@@ -1036,7 +1193,7 @@ if (isset($_SESSION['admin_logged_in']) && $_SESSION['admin_logged_in'] === true
                 <h2 id="login-title">Login</h2>
                 <?php if (isset($_SESSION['registration_success'])): ?>
                     <div style="color: #10b981; font-size: 0.9rem; padding: 0.75rem; background: rgba(16, 185, 129, 0.1); border-radius: 6px; margin-bottom: 1rem; border: 1px solid rgba(16, 185, 129, 0.2);">
-                        Registration successful! You can now login with username: <?php echo htmlspecialchars($_SESSION['registered_username'] ?? ''); ?>
+                        Registration successful! You can now login using your registered email address.
                     </div>
                     <?php unset($_SESSION['registration_success'], $_SESSION['registered_username']); ?>
                 <?php endif; ?>
@@ -1045,33 +1202,51 @@ if (isset($_SESSION['admin_logged_in']) && $_SESSION['admin_logged_in'] === true
                         <?php echo htmlspecialchars($error); ?>
                     </div>
                 <?php endif; ?>
-                <?php if (isset($attemptsRemaining) && $attemptsRemaining > 0 && $attemptsRemaining < 3): ?>
+                <?php if (!empty($otpPrompt)): ?>
+                    <div style="color: #10b981; font-size: 0.9rem; padding: 0.75rem; background: rgba(16, 185, 129, 0.1); border-radius: 6px; margin-bottom: 1rem; border: 1px solid rgba(16, 185, 129, 0.2);">
+                        <?php echo htmlspecialchars($otpPrompt); ?>
+                    </div>
+                <?php endif; ?>
+                <?php if (!$showOtpForm && isset($attemptsRemaining) && $attemptsRemaining > 0 && $attemptsRemaining < 3): ?>
                     <div style="color: #f59e0b; font-size: 0.9rem; padding: 0.75rem; background: rgba(245, 158, 11, 0.1); border-radius: 6px; margin-bottom: 1rem; border: 1px solid rgba(245, 158, 11, 0.2); display: flex; align-items: center; gap: 0.5rem;">
                         <i class="fas fa-exclamation-triangle"></i>
                         <span><strong>Warning:</strong> You have <?php echo $attemptsRemaining; ?> more <?php echo $attemptsRemaining === 1 ? 'attempt' : 'attempts'; ?> remaining before your account is locked for 30 minutes.</span>
                     </div>
-                <?php elseif (isset($_POST['username']) && isset($attemptsRemaining) && $attemptsRemaining === 0): ?>
+                <?php elseif (!$showOtpForm && isset($_POST['email']) && isset($attemptsRemaining) && $attemptsRemaining === 0): ?>
                     <div style="color: #ef4444; font-size: 0.9rem; padding: 0.75rem; background: rgba(239, 68, 68, 0.1); border-radius: 6px; margin-bottom: 1rem; border: 1px solid rgba(239, 68, 68, 0.2); display: flex; align-items: center; gap: 0.5rem;">
                         <i class="fas fa-lock"></i>
                         <span><strong>Account Locked:</strong> Your account has been locked due to multiple failed login attempts. Please wait 30 minutes or contact an administrator.</span>
                     </div>
                 <?php endif; ?>
-                <form method="POST" action="">
-                    <div class="field">
-                        <label for="username">Username</label>
-                        <input id="username" name="username" type="text" placeholder="Enter your username" required>
-                    </div>
-                    <div class="field">
-                        <label for="password">Password</label>
-                        <input id="password" name="password" type="password" placeholder="••••••••" required>
-                    </div>
-                    <div class="actions">
-                        <a href="#" onclick="event.preventDefault(); openForgotPasswordModal();" style="cursor: pointer;">Forgot password?</a>
-                    </div>
-                    <div class="button-group">
-                        <button class="btn" type="submit" style="width: 100%;">Sign in</button>
-                    </div>
-                </form>
+                <?php if ($showOtpForm): ?>
+                    <form method="POST" action="">
+                        <input type="hidden" name="verify_login_otp" value="1">
+                        <div class="field">
+                            <label for="login_otp">Login OTP</label>
+                            <input id="login_otp" name="login_otp" type="text" placeholder="Enter 6-digit OTP" maxlength="6" required>
+                        </div>
+                        <div class="button-group">
+                            <button class="btn" type="submit" style="width: 100%;">Verify OTP</button>
+                        </div>
+                    </form>
+                <?php else: ?>
+                    <form method="POST" action="">
+                        <div class="field">
+                            <label for="email">Email</label>
+                            <input id="email" name="email" type="email" placeholder="Enter your email" required>
+                        </div>
+                        <div class="field">
+                            <label for="password">Password</label>
+                            <input id="password" name="password" type="password" placeholder="••••••••" required>
+                        </div>
+                        <div class="actions">
+                            <a href="#" onclick="event.preventDefault(); openForgotPasswordModal();" style="cursor: pointer;">Forgot password?</a>
+                        </div>
+                        <div class="button-group">
+                            <button class="btn" type="submit" style="width: 100%;">Sign in</button>
+                        </div>
+                    </form>
+                <?php endif; ?>
             </section>
         </div>
 
@@ -1119,11 +1294,11 @@ if (isset($_SESSION['admin_logged_in']) && $_SESSION['admin_logged_in'] === true
             
             <!-- Step 1: Request OTP -->
             <div id="forgotPasswordStep1">
-                <p style="color: rgba(255, 255, 255, 0.85); margin-bottom: 1.5rem; line-height: 1.6;">Enter your username to receive an OTP code via email.</p>
+                <p style="color: rgba(255, 255, 255, 0.85); margin-bottom: 1.5rem; line-height: 1.6;">Enter your email to receive an OTP code.</p>
                 <form id="forgotPasswordForm1" onsubmit="requestOTP(event)" style="display: grid; gap: 1.75rem;">
                     <div class="field">
-                        <label for="forgotUsername" style="font-size: 1.1rem; color: rgba(255, 255, 255, 0.8); font-weight: 500;">Username *</label>
-                        <input id="forgotUsername" name="username" type="text" placeholder="Enter your username" required style="width: 100%; padding: 1.15rem 1.5rem; border: 1px solid rgba(255, 255, 255, 0.16); border-radius: var(--radius); font: inherit; font-size: 1.1rem; color: #f8fafc; background: rgba(255, 255, 255, 0.08); transition: border-color 0.2s ease, box-shadow 0.2s ease; box-sizing: border-box;">
+                        <label for="forgotEmail" style="font-size: 1.1rem; color: rgba(255, 255, 255, 0.8); font-weight: 500;">Email *</label>
+                        <input id="forgotEmail" name="email" type="email" placeholder="Enter your email" required style="width: 100%; padding: 1.15rem 1.5rem; border: 1px solid rgba(255, 255, 255, 0.16); border-radius: var(--radius); font: inherit; font-size: 1.1rem; color: #f8fafc; background: rgba(255, 255, 255, 0.08); transition: border-color 0.2s ease, box-shadow 0.2s ease; box-sizing: border-box;">
                     </div>
                     <div id="forgotPasswordMessage" style="display: none; padding: 0.75rem; border-radius: 6px; margin-bottom: 1rem; font-size: 0.9rem;"></div>
                     <div class="button-group" style="margin-top: 0.5rem;">
@@ -1249,11 +1424,11 @@ if (isset($_SESSION['admin_logged_in']) && $_SESSION['admin_logged_in'] === true
 
         async function requestOTP(event) {
             event.preventDefault();
-            const username = document.getElementById('forgotUsername').value.trim();
+            const email = document.getElementById('forgotEmail').value.trim();
             const messageDiv = document.getElementById('forgotPasswordMessage');
             
-            if (!username) {
-                messageDiv.textContent = 'Please enter your username.';
+            if (!email) {
+                messageDiv.textContent = 'Please enter your email.';
                 messageDiv.style.display = 'block';
                 messageDiv.style.color = '#ef4444';
                 messageDiv.style.background = 'rgba(239, 68, 68, 0.1)';
@@ -1265,7 +1440,7 @@ if (isset($_SESSION['admin_logged_in']) && $_SESSION['admin_logged_in'] === true
                 const response = await fetch('api/forgot-password.php?action=request', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ username })
+                    body: JSON.stringify({ email })
                 });
                 
                 const result = await response.json();
@@ -1417,6 +1592,13 @@ if (isset($_SESSION['admin_logged_in']) && $_SESSION['admin_logged_in'] === true
             const otpInput = document.getElementById('forgotOTP');
             if (otpInput) {
                 otpInput.addEventListener('input', function(e) {
+                    e.target.value = e.target.value.replace(/\D/g, '').slice(0, 6);
+                });
+            }
+
+            const loginOtpInput = document.getElementById('login_otp');
+            if (loginOtpInput) {
+                loginOtpInput.addEventListener('input', function(e) {
                     e.target.value = e.target.value.replace(/\D/g, '').slice(0, 6);
                 });
             }

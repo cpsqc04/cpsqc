@@ -1,5 +1,5 @@
 <?php
-// Login History API
+// Audit Trails API
 header('Content-Type: application/json');
 ob_start();
 
@@ -22,10 +22,9 @@ if (!isset($_SESSION['user_role']) || $_SESSION['user_role'] !== 'Admin') {
 
 require_once __DIR__ . '/../db.php';
 
-// Display all login/logout times in Philippines timezone
+// Display all login/logout times in Philippines timezone.
+// login/logout values are written using MySQL NOW() with db.php setting session time_zone='+08:00'.
 $displayTz = new DateTimeZone('Asia/Manila');
-// Assume database stores UTC (common on servers); convert to Manila for display
-$dbTz = new DateTimeZone('UTC');
 
 // Ensure login_history table exists
 try {
@@ -58,11 +57,11 @@ try {
     
     $history = [];
     while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
-        // Convert from UTC to Philippines (Asia/Manila) for display
-        $formatInManila = function($datetimeStr) use ($dbTz, $displayTz) {
+        // Parse timestamps as Manila time and format consistently.
+        $formatInManila = function($datetimeStr) use ($displayTz) {
             if (empty($datetimeStr)) return ['date' => '-', 'time' => '-', 'datetime' => '-'];
             try {
-                $dt = new DateTime($datetimeStr, $dbTz);
+                $dt = new DateTime($datetimeStr, $displayTz);
                 $dt->setTimezone($displayTz);
                 return [
                     'date' => $dt->format('M j, Y'),

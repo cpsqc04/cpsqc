@@ -1138,9 +1138,9 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                         <span class="nav-submodule-icon"><i class="fas fa-users"></i></span>
                         <span class="nav-submodule-text">Users</span>
                     </a>
-                    <a href="login-history.php" class="nav-submodule <?php echo basename($_SERVER['PHP_SELF']) == 'login-history.php' ? 'active' : ''; ?>" data-tooltip="Login History">
+                    <a href="login-history.php" class="nav-submodule <?php echo basename($_SERVER['PHP_SELF']) == 'login-history.php' ? 'active' : ''; ?>" data-tooltip="Audit Trails">
                         <span class="nav-submodule-icon"><i class="fas fa-history"></i></span>
-                        <span class="nav-submodule-text">Login History</span>
+                        <span class="nav-submodule-text">Audit Trails</span>
                     </a>
                 </div>
             </div>

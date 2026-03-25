@@ -41,7 +41,8 @@ if (isset($_SESSION['user_id']) && isset($_SESSION['username'])) {
             INDEX idx_created_at (created_at)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
         
-        $logoutTime = date('M j, Y g:i:s A');
+        $manilaTz = new DateTimeZone('Asia/Manila');
+        $logoutTime = (new DateTime('now', $manilaTz))->format('M j, Y g:i:s A');
         $message = "User {$_SESSION['username']} logged out at {$logoutTime}";
         
         // Create notification for the user who logged out

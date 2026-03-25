@@ -42,7 +42,7 @@ try {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login History</title>
+    <title>Audit Trails</title>
     <link rel="icon" type="image/x-icon" href="images/favicon.ico">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="css/theme.css">
@@ -633,9 +633,9 @@ try {
                         <span class="nav-submodule-icon"><i class="fas fa-users"></i></span>
                         <span class="nav-submodule-text">Users</span>
                     </a>
-                    <a href="login-history.php" class="nav-submodule <?php echo basename($_SERVER['PHP_SELF']) == 'login-history.php' ? 'active' : ''; ?>" data-tooltip="Login History">
+                    <a href="login-history.php" class="nav-submodule <?php echo basename($_SERVER['PHP_SELF']) == 'login-history.php' ? 'active' : ''; ?>" data-tooltip="Audit Trails">
                         <span class="nav-submodule-icon"><i class="fas fa-history"></i></span>
-                        <span class="nav-submodule-text">Login History</span>
+                        <span class="nav-submodule-text">Audit Trails</span>
                     </a>
                 </div>
             </div>
@@ -784,7 +784,7 @@ try {
                 <button class="content-burger-btn" onclick="toggleSidebar()" aria-label="Toggle sidebar">
                     <span></span>
                 </button>
-                <h1 class="page-title">Login History</h1>
+                <h1 class="page-title">Audit Trails</h1>
             </div>
             <div class="user-info">
                 <div class="datetime-display">
@@ -948,8 +948,8 @@ try {
         // Date and Time Display
         function updateDateTime() {
             const now = new Date();
-            const dateOptions = { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' };
-            const timeOptions = { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true };
+            const dateOptions = { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric', timeZone: 'Asia/Manila' };
+            const timeOptions = { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true, timeZone: 'Asia/Manila' };
             
             const dateStr = now.toLocaleDateString('en-US', dateOptions);
             const timeStr = now.toLocaleTimeString('en-US', timeOptions);
