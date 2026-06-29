@@ -39,7 +39,7 @@ function generateOTP() {
 // Send OTP via email (using PHPMailer if available, otherwise use native mail)
 function sendOTPEmail($email, $otp) {
     // Get email credentials from .env (with fallback to direct file read)
-    $mailHost = $_ENV['MAIL_HOST'] ?? 'smtp.gmail.com';
+    $mailHost = $_ENV['MAIL_HOST'] ?? 'smtp.resend.com';
     $mailPort = (int)($_ENV['MAIL_PORT'] ?? 465);
     $mailUser = $_ENV['MAIL_USERNAME'] ?? '';
     $mailPass = $_ENV['MAIL_PASSWORD'] ?? '';
@@ -90,10 +90,10 @@ function sendOTPEmail($email, $otp) {
             
             // Server settings
             $mail->isSMTP();
-            $mail->Host = 'smtp.gmail.com';
+            $mail->Host = 'smtp.resend.com';
             $mail->SMTPAuth = true;
-            $mail->Username = 'alertaraqc@gmail.com'; // Update with your email
-            $mail->Password = 'fyyzywptnqlqemyt'; // Update with your app password
+            $mail->Username = 'resend'; // Update with your email
+            $mail->Password = 're_7DSZDBy1_CiiSzLQAac5hHnu1Bdg5eEmn'; // Update with your app password
             $mail->SMTPSecure = PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_STARTTLS;
             $mail->Port = 587;
             
