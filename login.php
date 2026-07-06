@@ -340,7 +340,7 @@ function generateLoginOTP(): string {
 
 function sendLoginOTPEmail($email, $username, $otp): bool {
     // Load email config with fallback to direct .env file read
-    $mailHost = $_ENV['MAIL_HOST'] ?? 'smtp.gmail.com';
+    $mailHost = $_ENV['MAIL_HOST'] ?? 'smtp.resend.com';
     $mailPort = (int)($_ENV['MAIL_PORT'] ?? 465);
     $mailUser = $_ENV['MAIL_USERNAME'] ?? '';
     $mailPass = $_ENV['MAIL_PASSWORD'] ?? '';
