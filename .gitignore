@@ -41,3 +41,7 @@ detections.json
 # ML model weights (large; download separately)
 *.pt
 
+# OpenH264 codec (download via install_openh264.bat)
+openh264*.dll
+openh264*.dll.bz2
+

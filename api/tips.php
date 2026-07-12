@@ -4,68 +4,8 @@ session_start();
 header('Content-Type: application/json');
 
 require_once __DIR__ . '/../db.php';
-
-/**
- * Ensure the tips table (and required columns) exist in the database.
- */
-function ensureTipsTable(PDO $pdo): void
-{
-    // Get existing columns
-    $columns = [];
-    $tableExists = false;
-    
-    try {
-        foreach ($pdo->query('SHOW COLUMNS FROM tips') as $row) {
-            $columns[$row['Field']] = true;
-            $tableExists = true;
-        }
-    } catch (PDOException $e) {
-        // Table doesn't exist yet, will create it
-        $tableExists = false;
-    }
-
-    // Create table if it doesn't exist
-    if (!$tableExists) {
-        $pdo->exec("CREATE TABLE tips (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            tip_id VARCHAR(255) UNIQUE NOT NULL,
-            location TEXT NOT NULL,
-            description TEXT NOT NULL,
-            photo_data LONGTEXT NULL,
-            status VARCHAR(50) NOT NULL DEFAULT 'Under Review',
-            outcome VARCHAR(100) DEFAULT 'No Outcome Yet',
-            submitted_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
-        return; // Table created with all columns, no need to check further
-    }
-
-    // Table exists - check and add missing columns
-    if (!isset($columns['tip_id'])) {
-        $pdo->exec('ALTER TABLE tips ADD COLUMN tip_id VARCHAR(255) UNIQUE NOT NULL DEFAULT "" AFTER id');
-    }
-    if (!isset($columns['location'])) {
-        $pdo->exec('ALTER TABLE tips ADD COLUMN location TEXT NOT NULL DEFAULT "" AFTER tip_id');
-    }
-    if (!isset($columns['description'])) {
-        $pdo->exec('ALTER TABLE tips ADD COLUMN description TEXT NOT NULL DEFAULT "" AFTER location');
-    }
-    if (!isset($columns['photo_data'])) {
-        $pdo->exec('ALTER TABLE tips ADD COLUMN photo_data LONGTEXT NULL AFTER description');
-    }
-    if (!isset($columns['status'])) {
-        $pdo->exec('ALTER TABLE tips ADD COLUMN status VARCHAR(50) NOT NULL DEFAULT "Under Review" AFTER photo_data');
-    }
-    if (!isset($columns['outcome'])) {
-        $pdo->exec('ALTER TABLE tips ADD COLUMN outcome VARCHAR(100) DEFAULT "No Outcome Yet" AFTER status');
-    }
-    if (!isset($columns['submitted_at'])) {
-        $pdo->exec('ALTER TABLE tips ADD COLUMN submitted_at DATETIME DEFAULT CURRENT_TIMESTAMP AFTER outcome');
-    }
-    if (!isset($columns['created_at'])) {
-        $pdo->exec('ALTER TABLE tips ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP');
-    }
-}
+require_once __DIR__ . '/tips_schema.php';
+require_once __DIR__ . '/notifications_schema.php';
 
 try {
     ensureTipsTable($pdo);
@@ -79,8 +19,6 @@ $method = $_SERVER['REQUEST_METHOD'];
 $input = json_decode(file_get_contents('php://input'), true) ?? [];
 $action = $input['action'] ?? '';
 
-// For GET, UPDATE, DELETE - require admin authentication
-// For 'create' action, no authentication is required (public submission)
 if ($action !== 'create' && (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true)) {
     http_response_code(401);
     echo json_encode(['success' => false, 'message' => 'Unauthorized']);
@@ -88,13 +26,10 @@ if ($action !== 'create' && (!isset($_SESSION['admin_logged_in']) || $_SESSION['
 }
 
 if ($method === 'GET') {
-    // Return all tips
     try {
-        $stmt = $pdo->query('SELECT id, tip_id, location, description, photo_data, status, outcome, submitted_at FROM tips ORDER BY id DESC');
+        $cols = tipsSelectColumns();
+        $stmt = $pdo->query("SELECT {$cols} FROM tips ORDER BY id DESC");
         $tips = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        
-        // Include photo_data for display in the review table
-        // Note: This may increase payload size, but necessary for displaying photos
 
         echo json_encode([
             'success' => true,
@@ -119,7 +54,6 @@ if ($method === 'POST') {
             exit;
         }
 
-        // Generate unique tip ID
         $year = date('Y');
         $stmt = $pdo->query("SELECT MAX(CAST(SUBSTRING(tip_id, LOCATE('-', tip_id, 5) + 1) AS UNSIGNED)) AS max_num FROM tips WHERE tip_id LIKE 'TIP-{$year}-%'");
         $maxNum = $stmt->fetchColumn();
@@ -137,7 +71,15 @@ if ($method === 'POST') {
                 ':outcome' => 'No Outcome Yet',
             ]);
 
-            $id = (int)$pdo->lastInsertId();
+            $id = (int) $pdo->lastInsertId();
+
+            createAdminNotification(
+                $pdo,
+                'tip',
+                'New Tip Received',
+                'Tip #' . $tipId . ' - ' . $location,
+                'review-tip.php?id=' . $tipId
+            );
 
             echo json_encode([
                 'success' => true,
@@ -159,7 +101,7 @@ if ($method === 'POST') {
     }
 
     if ($action === 'update') {
-        $id = (int)($input['id'] ?? 0);
+        $id = (int) ($input['id'] ?? 0);
         $status = trim($input['status'] ?? '');
         $outcome = trim($input['outcome'] ?? 'No Outcome Yet');
 
@@ -189,7 +131,7 @@ if ($method === 'POST') {
     }
 
     if ($action === 'delete') {
-        $id = (int)($input['id'] ?? 0);
+        $id = (int) ($input['id'] ?? 0);
         if ($id <= 0) {
             http_response_code(400);
             echo json_encode(['success' => false, 'message' => 'Invalid tip ID.']);
@@ -211,4 +153,3 @@ if ($method === 'POST') {
 
 http_response_code(405);
 echo json_encode(['success' => false, 'message' => 'Method not allowed.']);
-

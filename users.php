@@ -6,6 +6,13 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
     header('Location: login.php');
     exit;
 }
+require_once __DIR__ . '/db.php';
+
+if (!isAdminUser()) {
+    header('Location: index.php');
+    exit;
+}
+
 ?>
 <!doctype html>
 <html lang="en">
@@ -16,6 +23,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
     <link rel="icon" type="image/x-icon" href="images/favicon.ico">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="css/theme.css">
+    <link rel="stylesheet" href="css/admin-sidebar.css">
     <style>
         body {
             margin: 0;
@@ -924,7 +932,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             </a>
             
             <!-- User Management Module (Admin Only) -->
-            <?php if (isset($_SESSION['user_role']) && $_SESSION['user_role'] === 'Admin'): ?>
+            <?php if (isAdminUser()): ?>
             <div class="nav-module <?php echo (basename($_SERVER['PHP_SELF']) == 'users.php' || basename($_SERVER['PHP_SELF']) == 'login-history.php') ? 'active' : ''; ?>">
                 <div class="nav-module-header" onclick="toggleModule(this)" data-tooltip="User Management">
                     <span class="nav-module-icon"><i class="fas fa-users-cog"></i></span>
@@ -951,18 +959,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                     <span class="arrow">▶</span>
                 </div>
                 <div class="nav-submodules">
-                    <a href="member-list.php" class="nav-submodule" data-tooltip="Member List">
-                        <span class="nav-submodule-icon"><i class="fas fa-clipboard-list"></i></span>
-                        <span class="nav-submodule-text">Member List</span>
-                    </a>
-                    <a href="activity-logs.php" class="nav-submodule" data-tooltip="Activity Logs">
-                        <span class="nav-submodule-icon"><i class="fas fa-chart-bar"></i></span>
-                        <span class="nav-submodule-text">Activity Logs</span>
-                    </a>
-                    <a href="incident-feed.php" class="nav-submodule" data-tooltip="Incident Feed">
-                        <span class="nav-submodule-icon"><i class="fas fa-exclamation-triangle"></i></span>
-                        <span class="nav-submodule-text">Incident Feed</span>
-                    </a>
+                    <?php require __DIR__ . '/includes/neighborhood_watch_nav_submodules.php'; ?>
                 </div>
             </div>
             
@@ -973,10 +970,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                     <span class="arrow">▶</span>
                 </div>
                 <div class="nav-submodules">
-                    <a href="open-surveillance-app.php" class="nav-submodule" data-tooltip="Open Surveillance App">
-                        <span class="nav-submodule-icon"><i class="fas fa-desktop"></i></span>
-                        <span class="nav-submodule-text">Open Surveillance App</span>
-                    </a>
+                    <?php $cctvNavActive = $cctvNavActive ?? ''; require __DIR__ . '/includes/cctv_nav_submodules.php'; ?>
                 </div>
             </div>
             
@@ -998,23 +992,6 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                 </div>
             </div>
             
-            <div class="nav-module">
-                <div class="nav-module-header" onclick="toggleModule(this)" data-tooltip="Volunteer Registry and Scheduling">
-                    <span class="nav-module-icon"><i class="fas fa-handshake"></i></span>
-                    <span class="nav-module-header-text">Volunteer Registry and Scheduling</span>
-                    <span class="arrow">▶</span>
-                </div>
-                <div class="nav-submodules">
-                    <a href="volunteer-list.php" class="nav-submodule" data-tooltip="Volunteer List">
-                        <span class="nav-submodule-icon"><i class="fas fa-user"></i></span>
-                        <span class="nav-submodule-text">Volunteer List</span>
-                    </a>
-                    <a href="schedule-management.php" class="nav-submodule" data-tooltip="Volunteer Request">
-                        <span class="nav-submodule-icon"><i class="fas fa-calendar"></i></span>
-                        <span class="nav-submodule-text">Volunteer Request</span>
-                    </a>
-                </div>
-            </div>
             
             <div class="nav-module">
                 <div class="nav-module-header" onclick="toggleModule(this)" data-tooltip="Patrol Scheduling and Monitoring">
@@ -1023,18 +1000,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                     <span class="arrow">▶</span>
                 </div>
                 <div class="nav-submodules">
-                    <a href="patrol-list.php" class="nav-submodule" data-tooltip="Patrol List">
-                        <span class="nav-submodule-icon"><i class="fas fa-list"></i></span>
-                        <span class="nav-submodule-text">Patrol List</span>
-                    </a>
-                    <a href="patrol-schedule.php" class="nav-submodule" data-tooltip="Patrol Schedule">
-                        <span class="nav-submodule-icon"><i class="fas fa-calendar-alt"></i></span>
-                        <span class="nav-submodule-text">Patrol Schedule</span>
-                    </a>
-                    <a href="patrol-logs.php" class="nav-submodule" data-tooltip="Patrol Logs">
-                        <span class="nav-submodule-icon"><i class="fas fa-file"></i></span>
-                        <span class="nav-submodule-text">Patrol Logs</span>
-                    </a>
+                    <?php $patrolNavActive = $patrolNavActive ?? ''; require __DIR__ . '/includes/patrol_nav_submodules.php'; ?>
                 </div>
             </div>
             
@@ -1095,7 +1061,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                     <span class="time-part" id="currentTime"></span>
                 </div>
                 <div class="notification-container">
-                    <button class="notification-bell" onclick="toggleNotifications()" aria-label="Notifications">
+                    <button class="notification-bell" type="button" onclick="toggleNotifications(event)" aria-label="Notifications">
                         <i class="fas fa-bell"></i>
                         <span class="notification-badge" id="notificationBadge"></span>
                     </button>
@@ -1132,7 +1098,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                             <tr>
                                 <th>ID</th>
                                 <th>Full Name</th>
-                                <th>Username</th>
+                                <th>Username / Personnel ID</th>
                                 <th>Email</th>
                                 <th>Role</th>
                                 <th>Status</th>
@@ -1179,7 +1145,6 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                     <select id="role" name="role" required>
                         <option value="">Select role</option>
                         <option value="Admin">Admin</option>
-                        <option value="User">User</option>
                     </select>
                 </div>
                 <div class="error-message" id="formError"></div>
@@ -1222,7 +1187,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                     <select id="editRole" name="role" required>
                         <option value="">Select role</option>
                         <option value="Admin">Admin</option>
-                        <option value="User">User</option>
+                        <option value="BPSO Personnel">BPSO Personnel</option>
                     </select>
                 </div>
                 <div class="error-message" id="editFormError"></div>
@@ -1325,51 +1290,76 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             }
         }
         
+        function formatRoleLabel(role) {
+            if (!role || role.toLowerCase() === 'user') {
+                return 'BPSO Personnel';
+            }
+            return role;
+        }
+
+        function isBpsoAccount(user) {
+            return user.account_type === 'bpso' || formatRoleLabel(user.role) === 'BPSO Personnel';
+        }
+
+        function isAccountActive(user) {
+            if (isBpsoAccount(user)) {
+                return (user.status || '').toLowerCase() !== 'off duty';
+            }
+            return user.status === 'Active';
+        }
+
         function displayUsers(users) {
             const tbody = document.getElementById('usersTableBody');
             tbody.innerHTML = '';
-            
+
             users.forEach(user => {
                 const tr = document.createElement('tr');
-                const isActive = user.status === 'Active';
-                
+                const isActive = isAccountActive(user);
+                const isBpso = isBpsoAccount(user);
+                const roleLabel = formatRoleLabel(user.role);
+                const statusLabel = isBpso ? (user.status || 'Available') : (user.status || 'Active');
+                const statusClass = isBpso
+                    ? (statusLabel === 'Available' ? 'status-active' : 'status-inactive')
+                    : (isActive ? 'status-active' : 'status-inactive');
+
                 tr.innerHTML = `
                     <td>${user.id}</td>
                     <td>${user.full_name || '-'}</td>
-                    <td>${user.username}</td>
+                    <td>${user.username || '-'}</td>
                     <td>${user.email || '-'}</td>
-                    <td>${user.role || 'User'}</td>
+                    <td>${roleLabel}</td>
                     <td>
-                        <span class="status-badge ${isActive ? 'status-active' : 'status-inactive'}" id="status-badge-${user.id}">
-                            ${user.status || 'Active'}
+                        <span class="status-badge ${statusClass}" id="status-badge-${user.id}">
+                            ${statusLabel}
                         </span>
                     </td>
                     <td>${user.created_at || '-'}</td>
                     <td>
                         <div class="action-cell">
                             <label class="status-toggle">
-                                <input type="checkbox" ${isActive ? 'checked' : ''} onchange="toggleUserStatus(${user.id}, this.checked)">
+                                <input type="checkbox" ${isActive ? 'checked' : ''} onchange="toggleUserStatus('${user.id}', this.checked, '${user.account_type || 'admin'}')">
                                 <span class="status-toggle-slider"></span>
                             </label>
-                            <button class="btn-action btn-edit" onclick="editUser(${user.id})">Edit</button>
+                            <button class="btn-action btn-edit" onclick="editUser('${user.id}')">Edit</button>
                         </div>
                     </td>
                 `;
-                
+
                 tbody.appendChild(tr);
             });
         }
-        
-        async function toggleUserStatus(userId, isActive) {
-            const newStatus = isActive ? 'Active' : 'Inactive';
+
+        async function toggleUserStatus(userId, isActive, accountType) {
+            const newStatus = accountType === 'bpso'
+                ? (isActive ? 'Available' : 'Off Duty')
+                : (isActive ? 'Active' : 'Inactive');
             const statusBadge = document.getElementById(`status-badge-${userId}`);
-            
-            // Update status badge immediately (optimistic update)
+
             if (statusBadge) {
                 statusBadge.textContent = newStatus;
                 statusBadge.className = `status-badge ${isActive ? 'status-active' : 'status-inactive'}`;
             }
-            
+
             try {
                 const response = await fetch('api/users.php', {
                     method: 'PUT',
@@ -1379,19 +1369,17 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                         status: newStatus
                     })
                 });
-                
+
                 const result = await response.json();
-                
-                if (result.success) {
-                    // Status already updated in UI, no need to reload
-                } else {
+
+                if (!result.success) {
                     alert('Failed to update user status: ' + result.error);
-                    loadUsers(); // Reload to reset toggle and status badge
+                    loadUsers();
                 }
             } catch (error) {
                 console.error('Error updating user status:', error);
                 alert('Error updating user status');
-                loadUsers(); // Reload to reset toggle and status badge
+                loadUsers();
             }
         }
         
@@ -1455,25 +1443,23 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
         
         async function editUser(userId) {
             try {
-                const response = await fetch(`api/users.php?id=${userId}`);
+                const response = await fetch('api/users.php?id=' + encodeURIComponent(userId));
                 const result = await response.json();
-                
+
                 if (result.success && result.user) {
                     const user = result.user;
-                    
-                    // Populate edit form
+                    const isBpso = user.account_type === 'bpso';
+
                     document.getElementById('editUserId').value = user.id;
                     document.getElementById('editFullName').value = user.full_name || '';
                     document.getElementById('editUsername').value = user.username || '';
                     document.getElementById('editEmail').value = user.email || '';
                     document.getElementById('editPassword').value = '';
-                    document.getElementById('editRole').value = user.role || 'User';
-                    
-                    // Clear errors
+                    document.getElementById('editRole').value = isBpso ? 'BPSO Personnel' : (user.role || 'Admin');
+                    document.getElementById('editRole').disabled = isBpso;
+                    document.getElementById('editUsername').disabled = isBpso;
                     document.getElementById('editFormError').style.display = 'none';
                     document.getElementById('editPasswordError').style.display = 'none';
-                    
-                    // Open modal
                     document.getElementById('editUserModal').classList.add('active');
                 } else {
                     alert('Failed to load user data: ' + (result.error || 'Unknown error'));
@@ -1483,52 +1469,50 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                 alert('Error loading user data. Please try again.');
             }
         }
-        
+
         function closeEditUserModal() {
             document.getElementById('editUserModal').classList.remove('active');
             document.getElementById('editUserForm').reset();
+            document.getElementById('editRole').disabled = false;
+            document.getElementById('editUsername').disabled = false;
             document.getElementById('editFormError').style.display = 'none';
             document.getElementById('editPasswordError').style.display = 'none';
         }
-        
+
         async function saveEditUser(event) {
             event.preventDefault();
-            
+
             const form = document.getElementById('editUserForm');
             const formData = new FormData(form);
-            
-            const userId = parseInt(document.getElementById('editUserId').value);
             const data = {
-                id: userId,
+                id: formData.get('user_id'),
                 full_name: formData.get('full_name'),
                 username: formData.get('username'),
                 email: formData.get('email'),
                 role: formData.get('role')
             };
-            
-            // Only include password if provided
+
             const password = formData.get('password');
             if (password && password.trim() !== '') {
-                // Validate password
                 if (!/[A-Z]/.test(password) || !/[0-9!@#$%^&*(),.?":{}|<>]/.test(password)) {
                     document.getElementById('editPasswordError').style.display = 'block';
                     return;
                 }
                 data.password = password;
             }
-            
+
             try {
                 const response = await fetch('api/users.php', {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(data)
                 });
-                
+
                 const result = await response.json();
-                
+
                 if (result.success) {
                     closeEditUserModal();
-                    loadUsers(); // Reload users to show updated data
+                    loadUsers();
                 } else {
                     document.getElementById('editFormError').textContent = result.error || 'Failed to update user';
                     document.getElementById('editFormError').style.display = 'block';
@@ -1594,143 +1578,8 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
         
         updateDateTime();
         setInterval(updateDateTime, 1000);
-        
-        // Notification System
-        let notificationDropdown = null;
-        let notificationBadge = null;
-        let notificationList = null;
-        
-        document.addEventListener('DOMContentLoaded', function() {
-            notificationDropdown = document.getElementById('notificationDropdown');
-            notificationBadge = document.getElementById('notificationBadge');
-            notificationList = document.getElementById('notificationList');
-            
-            if (notificationDropdown) {
-                loadNotifications();
-                setInterval(loadNotifications, 30000);
-                
-                document.addEventListener('click', function(event) {
-                    if (notificationDropdown && !event.target.closest('.notification-container')) {
-                        notificationDropdown.classList.remove('show');
-                    }
-                });
-            }
-        });
-        
-        function toggleNotifications() {
-            if (notificationDropdown) {
-                notificationDropdown.classList.toggle('show');
-                if (notificationDropdown.classList.contains('show')) {
-                    loadNotifications();
-                }
-            }
-        }
-        
-        async function loadNotifications() {
-            try {
-                await fetch('api/notifications.php?action=sync');
-                const response = await fetch('api/notifications.php?action=list');
-                const data = await response.json();
-                
-                if (data.success) {
-                    updateNotificationBadge(data.unread_count);
-                    renderNotifications(data.notifications);
-                }
-            } catch (error) {
-                console.error('Error loading notifications:', error);
-            }
-        }
-        
-        function updateNotificationBadge(count) {
-            if (notificationBadge) {
-                if (count > 0) {
-                    notificationBadge.textContent = count > 99 ? '99+' : count;
-                    notificationBadge.classList.add('show');
-                } else {
-                    notificationBadge.classList.remove('show');
-                }
-            }
-        }
-        
-        function renderNotifications(notifications) {
-            if (!notificationList) return;
-            
-            if (notifications.length === 0) {
-                notificationList.innerHTML = '<div class="notification-empty"><i class="fas fa-bell-slash"></i><p>No notifications</p></div>';
-                return;
-            }
-            
-            notificationList.innerHTML = notifications.map(notif => {
-                let iconClass, icon;
-                if (notif.type === 'complaint' || notif.type === 'incident') {
-                    iconClass = 'complaint';
-                    icon = 'fa-file-alt';
-                } else if (notif.type === 'tip') {
-                    iconClass = 'tip';
-                    icon = 'fa-comments';
-                } else if (notif.type === 'volunteer' || notif.type === 'volunteer_request') {
-                    iconClass = 'volunteer';
-                    icon = 'fa-handshake';
-                } else if (notif.type === 'login') {
-                    iconClass = 'login';
-                    icon = 'fa-sign-in-alt';
-                } else if (notif.type === 'logout') {
-                    iconClass = 'logout';
-                    icon = 'fa-sign-out-alt';
-                } else if (notif.type === 'event' || notif.type === 'event_report' || notif.type === 'patrol') {
-                    iconClass = 'event';
-                    icon = 'fa-bullhorn';
-                } else {
-                    iconClass = 'event';
-                    icon = 'fa-bullhorn';
-                }
-                
-                return `<div class="notification-item ${notif.is_read ? '' : 'unread'}" onclick="handleNotificationClick(${notif.id}, '${notif.link || ''}')">
-                    <div class="notification-icon ${iconClass}"><i class="fas ${icon}"></i></div>
-                    <div class="notification-content">
-                        <div class="notification-title">${escapeHtml(notif.title)}</div>
-                        <div class="notification-message">${escapeHtml(notif.message)}</div>
-                        <div class="notification-time">${notif.time_ago}</div>
-                    </div>
-                </div>`;
-            }).join('');
-        }
-        
-        function handleNotificationClick(id, link) {
-            fetch('api/notifications.php?action=mark_read', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: 'id=' + id
-            });
-            
-            const item = event.currentTarget;
-            item.classList.remove('unread');
-            
-            if (link) {
-                window.location.href = link;
-            }
-            
-            loadNotifications();
-        }
-        
-        async function markAllAsRead() {
-            try {
-                await fetch('api/notifications.php?action=mark_read', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
-                });
-                loadNotifications();
-            } catch (error) {
-                console.error('Error marking all as read:', error);
-            }
-        }
-        
-        function escapeHtml(text) {
-            const div = document.createElement('div');
-            div.textContent = text;
-            return div.innerHTML;
-        }
     </script>
+    <?php require __DIR__ . '/includes/admin_notifications_script.php'; ?>
 </body>
 </html>
 

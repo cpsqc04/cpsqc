@@ -6,6 +6,8 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
     header('Location: login.php');
     exit;
 }
+require_once __DIR__ . '/db.php';
+
 ?>
 <!doctype html>
 <html lang="en">
@@ -16,6 +18,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
     <link rel="icon" type="image/x-icon" href="images/favicon.ico">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="css/theme.css">
+    <link rel="stylesheet" href="css/admin-sidebar.css">
     <style>
         body {
             margin: 0;
@@ -1126,7 +1129,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             </a>
             
             <!-- User Management Module (Admin Only) -->
-            <?php if (isset($_SESSION['user_role']) && $_SESSION['user_role'] === 'Admin'): ?>
+            <?php if (isAdminUser()): ?>
             <div class="nav-module <?php echo (basename($_SERVER['PHP_SELF']) == 'users.php' || basename($_SERVER['PHP_SELF']) == 'login-history.php') ? 'active' : ''; ?>">
                 <div class="nav-module-header" onclick="toggleModule(this)" data-tooltip="User Management">
                     <span class="nav-module-icon"><i class="fas fa-users-cog"></i></span>
@@ -1153,18 +1156,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                     <span class="arrow">▶</span>
                 </div>
                 <div class="nav-submodules">
-                    <a href="member-list.php" class="nav-submodule" data-tooltip="Member List">
-                        <span class="nav-submodule-icon"><i class="fas fa-clipboard-list"></i></span>
-                        <span class="nav-submodule-text">Member List</span>
-                    </a>
-                    <a href="activity-logs.php" class="nav-submodule" data-tooltip="Activity Logs">
-                        <span class="nav-submodule-icon"><i class="fas fa-chart-bar"></i></span>
-                        <span class="nav-submodule-text">Activity Logs</span>
-                    </a>
-                    <a href="incident-feed.php" class="nav-submodule" data-tooltip="Incident Feed">
-                        <span class="nav-submodule-icon"><i class="fas fa-exclamation-triangle"></i></span>
-                        <span class="nav-submodule-text">Incident Feed</span>
-                    </a>
+                    <?php require __DIR__ . '/includes/neighborhood_watch_nav_submodules.php'; ?>
                 </div>
             </div>
             
@@ -1175,10 +1167,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                     <span class="arrow">▶</span>
                 </div>
                 <div class="nav-submodules">
-                    <a href="open-surveillance-app.php" class="nav-submodule" data-tooltip="Open Surveillance App">
-                        <span class="nav-submodule-icon"><i class="fas fa-desktop"></i></span>
-                        <span class="nav-submodule-text">Open Surveillance App</span>
-                    </a>
+                    <?php $cctvNavActive = $cctvNavActive ?? ''; require __DIR__ . '/includes/cctv_nav_submodules.php'; ?>
                 </div>
             </div>
             
@@ -1200,23 +1189,6 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                 </div>
             </div>
             
-            <div class="nav-module">
-                <div class="nav-module-header" onclick="toggleModule(this)" data-tooltip="Volunteer Registry and Scheduling">
-                    <span class="nav-module-icon"><i class="fas fa-handshake"></i></span>
-                    <span class="nav-module-header-text">Volunteer Registry and Scheduling</span>
-                    <span class="arrow">▶</span>
-                </div>
-                <div class="nav-submodules">
-                    <a href="volunteer-list.php" class="nav-submodule" data-tooltip="Volunteer List">
-                        <span class="nav-submodule-icon"><i class="fas fa-user"></i></span>
-                        <span class="nav-submodule-text">Volunteer List</span>
-                    </a>
-                    <a href="schedule-management.php" class="nav-submodule" data-tooltip="Volunteer Request">
-                        <span class="nav-submodule-icon"><i class="fas fa-calendar"></i></span>
-                        <span class="nav-submodule-text">Volunteer Request</span>
-                    </a>
-                </div>
-            </div>
             
             <div class="nav-module">
                 <div class="nav-module-header" onclick="toggleModule(this)" data-tooltip="Patrol Scheduling and Monitoring">
@@ -1225,18 +1197,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                     <span class="arrow">▶</span>
                 </div>
                 <div class="nav-submodules">
-                    <a href="patrol-list.php" class="nav-submodule" data-tooltip="Patrol List">
-                        <span class="nav-submodule-icon"><i class="fas fa-list"></i></span>
-                        <span class="nav-submodule-text">Patrol List</span>
-                    </a>
-                    <a href="patrol-schedule.php" class="nav-submodule" data-tooltip="Patrol Schedule">
-                        <span class="nav-submodule-icon"><i class="fas fa-calendar-alt"></i></span>
-                        <span class="nav-submodule-text">Patrol Schedule</span>
-                    </a>
-                    <a href="patrol-logs.php" class="nav-submodule" data-tooltip="Patrol Logs">
-                        <span class="nav-submodule-icon"><i class="fas fa-file"></i></span>
-                        <span class="nav-submodule-text">Patrol Logs</span>
-                    </a>
+                    <?php $patrolNavActive = $patrolNavActive ?? ''; require __DIR__ . '/includes/patrol_nav_submodules.php'; ?>
                 </div>
             </div>
             
@@ -1297,7 +1258,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                     <span class="time-part" id="currentTime"></span>
                 </div>
                 <div class="notification-container">
-                    <button class="notification-bell" onclick="toggleNotifications()" aria-label="Notifications">
+                    <button class="notification-bell" type="button" onclick="toggleNotifications(event)" aria-label="Notifications">
                         <i class="fas fa-bell"></i>
                         <span class="notification-badge" id="notificationBadge"></span>
                     </button>
@@ -1322,24 +1283,43 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                 <form id="complaintForm" onsubmit="submitComplaint(event)">
                     <div class="form-row">
                         <div class="form-group">
-                            <label for="complainantName">Complainant Name *</label>
-                            <input type="text" id="complainantName" name="complainantName" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="complainantContact">Contact Number *</label>
-                            <input type="tel" id="complainantContact" name="complainantContact" required>
-                        </div>
-                    </div>
-                    
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="complainantAddress">Address *</label>
-                            <input type="text" id="complainantAddress" name="complainantAddress" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="complaintDate">Date of Incident *</label>
+                            <label for="complaintDate">Date *</label>
                             <input type="date" id="complaintDate" name="complaintDate" required>
                         </div>
+                        <div class="form-group">
+                            <label for="complaintTime">Time *</label>
+                            <input type="time" id="complaintTime" name="complaintTime" required>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="complainantName">Complainant's Name *</label>
+                        <input type="text" id="complainantName" name="complainantName" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="complainantAddress">Complainant's Address *</label>
+                        <input type="text" id="complainantAddress" name="complainantAddress" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="complainantContact">Complainant's Contact Number *</label>
+                        <input type="tel" id="complainantContact" name="complainantContact" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="defendantName">Defendant's Name *</label>
+                        <input type="text" id="defendantName" name="defendantName" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="defendantAddress">Defendant's Address *</label>
+                        <input type="text" id="defendantAddress" name="defendantAddress" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="defendantContact">Defendant's Contact Number</label>
+                        <input type="tel" id="defendantContact" name="defendantContact">
                     </div>
                     
                     <div class="form-group">
@@ -1353,26 +1333,15 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                             <option value="Other">Other</option>
                         </select>
                     </div>
-                    
-                    <div class="form-group">
-                        <label for="complaintLocation">Location of Incident *</label>
-                        <input type="text" id="complaintLocation" name="complaintLocation" required>
+
+                    <div class="form-group" id="complaintTypeOtherGroup" style="display: none;">
+                        <label for="complaintTypeOther">Specify Complaint Type *</label>
+                        <input type="text" id="complaintTypeOther" name="complaintTypeOther" placeholder="Enter the type of complaint">
                     </div>
                     
                     <div class="form-group">
                         <label for="complaintDescription">Description of Complaint *</label>
                         <textarea id="complaintDescription" name="complaintDescription" required placeholder="Please provide detailed information about your complaint..."></textarea>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="complaintPriority">Priority Level *</label>
-                        <select id="complaintPriority" name="complaintPriority" required>
-                            <option value="">Select Priority</option>
-                            <option value="Low">Low</option>
-                            <option value="Medium">Medium</option>
-                            <option value="High">High</option>
-                            <option value="Urgent">Urgent</option>
-                        </select>
                     </div>
                     
                     <div class="form-actions">
@@ -1465,6 +1434,18 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
         }
         
         
+        function toggleComplaintTypeOtherField() {
+            const type = document.getElementById('complaintType').value;
+            const group = document.getElementById('complaintTypeOtherGroup');
+            const input = document.getElementById('complaintTypeOther');
+            const showOther = type === 'Other';
+            group.style.display = showOther ? '' : 'none';
+            input.required = showOther;
+            if (!showOther) {
+                input.value = '';
+            }
+        }
+
         function submitComplaint(event) {
             event.preventDefault();
             
@@ -1472,6 +1453,16 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             const submitBtn = event.target.querySelector('.btn-submit');
             submitBtn.disabled = true;
             submitBtn.textContent = 'Submitting...';
+            
+            const complaintType = document.getElementById('complaintType').value;
+            const complaintTypeOther = document.getElementById('complaintTypeOther').value.trim();
+            if (complaintType === 'Other' && complaintTypeOther === '') {
+                alert('Please specify the complaint type when selecting Other.');
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Submit Complaint';
+                document.getElementById('complaintTypeOther').focus();
+                return;
+            }
             
             // Get form values
             const complaintId = generateComplaintId();
@@ -1482,10 +1473,13 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                 contact_number: document.getElementById('complainantContact').value.trim(),
                 address: document.getElementById('complainantAddress').value.trim(),
                 incident_date: document.getElementById('complaintDate').value,
-                complaint_type: document.getElementById('complaintType').value,
-                location: document.getElementById('complaintLocation').value.trim(),
+                incident_time: document.getElementById('complaintTime').value,
+                defendant_name: document.getElementById('defendantName').value.trim(),
+                defendant_address: document.getElementById('defendantAddress').value.trim(),
+                defendant_contact_number: document.getElementById('defendantContact').value.trim(),
+                complaint_type: complaintType,
+                complaint_type_other: complaintType === 'Other' ? complaintTypeOther : '',
                 description: document.getElementById('complaintDescription').value.trim(),
-                priority: document.getElementById('complaintPriority').value,
                 status: 'Pending',
                 assigned_to: 'Pending Assignment',
                 notes: 'Complaint submitted and awaiting review.'
@@ -1514,6 +1508,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                 
                 // Reset form
                 document.getElementById('complaintForm').reset();
+                toggleComplaintTypeOtherField();
                 
                 // Re-enable submit button
                 submitBtn.disabled = false;
@@ -1534,15 +1529,27 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
         function resetForm() {
             if (confirm('Are you sure you want to reset the form? All entered data will be lost.')) {
                 document.getElementById('complaintForm').reset();
+                toggleComplaintTypeOtherField();
             }
         }
         
         // Set default date to today
         document.addEventListener('DOMContentLoaded', function() {
+            const complaintTypeSelect = document.getElementById('complaintType');
+            if (complaintTypeSelect) {
+                complaintTypeSelect.addEventListener('change', toggleComplaintTypeOtherField);
+                toggleComplaintTypeOtherField();
+            }
+
             const dateInput = document.getElementById('complaintDate');
             if (dateInput) {
                 const today = new Date().toISOString().split('T')[0];
-                dateInput.setAttribute('max', today); // Prevent future dates
+                dateInput.setAttribute('max', today);
+            }
+            const timeInput = document.getElementById('complaintTime');
+            if (timeInput && !timeInput.value) {
+                const now = new Date();
+                timeInput.value = now.toTimeString().slice(0, 5);
             }
         });
         
@@ -1575,164 +1582,8 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
         // Update date/time immediately and then every second
         updateDateTime();
         setInterval(updateDateTime, 1000);
-        
-        // Notification System
-        let notificationDropdown = null;
-        let notificationBadge = null;
-        let notificationList = null;
-        
-        document.addEventListener('DOMContentLoaded', function() {
-            notificationDropdown = document.getElementById('notificationDropdown');
-            notificationBadge = document.getElementById('notificationBadge');
-            notificationList = document.getElementById('notificationList');
-            
-            if (notificationDropdown && notificationBadge && notificationList) {
-                loadNotifications();
-                // Refresh notifications every 30 seconds
-                setInterval(loadNotifications, 30000);
-                
-                // Close dropdown when clicking outside
-                document.addEventListener('click', function(event) {
-                    if (notificationDropdown && !event.target.closest('.notification-container')) {
-                        notificationDropdown.classList.remove('show');
-                    }
-                });
-            }
-        });
-        
-        function toggleNotifications() {
-            if (notificationDropdown) {
-                notificationDropdown.classList.toggle('show');
-                if (notificationDropdown.classList.contains('show')) {
-                    loadNotifications();
-                }
-            }
-        }
-        
-        async function loadNotifications() {
-            try {
-                // Sync activities first
-                await fetch('api/notifications.php?action=sync');
-                
-                // Then load notifications
-                const response = await fetch('api/notifications.php?action=list');
-                const data = await response.json();
-                
-                if (data.success) {
-                    updateNotificationBadge(data.unread_count);
-                    renderNotifications(data.notifications);
-                }
-            } catch (error) {
-                console.error('Error loading notifications:', error);
-            }
-        }
-        
-        function updateNotificationBadge(count) {
-            if (notificationBadge) {
-                if (count > 0) {
-                    notificationBadge.textContent = count > 99 ? '99+' : count;
-                    notificationBadge.classList.add('show');
-                } else {
-                    notificationBadge.classList.remove('show');
-                }
-            }
-        }
-        
-        function renderNotifications(notifications) {
-            if (!notificationList) return;
-            
-            if (notifications.length === 0) {
-                notificationList.innerHTML = `
-                    <div class="notification-empty">
-                        <i class="fas fa-bell-slash"></i>
-                        <p>No notifications</p>
-                    </div>
-                `;
-                return;
-            }
-            
-            notificationList.innerHTML = notifications.map(notif => {
-                let iconClass, icon;
-                if (notif.type === 'complaint' || notif.type === 'incident') {
-                    iconClass = 'complaint';
-                    icon = 'fa-file-alt';
-                } else if (notif.type === 'tip') {
-                    iconClass = 'tip';
-                    icon = 'fa-comments';
-                } else if (notif.type === 'volunteer' || notif.type === 'volunteer_request') {
-                    iconClass = 'volunteer';
-                    icon = 'fa-handshake';
-                } else if (notif.type === 'login') {
-                    iconClass = 'login';
-                    icon = 'fa-sign-in-alt';
-                } else if (notif.type === 'logout') {
-                    iconClass = 'logout';
-                    icon = 'fa-sign-out-alt';
-                } else if (notif.type === 'event' || notif.type === 'event_report' || notif.type === 'patrol') {
-                    iconClass = 'event';
-                    icon = 'fa-bullhorn';
-                } else {
-                    iconClass = 'event';
-                    icon = 'fa-bullhorn';
-                }
-                
-                const safeLink = (notif.link || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
-                
-                return `
-                    <div class="notification-item ${notif.is_read ? '' : 'unread'}" 
-                         onclick="handleNotificationClick(${notif.id}, '${safeLink}')">
-                        <div class="notification-icon ${iconClass}">
-                            <i class="fas ${icon}"></i>
-                        </div>
-                        <div class="notification-content">
-                            <div class="notification-title">${escapeHtml(notif.title)}</div>
-                            <div class="notification-message">${escapeHtml(notif.message)}</div>
-                            <div class="notification-time">${notif.time_ago}</div>
-                        </div>
-                    </div>
-                `;
-            }).join('');
-        }
-        
-        function handleNotificationClick(id, link) {
-            // Mark as read
-            fetch('api/notifications.php?action=mark_read', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: 'id=' + id
-            });
-            
-            // Remove unread class
-            const item = event.currentTarget;
-            item.classList.remove('unread');
-            
-            // Navigate if link exists
-            if (link && link !== '') {
-                window.location.href = link;
-            }
-            
-            // Reload notifications to update badge
-            loadNotifications();
-        }
-        
-        async function markAllAsRead() {
-            try {
-                await fetch('api/notifications.php?action=mark_read', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
-                });
-                loadNotifications();
-            } catch (error) {
-                console.error('Error marking all as read:', error);
-            }
-        }
-        
-        function escapeHtml(text) {
-            const div = document.createElement('div');
-            div.textContent = text;
-            return div.innerHTML;
-        }
     </script>
+    <?php require __DIR__ . '/includes/admin_notifications_script.php'; ?>
 </body>
 </html>
 

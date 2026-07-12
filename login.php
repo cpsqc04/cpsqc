@@ -9,6 +9,7 @@ $autoloadPath = __DIR__ . DIRECTORY_SEPARATOR . 'vendor' . DIRECTORY_SEPARATOR .
 if (file_exists($autoloadPath)) {
     require_once $autoloadPath;
 }
+require_once __DIR__ . '/includes/login_otp.php';
 
 /**
  * Ensure the admins table exists and has required columns.
@@ -48,13 +49,19 @@ function ensureAdminsTable(PDO $pdo): void
     if (!isset($columns['locked_until'])) {
         $pdo->exec('ALTER TABLE admins ADD COLUMN locked_until DATETIME DEFAULT NULL');
     }
+    if (!isset($columns['status'])) {
+        $pdo->exec('ALTER TABLE admins ADD COLUMN status VARCHAR(20) DEFAULT "Active"');
+    }
+    if (!isset($columns['role'])) {
+        $pdo->exec('ALTER TABLE admins ADD COLUMN role VARCHAR(50) DEFAULT "Admin"');
+    }
 
     // Create default admin account if none exists
     $stmt = $pdo->query('SELECT COUNT(*) AS cnt FROM admins');
     $count = (int)$stmt->fetch()['cnt'];
     if ($count === 0) {
         $hash = password_hash('admin123', PASSWORD_DEFAULT);
-        $stmt = $pdo->prepare('INSERT INTO admins (username, password_hash, email, full_name, status) VALUES (:u, :p, :e, :f, "Active")');
+        $stmt = $pdo->prepare('INSERT INTO admins (username, password_hash, email, full_name, status, role) VALUES (:u, :p, :e, :f, "Active", "Admin")');
         $stmt->execute([
             ':u' => 'admin',
             ':p' => $hash,
@@ -64,10 +71,14 @@ function ensureAdminsTable(PDO $pdo): void
     }
 }
 
-try {
-    ensureAdminsTable($pdo);
-} catch (PDOException $e) {
-    $error = 'Login system error: ' . htmlspecialchars($e->getMessage());
+if (!($pdo instanceof PDO)) {
+    $error = 'Unable to connect to the database. Please make sure MySQL is running in XAMPP, then refresh this page.';
+} else {
+    try {
+        ensureAdminsTable($pdo);
+    } catch (PDOException $e) {
+        $error = 'Login system error: ' . htmlspecialchars($e->getMessage());
+    }
 }
 
 // Email sending functions
@@ -334,99 +345,6 @@ function sendLoginSuccessEmail($email, $username, $loginTime, $ipAddress) {
     return mail($email, $subject, $message, $headers);
 }
 
-function generateLoginOTP(): string {
-    return str_pad((string)rand(0, 999999), 6, '0', STR_PAD_LEFT);
-}
-
-function sendLoginOTPEmail($email, $username, $otp): bool {
-    // Load email config with fallback to direct .env file read
-    $mailHost = $_ENV['MAIL_HOST'] ?? 'smtp.resend.com';
-    $mailPort = (int)($_ENV['MAIL_PORT'] ?? 465);
-    $mailUser = $_ENV['MAIL_USERNAME'] ?? '';
-    $mailPass = $_ENV['MAIL_PASSWORD'] ?? '';
-    $mailFrom = $_ENV['MAIL_FROM_ADDRESS'] ?? $mailUser;
-    $mailFromName = $_ENV['MAIL_FROM_NAME'] ?? 'AlerTara QC';
-    $mailEncryption = $_ENV['MAIL_ENCRYPTION'] ?? 'ssl';
-    
-    if (empty($mailUser) || empty($mailPass)) {
-        $envPath = __DIR__ . DIRECTORY_SEPARATOR . '.env';
-        if (file_exists($envPath)) {
-            $lines = file($envPath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-            foreach ($lines as $line) {
-                if (strpos(trim($line), '#') === 0) continue;
-                if (strpos($line, '=') !== false) {
-                    list($key, $value) = explode('=', $line, 2);
-                    $key = trim($key);
-                    $value = trim($value);
-                    $value = trim($value, '"\'');
-                    if ($key === 'MAIL_USERNAME' && empty($mailUser)) $mailUser = $value;
-                    if ($key === 'MAIL_PASSWORD' && empty($mailPass)) $mailPass = $value;
-                    if ($key === 'MAIL_HOST' && empty($mailHost)) $mailHost = $value;
-                    if ($key === 'MAIL_PORT' && empty($mailPort)) $mailPort = (int)$value;
-                    if ($key === 'MAIL_FROM_ADDRESS' && empty($mailFrom)) $mailFrom = $value;
-                    if ($key === 'MAIL_FROM_NAME' && empty($mailFromName)) $mailFromName = $value;
-                    if ($key === 'MAIL_ENCRYPTION' && empty($mailEncryption)) $mailEncryption = $value;
-                }
-            }
-        }
-    }
-    
-    if (empty($mailUser) || empty($mailPass) || empty($email)) {
-        error_log('Login OTP email failed: Email credentials or recipient email not set.');
-        return false;
-    }
-    
-    if (class_exists('PHPMailer\\PHPMailer\\PHPMailer')) {
-        try {
-            $mail = new \PHPMailer\PHPMailer\PHPMailer(true);
-            $mail->isSMTP();
-            $mail->Host = $mailHost;
-            $mail->SMTPAuth = true;
-            $mail->Username = $mailUser;
-            $mail->Password = $mailPass;
-            if ($mailPort === 587 || strtolower($mailEncryption) === 'tls') {
-                $mail->SMTPSecure = \PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_STARTTLS;
-            } else {
-                $mail->SMTPSecure = \PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_SMTPS;
-            }
-            $mail->Port = $mailPort;
-            $mail->CharSet = 'UTF-8';
-            $mail->SMTPOptions = [
-                'ssl' => [
-                    'verify_peer' => false,
-                    'verify_peer_name' => false,
-                    'allow_self_signed' => true,
-                ],
-            ];
-
-            $mail->setFrom($mailFrom, $mailFromName);
-            $mail->addAddress($email);
-            $mail->isHTML(true);
-            $mail->Subject = 'AlerTara QC - Login OTP Verification';
-            $mail->Body = "
-            <html><body style='font-family: Arial, sans-serif; color: #333;'>
-                <h2 style='color:#2a5a59;'>Login Verification Required</h2>
-                <p>Hello {$username},</p>
-                <p>Use this OTP to complete your login:</p>
-                <p style='font-size: 30px; font-weight: 700; letter-spacing: 4px; color: #2a5a59;'>{$otp}</p>
-                <p>This code expires in 10 minutes.</p>
-                <p>If this wasn't you, please reset your password immediately.</p>
-            </body></html>
-            ";
-            $mail->send();
-            return true;
-        } catch (Exception $e) {
-            error_log('Login OTP email send failed: ' . ($mail->ErrorInfo ?? $e->getMessage()));
-            return false;
-        }
-    }
-
-    $subject = 'AlerTara QC - Login OTP Verification';
-    $message = "Your login OTP is {$otp}. This code expires in 10 minutes.";
-    $headers = "MIME-Version: 1.0\r\nContent-Type: text/html; charset=UTF-8\r\nFrom: {$mailFromName} <{$mailFrom}>\r\n";
-    return mail($email, $subject, $message, $headers);
-}
-
 // Get client IP address
 function logLoginHistory(PDO $pdo, $userId, $username, $status, $ipAddress = null) {
     try {
@@ -461,20 +379,8 @@ function logLoginHistory(PDO $pdo, $userId, $username, $status, $ipAddress = nul
         // Create notification for successful logins only
         if ($status === 'Success') {
             try {
-                // Ensure notifications table exists
-                $pdo->exec("CREATE TABLE IF NOT EXISTS notifications (
-                    id INT AUTO_INCREMENT PRIMARY KEY,
-                    user_id INT DEFAULT NULL,
-                    type VARCHAR(50) NOT NULL,
-                    title VARCHAR(255) NOT NULL,
-                    message TEXT NOT NULL,
-                    link VARCHAR(255) DEFAULT NULL,
-                    is_read TINYINT(1) DEFAULT 0,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    INDEX idx_user_id (user_id),
-                    INDEX idx_is_read (is_read),
-                    INDEX idx_created_at (created_at)
-                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+                require_once __DIR__ . '/api/notifications_schema.php';
+                ensureNotificationsTable($pdo);
                 
                 // Format login time
                 $loginTime = date('M j, Y g:i:s A');
@@ -548,11 +454,84 @@ function getClientIP() {
 // Database-backed authentication
 $attemptsRemaining = null;
 $otpPrompt = null;
-$showOtpForm = isset($_SESSION['pending_login']);
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($error)) {
-    $isOtpVerification = isset($_POST['verify_login_otp']);
+$showOtpForm = false;
+$otpEmailMasked = null;
+$otpExpiresAtText = null;
+$otpResendCooldown = 0;
 
-    if ($isOtpVerification) {
+if (isset($_GET['cancel_otp'])) {
+    unset($_SESSION['pending_login']);
+    header('Location: login.php');
+    exit;
+}
+
+if (isset($_SESSION['pending_login'])) {
+    $pendingLoginSession = $_SESSION['pending_login'];
+    $pendingExpiresAt = strtotime((string) ($pendingLoginSession['expires_at'] ?? ''));
+
+    if ($pendingExpiresAt === false || $pendingExpiresAt < time()) {
+        unset($_SESSION['pending_login']);
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            $error = 'OTP has expired. Please log in again.';
+        }
+    } else {
+        $showOtpForm = true;
+        $otpEmailMasked = maskEmailAddress((string) ($pendingLoginSession['email'] ?? ''));
+        $otpExpiresAtText = date('g:i A', $pendingExpiresAt);
+        $otpResendCooldown = getOtpResendCooldownSeconds($pendingLoginSession);
+        $otpPrompt = buildOtpPromptMessage(false, $pendingLoginSession['email'] ?? null, true);
+    }
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (isset($_POST['resend_login_otp'])) {
+        $pendingLogin = $_SESSION['pending_login'] ?? null;
+
+        if (!$pendingLogin) {
+            $error = 'No pending login verification found. Please log in again.';
+            $showOtpForm = false;
+        } elseif (strtotime((string) ($pendingLogin['expires_at'] ?? '')) < time()) {
+            unset($_SESSION['pending_login']);
+            $error = 'OTP has expired. Please log in again.';
+            $showOtpForm = false;
+        } else {
+            $otpResendCooldown = getOtpResendCooldownSeconds($pendingLogin);
+            if ($otpResendCooldown > 0) {
+                $error = "Please wait {$otpResendCooldown} second(s) before requesting another OTP.";
+                $showOtpForm = true;
+                $otpEmailMasked = maskEmailAddress((string) ($pendingLogin['email'] ?? ''));
+                $otpExpiresAtText = date('g:i A', strtotime((string) $pendingLogin['expires_at']));
+                $otpPrompt = buildOtpPromptMessage(false, $pendingLogin['email'] ?? null, true);
+            } else {
+            $otp = generateLoginOTP();
+            $_SESSION['pending_login']['otp'] = $otp;
+            $_SESSION['pending_login']['expires_at'] = date('Y-m-d H:i:s', strtotime('+10 minutes'));
+            $_SESSION['pending_login']['attempts'] = 0;
+            $_SESSION['pending_login']['last_resend_at'] = time();
+
+            $otpSent = sendLoginOTPEmail(
+                $pendingLogin['email'] ?? '',
+                $pendingLogin['display_name'] ?? $pendingLogin['username'] ?? 'User',
+                $otp
+            );
+
+            if ($otpSent) {
+                $otpPrompt = buildOtpPromptMessage(true, $pendingLogin['email'] ?? null);
+                $otpEmailMasked = maskEmailAddress((string) ($pendingLogin['email'] ?? ''));
+                $otpExpiresAtText = date('g:i A', strtotime((string) $_SESSION['pending_login']['expires_at']));
+                $otpResendCooldown = 60;
+                $showOtpForm = true;
+            } else {
+                $error = 'Failed to resend login OTP. Please try again later.';
+                $showOtpForm = true;
+            }
+            }
+        }
+    }
+
+    $isOtpVerification = isset($_POST['verify_login_otp']) && !isset($_POST['resend_login_otp']);
+
+    if ($isOtpVerification && !isset($error)) {
         $enteredOtp = trim($_POST['login_otp'] ?? '');
         $pendingLogin = $_SESSION['pending_login'] ?? null;
 
@@ -584,7 +563,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($error)) {
         } else {
             $_SESSION['admin_logged_in'] = true;
             $_SESSION['username'] = $pendingLogin['display_name'] ?: $pendingLogin['username'];
-            $_SESSION['user_role'] = $pendingLogin['role'] ?? 'User';
+            $_SESSION['user_role'] = $pendingLogin['role'] ?? 'Admin';
             $_SESSION['user_id'] = $pendingLogin['user_id'];
 
             $ipAddress = $pendingLogin['ip_address'] ?? getClientIP();
@@ -600,7 +579,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($error)) {
             header('Location: index.php');
             exit;
         }
-    } else {
+    } elseif (!isset($_POST['resend_login_otp']) && !isset($error)) {
         $email = trim($_POST['email'] ?? '');
         $password = $_POST['password'] ?? '';
         
@@ -700,17 +679,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($error)) {
                                 'user_id' => $admin['id'],
                                 'username' => $admin['username'],
                                 'display_name' => $admin['full_name'] ?: $admin['username'],
-                                'role' => $admin['role'] ?? 'User',
+                                'role' => $admin['role'] ?? 'Admin',
                                 'email' => $admin['email'],
                                 'otp' => $otp,
                                 'expires_at' => $expiresAt,
                                 'attempts' => 0,
-                                'ip_address' => $ipAddress
+                                'ip_address' => $ipAddress,
+                                'sent_at' => time(),
+                                'last_resend_at' => time(),
                             ];
 
                             $otpSent = sendLoginOTPEmail($admin['email'], $admin['full_name'] ?: $admin['username'], $otp);
                             if ($otpSent) {
-                                $otpPrompt = 'A 6-digit OTP has been sent to your registered email. Enter it below to continue.';
+                                $otpPrompt = buildOtpPromptMessage(false, $admin['email']);
+                                $otpEmailMasked = maskEmailAddress((string) $admin['email']);
+                                $otpExpiresAtText = date('g:i A', strtotime($expiresAt));
+                                $otpResendCooldown = 60;
                                 $showOtpForm = true;
                             } else {
                                 unset($_SESSION['pending_login']);
@@ -761,6 +745,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($error)) {
             }
         }
     }
+}
+
+if ($showOtpForm && empty($otpPrompt) && isset($_SESSION['pending_login'])) {
+    $pendingLoginSession = $_SESSION['pending_login'];
+    $otpEmailMasked = maskEmailAddress((string) ($pendingLoginSession['email'] ?? ''));
+    $otpExpiresAtText = date('g:i A', strtotime((string) ($pendingLoginSession['expires_at'] ?? '')));
+    $otpResendCooldown = getOtpResendCooldownSeconds($pendingLoginSession);
+    $otpPrompt = buildOtpPromptMessage(false, $pendingLoginSession['email'] ?? null, true);
 }
 
 // Get attempts remaining for display (if user exists and not already set)
@@ -915,6 +907,7 @@ if (isset($_SESSION['admin_logged_in']) && $_SESSION['admin_logged_in'] === true
             color: #f8fafc;
             background: rgba(255, 255, 255, 0.08);
             transition: border-color 0.2s ease, box-shadow 0.2s ease;
+            box-sizing: border-box;
         }
         .field input:focus {
             outline: none;
@@ -946,13 +939,35 @@ if (isset($_SESSION['admin_logged_in']) && $_SESSION['admin_logged_in'] === true
         .btn-secondary {
             background: transparent;
             color: #ffffff;
-            border: 1px solid #3a3a3a;
+            border: 1px solid rgba(255, 255, 255, 0.25);
             box-shadow: none;
         }
         .btn-secondary:hover {
-            background: #2a2a2a;
+            background: rgba(255, 255, 255, 0.08);
             border-color: var(--primary-color);
             transform: translateY(-1px);
+        }
+        .btn-secondary:disabled {
+            opacity: 0.55;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .otp-form {
+            display: grid;
+            gap: 1.75rem;
+        }
+        .otp-meta {
+            margin: 0;
+            font-size: 0.9rem;
+            color: rgba(255, 255, 255, 0.75);
+            line-height: 1.5;
+        }
+        .otp-meta strong {
+            color: #f8fafc;
+        }
+        .otp-actions {
+            justify-content: center;
+            margin-top: -0.5rem;
         }
         .btn {
             display: inline-flex;
@@ -1198,12 +1213,12 @@ if (isset($_SESSION['admin_logged_in']) && $_SESSION['admin_logged_in'] === true
                     <?php unset($_SESSION['registration_success'], $_SESSION['registered_username']); ?>
                 <?php endif; ?>
                 <?php if (isset($error)): ?>
-                    <div style="color: #ef4444; font-size: 0.9rem; padding: 0.75rem; background: rgba(239, 68, 68, 0.1); border-radius: 6px; margin-bottom: 1rem; border: 1px solid rgba(239, 68, 68, 0.2);">
+                    <div style="color: #ef4444; font-size: 0.9rem; padding: 0.75rem; background: rgba(239, 68, 68, 0.1); border-radius: 6px; border: 1px solid rgba(239, 68, 68, 0.2);">
                         <?php echo htmlspecialchars($error); ?>
                     </div>
                 <?php endif; ?>
                 <?php if (!empty($otpPrompt)): ?>
-                    <div style="color: #10b981; font-size: 0.9rem; padding: 0.75rem; background: rgba(16, 185, 129, 0.1); border-radius: 6px; margin-bottom: 1rem; border: 1px solid rgba(16, 185, 129, 0.2);">
+                    <div style="color: #10b981; font-size: 0.9rem; padding: 0.75rem; background: rgba(16, 185, 129, 0.1); border-radius: 6px; border: 1px solid rgba(16, 185, 129, 0.2);">
                         <?php echo htmlspecialchars($otpPrompt); ?>
                     </div>
                 <?php endif; ?>
@@ -1219,16 +1234,12 @@ if (isset($_SESSION['admin_logged_in']) && $_SESSION['admin_logged_in'] === true
                     </div>
                 <?php endif; ?>
                 <?php if ($showOtpForm): ?>
-                    <form method="POST" action="">
-                        <input type="hidden" name="verify_login_otp" value="1">
-                        <div class="field">
-                            <label for="login_otp">Login OTP</label>
-                            <input id="login_otp" name="login_otp" type="text" placeholder="Enter 6-digit OTP" maxlength="6" required>
-                        </div>
-                        <div class="button-group">
-                            <button class="btn" type="submit" style="width: 100%;">Verify OTP</button>
-                        </div>
-                    </form>
+                    <?php renderLoginOtpForm(
+                        'login.php?cancel_otp=1',
+                        $otpEmailMasked,
+                        $otpExpiresAtText,
+                        (int) $otpResendCooldown
+                    ); ?>
                 <?php else: ?>
                     <form method="POST" action="">
                         <div class="field">

@@ -5,6 +5,8 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
     header('Location: login.php');
     exit;
 }
+require_once __DIR__ . '/db.php';
+
 ?>
 <!doctype html>
 <html lang="en">
@@ -15,6 +17,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
     <link rel="icon" type="image/x-icon" href="images/favicon.ico">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="css/theme.css">
+    <link rel="stylesheet" href="css/admin-sidebar.css">
     <style>
         body { margin: 0; padding: 0; font-family: var(--font-family); background-color: var(--bg-color); display: flex; min-height: 100vh; }
         .sidebar { width: 320px; background: var(--tertiary-color); color: #fff; position: fixed; left: 0; top: 0; height: 100vh; overflow: hidden; box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1); z-index: 1000; transition: width 0.3s ease; display: flex; flex-direction: column; }
@@ -377,6 +380,28 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
         .btn-save:hover { background: #4ca8a6; }
         .status-in-progress { background: #cfe2ff; color: #084298; }
         .status-completed { background: #d1e7dd; color: #0f5132; }
+        .risk-alerts-panel { margin-bottom: 1.5rem; padding: 1.25rem 1.5rem; border: 1px solid var(--border-color); border-radius: 12px; background: #fff; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04); }
+        .risk-alerts-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; margin-bottom: 1rem; flex-wrap: wrap; }
+        .risk-alerts-header h3 { margin: 0 0 0.25rem 0; color: var(--tertiary-color); font-size: 1.15rem; }
+        .risk-alerts-subtitle { color: var(--text-secondary); font-size: 0.9rem; }
+        .risk-alerts-refresh { padding: 0.45rem 0.85rem; background: transparent; border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-color); cursor: pointer; font-size: 0.85rem; }
+        .risk-alerts-refresh:hover { background: #f5f5f5; }
+        .risk-alerts-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1rem; }
+        .risk-alert-card { border: 1px solid var(--border-color); border-radius: 10px; padding: 1rem; background: #fafafa; display: flex; flex-direction: column; gap: 0.65rem; }
+        .risk-alert-card-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 0.75rem; }
+        .risk-alert-title { font-weight: 600; color: var(--tertiary-color); font-size: 0.98rem; margin: 0; }
+        .risk-alert-type { color: var(--text-secondary); font-size: 0.82rem; }
+        .risk-alert-location { color: var(--text-color); font-size: 0.92rem; line-height: 1.45; }
+        .risk-alert-condition { color: var(--text-secondary); font-size: 0.85rem; font-style: italic; }
+        .risk-alert-meta { color: var(--text-secondary); font-size: 0.8rem; }
+        .severity-badge { padding: 0.2rem 0.55rem; border-radius: 999px; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.03em; white-space: nowrap; }
+        .severity-critical { background: #fee2e2; color: #b91c1c; }
+        .severity-high { background: #ffedd5; color: #c2410c; }
+        .severity-medium { background: #fef3c7; color: #a16207; }
+        .severity-low { background: #e5e7eb; color: #4b5563; }
+        .btn-assign-hotspot { margin-top: auto; padding: 0.55rem 0.9rem; background: var(--primary-color); color: #fff; border: none; border-radius: 6px; font-size: 0.85rem; font-weight: 600; cursor: pointer; transition: all 0.2s ease; }
+        .btn-assign-hotspot:hover { background: #4ca8a6; }
+        .risk-alerts-empty { padding: 1.25rem; text-align: center; color: var(--text-secondary); background: #f9fafb; border-radius: 8px; border: 1px dashed var(--border-color); }
         @media (max-width: 768px) { .sidebar { width: 320px; transform: translateX(-100%); transition: transform 0.3s ease; } .sidebar.mobile-open { transform: translateX(0); } .sidebar.collapsed { width: 80px; transform: translateX(0); } .main-wrapper { margin-left: 0; } body.sidebar-collapsed .main-wrapper { margin-left: 80px; } .modal-content { width: 95%; margin: 10% auto; padding: 1.5rem; } .search-container { flex-direction: column; } .btn-add { width: 100%; justify-content: center; } }
     </style>
 </head>
@@ -397,7 +422,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             </a>
             
             <!-- User Management Module (Admin Only) -->
-            <?php if (isset($_SESSION['user_role']) && $_SESSION['user_role'] === 'Admin'): ?>
+            <?php if (isAdminUser()): ?>
             <div class="nav-module <?php echo (basename($_SERVER['PHP_SELF']) == 'users.php' || basename($_SERVER['PHP_SELF']) == 'login-history.php') ? 'active' : ''; ?>">
                 <div class="nav-module-header" onclick="toggleModule(this)" data-tooltip="User Management">
                     <span class="nav-module-icon"><i class="fas fa-users-cog"></i></span>
@@ -424,18 +449,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                     <span class="arrow">▶</span>
                 </div>
                 <div class="nav-submodules">
-                    <a href="member-list.php" class="nav-submodule" data-tooltip="Member List">
-                        <span class="nav-submodule-icon"><i class="fas fa-clipboard-list"></i></span>
-                        <span class="nav-submodule-text">Member List</span>
-                    </a>
-                    <a href="activity-logs.php" class="nav-submodule" data-tooltip="Activity Logs">
-                        <span class="nav-submodule-icon"><i class="fas fa-chart-bar"></i></span>
-                        <span class="nav-submodule-text">Activity Logs</span>
-                    </a>
-                    <a href="incident-feed.php" class="nav-submodule" data-tooltip="Incident Feed">
-                        <span class="nav-submodule-icon"><i class="fas fa-exclamation-triangle"></i></span>
-                        <span class="nav-submodule-text">Incident Feed</span>
-                    </a>
+                    <?php require __DIR__ . '/includes/neighborhood_watch_nav_submodules.php'; ?>
                 </div>
             </div>
             <div class="nav-module">
@@ -445,10 +459,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                     <span class="arrow">▶</span>
                 </div>
                 <div class="nav-submodules">
-                    <a href="open-surveillance-app.php" class="nav-submodule" data-tooltip="Open Surveillance App">
-                        <span class="nav-submodule-icon"><i class="fas fa-desktop"></i></span>
-                        <span class="nav-submodule-text">Open Surveillance App</span>
-                    </a>
+                    <?php $cctvNavActive = $cctvNavActive ?? ''; require __DIR__ . '/includes/cctv_nav_submodules.php'; ?>
                 </div>
             </div>
             <div class="nav-module">
@@ -468,23 +479,6 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                     </a>
                 </div>
             </div>
-            <div class="nav-module">
-                <div class="nav-module-header" onclick="toggleModule(this)" data-tooltip="Volunteer Registry and Scheduling">
-                    <span class="nav-module-icon"><i class="fas fa-handshake"></i></span>
-                    <span class="nav-module-header-text">Volunteer Registry and Scheduling</span>
-                    <span class="arrow">▶</span>
-                </div>
-                <div class="nav-submodules">
-                    <a href="volunteer-list.php" class="nav-submodule" data-tooltip="Volunteer List">
-                        <span class="nav-submodule-icon"><i class="fas fa-user"></i></span>
-                        <span class="nav-submodule-text">Volunteer List</span>
-                    </a>
-                    <a href="schedule-management.php" class="nav-submodule" data-tooltip="Volunteer Request">
-                        <span class="nav-submodule-icon"><i class="fas fa-calendar"></i></span>
-                        <span class="nav-submodule-text">Volunteer Request</span>
-                    </a>
-                </div>
-            </div>
             <div class="nav-module active">
                 <div class="nav-module-header" onclick="toggleModule(this)" data-tooltip="Patrol Scheduling and Monitoring">
                     <span class="nav-module-icon"><i class="fas fa-walking"></i></span>
@@ -492,18 +486,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                     <span class="arrow">▶</span>
                 </div>
                 <div class="nav-submodules">
-                    <a href="patrol-list.php" class="nav-submodule" data-tooltip="Patrol List">
-                        <span class="nav-submodule-icon"><i class="fas fa-list"></i></span>
-                        <span class="nav-submodule-text">Patrol List</span>
-                    </a>
-                    <a href="patrol-schedule.php" class="nav-submodule active" data-tooltip="Patrol Schedule">
-                        <span class="nav-submodule-icon"><i class="fas fa-calendar-alt"></i></span>
-                        <span class="nav-submodule-text">Patrol Schedule</span>
-                    </a>
-                    <a href="patrol-logs.php" class="nav-submodule" data-tooltip="Patrol Logs">
-                        <span class="nav-submodule-icon"><i class="fas fa-file"></i></span>
-                        <span class="nav-submodule-text">Patrol Logs</span>
-                    </a>
+                    <?php $patrolNavActive = 'patrol-schedule'; require __DIR__ . '/includes/patrol_nav_submodules.php'; ?>
                 </div>
             </div>
             <div class="nav-module">
@@ -560,7 +543,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                     <span class="time-part" id="currentTime"></span>
                 </div>
                 <div class="notification-container">
-                    <button class="notification-bell" onclick="toggleNotifications()" aria-label="Notifications">
+                    <button class="notification-bell" type="button" onclick="toggleNotifications(event)" aria-label="Notifications">
                         <i class="fas fa-bell"></i>
                         <span class="notification-badge" id="notificationBadge"></span>
                     </button>
@@ -581,65 +564,42 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
         </header>
         <main class="content-area">
             <div class="page-content">
+                <div class="risk-alerts-panel" id="riskAlertsPanel">
+                    <div class="risk-alerts-header">
+                        <div>
+                            <h3><i class="fas fa-exclamation-triangle" style="color:#dc2626;margin-right:0.4rem;"></i>High-Risk Areas</h3>
+                        </div>
+                        <button type="button" class="risk-alerts-refresh" onclick="loadRiskAlerts()">
+                            <i class="fas fa-sync-alt"></i> Refresh
+                        </button>
+                    </div>
+                    <div id="riskAlertsList">
+                        <div class="risk-alerts-empty">Loading high-risk alerts...</div>
+                    </div>
+                </div>
                 <div class="search-container">
                     <div class="search-box">
-                        <input type="text" id="searchInput" placeholder="Search by location, date, or incident type..." onkeyup="filterPatrols()">
+                        <input type="text" id="searchInput" placeholder="Search by personnel, route, location, or status..." onkeyup="filterPatrols()">
                     </div>
+                    <button type="button" class="btn-add" onclick="openAssignPatrolModal()" style="white-space: nowrap;">
+                        <i class="fas fa-plus"></i> Assign Patrol
+                    </button>
                 </div>
                 <div class="table-container">
                     <table id="patrolsTable">
                         <thead>
                             <tr>
+                                <th>BPSO Personnel</th>
+                                <th>Route</th>
                                 <th>Location</th>
                                 <th>Date</th>
-                                <th>Incident Type</th>
-                                <th>Description</th>
+                                <th>Time</th>
+                                <th>Status</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody id="patrolsTableBody">
-                            <tr data-patrol-id="1">
-                                <td>San Agustin Street, Barangay San Agustin</td>
-                                <td>2025-01-20</td>
-                                <td>Theft</td>
-                                <td>Reported theft incident at residential area. Requires immediate patrol dispatch.</td>
-                                <td>
-                                    <div class="action-buttons">
-                                        <button class="btn-view" onclick="viewPatrol('1')">View</button>
-                                        <button class="btn-add" onclick="assignPatrolToDispatch('1')" style="padding: 0.5rem 1rem; font-size: 0.85rem;">
-                                            <i class="fas fa-user-check"></i> Assign Patrol
-                                        </button>
-                                    </div>
-                                </td>
-                            </tr>
-                            <tr data-patrol-id="2">
-                                <td>Quezon Avenue Extension, Barangay San Agustin</td>
-                                <td>2025-01-21</td>
-                                <td>Vandalism</td>
-                                <td>Vandalism reported on public property. Patrol needed for investigation.</td>
-                                <td>
-                                    <div class="action-buttons">
-                                        <button class="btn-view" onclick="viewPatrol('2')">View</button>
-                                        <button class="btn-add" onclick="assignPatrolToDispatch('2')" style="padding: 0.5rem 1rem; font-size: 0.85rem;">
-                                            <i class="fas fa-user-check"></i> Assign Patrol
-                                        </button>
-                                    </div>
-                                </td>
-                            </tr>
-                            <tr data-patrol-id="3">
-                                <td>Rizal Street, Barangay San Agustin</td>
-                                <td>2025-01-22</td>
-                                <td>Suspicious Activity</td>
-                                <td>Suspicious activity detected. Requires patrol verification.</td>
-                                <td>
-                                    <div class="action-buttons">
-                                        <button class="btn-view" onclick="viewPatrol('3')">View</button>
-                                        <button class="btn-add" onclick="assignPatrolToDispatch('3')" style="padding: 0.5rem 1rem; font-size: 0.85rem;">
-                                            <i class="fas fa-user-check"></i> Assign Patrol
-                                        </button>
-                                    </div>
-                                </td>
-                            </tr>
+                            <tr><td colspan="7" style="text-align:center;padding:2rem;color:#666;">Loading patrol schedules...</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -647,33 +607,20 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
         </main>
     </div>
 
-    <!-- Assign Patrol to Dispatch Modal -->
+    <!-- Assign Patrol Modal -->
     <div id="assignPatrolModal" class="modal">
         <div class="modal-content" style="max-width: 800px;">
             <div class="modal-header">
-                <h2>Assign Patrol to Dispatch</h2>
+                <h2>Assign Patrol</h2>
                 <span class="close" onclick="closeAssignPatrolModal()">&times;</span>
-            </div>
-            <div id="incidentDetails" style="margin-bottom: 1.5rem; padding: 1rem; background: #f9f9f9; border-radius: 8px;">
-                <!-- Incident details will be populated here -->
             </div>
             <form id="assignPatrolForm" onsubmit="savePatrolAssignment(event)">
                 <div class="form-group">
-                    <label>Select Patrol Officer *</label>
-                    <div style="margin-bottom: 1rem;">
-                        <label style="font-weight: 600; margin-bottom: 0.5rem; display: block;">Official Patrol Officers</label>
-                        <select id="patrolOfficer" name="officer" style="margin-bottom: 0.5rem;">
-                            <option value="">Select Official Patrol Officer</option>
-                            <!-- Options will be loaded from database -->
-                        </select>
-                    </div>
-                    <div>
-                        <label style="font-weight: 600; margin-bottom: 0.5rem; display: block;">Neighborhood Watch Members</label>
-                        <select id="neighborhoodMember" name="member">
-                            <option value="">Select Neighborhood Watch Member</option>
-                            <!-- Options will be loaded from database -->
-                        </select>
-                    </div>
+                    <label for="patrolOfficer">BPSO Personnel *</label>
+                    <select id="patrolOfficer" name="patrol_id" required>
+                        <option value="">Select BPSO Personnel</option>
+                    </select>
+                    <small style="display:block;margin-top:0.35rem;color:var(--text-secondary);font-size:0.85rem;">Only personnel <strong>currently at the barangay hall</strong> (timed in today) are shown.</small>
                 </div>
                 <div class="form-group">
                     <label for="patrolDate">Date *</label>
@@ -685,11 +632,19 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                 </div>
                 <div class="form-group">
                     <label for="patrolRoute">Route *</label>
-                    <input type="text" id="patrolRoute" name="route" required>
+                    <input type="text" id="patrolRoute" name="route" required placeholder="e.g. San Agustin Street to Quezon Avenue">
+                </div>
+                <div class="form-group">
+                    <label for="patrolLocation">Location</label>
+                    <input type="text" id="patrolLocation" name="location" placeholder="Barangay San Agustin, Quezon City">
+                </div>
+                <div class="form-group">
+                    <label for="patrolNotes">Notes</label>
+                    <textarea id="patrolNotes" name="notes" rows="3" placeholder="Optional instructions for the assigned personnel"></textarea>
                 </div>
                 <div class="form-actions">
                     <button type="button" class="btn-cancel" onclick="closeAssignPatrolModal()">Cancel</button>
-                    <button type="submit" class="btn-save">Assign and Dispatch</button>
+                    <button type="submit" class="btn-save">Assign Patrol</button>
                 </div>
             </form>
         </div>
@@ -768,88 +723,214 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                 }
             }
         }
-        // Initialize patrol data (from Crime Mapping and Heatmaps System - Group 5)
+        // Patrol schedule data from database
         let patrolData = {};
-        
-        function initializePatrolData() {
-            const tableBody = document.getElementById('patrolsTableBody');
-            const rows = tableBody.querySelectorAll('tr[data-patrol-id]');
-            
-            rows.forEach(row => {
-                const id = row.getAttribute('data-patrol-id');
-                const cells = row.querySelectorAll('td');
-                
-                patrolData[id] = {
-                    id: id,
-                    location: cells[0].textContent.trim(),
-                    date: cells[1].textContent.trim(),
-                    incidentType: cells[2].textContent.trim(),
-                    description: cells[3].textContent.trim()
-                };
+        let riskAlertData = {};
+
+        function severityBadgeClass(severity) {
+            const level = String(severity || '').toUpperCase();
+            if (level === 'CRITICAL') return 'severity-critical';
+            if (level === 'HIGH') return 'severity-high';
+            if (level === 'LOW') return 'severity-low';
+            return 'severity-medium';
+        }
+
+        function formatAlertTime(value) {
+            if (!value) return '—';
+            const date = new Date(value);
+            if (Number.isNaN(date.getTime())) return value;
+            return date.toLocaleString();
+        }
+
+        function buildHotspotNotes(alert) {
+            const parts = [
+                'Group 5 high-risk alert — recommended extra patrol.',
+                alert.rule_name ? `Rule: ${alert.rule_name}` : '',
+                alert.severity ? `Severity: ${alert.severity}` : '',
+                alert.condition_text ? `Condition: ${alert.condition_text}` : '',
+                alert.incident_count ? `Incidents: ${alert.incident_count}` : '',
+                alert.time_window ? `Window: ${alert.time_window}` : '',
+                alert.alert_id ? `Ref: ${alert.alert_id}` : ''
+            ].filter(Boolean);
+            return parts.join('\n');
+        }
+
+        async function loadRiskAlerts() {
+            const listEl = document.getElementById('riskAlertsList');
+            try {
+                const response = await fetch('api/risk_alerts.php?status=active');
+                const result = await response.json();
+
+                if (!result.success) {
+                    listEl.innerHTML = `<div class="risk-alerts-empty">${escapeHtml(result.message || 'Unable to load high-risk alerts.')}</div>`;
+                    return;
+                }
+
+                riskAlertData = {};
+                const rows = result.data || [];
+
+                if (rows.length === 0) {
+                    listEl.innerHTML = '<div class="risk-alerts-empty">No active high-risk alerts from Group 5 right now.</div>';
+                    return;
+                }
+
+                listEl.innerHTML = `<div class="risk-alerts-grid">${rows.map(row => {
+                    riskAlertData[row.alert_id] = row;
+                    const severity = String(row.severity || 'MEDIUM').toUpperCase();
+                    return `<div class="risk-alert-card">
+                        <div class="risk-alert-card-top">
+                            <div>
+                                <p class="risk-alert-title">${escapeHtml(row.rule_name)}</p>
+                                <div class="risk-alert-type">${escapeHtml(row.rule_type || 'Alert')}</div>
+                            </div>
+                            <span class="severity-badge ${severityBadgeClass(severity)}">${escapeHtml(severity)}</span>
+                        </div>
+                        <div class="risk-alert-location"><strong>Area:</strong> ${escapeHtml(row.area_name || row.location)}</div>
+                        ${row.condition_text ? `<div class="risk-alert-condition">${escapeHtml(row.condition_text)}</div>` : ''}
+                        <div class="risk-alert-meta">
+                            ${row.incident_count ? `${escapeHtml(String(row.incident_count))} incident(s)` : ''}
+                            ${row.incident_count && row.time_window ? ' · ' : ''}
+                            ${row.time_window ? escapeHtml(row.time_window) : ''}
+                            ${(row.incident_count || row.time_window) ? '<br>' : ''}
+                            Triggered: ${escapeHtml(formatAlertTime(row.triggered_at))}
+                        </div>
+                        <button type="button" class="btn-assign-hotspot" data-alert-id="${escapeHtml(row.alert_id)}">
+                            <i class="fas fa-walking"></i> Assign Patrol Here
+                        </button>
+                    </div>`;
+                }).join('')}</div>`;
+
+                listEl.querySelectorAll('.btn-assign-hotspot').forEach(btn => {
+                    btn.addEventListener('click', () => assignPatrolFromHotspot(btn.dataset.alertId));
+                });
+            } catch (e) {
+                console.error('Error loading risk alerts:', e);
+                listEl.innerHTML = '<div class="risk-alerts-empty">Error loading high-risk alerts.</div>';
+            }
+        }
+
+        async function assignPatrolFromHotspot(alertId) {
+            const hotspot = riskAlertData[alertId];
+            if (!hotspot) {
+                window.alert('Hotspot data not found. Please refresh and try again.');
+                return;
+            }
+            await openAssignPatrolModal({
+                route: hotspot.route_suggestion || hotspot.area_name || hotspot.location || '',
+                location: hotspot.location || hotspot.area_name || '',
+                notes: buildHotspotNotes(hotspot)
             });
         }
 
-        async function assignPatrolToDispatch(id) {
-            const incident = patrolData[id];
-            if (!incident) return;
-            
-            // Populate incident details
-            document.getElementById('incidentDetails').innerHTML = `
-                <h3 style="margin-top: 0; color: var(--tertiary-color);">Incident Details</h3>
-                <p><strong>Location:</strong> ${incident.location}</p>
-                <p><strong>Date:</strong> ${incident.date}</p>
-                <p><strong>Incident Type:</strong> ${incident.incidentType}</p>
-                <p><strong>Description:</strong> ${incident.description}</p>
-            `;
-            
-            // Set default values
-            document.getElementById('patrolDate').value = incident.date;
-            document.getElementById('patrolRoute').value = incident.location;
-            
-            // Store incident ID for later use
-            document.getElementById('assignPatrolForm').setAttribute('data-incident-id', id);
-            
-            // Load patrol officers from database
+        function statusClass(status) {
+            if (status === 'Completed') return 'status-completed';
+            if (status === 'In Progress') return 'status-in-progress';
+            return 'status-scheduled';
+        }
+
+        async function loadPatrolSchedules() {
+            const tableBody = document.getElementById('patrolsTableBody');
+            try {
+                const response = await fetch('api/patrol_schedules.php');
+                const result = await response.json();
+
+                if (!result.success) {
+                    tableBody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:2rem;color:#666;">Failed to load patrol schedules.</td></tr>';
+                    return;
+                }
+
+                patrolData = {};
+                const rows = result.data || [];
+
+                if (rows.length === 0) {
+                    tableBody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:2rem;color:#666;">No patrol assignments yet. Click "Assign Patrol" to create one.</td></tr>';
+                    return;
+                }
+
+                tableBody.innerHTML = rows.map(row => {
+                    patrolData[row.id] = row;
+                    return `<tr data-schedule-id="${row.id}">
+                        <td>${escapeHtml(row.personnel_name)}</td>
+                        <td>${escapeHtml(row.route)}</td>
+                        <td>${escapeHtml(row.location || '—')}</td>
+                        <td>${escapeHtml(row.schedule_date)}</td>
+                        <td>${escapeHtml(row.schedule_time)}</td>
+                        <td><span class="status-badge ${statusClass(row.status)}">${escapeHtml(row.status)}</span></td>
+                        <td>
+                            <div class="action-buttons">
+                                <button class="btn-view" onclick="viewPatrol('${row.id}')">View</button>
+                            </div>
+                        </td>
+                    </tr>`;
+                }).join('');
+            } catch (e) {
+                console.error('Error loading patrol schedules:', e);
+                tableBody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:2rem;color:#666;">Error loading patrol schedules.</td></tr>';
+            }
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text ?? '';
+            return div.innerHTML;
+        }
+
+        async function openAssignPatrolModal(prefill = null) {
             const patrolOfficerSelect = document.getElementById('patrolOfficer');
-            patrolOfficerSelect.innerHTML = '<option value="">Select Official Patrol Officer</option>';
-            
+            patrolOfficerSelect.innerHTML = '<option value="">Select BPSO Personnel</option>';
+
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('patrolDate').value = today;
+            document.getElementById('patrolRoute').value = '';
+            document.getElementById('patrolLocation').value = '';
+            document.getElementById('patrolNotes').value = '';
+
+            if (prefill) {
+                document.getElementById('patrolRoute').value = prefill.route || '';
+                document.getElementById('patrolLocation').value = prefill.location || '';
+                document.getElementById('patrolNotes').value = prefill.notes || '';
+            }
+
             try {
-                const patrolResponse = await fetch('api/patrols.php');
+                const [patrolResponse, hallResponse] = await Promise.all([
+                    fetch('api/patrols.php'),
+                    fetch('api/bpso_attendance.php?view=at_hall')
+                ]);
                 const patrolResult = await patrolResponse.json();
-                
+                const hallResult = await hallResponse.json();
+
+                const atHallIds = new Set(
+                    (hallResult.success ? (hallResult.data || []) : [])
+                        .map(row => String(row.patrol_id))
+                );
+
                 if (patrolResult.success && patrolResult.data) {
-                    patrolResult.data.forEach(officer => {
+                    const atHallPersonnel = patrolResult.data.filter(officer => atHallIds.has(String(officer.id)));
+
+                    if (atHallPersonnel.length === 0) {
                         const option = document.createElement('option');
-                        option.value = `${officer.badge_number}|${officer.officer_name}|Official`;
-                        option.textContent = `${officer.badge_number} - ${officer.officer_name}`;
+                        option.value = '';
+                        option.textContent = 'No personnel at barangay hall';
+                        option.disabled = true;
                         patrolOfficerSelect.appendChild(option);
-                    });
+                    } else {
+                        atHallPersonnel.forEach(officer => {
+                            const option = document.createElement('option');
+                            option.value = officer.id;
+                            option.textContent = `${officer.bpso_personnel_id} - ${officer.personnel_name} (At Hall)`;
+                            patrolOfficerSelect.appendChild(option);
+                        });
+                    }
                 }
             } catch (e) {
-                console.error('Error loading patrol officers:', e);
+                console.error('Error loading BPSO personnel:', e);
             }
-            
-            // Load neighborhood watch members from database
-            const neighborhoodMemberSelect = document.getElementById('neighborhoodMember');
-            neighborhoodMemberSelect.innerHTML = '<option value="">Select Neighborhood Watch Member</option>';
-            
-            try {
-                const memberResponse = await fetch('api/members.php');
-                const memberResult = await memberResponse.json();
-                
-                if (memberResult.success && memberResult.data) {
-                    memberResult.data.forEach(member => {
-                        const option = document.createElement('option');
-                        option.value = `NW-${String(member.id).padStart(3, '0')}|${member.name}|Neighborhood Watch Only`;
-                        option.innerHTML = `NW-${String(member.id).padStart(3, '0')} - ${member.name} <span style="color: #ff9800;">(Neighborhood Watch Only)</span>`;
-                        neighborhoodMemberSelect.appendChild(option);
-                    });
-                }
-            } catch (e) {
-                console.error('Error loading neighborhood watch members:', e);
-            }
-            
+
             document.getElementById('assignPatrolModal').style.display = 'block';
+        }
+
+        async function assignPatrolToDispatch(id) {
+            await openAssignPatrolModal();
         }
 
         function closeAssignPatrolModal() {
@@ -858,15 +939,18 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
         }
 
         function openViewPatrolModal(id) {
-            const incident = patrolData[id];
-            if (!incident) return;
+            const schedule = patrolData[id];
+            if (!schedule) return;
             
             const content = `
                 <div style="line-height: 1.8;">
-                    <p><strong>Location:</strong> ${incident.location}</p>
-                    <p><strong>Date:</strong> ${incident.date}</p>
-                    <p><strong>Incident Type:</strong> ${incident.incidentType}</p>
-                    <p><strong>Description:</strong> ${incident.description}</p>
+                    <p><strong>BPSO Personnel:</strong> ${escapeHtml(schedule.personnel_name)}</p>
+                    <p><strong>Route:</strong> ${escapeHtml(schedule.route)}</p>
+                    <p><strong>Location:</strong> ${escapeHtml(schedule.location || '—')}</p>
+                    <p><strong>Date:</strong> ${escapeHtml(schedule.schedule_date)}</p>
+                    <p><strong>Time:</strong> ${escapeHtml(schedule.schedule_time)}</p>
+                    <p><strong>Status:</strong> <span class="status-badge ${statusClass(schedule.status)}">${escapeHtml(schedule.status)}</span></p>
+                    <p><strong>Notes:</strong> ${escapeHtml(schedule.notes || '—')}</p>
                 </div>
             `;
             
@@ -882,68 +966,45 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             openViewPatrolModal(id);
         }
 
-        function savePatrolAssignment(event) {
+        async function savePatrolAssignment(event) {
             event.preventDefault();
             
             const formData = new FormData(event.target);
-            const incidentId = event.target.getAttribute('data-incident-id');
-            const incident = patrolData[incidentId];
-            
-            // Get selected officer or member
-            const officerValue = formData.get('officer');
-            const memberValue = formData.get('member');
-            
-            if (!officerValue && !memberValue) {
-                alert('Please select either a patrol officer or a neighborhood watch member.');
+            const patrolId = parseInt(formData.get('patrol_id'), 10);
+
+            if (!patrolId) {
+                alert('Please select BPSO personnel.');
                 return;
             }
-            
-            let officerName = '';
-            let officerType = '';
-            
-            if (officerValue) {
-                const parts = officerValue.split('|');
-                officerName = parts[1];
-                officerType = parts[2];
-            } else if (memberValue) {
-                const parts = memberValue.split('|');
-                officerName = parts[1];
-                officerType = parts[2];
-            }
-            
+
             const assignmentData = {
-                date: formData.get('date'),
-                time: formData.get('time'),
+                action: 'create',
+                patrol_id: patrolId,
+                schedule_date: formData.get('date'),
+                schedule_time: formData.get('time'),
                 route: formData.get('route'),
-                officerName: officerName,
-                officerType: officerType,
-                incidentId: incidentId,
-                location: incident.location,
-                incidentType: incident.incidentType
+                location: formData.get('location') || '',
+                notes: formData.get('notes') || ''
             };
-            
-            // Send to Incident Prioritization and Dispatch (Group 3)
-            fetch('api/send_patrol_assignment.php', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(assignmentData)
-            })
-            .then(response => response.json())
-            .then(data => {
+
+            try {
+                const response = await fetch('api/patrol_schedules.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(assignmentData)
+                });
+                const data = await response.json();
                 if (data.success) {
-                    alert('Patrol assignment sent successfully to Incident Prioritization and Dispatch System (Group 3)');
+                    alert('Patrol assignment created successfully. The assigned personnel can view it in the BPSO portal.');
                     closeAssignPatrolModal();
+                    await loadPatrolSchedules();
                 } else {
-                    alert('Error sending assignment: ' + (data.message || 'Unknown error'));
+                    alert('Error creating assignment: ' + (data.message || 'Unknown error'));
                 }
-            })
-            .catch(error => {
+            } catch (error) {
                 console.error('Error:', error);
-                alert('Assignment saved locally.');
-                closeAssignPatrolModal();
-            });
+                alert('Failed to create patrol assignment.');
+            }
         }
 
         // Close modals when clicking outside
@@ -961,9 +1022,8 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
 
         // Initialize data on page load
         document.addEventListener('DOMContentLoaded', function() {
-            initializePatrolData();
-            // Load patrol officers from patrol-list (could be from localStorage or API)
-            // Load neighborhood watch members (could be from member-list or API)
+            loadRiskAlerts();
+            loadPatrolSchedules();
         });
         
         // Date and Time Display
@@ -995,164 +1055,8 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
         // Update date/time immediately and then every second
         updateDateTime();
         setInterval(updateDateTime, 1000);
-        
-        // Notification System
-        let notificationDropdown = null;
-        let notificationBadge = null;
-        let notificationList = null;
-        
-        document.addEventListener('DOMContentLoaded', function() {
-            notificationDropdown = document.getElementById('notificationDropdown');
-            notificationBadge = document.getElementById('notificationBadge');
-            notificationList = document.getElementById('notificationList');
-            
-            if (notificationDropdown && notificationBadge && notificationList) {
-                loadNotifications();
-                // Refresh notifications every 30 seconds
-                setInterval(loadNotifications, 30000);
-                
-                // Close dropdown when clicking outside
-                document.addEventListener('click', function(event) {
-                    if (notificationDropdown && !event.target.closest('.notification-container')) {
-                        notificationDropdown.classList.remove('show');
-                    }
-                });
-            }
-        });
-        
-        function toggleNotifications() {
-            if (notificationDropdown) {
-                notificationDropdown.classList.toggle('show');
-                if (notificationDropdown.classList.contains('show')) {
-                    loadNotifications();
-                }
-            }
-        }
-        
-        async function loadNotifications() {
-            try {
-                // Sync activities first
-                await fetch('api/notifications.php?action=sync');
-                
-                // Then load notifications
-                const response = await fetch('api/notifications.php?action=list');
-                const data = await response.json();
-                
-                if (data.success) {
-                    updateNotificationBadge(data.unread_count);
-                    renderNotifications(data.notifications);
-                }
-            } catch (error) {
-                console.error('Error loading notifications:', error);
-            }
-        }
-        
-        function updateNotificationBadge(count) {
-            if (notificationBadge) {
-                if (count > 0) {
-                    notificationBadge.textContent = count > 99 ? '99+' : count;
-                    notificationBadge.classList.add('show');
-                } else {
-                    notificationBadge.classList.remove('show');
-                }
-            }
-        }
-        
-        function renderNotifications(notifications) {
-            if (!notificationList) return;
-            
-            if (notifications.length === 0) {
-                notificationList.innerHTML = `
-                    <div class="notification-empty">
-                        <i class="fas fa-bell-slash"></i>
-                        <p>No notifications</p>
-                    </div>
-                `;
-                return;
-            }
-            
-            notificationList.innerHTML = notifications.map(notif => {
-                let iconClass, icon;
-                if (notif.type === 'complaint' || notif.type === 'incident') {
-                    iconClass = 'complaint';
-                    icon = 'fa-file-alt';
-                } else if (notif.type === 'tip') {
-                    iconClass = 'tip';
-                    icon = 'fa-comments';
-                } else if (notif.type === 'volunteer' || notif.type === 'volunteer_request') {
-                    iconClass = 'volunteer';
-                    icon = 'fa-handshake';
-                } else if (notif.type === 'login') {
-                    iconClass = 'login';
-                    icon = 'fa-sign-in-alt';
-                } else if (notif.type === 'logout') {
-                    iconClass = 'logout';
-                    icon = 'fa-sign-out-alt';
-                } else if (notif.type === 'event' || notif.type === 'event_report' || notif.type === 'patrol') {
-                    iconClass = 'event';
-                    icon = 'fa-bullhorn';
-                } else {
-                    iconClass = 'event';
-                    icon = 'fa-bullhorn';
-                }
-                
-                const safeLink = (notif.link || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
-                
-                return `
-                    <div class="notification-item ${notif.is_read ? '' : 'unread'}" 
-                         onclick="handleNotificationClick(${notif.id}, '${safeLink}')">
-                        <div class="notification-icon ${iconClass}">
-                            <i class="fas ${icon}"></i>
-                        </div>
-                        <div class="notification-content">
-                            <div class="notification-title">${escapeHtml(notif.title)}</div>
-                            <div class="notification-message">${escapeHtml(notif.message)}</div>
-                            <div class="notification-time">${notif.time_ago}</div>
-                        </div>
-                    </div>
-                `;
-            }).join('');
-        }
-        
-        function handleNotificationClick(id, link) {
-            // Mark as read
-            fetch('api/notifications.php?action=mark_read', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: 'id=' + id
-            });
-            
-            // Remove unread class
-            const item = event.currentTarget;
-            item.classList.remove('unread');
-            
-            // Navigate if link exists
-            if (link && link !== '') {
-                window.location.href = link;
-            }
-            
-            // Reload notifications to update badge
-            loadNotifications();
-        }
-        
-        async function markAllAsRead() {
-            try {
-                await fetch('api/notifications.php?action=mark_read', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
-                });
-                loadNotifications();
-            } catch (error) {
-                console.error('Error marking all as read:', error);
-            }
-        }
-        
-        function escapeHtml(text) {
-            const div = document.createElement('div');
-            div.textContent = text;
-            return div.innerHTML;
-        }
     </script>
+    <?php require __DIR__ . '/includes/admin_notifications_script.php'; ?>
 </body>
 </html>
 

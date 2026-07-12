@@ -5,6 +5,8 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
     header('Location: login.php');
     exit;
 }
+require_once __DIR__ . '/db.php';
+
 ?>
 <!doctype html>
 <html lang="en">
@@ -15,6 +17,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
     <link rel="icon" type="image/x-icon" href="images/favicon.ico">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="css/theme.css">
+    <link rel="stylesheet" href="css/admin-sidebar.css">
     <style>
         body { margin: 0; padding: 0; font-family: var(--font-family); background-color: var(--bg-color); display: flex; min-height: 100vh; }
         .sidebar { width: 320px; background: var(--tertiary-color); color: #fff; position: fixed; left: 0; top: 0; height: 100vh; overflow: hidden; box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1); z-index: 1000; transition: width 0.3s ease; display: flex; flex-direction: column; }
@@ -396,7 +399,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             </a>
             
             <!-- User Management Module (Admin Only) -->
-            <?php if (isset($_SESSION['user_role']) && $_SESSION['user_role'] === 'Admin'): ?>
+            <?php if (isAdminUser()): ?>
             <div class="nav-module <?php echo (basename($_SERVER['PHP_SELF']) == 'users.php' || basename($_SERVER['PHP_SELF']) == 'login-history.php') ? 'active' : ''; ?>">
                 <div class="nav-module-header" onclick="toggleModule(this)" data-tooltip="User Management">
                     <span class="nav-module-icon"><i class="fas fa-users-cog"></i></span>
@@ -423,18 +426,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                     <span class="arrow">▶</span>
                 </div>
                 <div class="nav-submodules">
-                    <a href="member-list.php" class="nav-submodule" data-tooltip="Member List">
-                        <span class="nav-submodule-icon"><i class="fas fa-clipboard-list"></i></span>
-                        <span class="nav-submodule-text">Member List</span>
-                    </a>
-                    <a href="activity-logs.php" class="nav-submodule" data-tooltip="Activity Logs">
-                        <span class="nav-submodule-icon"><i class="fas fa-chart-bar"></i></span>
-                        <span class="nav-submodule-text">Activity Logs</span>
-                    </a>
-                    <a href="incident-feed.php" class="nav-submodule" data-tooltip="Incident Feed">
-                        <span class="nav-submodule-icon"><i class="fas fa-exclamation-triangle"></i></span>
-                        <span class="nav-submodule-text">Incident Feed</span>
-                    </a>
+                    <?php require __DIR__ . '/includes/neighborhood_watch_nav_submodules.php'; ?>
                 </div>
             </div>
             <div class="nav-module">
@@ -444,10 +436,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                     <span class="arrow">▶</span>
                 </div>
                 <div class="nav-submodules">
-                    <a href="open-surveillance-app.php" class="nav-submodule" data-tooltip="Open Surveillance App">
-                        <span class="nav-submodule-icon"><i class="fas fa-desktop"></i></span>
-                        <span class="nav-submodule-text">Open Surveillance App</span>
-                    </a>
+                    <?php $cctvNavActive = $cctvNavActive ?? ''; require __DIR__ . '/includes/cctv_nav_submodules.php'; ?>
                 </div>
             </div>
             <div class="nav-module">
@@ -468,41 +457,13 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                 </div>
             </div>
             <div class="nav-module">
-                <div class="nav-module-header" onclick="toggleModule(this)" data-tooltip="Volunteer Registry and Scheduling">
-                    <span class="nav-module-icon"><i class="fas fa-handshake"></i></span>
-                    <span class="nav-module-header-text">Volunteer Registry and Scheduling</span>
-                    <span class="arrow">▶</span>
-                </div>
-                <div class="nav-submodules">
-                    <a href="volunteer-list.php" class="nav-submodule" data-tooltip="Volunteer List">
-                        <span class="nav-submodule-icon"><i class="fas fa-user"></i></span>
-                        <span class="nav-submodule-text">Volunteer List</span>
-                    </a>
-                    <a href="schedule-management.php" class="nav-submodule" data-tooltip="Volunteer Request">
-                        <span class="nav-submodule-icon"><i class="fas fa-calendar"></i></span>
-                        <span class="nav-submodule-text">Volunteer Request</span>
-                    </a>
-                </div>
-            </div>
-            <div class="nav-module">
                 <div class="nav-module-header" onclick="toggleModule(this)" data-tooltip="Patrol Scheduling and Monitoring">
                     <span class="nav-module-icon"><i class="fas fa-walking"></i></span>
                     <span class="nav-module-header-text">Patrol Scheduling and Monitoring</span>
                     <span class="arrow">▶</span>
                 </div>
                 <div class="nav-submodules">
-                    <a href="patrol-list.php" class="nav-submodule" data-tooltip="Patrol List">
-                        <span class="nav-submodule-icon"><i class="fas fa-list"></i></span>
-                        <span class="nav-submodule-text">Patrol List</span>
-                    </a>
-                    <a href="patrol-schedule.php" class="nav-submodule" data-tooltip="Patrol Schedule">
-                        <span class="nav-submodule-icon"><i class="fas fa-calendar-alt"></i></span>
-                        <span class="nav-submodule-text">Patrol Schedule</span>
-                    </a>
-                    <a href="patrol-logs.php" class="nav-submodule" data-tooltip="Patrol Logs">
-                        <span class="nav-submodule-icon"><i class="fas fa-file"></i></span>
-                        <span class="nav-submodule-text">Patrol Logs</span>
-                    </a>
+                    <?php $patrolNavActive = $patrolNavActive ?? ''; require __DIR__ . '/includes/patrol_nav_submodules.php'; ?>
                 </div>
             </div>
             <div class="nav-module active">
@@ -559,7 +520,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                     <span class="time-part" id="currentTime"></span>
                 </div>
                 <div class="notification-container">
-                    <button class="notification-bell" onclick="toggleNotifications()" aria-label="Notifications">
+                    <button class="notification-bell" type="button" onclick="toggleNotifications(event)" aria-label="Notifications">
                         <i class="fas fa-bell"></i>
                         <span class="notification-badge" id="notificationBadge"></span>
                     </button>
@@ -596,56 +557,11 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                                 <th>Organizer</th>
                                 <th>Type</th>
                                 <th>Venue</th>
-                                <th>Status</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody id="eventsTableBody">
-                            <tr data-event-id="1">
-                                <td>EVT-2025-001</td>
-                                <td>Community Safety Awareness</td>
-                                <td>2025-01-25</td>
-                                <td>09:00 AM</td>
-                                <td>Maria Santos</td>
-                                <td>Awareness</td>
-                                <td>Barangay San Agustin Hall</td>
-                                <td><span class="status-badge status-resolved">Scheduled</span></td>
-                                <td>
-                                    <div class="action-buttons">
-                                        <button class="btn-view" onclick="viewEvent('1')">View</button>
-                                    </div>
-                                </td>
-                            </tr>
-                            <tr data-event-id="2">
-                                <td>EVT-2025-002</td>
-                                <td>Neighborhood Meeting</td>
-                                <td>2025-01-28</td>
-                                <td>02:00 PM</td>
-                                <td>Juan Dela Cruz</td>
-                                <td>Meeting</td>
-                                <td>Barangay San Agustin Multi-Purpose Hall</td>
-                                <td><span class="status-badge status-resolved">Scheduled</span></td>
-                                <td>
-                                    <div class="action-buttons">
-                                        <button class="btn-view" onclick="viewEvent('2')">View</button>
-                                    </div>
-                                </td>
-                            </tr>
-                            <tr data-event-id="3">
-                                <td>EVT-2025-003</td>
-                                <td>Safety Training Workshop</td>
-                                <td>2025-02-01</td>
-                                <td>10:00 AM</td>
-                                <td>Roberto Reyes</td>
-                                <td>Training</td>
-                                <td>Barangay San Agustin Community Center</td>
-                                <td><span class="status-badge status-pending">Pending</span></td>
-                                <td>
-                                    <div class="action-buttons">
-                                        <button class="btn-view" onclick="viewEvent('3')">View</button>
-                                    </div>
-                                </td>
-                            </tr>
+                            <tr><td colspan="8" style="text-align:center;color:var(--text-secondary);">Loading events...</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -678,6 +594,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                 document.body.classList.add('sidebar-collapsed');
             }
             initializeEventData();
+            loadEvents();
         });
         function toggleSidebar() {
             const sidebar = document.getElementById('sidebar');
@@ -726,6 +643,75 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                 }
             }
         }
+
+        function formatDate(value) {
+            if (!value) return '—';
+            const date = new Date(value);
+            if (Number.isNaN(date.getTime())) return value;
+            return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+        }
+
+        async function loadEvents() {
+            const tbody = document.getElementById('eventsTableBody');
+            try {
+                const res = await fetch('api/awareness_events.php?record_type=event');
+                const result = await res.json();
+                if (!result.success) throw new Error(result.message || 'Failed to load events');
+                renderEvents(result.data || []);
+                const urlId = new URLSearchParams(window.location.search).get('id');
+                if (urlId && eventData[urlId]) {
+                    viewEvent(urlId);
+                }
+            } catch (e) {
+                console.error(e);
+                tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#b91c1c;">Failed to load events.</td></tr>';
+            }
+        }
+
+        function renderEvents(events) {
+            const tbody = document.getElementById('eventsTableBody');
+            eventData = {};
+            if (!events.length) {
+                tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--text-secondary);">No events found.</td></tr>';
+                return;
+            }
+            tbody.innerHTML = events.map(function(item) {
+                eventData[item.event_id] = {
+                    id: item.event_id,
+                    eventId: item.event_id,
+                    name: item.event_name,
+                    date: item.event_date,
+                    time: item.event_time_display || item.event_time,
+                    organizer: item.organizer,
+                    type: item.event_type,
+                    venue: item.venue,
+                    description: item.description || ''
+                };
+                return `
+                    <tr data-event-id="${item.event_id}">
+                        <td>${item.event_id}</td>
+                        <td>${item.event_name}</td>
+                        <td>${item.event_date}</td>
+                        <td>${item.event_time_display || String(item.event_time || '').slice(0, 5)}</td>
+                        <td>${item.organizer}</td>
+                        <td>${item.event_type}</td>
+                        <td>${item.venue}</td>
+                        <td>
+                            <div class="action-buttons">
+                                <button class="btn-view" onclick="viewEvent('${item.event_id}')">View</button>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        let eventData = {};
+
+        function initializeEventData() {
+            eventData = {};
+        }
+
         function openViewEventModal(id) {
             const event = eventData[id];
             if (!event) return;
@@ -739,7 +725,6 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                     <p><strong>Organizer:</strong> ${event.organizer}</p>
                     <p><strong>Type:</strong> ${event.type}</p>
                     <p><strong>Venue:</strong> ${event.venue}</p>
-                    <p><strong>Status:</strong> ${event.status}</p>
                     ${event.description ? `<p><strong>Description:</strong> ${event.description}</p>` : ''}
                 </div>
             `;
@@ -750,32 +735,6 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
 
         function closeViewEventModal() {
             document.getElementById('viewEventModal').style.display = 'none';
-        }
-
-        // Initialize event data
-        let eventData = {};
-        
-        function initializeEventData() {
-            const tableBody = document.getElementById('eventsTableBody');
-            const rows = tableBody.querySelectorAll('tr[data-event-id]');
-            
-            rows.forEach(row => {
-                const id = row.getAttribute('data-event-id');
-                const cells = row.querySelectorAll('td');
-                
-                eventData[id] = {
-                    id: id,
-                    eventId: cells[0].textContent.trim(),
-                    name: cells[1].textContent.trim(),
-                    date: cells[2].textContent.trim(),
-                    time: cells[3].textContent.trim(),
-                    organizer: cells[4].textContent.trim(),
-                    type: cells[5].textContent.trim(),
-                    venue: cells[6].textContent.trim(),
-                    status: cells[7].querySelector('.status-badge').textContent.trim(),
-                    description: ''
-                };
-            });
         }
 
         function viewEvent(id) {
@@ -820,165 +779,9 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
         // Update date/time immediately and then every second
         updateDateTime();
         setInterval(updateDateTime, 1000);
-        
-        // Notification System
-        let notificationDropdown = null;
-        let notificationBadge = null;
-        let notificationList = null;
-        
-        document.addEventListener('DOMContentLoaded', function() {
-            notificationDropdown = document.getElementById('notificationDropdown');
-            notificationBadge = document.getElementById('notificationBadge');
-            notificationList = document.getElementById('notificationList');
-            
-            if (notificationDropdown && notificationBadge && notificationList) {
-                loadNotifications();
-                // Refresh notifications every 30 seconds
-                setInterval(loadNotifications, 30000);
-                
-                // Close dropdown when clicking outside
-                document.addEventListener('click', function(event) {
-                    if (notificationDropdown && !event.target.closest('.notification-container')) {
-                        notificationDropdown.classList.remove('show');
-                    }
-                });
-            }
-        });
-        
-        function toggleNotifications() {
-            if (notificationDropdown) {
-                notificationDropdown.classList.toggle('show');
-                if (notificationDropdown.classList.contains('show')) {
-                    loadNotifications();
-                }
-            }
-        }
-        
-        async function loadNotifications() {
-            try {
-                // Sync activities first
-                await fetch('api/notifications.php?action=sync');
-                
-                // Then load notifications
-                const response = await fetch('api/notifications.php?action=list');
-                const data = await response.json();
-                
-                if (data.success) {
-                    updateNotificationBadge(data.unread_count);
-                    renderNotifications(data.notifications);
-                }
-            } catch (error) {
-                console.error('Error loading notifications:', error);
-            }
-        }
-        
-        function updateNotificationBadge(count) {
-            if (notificationBadge) {
-                if (count > 0) {
-                    notificationBadge.textContent = count > 99 ? '99+' : count;
-                    notificationBadge.classList.add('show');
-                } else {
-                    notificationBadge.classList.remove('show');
-                }
-            }
-        }
-        
-        function renderNotifications(notifications) {
-            if (!notificationList) return;
-            
-            if (notifications.length === 0) {
-                notificationList.innerHTML = `
-                    <div class="notification-empty">
-                        <i class="fas fa-bell-slash"></i>
-                        <p>No notifications</p>
-                    </div>
-                `;
-                return;
-            }
-            
-            notificationList.innerHTML = notifications.map(notif => {
-                let iconClass, icon;
-                if (notif.type === 'complaint' || notif.type === 'incident') {
-                    iconClass = 'complaint';
-                    icon = 'fa-file-alt';
-                } else if (notif.type === 'tip') {
-                    iconClass = 'tip';
-                    icon = 'fa-comments';
-                } else if (notif.type === 'volunteer' || notif.type === 'volunteer_request') {
-                    iconClass = 'volunteer';
-                    icon = 'fa-handshake';
-                } else if (notif.type === 'login') {
-                    iconClass = 'login';
-                    icon = 'fa-sign-in-alt';
-                } else if (notif.type === 'logout') {
-                    iconClass = 'logout';
-                    icon = 'fa-sign-out-alt';
-                } else if (notif.type === 'event' || notif.type === 'event_report' || notif.type === 'patrol') {
-                    iconClass = 'event';
-                    icon = 'fa-bullhorn';
-                } else {
-                    iconClass = 'event';
-                    icon = 'fa-bullhorn';
-                }
-                
-                const safeLink = (notif.link || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
-                
-                return `
-                    <div class="notification-item ${notif.is_read ? '' : 'unread'}" 
-                         onclick="handleNotificationClick(${notif.id}, '${safeLink}')">
-                        <div class="notification-icon ${iconClass}">
-                            <i class="fas ${icon}"></i>
-                        </div>
-                        <div class="notification-content">
-                            <div class="notification-title">${escapeHtml(notif.title)}</div>
-                            <div class="notification-message">${escapeHtml(notif.message)}</div>
-                            <div class="notification-time">${notif.time_ago}</div>
-                        </div>
-                    </div>
-                `;
-            }).join('');
-        }
-        
-        function handleNotificationClick(id, link) {
-            // Mark as read
-            fetch('api/notifications.php?action=mark_read', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: 'id=' + id
-            });
-            
-            // Remove unread class
-            const item = event.currentTarget;
-            item.classList.remove('unread');
-            
-            // Navigate if link exists
-            if (link && link !== '') {
-                window.location.href = link;
-            }
-            
-            // Reload notifications to update badge
-            loadNotifications();
-        }
-        
-        async function markAllAsRead() {
-            try {
-                await fetch('api/notifications.php?action=mark_read', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
-                });
-                loadNotifications();
-            } catch (error) {
-                console.error('Error marking all as read:', error);
-            }
-        }
-        
-        function escapeHtml(text) {
-            const div = document.createElement('div');
-            div.textContent = text;
-            return div.innerHTML;
-        }
 
     </script>
+    <?php require __DIR__ . '/includes/admin_notifications_script.php'; ?>
 </body>
 </html>
 

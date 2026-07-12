@@ -23,7 +23,7 @@ echo.
 echo ✓ Detection processes stopped.
 echo.
 echo To start again, run: start_detection.bat
-echo Or use the auto-start feature.
+echo Or use: install_detection_autostart.bat
 echo.
 pause
 

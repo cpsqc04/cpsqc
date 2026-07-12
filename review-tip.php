@@ -5,6 +5,8 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
     header('Location: login.php');
     exit;
 }
+require_once __DIR__ . '/db.php';
+
 ?>
 <!doctype html>
 <html lang="en">
@@ -15,6 +17,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
     <link rel="icon" type="image/x-icon" href="images/favicon.ico">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="css/theme.css">
+    <link rel="stylesheet" href="css/admin-sidebar.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <style>
         @keyframes fadeIn {
@@ -412,7 +415,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             </a>
             
             <!-- User Management Module (Admin Only) -->
-            <?php if (isset($_SESSION['user_role']) && $_SESSION['user_role'] === 'Admin'): ?>
+            <?php if (isAdminUser()): ?>
             <div class="nav-module <?php echo (basename($_SERVER['PHP_SELF']) == 'users.php' || basename($_SERVER['PHP_SELF']) == 'login-history.php') ? 'active' : ''; ?>">
                 <div class="nav-module-header" onclick="toggleModule(this)" data-tooltip="User Management">
                     <span class="nav-module-icon"><i class="fas fa-users-cog"></i></span>
@@ -439,18 +442,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                     <span class="arrow">▶</span>
                 </div>
                 <div class="nav-submodules">
-                    <a href="member-list.php" class="nav-submodule" data-tooltip="Member List">
-                        <span class="nav-submodule-icon"><i class="fas fa-clipboard-list"></i></span>
-                        <span class="nav-submodule-text">Member List</span>
-                    </a>
-                    <a href="activity-logs.php" class="nav-submodule" data-tooltip="Activity Logs">
-                        <span class="nav-submodule-icon"><i class="fas fa-chart-bar"></i></span>
-                        <span class="nav-submodule-text">Activity Logs</span>
-                    </a>
-                    <a href="incident-feed.php" class="nav-submodule" data-tooltip="Incident Feed">
-                        <span class="nav-submodule-icon"><i class="fas fa-exclamation-triangle"></i></span>
-                        <span class="nav-submodule-text">Incident Feed</span>
-                    </a>
+                    <?php require __DIR__ . '/includes/neighborhood_watch_nav_submodules.php'; ?>
                 </div>
             </div>
             <div class="nav-module">
@@ -460,10 +452,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                     <span class="arrow">▶</span>
                 </div>
                 <div class="nav-submodules">
-                    <a href="open-surveillance-app.php" class="nav-submodule" data-tooltip="Open Surveillance App">
-                        <span class="nav-submodule-icon"><i class="fas fa-desktop"></i></span>
-                        <span class="nav-submodule-text">Open Surveillance App</span>
-                    </a>
+                    <?php $cctvNavActive = $cctvNavActive ?? ''; require __DIR__ . '/includes/cctv_nav_submodules.php'; ?>
                 </div>
             </div>
             <div class="nav-module">
@@ -484,41 +473,13 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                 </div>
             </div>
             <div class="nav-module">
-                <div class="nav-module-header" onclick="toggleModule(this)" data-tooltip="Volunteer Registry and Scheduling">
-                    <span class="nav-module-icon"><i class="fas fa-handshake"></i></span>
-                    <span class="nav-module-header-text">Volunteer Registry and Scheduling</span>
-                    <span class="arrow">▶</span>
-                </div>
-                <div class="nav-submodules">
-                    <a href="volunteer-list.php" class="nav-submodule" data-tooltip="Volunteer List">
-                        <span class="nav-submodule-icon"><i class="fas fa-user"></i></span>
-                        <span class="nav-submodule-text">Volunteer List</span>
-                    </a>
-                    <a href="schedule-management.php" class="nav-submodule" data-tooltip="Volunteer Request">
-                        <span class="nav-submodule-icon"><i class="fas fa-calendar"></i></span>
-                        <span class="nav-submodule-text">Volunteer Request</span>
-                    </a>
-                </div>
-            </div>
-            <div class="nav-module">
                 <div class="nav-module-header" onclick="toggleModule(this)" data-tooltip="Patrol Scheduling and Monitoring">
                     <span class="nav-module-icon"><i class="fas fa-walking"></i></span>
                     <span class="nav-module-header-text">Patrol Scheduling and Monitoring</span>
                     <span class="arrow">▶</span>
                 </div>
                 <div class="nav-submodules">
-                    <a href="patrol-list.php" class="nav-submodule" data-tooltip="Patrol List">
-                        <span class="nav-submodule-icon"><i class="fas fa-list"></i></span>
-                        <span class="nav-submodule-text">Patrol List</span>
-                    </a>
-                    <a href="patrol-schedule.php" class="nav-submodule" data-tooltip="Patrol Schedule">
-                        <span class="nav-submodule-icon"><i class="fas fa-calendar-alt"></i></span>
-                        <span class="nav-submodule-text">Patrol Schedule</span>
-                    </a>
-                    <a href="patrol-logs.php" class="nav-submodule" data-tooltip="Patrol Logs">
-                        <span class="nav-submodule-icon"><i class="fas fa-file"></i></span>
-                        <span class="nav-submodule-text">Patrol Logs</span>
-                    </a>
+                    <?php $patrolNavActive = $patrolNavActive ?? ''; require __DIR__ . '/includes/patrol_nav_submodules.php'; ?>
                 </div>
             </div>
             <div class="nav-module">
@@ -575,7 +536,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                     <span class="time-part" id="currentTime"></span>
                 </div>
                 <div class="notification-container">
-                    <button class="notification-bell" onclick="toggleNotifications()" aria-label="Notifications">
+                    <button class="notification-bell" type="button" onclick="toggleNotifications(event)" aria-label="Notifications">
                         <i class="fas fa-bell"></i>
                         <span class="notification-badge" id="notificationBadge"></span>
                     </button>
@@ -648,9 +609,6 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                     <option value="Arrest Made">Arrest Made</option>
                     <option value="Unfounded / No Action">Unfounded / No Action</option>
                 </select>
-                <p style="margin-top: 0.5rem; font-size: 0.8rem; color: var(--text-secondary);">
-                    This will be used for dashboard analytics on how effective submitted tips are.
-                </p>
             </div>
             <div class="form-actions">
                 <button type="button" class="btn-cancel" onclick="closeViewTipModal()">Close</button>
@@ -679,11 +637,16 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                         <span style="flex: 1; line-height: 1.5;">Send to Incident Logging and Classification</span>
                     </label>
                     <label style="display: flex; align-items: flex-start; gap: 0.75rem; cursor: pointer; padding: 0.5rem; border-radius: 6px; transition: background 0.2s ease;">
+                        <input type="checkbox" id="sendToGroup3" value="group3" style="margin-top: 0.25rem; flex-shrink: 0; width: 18px; height: 18px; cursor: pointer;">
+                        <span style="flex: 1; line-height: 1.5;">Send to Inter-agency Coordination Portal (Police Backup)</span>
+                    </label>
+                    <label style="display: flex; align-items: flex-start; gap: 0.75rem; cursor: pointer; padding: 0.5rem; border-radius: 6px; transition: background 0.2s ease;">
                         <input type="checkbox" id="exportWord" value="export" style="margin-top: 0.25rem; flex-shrink: 0; width: 18px; height: 18px; cursor: pointer;">
                         <span style="flex: 1; line-height: 1.5;">Export to Word Document</span>
                     </label>
                 </div>
             </div>
+            <div id="actionReviewPreview" style="display: none; margin-bottom: 1.25rem; padding: 0.85rem 1rem; background: #eef6f6; border: 1px solid #b8d4d4; border-radius: 8px; line-height: 1.6; font-size: 0.92rem;"></div>
             <div class="form-actions">
                 <button type="button" class="btn-cancel" onclick="closeActionModal()">Cancel</button>
                 <button type="button" class="btn-save" onclick="executeActions()">
@@ -936,6 +899,18 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             currentTipId = null;
         }
 
+        function getTipUpdatePayload(overrides = {}) {
+            const tip = tipData[currentTipId];
+            if (!tip) return null;
+
+            return {
+                action: 'update',
+                id: parseInt(currentTipId, 10),
+                status: overrides.status ?? document.getElementById('tipStatus').value,
+                outcome: overrides.outcome ?? document.getElementById('tipOutcome').value
+            };
+        }
+
         function updateTipStatus() {
             if (!currentTipId) return;
             
@@ -943,18 +918,16 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             const tip = tipData[currentTipId];
             if (!tip) return;
             
+            const payload = getTipUpdatePayload({ status });
+            if (!payload) return;
+
             // Update in database
             fetch('api/tips.php', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({
-                    action: 'update',
-                    id: parseInt(currentTipId),
-                    status: status,
-                    outcome: tip.outcome || 'No Outcome Yet'
-                })
+                body: JSON.stringify(payload)
             })
             .then(res => res.json())
             .then(result => {
@@ -994,6 +967,9 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             const outcome = document.getElementById('tipOutcome').value;
             const tip = tipData[currentTipId];
             if (!tip) return;
+
+            const payload = getTipUpdatePayload({ outcome });
+            if (!payload) return;
             
             // Update in database
             fetch('api/tips.php', {
@@ -1001,12 +977,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                 headers: {
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({
-                    action: 'update',
-                    id: parseInt(currentTipId),
-                    status: tip.status || 'Under Review',
-                    outcome: outcome
-                })
+                body: JSON.stringify(payload)
             })
             .then(res => res.json())
             .then(result => {
@@ -1032,6 +1003,32 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             });
         }
 
+        function updateActionReviewPreview() {
+            const preview = document.getElementById('actionReviewPreview');
+            if (!preview || !currentTipId) return;
+
+            const tip = tipData[currentTipId];
+            if (!tip) return;
+
+            const sendToGroup1 = document.getElementById('sendToGroup1').checked;
+            const sendToGroup3 = document.getElementById('sendToGroup3').checked;
+
+            if (!sendToGroup1 && !sendToGroup3) {
+                preview.style.display = 'none';
+                preview.innerHTML = '';
+                return;
+            }
+
+            let html = '<p style="margin: 0 0 0.5rem; font-weight: 600; color: var(--tertiary-color);">Will be included in forward:</p>';
+            html += '<p style="margin-bottom: 0.35rem;"><strong>Status:</strong> ' + (tip.status || 'Under Review') + '</p>';
+            if (sendToGroup1) {
+                html += '<p style="margin-bottom: 0;"><strong>Outcome:</strong> ' + (tip.outcome || 'No Outcome Yet') + '</p>';
+            }
+
+            preview.innerHTML = html;
+            preview.style.display = 'block';
+        }
+
         function openActionModal() {
             if (!currentTipId) return;
             
@@ -1049,24 +1046,68 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                 hour12: false
             }).replace(',', '') : '';
             
+            let photoHtml = '';
+            if (tip.photo_data) {
+                const photoId = 'action-tip-photo-' + currentTipId;
+                photoHtml = `<p style="margin-bottom: 0.75rem;"><strong>Photo:</strong></p><img id="${photoId}" src="${tip.photo_data}" alt="Tip Photo" class="tip-photo-full" data-photo-src="${tip.photo_data.replace(/"/g, '&quot;')}" style="cursor: pointer;">`;
+            }
+            
             // Populate tip details in action modal
             document.getElementById('actionTipContent').innerHTML = `
                 <h3 style="margin-top: 0; margin-bottom: 1rem; color: var(--tertiary-color); font-size: 1.1rem;">Tip Details</h3>
                 <p style="margin-bottom: 0.75rem;"><strong>Tip ID:</strong> ${tip.tip_id || ''}</p>
                 <p style="margin-bottom: 0.75rem;"><strong>Timestamp:</strong> ${timestamp}</p>
                 <p style="margin-bottom: 0.75rem;"><strong>Location:</strong> ${tip.location || ''}</p>
-                <p style="margin-bottom: 0;"><strong>Description:</strong> ${tip.description || ''}</p>
+                <p style="margin-bottom: 0.75rem;"><strong>Description:</strong> ${tip.description || ''}</p>
+                ${photoHtml}
             `;
+
+            if (tip.photo_data) {
+                const photoId = 'action-tip-photo-' + currentTipId;
+                setTimeout(function() {
+                    const photoElement = document.getElementById(photoId);
+                    if (photoElement) {
+                        photoElement.addEventListener('click', function() {
+                            viewPhotoFull(tip.photo_data);
+                        });
+                    }
+                }, 100);
+            }
             
             // Reset checkboxes
             document.getElementById('sendToGroup1').checked = false;
+            document.getElementById('sendToGroup3').checked = false;
             document.getElementById('exportWord').checked = false;
+
+            const group1Input = document.getElementById('sendToGroup1');
+            const group3Input = document.getElementById('sendToGroup3');
+            group1Input.disabled = Boolean(tip.forwarded_at);
+            group3Input.disabled = Boolean(tip.backup_requested_at);
+            group1Input.onchange = updateActionReviewPreview;
+            group3Input.onchange = updateActionReviewPreview;
+            updateActionReviewPreview();
+
+            let statusHtml = '';
+            if (tip.forwarded_at) {
+                statusHtml += `<p style="margin-bottom:0.5rem;color:#0f5132;"><strong>Group 1:</strong> Sent ${new Date(tip.forwarded_at).toLocaleString()}${tip.blotter_reference_id ? ' — Ref: ' + tip.blotter_reference_id : ''}</p>`;
+            }
+            if (tip.backup_requested_at) {
+                statusHtml += `<p style="margin-bottom:0.5rem;color:#0f5132;"><strong>Group 3:</strong> Backup requested ${new Date(tip.backup_requested_at).toLocaleString()}${tip.group3_reference_id ? ' — Ref: ' + tip.group3_reference_id : ''}</p>`;
+            }
+            if (statusHtml) {
+                document.getElementById('actionTipContent').innerHTML += `<div style="margin-top:1rem;padding-top:0.75rem;border-top:1px solid var(--border-color);">${statusHtml}</div>`;
+            }
             
             document.getElementById('actionModal').style.display = 'block';
         }
 
         function closeActionModal() {
             document.getElementById('actionModal').style.display = 'none';
+            const preview = document.getElementById('actionReviewPreview');
+            if (preview) {
+                preview.style.display = 'none';
+                preview.innerHTML = '';
+            }
         }
 
         function executeActions() {
@@ -1074,44 +1115,81 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             
             const tip = tipData[currentTipId];
             const sendToGroup1 = document.getElementById('sendToGroup1').checked;
+            const sendToGroup3 = document.getElementById('sendToGroup3').checked;
             const exportWord = document.getElementById('exportWord').checked;
             
-            if (!sendToGroup1 && !exportWord) {
+            if (!sendToGroup1 && !sendToGroup3 && !exportWord) {
                 alert('Please select at least one action.');
                 return;
             }
+
+            if (sendToGroup1 && tip.forwarded_at) {
+                alert('This tip was already sent to Incident Logging and Classification.');
+                return;
+            }
+
+            if (sendToGroup3 && tip.backup_requested_at) {
+                alert('Police backup was already requested for this tip.');
+                return;
+            }
             
-            const tipDataToSend = {
-                tipId: tip.tipId,
-                timestamp: tip.timestamp,
-                location: tip.location,
-                description: tip.description
+            const payload = {
+                id: tip.id,
+                tip_id: tip.tip_id
             };
             
             let actionsCompleted = 0;
             let totalActions = 0;
+            const results = {
+                group1: null,
+                group3: null,
+                export: null
+            };
             
             if (sendToGroup1) {
                 totalActions++;
                 fetch('api/send_to_group1.php', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(tipDataToSend)
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
                 })
                 .then(response => response.json())
                 .then(data => {
+                    results.group1 = data;
                     if (data.success) {
-                        actionsCompleted++;
-                        checkAllActionsComplete();
-                    } else {
-                        console.error('Error sending to Incident Logging and Classification:', data.message);
-                        checkAllActionsComplete();
+                        tip.forwarded_at = data.data?.forwarded_at || new Date().toISOString();
+                        tip.blotter_reference_id = data.data?.blotter_reference_id || '';
                     }
+                    actionsCompleted++;
+                    checkAllActionsComplete();
                 })
                 .catch(error => {
-                    console.error('Error sending to Incident Logging and Classification:', error);
+                    results.group1 = { success: false, message: error.message };
+                    actionsCompleted++;
+                    checkAllActionsComplete();
+                });
+            }
+            
+            if (sendToGroup3) {
+                totalActions++;
+                fetch('api/send_to_group3.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                })
+                .then(response => response.json())
+                .then(data => {
+                    results.group3 = data;
+                    if (data.success) {
+                        tip.backup_requested_at = data.data?.backup_requested_at || new Date().toISOString();
+                        tip.group3_reference_id = data.data?.group3_reference_id || '';
+                    }
+                    actionsCompleted++;
+                    checkAllActionsComplete();
+                })
+                .catch(error => {
+                    results.group3 = { success: false, message: error.message };
+                    actionsCompleted++;
                     checkAllActionsComplete();
                 });
             }
@@ -1119,20 +1197,61 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             if (exportWord) {
                 totalActions++;
                 exportTipToWord(tip).then(() => {
+                    results.export = { success: true };
                     actionsCompleted++;
                     checkAllActionsComplete();
                 }).catch(error => {
-                    console.error('Error exporting to Word:', error);
+                    results.export = { success: false, message: error.message };
+                    actionsCompleted++;
                     checkAllActionsComplete();
                 });
             }
             
             function checkAllActionsComplete() {
-                if (actionsCompleted >= totalActions && totalActions > 0) {
-                    let message = 'Actions completed:\n';
-                    if (sendToGroup1) message += '- Sent to Incident Logging and Classification\n';
-                    if (exportWord) message += '- Exported to Word document\n';
-                    alert(message);
+                if (actionsCompleted < totalActions || totalActions === 0) {
+                    return;
+                }
+
+                let message = 'Actions completed:\n';
+                let hasError = false;
+
+                if (sendToGroup1) {
+                    if (results.group1?.success) {
+                        message += '- Sent to Incident Logging and Classification';
+                        if (results.group1.data?.blotter_reference_id) {
+                            message += ' (Ref: ' + results.group1.data.blotter_reference_id + ')';
+                        }
+                        message += '\n';
+                    } else {
+                        hasError = true;
+                        message += '- Incident Logging failed: ' + (results.group1?.message || 'Unknown error') + '\n';
+                    }
+                }
+
+                if (sendToGroup3) {
+                    if (results.group3?.success) {
+                        message += '- Sent to Inter-agency Coordination Portal (Police Backup)';
+                        if (results.group3.data?.group3_reference_id) {
+                            message += ' (Ref: ' + results.group3.data.group3_reference_id + ')';
+                        }
+                        message += '\n';
+                    } else {
+                        hasError = true;
+                        message += '- Police backup request failed: ' + (results.group3?.message || 'Unknown error') + '\n';
+                    }
+                }
+
+                if (exportWord) {
+                    if (results.export?.success) {
+                        message += '- Exported to Word document\n';
+                    } else {
+                        hasError = true;
+                        message += '- Word export failed\n';
+                    }
+                }
+
+                alert(message.trim());
+                if (!hasError || (sendToGroup1 && results.group1?.success) || (sendToGroup3 && results.group3?.success)) {
                     closeActionModal();
                 }
             }
@@ -1383,165 +1502,9 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
         // Update date/time immediately and then every second
         updateDateTime();
         setInterval(updateDateTime, 1000);
-        
-        // Notification System
-        let notificationDropdown = null;
-        let notificationBadge = null;
-        let notificationList = null;
-        
-        document.addEventListener('DOMContentLoaded', function() {
-            notificationDropdown = document.getElementById('notificationDropdown');
-            notificationBadge = document.getElementById('notificationBadge');
-            notificationList = document.getElementById('notificationList');
-            
-            if (notificationDropdown && notificationBadge && notificationList) {
-                loadNotifications();
-                // Refresh notifications every 30 seconds
-                setInterval(loadNotifications, 30000);
-                
-                // Close dropdown when clicking outside
-                document.addEventListener('click', function(event) {
-                    if (notificationDropdown && !event.target.closest('.notification-container')) {
-                        notificationDropdown.classList.remove('show');
-                    }
-                });
-            }
-        });
-        
-        function toggleNotifications() {
-            if (notificationDropdown) {
-                notificationDropdown.classList.toggle('show');
-                if (notificationDropdown.classList.contains('show')) {
-                    loadNotifications();
-                }
-            }
-        }
-        
-        async function loadNotifications() {
-            try {
-                // Sync activities first
-                await fetch('api/notifications.php?action=sync');
-                
-                // Then load notifications
-                const response = await fetch('api/notifications.php?action=list');
-                const data = await response.json();
-                
-                if (data.success) {
-                    updateNotificationBadge(data.unread_count);
-                    renderNotifications(data.notifications);
-                }
-            } catch (error) {
-                console.error('Error loading notifications:', error);
-            }
-        }
-        
-        function updateNotificationBadge(count) {
-            if (notificationBadge) {
-                if (count > 0) {
-                    notificationBadge.textContent = count > 99 ? '99+' : count;
-                    notificationBadge.classList.add('show');
-                } else {
-                    notificationBadge.classList.remove('show');
-                }
-            }
-        }
-        
-        function renderNotifications(notifications) {
-            if (!notificationList) return;
-            
-            if (notifications.length === 0) {
-                notificationList.innerHTML = `
-                    <div class="notification-empty">
-                        <i class="fas fa-bell-slash"></i>
-                        <p>No notifications</p>
-                    </div>
-                `;
-                return;
-            }
-            
-            notificationList.innerHTML = notifications.map(notif => {
-                let iconClass, icon;
-                if (notif.type === 'complaint' || notif.type === 'incident') {
-                    iconClass = 'complaint';
-                    icon = 'fa-file-alt';
-                } else if (notif.type === 'tip') {
-                    iconClass = 'tip';
-                    icon = 'fa-comments';
-                } else if (notif.type === 'volunteer' || notif.type === 'volunteer_request') {
-                    iconClass = 'volunteer';
-                    icon = 'fa-handshake';
-                } else if (notif.type === 'login') {
-                    iconClass = 'login';
-                    icon = 'fa-sign-in-alt';
-                } else if (notif.type === 'logout') {
-                    iconClass = 'logout';
-                    icon = 'fa-sign-out-alt';
-                } else if (notif.type === 'event' || notif.type === 'event_report' || notif.type === 'patrol') {
-                    iconClass = 'event';
-                    icon = 'fa-bullhorn';
-                } else {
-                    iconClass = 'event';
-                    icon = 'fa-bullhorn';
-                }
-                
-                const safeLink = (notif.link || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
-                
-                return `
-                    <div class="notification-item ${notif.is_read ? '' : 'unread'}" 
-                         onclick="handleNotificationClick(${notif.id}, '${safeLink}')">
-                        <div class="notification-icon ${iconClass}">
-                            <i class="fas ${icon}"></i>
-                        </div>
-                        <div class="notification-content">
-                            <div class="notification-title">${escapeHtml(notif.title)}</div>
-                            <div class="notification-message">${escapeHtml(notif.message)}</div>
-                            <div class="notification-time">${notif.time_ago}</div>
-                        </div>
-                    </div>
-                `;
-            }).join('');
-        }
-        
-        function handleNotificationClick(id, link) {
-            // Mark as read
-            fetch('api/notifications.php?action=mark_read', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: 'id=' + id
-            });
-            
-            // Remove unread class
-            const item = event.currentTarget;
-            item.classList.remove('unread');
-            
-            // Navigate if link exists
-            if (link && link !== '') {
-                window.location.href = link;
-            }
-            
-            // Reload notifications to update badge
-            loadNotifications();
-        }
-        
-        async function markAllAsRead() {
-            try {
-                await fetch('api/notifications.php?action=mark_read', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
-                });
-                loadNotifications();
-            } catch (error) {
-                console.error('Error marking all as read:', error);
-            }
-        }
-        
-        function escapeHtml(text) {
-            const div = document.createElement('div');
-            div.textContent = text;
-            return div.innerHTML;
-        }
 
     </script>
+    <?php require __DIR__ . '/includes/admin_notifications_script.php'; ?>
 </body>
 </html>
 

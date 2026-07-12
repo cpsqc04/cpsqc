@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 YOLO Object Detection Script for RTSP Camera Stream
-Detects: person, vehicle, animal, and weapon
+Detects: person, group/crowd, vehicle, animal, plant, phone (and weapon when model supports it)
 Stable, offline-capable, with auto-reconnection
 """
 
@@ -19,6 +19,7 @@ import warnings
 import subprocess
 import contextlib
 import atexit
+from urllib.parse import quote, urlparse
 try:
     import requests
     from requests.auth import HTTPDigestAuth, HTTPBasicAuth
@@ -111,8 +112,12 @@ except ImportError:
 # Main stream for 4K quality: H.264, 3840x2160 (4K UHD)
 # Sub-stream (fallback): 640x360, 10fps - lower quality but more stable
 # REOLINK cameras use Preview_01_sub (not h264Preview_01_sub)
-RTSP_URL = "rtsp://admin:admin123@172.22.0.187:554/Preview_01_sub"
-PREFER_SUB_STREAM = True  # Use sub-stream for stability (H.264, lower resolution, more stable)
+RTSP_URL = "rtsp://127.0.0.1:554/Preview_01_sub"
+PREFER_SUB_STREAM = True  # Sub-stream = lower latency, fewer decode errors on Reolink
+RTSP_FLUSH_GRABS = 5  # Drop buffered frames when reading RTSP (reduces lag)
+MAX_DECODE_FAILURES_BEFORE_RECONNECT = 8
+CAMERAS_FILE = "cameras.json"
+ACTIVE_CAMERA = None
 DETECTIONS_FILE = "detections.json"
 FRAME_FILE = "current_frame.jpg"  # Frame saved for web display
 FRAME_FILE_ALT = "current_frame_alt.jpg"  # Alternate file to avoid locks
@@ -120,24 +125,43 @@ FRAME_FILE_TEMP = "current_frame_temp.jpg"  # Temporary file for atomic writes
 DETECTED_OBJECTS_DIR = "detected_objects"  # Directory for cropped detected object images
 LOCK_FILE = "detect.lock"  # Lock file to prevent multiple instances
 RECORDINGS_DIR = "recordings"  # Directory for recorded video files
-# Sub-stream Resolution for stability and smooth playback
-FRAME_WIDTH = 640   # Sub-stream width (matches camera sub-stream)
-FRAME_HEIGHT = 360  # Sub-stream height (matches camera sub-stream)
+# Display/recording target — use native camera resolution up to this cap (never upscale).
+MAX_DISPLAY_WIDTH = 1920
+MAX_DISPLAY_HEIGHT = 1080
+FRAME_WIDTH = 1280   # Updated from first frame; used for placeholders/recording
+FRAME_HEIGHT = 720
 # Video recording settings
 ENABLE_RECORDING = True  # Set to False to disable recording
-RECORDING_FPS = 30  # FPS for recorded video (30 FPS is standard for CCTV)
-RECORDING_CHUNK_DURATION = 3600  # Record in 1-hour chunks (seconds)
-RECORDING_CODEC = 'mp4v'  # Use 'mp4v' for .mp4, 'XVID' for .avi
+RECORDING_FPS = 30  # FPS for RTSP recorded video
+HTTP_SNAPSHOT_INTERVAL = 0.35  # Seconds between HTTP snapshots (fallback mode)
+HTTP_RECORDING_FPS = 1.0 / HTTP_SNAPSHOT_INTERVAL  # Match snapshot rate for recording duration
+LIVE_JPEG_QUALITY = 92  # Higher quality for sharper live web view
+RECORDING_CHUNK_DURATION = 300  # Record in 5-minute chunks (seconds)
+MIN_RECORDING_DURATION = 120  # Discard fragments shorter than 2 minutes
+RECORDING_BUCKET_SECONDS = 300  # Align filenames to 5-minute windows
+RECORDING_CODEC = 'avc1'  # H.264 for browser playback (fallback: mp4v)
 RECORDING_EXTENSION = '.mp4'  # File extension for recordings
-MAX_RECORDINGS_TO_KEEP = 168  # Keep 7 days of 1-hour recordings (168 hours)
-CONFIDENCE_THRESHOLD = 0.5
+RECORDING_RETENTION_DAYS = 30  # Auto-delete recordings older than 30 days
+CONFIDENCE_THRESHOLD = 0.35
+PLANT_CONFIDENCE_THRESHOLD = 0.20  # Potted plants are often lower-confidence in YOLO
+PHONE_CONFIDENCE_THRESHOLD = 0.25  # Phones are small / often partially occluded
+PHONE_YOLO_SCAN_CONF = 0.05  # Low conf for dedicated phone scan passes
+PHONE_CONTOUR_CONFIDENCE = 0.42  # Estimated confidence for shape-based phone hits
+PHONE_SCAN_IMGSZ = 1280
+ENABLE_PHONE_SECONDARY_SCAN = True
+PHONE_MODEL_CANDIDATES = ('phone_yolov8.pt', 'yolov8s.pt', 'yolov8m.pt', 'yolov8n.pt')
+PHONE_COCO_CLASS_ID = 67
+GROUP_MIN_PEOPLE = 2   # Nearby people counted as a group
+CROWD_MIN_PEOPLE = 4   # Larger clusters counted as a crowd
+MAX_PERSON_DETECTIONS = 25  # Keep enough people for crowd counting
+MAX_OTHER_DETECTIONS = 10
 MAX_RECONNECT_ATTEMPTS = 10
 RECONNECT_DELAY = 3  # seconds
 FRAME_READ_TIMEOUT = 5  # seconds
 STREAM_TIMEOUT = 30  # seconds for initial connection
 MAX_DETECTED_OBJECT_IMAGES = 20  # Maximum number of object images to keep
 FRAME_PROCESS_DELAY = 0.0  # No delay for lowest latency
-DETECTION_INTERVAL = 30  # Run detection every N frames (higher = faster frame saving for real-time)
+DETECTION_INTERVAL = 15  # Run detection more often so boxes stay visible
 TARGET_FPS = 30  # Target frame rate for smooth real-time video (matches recording FPS)
 ENABLE_DETECTION = True  # Set to False to disable detection for absolute lowest latency
 FRAME_SAVE_INTERVAL = 1  # Save EVERY frame - CRITICAL for real-time viewing
@@ -147,6 +171,7 @@ PRIORITIZE_FRAME_SAVING = True  # Save frame BEFORE detection to minimize latenc
 # Class mapping for YOLO
 # COCO dataset classes: 0=person, 2=car, 3=motorcycle, 5=bus, 7=truck (vehicles)
 # 14=bird, 15=cat, 16=dog, 17=horse, 18=sheep, 19=cow, 20=elephant, 21=bear, 22=zebra, 23=giraffe (animals)
+# 58=potted plant, 67=cell phone
 # Custom model needed for weapon detection, or use general "object" class
 CLASS_NAMES = {
     0: "person",
@@ -164,14 +189,133 @@ CLASS_NAMES = {
     21: "animal",  # bear
     22: "animal",  # zebra
     23: "animal",  # giraffe
+    58: "plant",   # potted plant
+    67: "phone",   # cell phone / smartphone
 }
 
 # Target classes we want to detect
-TARGET_CLASSES = ["person", "vehicle", "animal"]
+TARGET_CLASSES = ["person", "vehicle", "animal", "plant", "phone"]
 
 # For weapon detection, we'll use a separate approach or custom model
 # For now, we'll detect weapons as "knife", "gun", etc. if available in model
 WEAPON_CLASSES = ["knife", "gun", "pistol", "rifle", "weapon"]
+
+# YOLO class IDs we care about (speeds inference and keeps plant/phone enabled)
+YOLO_TARGET_CLASS_IDS = [0, 2, 3, 5, 7, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 58, 67]
+
+
+def get_rtsp_bases(rtsp_url):
+    """Build RTSP base URLs (with and without auth) from configured camera URL."""
+    parsed = urlparse(rtsp_url)
+    if parsed.scheme != "rtsp" or not parsed.hostname:
+        return rtsp_url, rtsp_url
+
+    port = parsed.port or 554
+    base_no_auth = f"rtsp://{parsed.hostname}:{port}"
+
+    if parsed.username:
+        auth = parsed.username
+        if parsed.password:
+            auth = f"{auth}:{parsed.password}"
+        base_with_auth = f"rtsp://{auth}@{parsed.hostname}:{port}"
+    else:
+        base_with_auth = base_no_auth
+
+    return base_with_auth, base_no_auth
+
+
+def build_rtsp_url(ip, port, username, password, stream_type):
+    """Build a valid RTSP URL with URL-encoded credentials."""
+    port = str(port or "554").strip() or "554"
+    suffix = "Preview_01_main" if stream_type == "main" else "Preview_01_sub"
+    if username:
+        user = quote(str(username).strip(), safe="")
+        pwd = quote(str(password).strip(), safe="") if password else ""
+        auth = f"{user}:{pwd}" if password else user
+        return f"rtsp://{auth}@{ip}:{port}/{suffix}"
+    return f"rtsp://{ip}:{port}/{suffix}"
+
+
+def load_active_camera_config():
+    """Load first available camera from cameras.json and derive RTSP source."""
+    cameras_path = Path(CAMERAS_FILE)
+    if not cameras_path.exists():
+        return None
+
+    try:
+        cameras = json.loads(cameras_path.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+
+    if not isinstance(cameras, list) or not cameras:
+        return None
+
+    selected = None
+    for camera in cameras:
+        status = str(camera.get("status", "")).strip().lower()
+        if status == "online":
+            selected = camera
+            break
+    if selected is None:
+        selected = cameras[0]
+
+    stream_type = str(selected.get("streamType", "sub")).strip().lower()
+    ip = str(selected.get("ipAddress", "")).strip()
+    port = str(selected.get("port", "554")).strip() or "554"
+    username = str(selected.get("username", "")).strip()
+    password = str(selected.get("password", "")).strip()
+
+    if ip:
+        rtsp_url = build_rtsp_url(ip, port, username, password, stream_type)
+    else:
+        rtsp_url = str(selected.get("rtspUrl", "")).strip()
+        if not rtsp_url:
+            return None
+
+    return {
+        "camera_id": selected.get("cameraId") or selected.get("id") or "CAMERA",
+        "name": selected.get("name") or "Camera",
+        "stream_type": stream_type if stream_type in {"main", "sub"} else "sub",
+        "rtsp_url": rtsp_url,
+        "ipAddress": ip,
+        "port": port,
+        "username": username,
+        "password": password,
+    }
+
+
+def configure_camera_source():
+    """Set RTSP source from camera config file when available."""
+    global RTSP_URL, PREFER_SUB_STREAM, ACTIVE_CAMERA
+
+    camera_cfg = load_active_camera_config()
+    if not camera_cfg:
+        print(f"Using fallback RTSP URL from script: {RTSP_URL}")
+        return
+
+    ACTIVE_CAMERA = camera_cfg
+    RTSP_URL = camera_cfg["rtsp_url"]
+    PREFER_SUB_STREAM = camera_cfg["stream_type"] != "main"
+    print(f"Using camera {camera_cfg['camera_id']} ({camera_cfg['name']})")
+    print(f"Stream type: {camera_cfg['stream_type'].upper()}")
+    print(f"RTSP source: {RTSP_URL}")
+
+
+def get_active_camera_credentials():
+    """Return IP/username/password from active camera config."""
+    global ACTIVE_CAMERA
+    if ACTIVE_CAMERA is None:
+        ACTIVE_CAMERA = load_active_camera_config()
+
+    if not ACTIVE_CAMERA:
+        parsed = urlparse(RTSP_URL)
+        return parsed.hostname or "127.0.0.1", parsed.username or "", parsed.password or ""
+
+    return (
+        ACTIVE_CAMERA.get("ipAddress") or urlparse(ACTIVE_CAMERA.get("rtsp_url", RTSP_URL)).hostname or "127.0.0.1",
+        ACTIVE_CAMERA.get("username", ""),
+        ACTIVE_CAMERA.get("password", ""),
+    )
 
 def load_yolo_model():
     """Load YOLO model - works offline after first download"""
@@ -205,6 +349,288 @@ def load_yolo_model():
         print("If this is your first run, ensure you have internet connection.")
         sys.exit(1)
 
+_phone_scan_model = None
+
+def get_phone_scan_model(main_model):
+    """Use a stronger/local phone-tuned model when available."""
+    global _phone_scan_model
+    if _phone_scan_model is not None:
+        return _phone_scan_model
+
+    if USE_ULTRALYTICS:
+        for model_path in PHONE_MODEL_CANDIDATES:
+            if os.path.exists(model_path):
+                print(f"Phone scan model: {model_path}")
+                _phone_scan_model = YOLO(model_path)
+                return _phone_scan_model
+
+    _phone_scan_model = main_model
+    return _phone_scan_model
+
+def bbox_area(bbox):
+    return max(0, bbox['x2'] - bbox['x1']) * max(0, bbox['y2'] - bbox['y1'])
+
+def bbox_iou(a, b):
+    x1 = max(a['x1'], b['x1'])
+    y1 = max(a['y1'], b['y1'])
+    x2 = min(a['x2'], b['x2'])
+    y2 = min(a['y2'], b['y2'])
+    inter = max(0, x2 - x1) * max(0, y2 - y1)
+    if inter <= 0:
+        return 0.0
+    union = bbox_area(a) + bbox_area(b) - inter
+    return inter / union if union > 0 else 0.0
+
+def bbox_overlaps_any(bbox, others, min_iou=0.35):
+    for other in others:
+        if bbox_iou(bbox, other) >= min_iou:
+            return True
+    return False
+
+def clamp_bbox(bbox, width, height):
+    return {
+        'x1': max(0, min(width, int(bbox['x1']))),
+        'y1': max(0, min(height, int(bbox['y1']))),
+        'x2': max(0, min(width, int(bbox['x2']))),
+        'y2': max(0, min(height, int(bbox['y2']))),
+    }
+
+def append_phone_detection(detections, frame, bbox, confidence, class_name='cell phone', source='scan'):
+    bbox = clamp_bbox(bbox, frame.shape[1], frame.shape[0])
+    if bbox['x2'] <= bbox['x1'] or bbox['y2'] <= bbox['y1']:
+        return detections
+
+    existing_phone_boxes = [d['bbox'] for d in detections if d.get('category') == 'phone']
+    if bbox_overlaps_any(bbox, existing_phone_boxes):
+        return detections
+
+    detection_id = int(time.time() * 1000) + len(detections) + 1
+    image_path = save_detected_object_image(frame, bbox, detection_id, 'phone', None)
+    detections.append({
+        'id': detection_id,
+        'category': 'phone',
+        'class': class_name,
+        'confidence': round(float(confidence), 2),
+        'bbox': bbox,
+        'image': image_path,
+        'timestamp': datetime.now().isoformat(),
+        'source': source,
+    })
+    return detections
+
+def scan_yolo_phones_in_crop(frame, scan_model, offset_x, offset_y, crop):
+    hits = []
+    if crop is None or crop.size == 0:
+        return hits
+
+    try:
+        results = scan_model(
+            crop,
+            verbose=False,
+            conf=PHONE_YOLO_SCAN_CONF,
+            classes=[PHONE_COCO_CLASS_ID],
+            imgsz=PHONE_SCAN_IMGSZ,
+        )
+    except Exception:
+        return hits
+
+    if not USE_ULTRALYTICS:
+        return hits
+
+    for result in results:
+        boxes = result.boxes
+        if boxes is None:
+            continue
+        for box in boxes:
+            conf = float(box.conf[0])
+            if conf < PHONE_CONFIDENCE_THRESHOLD:
+                continue
+            x1, y1, x2, y2 = box.xyxy[0].tolist()
+            hits.append({
+                'bbox': {
+                    'x1': int(offset_x + x1),
+                    'y1': int(offset_y + y1),
+                    'x2': int(offset_x + x2),
+                    'y2': int(offset_y + y2),
+                },
+                'confidence': conf,
+                'class_name': result.names[int(box.cls[0])],
+                'source': 'yolo_phone_scan',
+            })
+    return hits
+
+def scan_contour_phones_in_crop(frame, offset_x, offset_y, crop):
+    hits = []
+    if crop is None or crop.size == 0:
+        return hits
+
+    ch, cw = crop.shape[:2]
+    if ch < 30 or cw < 20:
+        return hits
+
+    gray = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
+    blur = cv2.GaussianBlur(gray, (5, 5), 0)
+    edges = cv2.Canny(blur, 40, 140)
+    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
+    edges = cv2.dilate(edges, kernel, iterations=1)
+    contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+    best = None
+    best_score = 0.0
+    min_area = max(250, int(ch * cw * 0.004))
+    max_area = int(ch * cw * 0.35)
+
+    for contour in contours:
+        area = cv2.contourArea(contour)
+        if area < min_area or area > max_area:
+            continue
+
+        rect = cv2.minAreaRect(contour)
+        (_, _), (rw, rh), _ = rect
+        if rw < 8 or rh < 8:
+            continue
+
+        aspect = max(rw, rh) / min(rw, rh)
+        if aspect < 1.25 or aspect > 3.0:
+            continue
+
+        box = cv2.boxPoints(rect)
+        bx1 = int(max(0, min(box[:, 0])))
+        by1 = int(max(0, min(box[:, 1])))
+        bx2 = int(min(cw, max(box[:, 0])))
+        by2 = int(min(ch, max(box[:, 1])))
+        if bx2 - bx1 < 10 or by2 - by1 < 14:
+            continue
+
+        roi = crop[by1:by2, bx1:bx2]
+        if roi.size == 0:
+            continue
+
+        gray_roi = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
+        std_dev = float(np.std(gray_roi))
+        if std_dev < 12:
+            continue
+
+        score = area * min(1.0, aspect / 2.0) * min(1.0, std_dev / 40.0)
+        if score > best_score:
+            best_score = score
+            best = (bx1, by1, bx2, by2)
+
+    if best is None:
+        return hits
+
+    bx1, by1, bx2, by2 = best
+    hits.append({
+        'bbox': {
+            'x1': int(offset_x + bx1),
+            'y1': int(offset_y + by1),
+            'x2': int(offset_x + bx2),
+            'y2': int(offset_y + by2),
+        },
+        'confidence': PHONE_CONTOUR_CONFIDENCE,
+        'class_name': 'cell phone',
+        'source': 'contour_phone_scan',
+    })
+    return hits
+
+def person_phone_scan_regions(person_bbox, frame_width, frame_height):
+    x1 = int(person_bbox['x1'])
+    y1 = int(person_bbox['y1'])
+    x2 = int(person_bbox['x2'])
+    y2 = int(person_bbox['y2'])
+    width = max(1, x2 - x1)
+    height = max(1, y2 - y1)
+
+    regions = [
+        (x1, y1, x1 + int(width * 0.50), y1 + int(height * 0.72)),
+        (x2 - int(width * 0.50), y1, x2, y1 + int(height * 0.72)),
+        (x1 + int(width * 0.20), y1 + int(height * 0.08), x2 - int(width * 0.20), y1 + int(height * 0.58)),
+    ]
+
+    clamped = []
+    for rx1, ry1, rx2, ry2 in regions:
+        bbox = clamp_bbox({'x1': rx1, 'y1': ry1, 'x2': rx2, 'y2': ry2}, frame_width, frame_height)
+        if bbox['x2'] - bbox['x1'] >= 20 and bbox['y2'] - bbox['y1'] >= 20:
+            clamped.append(bbox)
+    return clamped
+
+def dedupe_phone_hits(phone_hits, min_iou=0.25):
+    """Keep highest-confidence phone hits and drop overlapping duplicates."""
+    phone_hits = sorted(phone_hits, key=lambda hit: hit['confidence'], reverse=True)
+    kept = []
+    kept_boxes = []
+    for hit in phone_hits:
+        bbox = hit['bbox']
+        if bbox_overlaps_any(bbox, kept_boxes, min_iou=min_iou):
+            continue
+        kept.append(hit)
+        kept_boxes.append(bbox)
+    return kept
+
+def enhance_phone_detections(frame, model, detections):
+    """Run extra phone passes because COCO phone class is often missed on CCTV footage."""
+    if not ENABLE_PHONE_SECONDARY_SCAN or not USE_ULTRALYTICS:
+        return detections
+
+    scan_model = get_phone_scan_model(model)
+    frame_height, frame_width = frame.shape[:2]
+    phone_hits = []
+
+    person_boxes = [d['bbox'] for d in detections if d.get('category') == 'person' and d.get('bbox')]
+    if person_boxes:
+        for person_bbox in person_boxes:
+            region_hits = []
+            for region in person_phone_scan_regions(person_bbox, frame_width, frame_height):
+                crop = frame[region['y1']:region['y2'], region['x1']:region['x2']]
+                region_hits.extend(
+                    scan_yolo_phones_in_crop(frame, scan_model, region['x1'], region['y1'], crop)
+                )
+
+            yolo_hits = dedupe_phone_hits(
+                [hit for hit in region_hits if hit.get('source') == 'yolo_phone_scan']
+            )
+            if yolo_hits:
+                phone_hits.append(yolo_hits[0])
+                continue
+
+            contour_hits = []
+            for region in person_phone_scan_regions(person_bbox, frame_width, frame_height):
+                crop = frame[region['y1']:region['y2'], region['x1']:region['x2']]
+                contour_hits.extend(
+                    scan_contour_phones_in_crop(frame, region['x1'], region['y1'], crop)
+                )
+            contour_hits = dedupe_phone_hits(
+                [hit for hit in contour_hits if hit.get('source') == 'contour_phone_scan']
+            )
+            if contour_hits:
+                phone_hits.append(contour_hits[0])
+    else:
+        phone_hits.extend(
+            scan_yolo_phones_in_crop(frame, scan_model, 0, 0, frame)
+        )
+
+    for hit in dedupe_phone_hits(phone_hits):
+        if hit['confidence'] < PHONE_CONFIDENCE_THRESHOLD:
+            continue
+        append_phone_detection(
+            detections,
+            frame,
+            hit['bbox'],
+            hit['confidence'],
+            hit.get('class_name', 'cell phone'),
+            hit.get('source', 'scan'),
+        )
+
+    return detections
+
+def confidence_threshold_for_category(category):
+    """Use lower thresholds for small / lower-confidence COCO classes."""
+    if category == "plant":
+        return PLANT_CONFIDENCE_THRESHOLD
+    if category == "phone":
+        return PHONE_CONFIDENCE_THRESHOLD
+    return CONFIDENCE_THRESHOLD
+
 def map_class_to_category(class_id, class_name):
     """Map YOLO class to our categories"""
     if class_id in CLASS_NAMES:
@@ -219,6 +645,14 @@ def map_class_to_category(class_id, class_name):
     # Check for animals
     if any(a in class_lower for a in ["dog", "cat", "bird", "horse", "sheep", "cow", "animal"]):
         return "animal"
+    
+    # Check for plants
+    if any(p in class_lower for p in ["plant", "potted plant", "flower", "tree", "potted"]):
+        return "plant"
+
+    # Check for phones / smartphones
+    if any(p in class_lower for p in ["cell phone", "cellphone", "mobile phone", "smartphone", "phone"]):
+        return "phone"
     
     # Check for weapons
     if any(w in class_lower for w in WEAPON_CLASSES):
@@ -320,7 +754,8 @@ def analyze_person_attributes(frame, person_bbox, face_bbox=None):
         "gender": "Unknown",
         "expression": "calm",
         "accessories": [],
-        "clothes_color": "Unknown"
+        "clothes_color": "Unknown",
+        "facial_hair": "None",
     }
     
     try:
@@ -853,10 +1288,77 @@ def analyze_person_attributes(frame, person_bbox, face_bbox=None):
             attributes["accessories"] = "None"  # Explicitly set to "None" string when no accessories
         else:
             attributes["accessories"] = ", ".join(attributes["accessories"]).lower()
+
+        # Facial hair heuristic from lower face region
+        if face_bbox:
+            fx1, fy1, fx2, fy2 = face_bbox
+            fh = max(1, fy2 - fy1)
+            beard_y1 = fy1 + int(fh * 0.55)
+            beard_region = frame[beard_y1:fy2, fx1:fx2]
+            if beard_region.size > 0:
+                gray_beard = cv2.cvtColor(beard_region, cv2.COLOR_BGR2GRAY)
+                dark_ratio = float(np.mean(gray_beard < 75))
+                if dark_ratio > 0.35:
+                    attributes["facial_hair"] = "Beard"
     except:
         pass
     
     return attributes
+
+def phone_near_person(phone_bbox, person_bbox):
+    cx, cy = bbox_center(phone_bbox)
+    if person_bbox['x1'] <= cx <= person_bbox['x2'] and person_bbox['y1'] <= cy <= person_bbox['y2']:
+        return True
+    return bbox_iou(phone_bbox, person_bbox) >= 0.05
+
+def enrich_detections_for_display(detections):
+    """Normalize person fields for the Detected Objects card UI."""
+    phones = [d for d in detections if d.get('category') == 'phone' and d.get('bbox')]
+
+    for det in detections:
+        category = det.get('category')
+        if category == 'person':
+            acc = str(det.get('accessories', 'None') or 'None').lower()
+            det['mask'] = 'Yes' if 'mask' in acc else 'No'
+            det['earrings'] = 'Yes' if 'earring' in acc else 'No'
+            det['facial_hair'] = det.get('facial_hair') or 'None'
+
+            gender = det.get('gender', 'Unknown')
+            if gender == 'Male':
+                det['gender'] = 'Man'
+            elif gender == 'Female':
+                det['gender'] = 'Woman'
+
+            expr = str(det.get('expression', 'calm') or 'calm')
+            det['expression'] = expr.capitalize()
+
+            clothes = str(det.get('clothes_color', 'Unknown') or 'Unknown')
+            if clothes.lower() in ('none', 'unknown'):
+                det['clothes_color'] = clothes.capitalize() if clothes.lower() == 'none' else 'Unknown'
+            else:
+                det['clothes_color'] = clothes.capitalize()
+
+            items = []
+            weapon = det.get('weapon')
+            if weapon:
+                items.append(str(weapon.get('class', 'weapon')))
+            person_bbox = det.get('bbox')
+            if person_bbox:
+                for phone in phones:
+                    if phone_near_person(phone['bbox'], person_bbox):
+                        items.append('cell phone')
+                        break
+            det['items_detected'] = ', '.join(dict.fromkeys(items)) if items else 'None'
+            continue
+
+        if category in ('group', 'crowd'):
+            count = det.get('people_count') or det.get('group_size') or 0
+            det['items_detected'] = f'{count} people'
+            continue
+
+        det['items_detected'] = det.get('class') or category or 'None'
+
+    return detections
 
 def save_detected_object_image(frame, bbox, detection_id, category="person", face_bbox=None):
     """Crop and save detected object image - for persons, extract FACE ONLY (no body parts)"""
@@ -1013,12 +1515,13 @@ def process_detections(results, frame):
                 for box in boxes:
                     cls_id = int(box.cls[0])
                     conf = float(box.conf[0])
-                    if conf < CONFIDENCE_THRESHOLD:
-                        continue
                     
                     # Get class name
                     class_name = result.names[cls_id]
                     category = map_class_to_category(cls_id, class_name)
+                    min_conf = confidence_threshold_for_category(category)
+                    if conf < min_conf:
+                        continue
                     
                     if category and category in TARGET_CLASSES + ["weapon"]:
                         # Get bounding box coordinates
@@ -1031,8 +1534,8 @@ def process_detections(results, frame):
                             "y2": int(y2)
                         }
                         
-                        # Filter out ground motion (false positives at ground level)
-                        if is_ground_motion(bbox, frame_height):
+                        # Filter out ground motion (false positives at ground level); keep plants/phones
+                        if category not in ("plant", "phone") and is_ground_motion(bbox, frame_height):
                             continue  # Skip this detection - it's ground motion/noise
                         
                         # Generate unique ID for this detection
@@ -1111,12 +1614,12 @@ def process_detections(results, frame):
         if pred is not None and len(pred) > 0:
             for det in pred:
                 x1, y1, x2, y2, conf, cls_id = det.tolist()
-                if conf < CONFIDENCE_THRESHOLD:
-                    continue
-                
                 cls_id = int(cls_id)
                 class_name = results.names[cls_id]
                 category = map_class_to_category(cls_id, class_name)
+                min_conf = confidence_threshold_for_category(category)
+                if conf < min_conf:
+                    continue
                 
                 if category and category in TARGET_CLASSES + ["weapon"]:
                     bbox = {
@@ -1126,8 +1629,8 @@ def process_detections(results, frame):
                         "y2": int(y2)
                     }
                     
-                    # Filter out ground motion (false positives at ground level)
-                    if is_ground_motion(bbox, frame_height):
+                    # Filter out ground motion (false positives at ground level); keep plants/phones
+                    if category not in ("plant", "phone") and is_ground_motion(bbox, frame_height):
                         continue  # Skip this detection - it's ground motion/noise
                     
                     # Generate unique ID for this detection
@@ -1160,30 +1663,168 @@ def process_detections(results, frame):
                     
                     detections.append(detection)
     
-    # Limit to top 5 detections by confidence (for real-time performance and clarity)
-    if len(detections) > 5:
-        detections = sorted(detections, key=lambda x: x.get('confidence', 0), reverse=True)[:5]
-    
-    # Draw bounding boxes only for top 5 detections (reduced size for clarity)
+    # Keep enough people for crowd/group analysis; trim other classes
+    persons = [d for d in detections if d.get('category') == 'person']
+    others = [d for d in detections if d.get('category') != 'person']
+    persons = sorted(persons, key=lambda x: x.get('confidence', 0), reverse=True)[:MAX_PERSON_DETECTIONS]
+    others = sorted(others, key=lambda x: x.get('confidence', 0), reverse=True)[:MAX_OTHER_DETECTIONS]
+    return persons + others
+
+def bbox_center(bbox):
+    return (
+        (bbox['x1'] + bbox['x2']) / 2.0,
+        (bbox['y1'] + bbox['y2']) / 2.0,
+    )
+
+def people_are_nearby(a, b, distance_scale=1.6):
+    """True when two person boxes are close enough to count as the same group."""
+    ax, ay = bbox_center(a)
+    bx, by = bbox_center(b)
+    aw = max(1, a['x2'] - a['x1'])
+    ah = max(1, a['y2'] - a['y1'])
+    bw = max(1, b['x2'] - b['x1'])
+    bh = max(1, b['y2'] - b['y1'])
+    avg_w = (aw + bw) / 2.0
+    avg_h = (ah + bh) / 2.0
+    # Allow a bit more horizontal spacing (side-by-side people) than vertical
+    return abs(ax - bx) <= avg_w * distance_scale * 1.4 and abs(ay - by) <= avg_h * distance_scale
+
+def cluster_person_detections(person_detections):
+    """Group nearby person detections with simple connected-component clustering."""
+    n = len(person_detections)
+    if n == 0:
+        return []
+
+    parent = list(range(n))
+
+    def find(i):
+        while parent[i] != i:
+            parent[i] = parent[parent[i]]
+            i = parent[i]
+        return i
+
+    def union(i, j):
+        ri, rj = find(i), find(j)
+        if ri != rj:
+            parent[rj] = ri
+
+    for i in range(n):
+        for j in range(i + 1, n):
+            if people_are_nearby(person_detections[i]['bbox'], person_detections[j]['bbox']):
+                union(i, j)
+
+    clusters = {}
+    for i in range(n):
+        root = find(i)
+        clusters.setdefault(root, []).append(person_detections[i])
+    return list(clusters.values())
+
+def analyze_crowds_and_groups(frame, detections):
+    """
+    Detect groups/crowds from individual person boxes.
+    - 2–3 nearby people => group
+    - 4+ nearby people => crowd
+    Also tags each person with group_size / crowd_id when applicable.
+    """
+    persons = [d for d in detections if d.get('category') == 'person' and d.get('bbox')]
+    person_count = len(persons)
+
+    # Always expose a live people count for the UI / API consumers
+    for det in detections:
+        if det.get('category') == 'person':
+            det['people_in_frame'] = person_count
+
+    if person_count < GROUP_MIN_PEOPLE:
+        return detections
+
+    clusters = cluster_person_detections(persons)
+    crowd_id = 0
+
+    for cluster in clusters:
+        size = len(cluster)
+        if size < GROUP_MIN_PEOPLE:
+            continue
+
+        crowd_id += 1
+        xs1 = [p['bbox']['x1'] for p in cluster]
+        ys1 = [p['bbox']['y1'] for p in cluster]
+        xs2 = [p['bbox']['x2'] for p in cluster]
+        ys2 = [p['bbox']['y2'] for p in cluster]
+        group_bbox = {
+            'x1': int(min(xs1)),
+            'y1': int(min(ys1)),
+            'x2': int(max(xs2)),
+            'y2': int(max(ys2)),
+        }
+
+        category = 'crowd' if size >= CROWD_MIN_PEOPLE else 'group'
+        class_name = f'{size} people'
+        avg_conf = sum(p.get('confidence', 0) for p in cluster) / size
+
+        for person in cluster:
+            person['group_id'] = crowd_id
+            person['group_size'] = size
+            person['in_crowd'] = category == 'crowd'
+
+        detection_id = int(time.time() * 1000) + len(detections) + crowd_id
+        image_path = save_detected_object_image(frame, group_bbox, detection_id, category, None)
+        detections.append({
+            'id': detection_id,
+            'category': category,
+            'class': class_name,
+            'confidence': round(avg_conf, 2),
+            'bbox': group_bbox,
+            'image': image_path,
+            'timestamp': datetime.now().isoformat(),
+            'people_count': size,
+            'group_id': crowd_id,
+            'people_in_frame': person_count,
+            'source': 'crowd_analysis',
+        })
+
+    return detections
+
+def draw_detections_on_frame(frame, detections):
+    """Draw cached detection overlays so boxes stay stable between inference frames."""
     for detection in detections:
         bbox = detection.get('bbox', {})
-        if bbox:
-            x1 = bbox.get('x1', 0)
-            y1 = bbox.get('y1', 0)
-            x2 = bbox.get('x2', 0)
-            y2 = bbox.get('y2', 0)
-            category = detection.get('category', 'unknown')
-            conf = detection.get('confidence', 0)
-            
-            color = get_color_for_category(category)
-            # Use thinner line (1 instead of 2) and smaller font
-            cv2.rectangle(frame, (int(x1), int(y1)), (int(x2), int(y2)), color, 1)
-            label = f"{category}: {conf:.2f}"
-            # Smaller font scale (0.4 instead of 0.5) and thinner text (1 instead of 2)
-            cv2.putText(frame, label, (int(x1), int(y1) - 5),
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.4, color, 1)
-    
-    return detections
+        if not bbox:
+            continue
+        x1 = bbox.get('x1', 0)
+        y1 = bbox.get('y1', 0)
+        x2 = bbox.get('x2', 0)
+        y2 = bbox.get('y2', 0)
+        category = detection.get('category', 'unknown')
+        class_name = detection.get('class', category)
+        conf = detection.get('confidence', 0)
+        color = get_color_for_category(category)
+        thickness = 3 if category in ("plant", "phone", "group", "crowd") else 2
+        cv2.rectangle(frame, (int(x1), int(y1)), (int(x2), int(y2)), color, thickness)
+        if category in ("group", "crowd"):
+            people_count = detection.get('people_count', detection.get('group_size', 0))
+            label = f"{category}: {people_count} people"
+        else:
+            label = f"{category}: {class_name} {conf:.2f}"
+        font_scale = 0.7 if category in ("plant", "phone", "group", "crowd") else 0.55
+        font_thickness = 2
+        (tw, th), baseline = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, font_scale, font_thickness)
+        label_y = max(int(y1) - 8, th + 8)
+        cv2.rectangle(
+            frame,
+            (int(x1), label_y - th - 6),
+            (int(x1) + tw + 8, label_y + baseline),
+            color,
+            -1
+        )
+        cv2.putText(
+            frame,
+            label,
+            (int(x1) + 4, label_y - 2),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            font_scale,
+            (0, 0, 0) if category in ("plant", "phone", "group", "crowd") else (255, 255, 255),
+            font_thickness
+        )
 
 def get_color_for_category(category):
     """Get color for drawing bounding boxes"""
@@ -1191,6 +1832,10 @@ def get_color_for_category(category):
         "person": (0, 255, 0),      # Green
         "vehicle": (255, 165, 0),   # Orange
         "animal": (0, 255, 255),    # Yellow
+        "plant": (72, 187, 120),    # Light green
+        "phone": (59, 130, 246),    # Blue
+        "group": (168, 85, 247),    # Purple
+        "crowd": (236, 72, 153),    # Pink / magenta
         "weapon": (0, 0, 255)       # Red
     }
     return colors.get(category, (255, 255, 255))
@@ -1204,6 +1849,9 @@ def save_detections(detections):
             "timestamp": datetime.now().isoformat(),
             "detections": detections,
             "count": len(detections),
+            "people_count": sum(1 for d in detections if d.get('category') == 'person'),
+            "group_count": sum(1 for d in detections if d.get('category') == 'group'),
+            "crowd_count": sum(1 for d in detections if d.get('category') == 'crowd'),
             "status": "active"
         }
         
@@ -1277,9 +1925,55 @@ def save_detections(detections):
         # Only log errors occasionally to avoid spam
         pass  # Silently fail - detections will be saved on next attempt
 
+def save_live_frame(frame, frame_count):
+    """Fast ping-pong JPEG save for the web live view (avoids Windows file-lock delays)."""
+    if frame is None or frame.size == 0:
+        return False
+
+    use_alt = (frame_count // max(FRAME_SAVE_INTERVAL, 1)) % 2
+    target = FRAME_FILE_ALT if use_alt else FRAME_FILE
+    fallback = FRAME_FILE if use_alt else FRAME_FILE_ALT
+    params = [cv2.IMWRITE_JPEG_QUALITY, LIVE_JPEG_QUALITY]
+
+    try:
+        if cv2.imwrite(target, frame, params):
+            return True
+        return cv2.imwrite(fallback, frame, params)
+    except Exception:
+        try:
+            return cv2.imwrite(fallback, frame, params)
+        except Exception:
+            return False
+
+
+def read_latest_rtsp_frame(cap, flush_grabs=RTSP_FLUSH_GRABS):
+    """Drop buffered RTSP frames and return the newest decodable one."""
+    ret = False
+    frame = None
+    with open(os.devnull, 'w') as devnull:
+        old_stderr = sys.stderr
+        try:
+            sys.stderr = devnull
+            for _ in range(max(1, flush_grabs)):
+                if not cap.grab():
+                    break
+            for _ in range(3):
+                ret, frame = cap.retrieve()
+                if ret and frame is not None and is_valid_frame(frame):
+                    break
+                if not cap.grab():
+                    break
+            if not ret or frame is None or not is_valid_frame(frame):
+                ret, frame = cap.read()
+        finally:
+            sys.stderr = old_stderr
+    return ret, frame
+
+
 def save_frame_atomic(frame, filepath):
     """Save frame atomically to prevent corruption"""
-    temp_file = filepath + ".tmp"
+    root, ext = os.path.splitext(filepath)
+    temp_file = f"{root}.tmp{ext or '.jpg'}"
     
     try:
         # Ensure frame is valid before saving
@@ -1307,7 +2001,7 @@ def save_frame_atomic(frame, filepath):
         
         # Use higher quality for better image clarity
         encode_params = [
-            cv2.IMWRITE_JPEG_QUALITY, 95,  # High quality for accurate 4K video
+            cv2.IMWRITE_JPEG_QUALITY, 95,
         ]
         
         # Save to temporary file first
@@ -1326,8 +2020,8 @@ def save_frame_atomic(frame, filepath):
         if not os.path.exists(temp_file):
             return False
         
-        # Wait a moment to ensure file is fully written
-        time.sleep(0.01)
+        # Brief wait to ensure file is fully flushed on disk
+        time.sleep(0.002)
         
         # Verify file is complete by checking size and trying to read it back
         try:
@@ -1449,31 +2143,207 @@ def save_frame_atomic(frame, filepath):
         # Only print error occasionally to avoid spam
         return False
 
-def get_recording_filename():
-    """Generate filename for current recording chunk based on timestamp"""
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+def get_recording_bucket_start(dt=None):
+    """Floor a timestamp to the current 5-minute recording bucket."""
+    dt = dt or datetime.now()
+    bucket_minute = (dt.minute // (RECORDING_BUCKET_SECONDS // 60)) * (RECORDING_BUCKET_SECONDS // 60)
+    return dt.replace(minute=bucket_minute, second=0, microsecond=0)
+
+
+def get_recording_filename(dt=None):
+    """Generate filename for the current 5-minute recording bucket."""
+    bucket = get_recording_bucket_start(dt)
+    timestamp = bucket.strftime("%Y%m%d_%H%M%S")
     filename = f"recording_{timestamp}{RECORDING_EXTENSION}"
     return os.path.join(RECORDINGS_DIR, filename)
 
-def init_video_writer(width, height, fps=RECORDING_FPS):
+
+def estimate_recording_duration(filepath, frame_count=0, start_time=None, fps=None):
+    """Estimate clip duration. Prefer wall-clock for min-length checks."""
+    if start_time:
+        wall = max(0.0, time.time() - start_time)
+        if wall > 0:
+            return wall
+    write_fps = fps if fps and fps > 0 else RECORDING_FPS
+    if frame_count and frame_count > 0:
+        return frame_count / write_fps
+    try:
+        cap = cv2.VideoCapture(filepath)
+        if cap.isOpened():
+            file_fps = cap.get(cv2.CAP_PROP_FPS) or write_fps
+            frames = cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0
+            cap.release()
+            if file_fps > 0 and frames > 0:
+                return frames / file_fps
+    except Exception:
+        pass
+    return 0.0
+
+
+def remux_recording_faststart(filepath):
+    """Rewrite MP4 with moov at front for browser playback (requires ffmpeg)."""
+    ffmpeg = shutil.which('ffmpeg')
+    if not ffmpeg or not os.path.isfile(filepath):
+        return False
+
+    tmp_path = filepath + '.faststart.mp4'
+    try:
+        result = subprocess.run(
+            [
+                ffmpeg, '-y', '-i', filepath,
+                '-c', 'copy', '-movflags', '+faststart',
+                tmp_path,
+            ],
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+        if result.returncode != 0 or not os.path.isfile(tmp_path) or os.path.getsize(tmp_path) < 1024:
+            if os.path.exists(tmp_path):
+                os.remove(tmp_path)
+            return False
+        os.replace(tmp_path, filepath)
+        return True
+    except Exception as e:
+        if os.path.exists(tmp_path):
+            try:
+                os.remove(tmp_path)
+            except OSError:
+                pass
+        print(f"⚠ Faststart remux skipped: {e}")
+        return False
+
+
+def recording_has_moov(filepath):
+    """True when the MP4 container was finalized (required for browser play)."""
+    try:
+        with open(filepath, 'rb') as fh:
+            head = fh.read(min(1048576, os.path.getsize(filepath)))
+            if b'moov' in head:
+                return True
+            if os.path.getsize(filepath) > 1048576:
+                fh.seek(max(0, os.path.getsize(filepath) - 1048576))
+                return b'moov' in fh.read()
+    except OSError:
+        pass
+    return False
+
+
+def finalize_video_writer(writer_info, discard_short=True):
+    """Release writer and discard fragments that are too short."""
+    if writer_info is None:
+        return
+
+    writer, filename, start_time, frame_count, write_fps = writer_info
+    try:
+        if writer is not None:
+            writer.release()
+    except Exception as e:
+        print(f"✗ Error closing video writer: {e}")
+
+    if not filename or not os.path.exists(filename):
+        return
+
+    size = os.path.getsize(filename)
+    if size < 1024:
+        try:
+            os.remove(filename)
+            print(f"✓ Removed empty recording: {os.path.basename(filename)}")
+        except OSError as e:
+            print(f"✗ Error removing empty recording: {e}")
+        return
+
+    duration = estimate_recording_duration(
+        filename, frame_count=frame_count, start_time=start_time, fps=write_fps
+    )
+    if discard_short and duration < MIN_RECORDING_DURATION:
+        try:
+            os.remove(filename)
+            print(f"✓ Discarded short fragment ({duration:.0f}s wall): {os.path.basename(filename)}")
+        except OSError as e:
+            print(f"✗ Error removing short recording: {e}")
+        return
+
+    if remux_recording_faststart(filename):
+        print(f"✓ Faststart remux done: {os.path.basename(filename)}")
+    elif not recording_has_moov(filename):
+        print(f"⚠ Warning: {os.path.basename(filename)} may not play in browsers (missing moov)")
+
+    print(f"✓ Completed recording: {filename} ({duration:.0f}s wall-clock, {frame_count} frames @ {write_fps:.2f} fps)")
+
+
+def cleanup_short_recordings(min_duration=MIN_RECORDING_DURATION):
+    """Remove old tiny recording fragments left by restarts or failed sessions."""
+    if not os.path.exists(RECORDINGS_DIR):
+        return
+
+    removed = 0
+    for filename in os.listdir(RECORDINGS_DIR):
+        if not (filename.startswith("recording_") and filename.endswith(RECORDING_EXTENSION)):
+            continue
+        filepath = os.path.join(RECORDINGS_DIR, filename)
+        if not os.path.isfile(filepath):
+            continue
+        if os.path.getsize(filepath) < 1024:
+            try:
+                os.remove(filepath)
+                removed += 1
+            except OSError:
+                pass
+            continue
+        duration = estimate_recording_duration(filepath)
+        if duration > 0 and duration < min_duration:
+            try:
+                os.remove(filepath)
+                removed += 1
+                print(f"✓ Cleaned short recording ({duration:.0f}s): {filename}")
+            except OSError as e:
+                print(f"✗ Error cleaning short recording {filename}: {e}")
+
+    if removed:
+        print(f"✓ Removed {removed} short recording fragment(s)")
+
+
+def create_video_writer(filename, width, height, fps=RECORDING_FPS):
+    """Create a VideoWriter using a browser-compatible codec when possible."""
+    for codec in ('avc1', 'H264', 'mp4v'):
+        fourcc = cv2.VideoWriter_fourcc(*codec)
+        writer = cv2.VideoWriter(filename, fourcc, fps, (width, height))
+        if writer.isOpened():
+            if codec != RECORDING_CODEC:
+                print(f"  Recording codec: {codec}")
+            return writer
+        writer.release()
+    return None
+
+def init_video_writer(width, height, fps=None):
     """Initialize VideoWriter for recording"""
     if not ENABLE_RECORDING:
         return None
-    
+
+    write_fps = float(fps if fps is not None else RECORDING_FPS)
+    if write_fps <= 0:
+        write_fps = RECORDING_FPS
+
     try:
         # Ensure recordings directory exists
         os.makedirs(RECORDINGS_DIR, exist_ok=True)
-        
+
         # Get filename for new recording
         filename = get_recording_filename()
-        
-        # Define codec and create VideoWriter
-        fourcc = cv2.VideoWriter_fourcc(*RECORDING_CODEC)
-        writer = cv2.VideoWriter(filename, fourcc, fps, (width, height))
-        
-        if writer.isOpened():
-            print(f"✓ Started recording: {filename}")
-            return writer, filename, time.time()
+
+        # Overwrite any incomplete in-progress file for this bucket
+        if os.path.exists(filename) and not recording_has_moov(filename):
+            try:
+                os.remove(filename)
+            except OSError:
+                pass
+
+        writer = create_video_writer(filename, width, height, write_fps)
+
+        if writer is not None:
+            print(f"✓ Started recording ({write_fps:.2f} fps, 5-min bucket): {os.path.basename(filename)}")
+            return writer, filename, time.time(), 0, write_fps
         else:
             print(f"✗ Failed to initialize video writer for: {filename}")
             return None
@@ -1481,62 +2351,100 @@ def init_video_writer(width, height, fps=RECORDING_FPS):
         print(f"✗ Error initializing video writer: {e}")
         return None
 
+def scale_frame_for_display(frame):
+    """Keep native resolution when possible; downscale only if above display cap. Never upscale."""
+    height, width = frame.shape[:2]
+    if width <= 0 or height <= 0:
+        return frame
+
+    if width <= MAX_DISPLAY_WIDTH and height <= MAX_DISPLAY_HEIGHT:
+        return frame
+
+    scale = min(MAX_DISPLAY_WIDTH / width, MAX_DISPLAY_HEIGHT / height)
+    new_width = max(1, int(width * scale))
+    new_height = max(1, int(height * scale))
+    return cv2.resize(frame, (new_width, new_height), interpolation=cv2.INTER_AREA)
+
+
 def should_rotate_video(writer_info, chunk_duration=RECORDING_CHUNK_DURATION):
-    """Check if video chunk should be rotated"""
+    """Check if video chunk should be rotated."""
     if writer_info is None:
         return False
-    _, _, start_time = writer_info
-    return (time.time() - start_time) >= chunk_duration
+    _, filename, start_time, _frame_count = writer_info[:4]
+    if (time.time() - start_time) >= chunk_duration:
+        return True
+    expected_filename = get_recording_filename()
+    return os.path.basename(filename) != os.path.basename(expected_filename)
 
-def rotate_video_writer(writer_info, width, height, fps=RECORDING_FPS):
-    """Close current video and start a new chunk"""
+
+def rotate_video_writer(writer_info, width, height, fps=None):
+    """Close current video and start a new chunk."""
+    write_fps = fps
+    if write_fps is None and writer_info is not None:
+        write_fps = writer_info[4] if len(writer_info) > 4 else RECORDING_FPS
     if writer_info is None:
-        return init_video_writer(width, height, fps)
-    
-    writer, old_filename, _ = writer_info
-    
-    try:
-        if writer is not None:
-            writer.release()
-            # Verify file was created and has content
-            if os.path.exists(old_filename) and os.path.getsize(old_filename) > 0:
-                print(f"✓ Completed recording chunk: {old_filename}")
-            else:
-                print(f"⚠ Warning: Recording chunk may be empty: {old_filename}")
-    except Exception as e:
-        print(f"✗ Error closing video writer: {e}")
-    
-    # Cleanup old recordings
-    cleanup_old_recordings()
-    
-    # Start new recording
-    return init_video_writer(width, height, fps)
+        return init_video_writer(width, height, write_fps)
 
-def cleanup_old_recordings(max_keep=MAX_RECORDINGS_TO_KEEP):
-    """Remove old recording files, keeping only the most recent ones"""
+    finalize_video_writer(writer_info, discard_short=True)
+    cleanup_old_recordings()
+    return init_video_writer(width, height, write_fps)
+
+def get_recording_file_age_seconds(filepath):
+    """Return age of a recording file in seconds (from filename timestamp or mtime)."""
+    name = os.path.basename(filepath)
+    if name.startswith("recording_") and name.endswith(RECORDING_EXTENSION):
+        stamp = name[len("recording_"):-len(RECORDING_EXTENSION)]
+        if len(stamp) == 15 and "_" in stamp:
+            try:
+                recorded_at = datetime.strptime(stamp, "%Y%m%d_%H%M%S")
+                return max(0.0, (datetime.now() - recorded_at).total_seconds())
+            except ValueError:
+                pass
+    try:
+        return max(0.0, time.time() - os.path.getmtime(filepath))
+    except OSError:
+        return None
+
+
+def cleanup_old_recordings(retention_days=RECORDING_RETENTION_DAYS):
+    """Remove recording files older than the retention window."""
     if not os.path.exists(RECORDINGS_DIR):
         return
-    
+
+    cutoff_seconds = max(1, int(retention_days)) * 86400
+    removed = 0
+
     try:
-        # Get all recording files
-        recordings = []
         for filename in os.listdir(RECORDINGS_DIR):
-            if filename.startswith("recording_") and filename.endswith(RECORDING_EXTENSION):
-                filepath = os.path.join(RECORDINGS_DIR, filename)
-                if os.path.isfile(filepath):
-                    recordings.append((filepath, os.path.getmtime(filepath)))
-        
-        # Sort by modification time (newest first)
-        recordings.sort(key=lambda x: x[1], reverse=True)
-        
-        # Remove old files beyond max_keep
-        if len(recordings) > max_keep:
-            for filepath, _ in recordings[max_keep:]:
+            if not (filename.startswith("recording_") and filename.endswith(RECORDING_EXTENSION)):
+                continue
+            filepath = os.path.join(RECORDINGS_DIR, filename)
+            if not os.path.isfile(filepath):
+                continue
+
+            try:
+                size = os.path.getsize(filepath)
+            except OSError:
+                continue
+
+            age_seconds = get_recording_file_age_seconds(filepath)
+            expired = age_seconds is not None and age_seconds > cutoff_seconds
+            empty = size < 1024
+
+            if expired or empty:
                 try:
                     os.remove(filepath)
-                    print(f"✓ Removed old recording: {os.path.basename(filepath)}")
+                    removed += 1
+                    if expired:
+                        days_old = int(age_seconds // 86400)
+                        print(f"✓ Removed expired recording ({days_old}d old): {filename}")
+                    else:
+                        print(f"✓ Removed empty recording: {filename}")
                 except Exception as e:
                     print(f"✗ Error removing old recording {filepath}: {e}")
+
+        if removed:
+            print(f"✓ Retention cleanup complete ({removed} file(s) removed, keep {retention_days} days)")
     except Exception as e:
         print(f"✗ Error during recording cleanup: {e}")
 
@@ -1622,10 +2530,8 @@ def try_http_snapshot_fallback():
     """Try HTTP snapshot as fallback when RTSP fails - REOLINK cameras work better with HTTP"""
     if not REQUESTS_AVAILABLE:
         return None
-    
-    camera_ip = "172.22.0.187"
-    username = "admin"
-    password = "admin123"
+
+    camera_ip, username, password = get_active_camera_credentials()
     
     # REOLINK HTTP snapshot URLs (prioritize known working format)
     # Tested: http://172.22.0.187/cgi-bin/api.cgi?cmd=Snap&channel=0&rs=wuuPhkmUCeI9WP7T&user=admin&password=admin123
@@ -1691,29 +2597,13 @@ def try_http_snapshot_fallback():
 def connect_to_stream(url, timeout=STREAM_TIMEOUT):
     """Connect to RTSP stream with optimized settings for HEVC/H.264"""
     print(f"Connecting to camera stream: {url}")
-    
-    # For REOLINK cameras, try HTTP snapshot FIRST (more reliable than RTSP)
-    # RTSP often has authentication issues with OpenCV
-    print("  Trying HTTP snapshot first (more reliable for REOLINK cameras)...")
-    http_result = try_http_snapshot_fallback()
-    if http_result:
-        snap_url, test_img = http_result
-        print(f"\n  ✓ HTTP snapshot mode working - using this method")
-        print(f"  Note: Updates every 1-2 seconds (stable and reliable)")
-        try:
-            save_frame_atomic(test_img, FRAME_FILE)
-        except:
-            pass
-        return "HTTP_SNAPSHOT_MODE"
-    
-    print("  HTTP snapshot failed, trying RTSP stream...")
+    print("  Trying RTSP first for lowest live-view latency...")
     
     # Build comprehensive list of REOLINK RTSP URL variants
     # REOLINK cameras support multiple URL formats - try all common ones
     # Note: Some formats may need authentication in URL, others may need separate auth
     url_variants = []
-    base_rtsp = "rtsp://admin:admin123@172.22.0.187:554"
-    base_rtsp_no_auth = "rtsp://172.22.0.187:554"  # Try without auth in URL (auth via DESCRIBE)
+    base_rtsp, base_rtsp_no_auth = get_rtsp_bases(url)
     
     # REOLINK common formats (try most common first)
     # Try URLs without auth in URL first (some cameras prefer auth via RTSP DESCRIBE)
@@ -1792,17 +2682,17 @@ def connect_to_stream(url, timeout=STREAM_TIMEOUT):
     # Use TCP transport for reliability, longer timeouts for connection
     os.environ['OPENCV_FFMPEG_CAPTURE_OPTIONS'] = (
         'rtsp_transport;tcp|'
-        'timeout;10000000|'  # 10 second timeout for connection
-        'stimeout;10000000|'  # 10 second socket timeout
-        'max_delay;500000|'
+        'timeout;5000000|'
+        'stimeout;5000000|'
+        'max_delay;0|'
         'fflags;nobuffer|'
         'flags;low_delay|'
         'err_detect;ignore_err|'
         'error;0|'
-        'thread_queue_size;512|'
-        'skip_frame;default|'
-        'skip_idct;default|'
-        'skip_loop_filter;default'
+        'thread_queue_size;64|'
+        'reorder_queue_size;0|'
+        'probesize;32768|'
+        'analyzeduration;0'
     )
     
     # Suppress FFmpeg verbose output
@@ -1823,12 +2713,12 @@ def connect_to_stream(url, timeout=STREAM_TIMEOUT):
                 cap = cv2.VideoCapture(test_url, cv2.CAP_FFMPEG)
                 
                 # For URLs without auth, try to set credentials via environment or properties
-                if "@" not in test_url and "admin" not in test_url:
-                    # Some cameras need auth set via OpenCV properties (if supported)
+                if "@" not in test_url:
+                    _, rtsp_user, rtsp_pass = get_active_camera_credentials()
                     try:
-                        cap.set(cv2.CAP_PROP_USERNAME, "admin")
-                        cap.set(cv2.CAP_PROP_PASSWORD, "admin123")
-                    except:
+                        cap.set(cv2.CAP_PROP_USERNAME, rtsp_user)
+                        cap.set(cv2.CAP_PROP_PASSWORD, rtsp_pass)
+                    except Exception:
                         pass  # Not all backends support this
             
             # Set properties for absolute lowest latency
@@ -1868,6 +2758,7 @@ def connect_to_stream(url, timeout=STREAM_TIMEOUT):
                 
                 if ret and test_frame is not None and is_valid_frame(test_frame):
                     print(f"  ✓ Found working URL: {test_url}")
+                    print(f"  ✓ Using RTSP live stream (low latency)")
                     working_url = test_url
                     break
                 else:
@@ -1894,7 +2785,7 @@ def connect_to_stream(url, timeout=STREAM_TIMEOUT):
         if http_result:
             snap_url, test_img = http_result
             print(f"\n  ✓ Using HTTP snapshot fallback mode")
-            print(f"  Note: This is slower than RTSP but will work for basic monitoring")
+            print(f"  Note: ~{HTTP_SNAPSHOT_INTERVAL:.2f}s between frames (RTSP unavailable)")
             # Return a special marker to indicate HTTP mode
             return "HTTP_SNAPSHOT_MODE"
         
@@ -1910,11 +2801,15 @@ def connect_to_stream(url, timeout=STREAM_TIMEOUT):
                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (200, 200, 200), 1)
         save_frame_atomic(placeholder, FRAME_FILE)
         save_detections([])
+        parsed = urlparse(RTSP_URL)
+        host = parsed.hostname or "camera-host"
+        user = parsed.username or "username"
+        password = parsed.password or "password"
         print(f"\n  Possible solutions:")
-    print(f"  1. Check camera IP: 172.22.0.187")
-        print(f"  2. Verify credentials: admin / admin123")
-    print(f"  3. Test in VLC: rtsp://admin:admin123@172.22.0.187:554/cam/realmonitor?channel=1&subtype=1")
-    print(f"  4. Check camera web interface: http://172.22.0.187")
+        print(f"  1. Check camera IP: {host}")
+        print(f"  2. Verify credentials: {user} / {password}")
+        print(f"  3. Test in VLC: rtsp://{user}:{password}@{host}:554/cam/realmonitor?channel=1&subtype=1")
+        print(f"  4. Check camera web interface: http://{host}")
         print(f"  5. Verify camera is powered on and connected to network")
         print(f"  6. Check firewall settings")
         return None
@@ -2035,6 +2930,7 @@ def remove_lock():
 
 def main():
     """Main detection loop with robust error handling and auto-reconnection"""
+    global FRAME_WIDTH, FRAME_HEIGHT
     print("=" * 60)
     print("YOLO Object Detection System")
     print("=" * 60)
@@ -2047,6 +2943,7 @@ def main():
     atexit.register(remove_lock)
     
     print("Initializing...")
+    configure_camera_source()
     
     # Load model (offline after first download)
     model = load_yolo_model()
@@ -2066,6 +2963,12 @@ def main():
         try:
             os.makedirs(RECORDINGS_DIR, exist_ok=True)
             print(f"✓ Recordings directory ready: {RECORDINGS_DIR}")
+            cleanup_short_recordings()
+            cleanup_old_recordings()
+            print(f"✓ Recording policy: {RECORDING_CHUNK_DURATION // 60}-min segments, min {MIN_RECORDING_DURATION // 60} min kept")
+            print(f"✓ Retention policy: auto-delete after {RECORDING_RETENTION_DAYS} days")
+            print(f"  HTTP recording: {HTTP_RECORDING_FPS:.2f} fps (snapshot every {HTTP_SNAPSHOT_INTERVAL:.1f}s)")
+            print(f"  RTSP recording: {RECORDING_FPS} fps")
         except Exception as e:
             print(f"Warning: Could not create recordings directory: {e}")
             print("Recording will be disabled")
@@ -2091,6 +2994,7 @@ def main():
     frame_count = 0
     last_detection_save = time.time()
     last_frame_time = time.time()
+    last_overlay_detections = []
     consecutive_failures = 0
     
     http_snapshot_url = None
@@ -2138,14 +3042,10 @@ def main():
         
         reconnect_count = 0
         consecutive_failures = 0
+        consecutive_decode_failures = 0
         
-        # Initialize video recording
-        if ENABLE_RECORDING:
-            video_writer_info = init_video_writer(FRAME_WIDTH, FRAME_HEIGHT, RECORDING_FPS)
-            if video_writer_info is None:
-                print("⚠ Warning: Video recording initialization failed, continuing without recording")
-        else:
-            video_writer_info = None
+        # Initialize video recording on first valid frame (uses actual display size)
+        video_writer_info = None
         
         try:
             while True:
@@ -2153,12 +3053,13 @@ def main():
                     # HTTP snapshot mode - fetch snapshot periodically with proper validation
                     ret = False
                     frame = None
+                    _, http_user, http_pass = get_active_camera_credentials()
                     try:
                         # Try without auth first (for URLs with auth in query string)
                         if 'user=' in http_snapshot_url and 'password=' in http_snapshot_url:
                             response = requests.get(http_snapshot_url, timeout=5)
                         else:
-                            response = requests.get(http_snapshot_url, auth=HTTPDigestAuth("admin", "admin123"), timeout=5)
+                            response = requests.get(http_snapshot_url, auth=HTTPDigestAuth(http_user, http_pass), timeout=5)
                         
                         if response.status_code == 200 and len(response.content) > 1000:
                             # Validate JPEG data before decoding
@@ -2187,7 +3088,7 @@ def main():
                         # Try with basic auth as fallback
                         try:
                             if 'user=' not in http_snapshot_url or 'password=' not in http_snapshot_url:
-                                response = requests.get(http_snapshot_url, auth=HTTPBasicAuth("admin", "admin123"), timeout=5)
+                                response = requests.get(http_snapshot_url, auth=HTTPBasicAuth(http_user, http_pass), timeout=5)
                                 if response.status_code == 200 and len(response.content) > 1000:
                                     if response.content[:2] == b'\xff\xd8':  # JPEG magic bytes
                                         img_array = np.frombuffer(response.content, np.uint8)
@@ -2219,19 +3120,11 @@ def main():
                         time.sleep(1)
                         continue
                     
-                    # Add delay between HTTP snapshot requests (1-2 seconds)
-                    time.sleep(1.5)
+                    # Pace snapshots so recorded FPS matches real elapsed time
+                    time.sleep(HTTP_SNAPSHOT_INTERVAL)
                 else:
-                    # RTSP mode - read from video stream
-                    # Aggressively suppress ALL FFmpeg H.264 decoding errors during frame read
-                    # Complete stderr redirection to devnull eliminates all error spam
-                    with open(os.devnull, 'w') as devnull:
-                        old_stderr = sys.stderr
-                        try:
-                            sys.stderr = devnull
-                            ret, frame = cap.read()
-                        finally:
-                            sys.stderr = old_stderr
+                    # RTSP mode - read newest frame (flush stale buffer for lower latency)
+                    ret, frame = read_latest_rtsp_frame(cap)
                 
                 # Also suppress any Python warnings that might appear
                 with warnings.catch_warnings():
@@ -2246,38 +3139,34 @@ def main():
                     time.sleep(0.1)
                     continue
                 
-                # Validate frame quality (skip corrupted frames from HEVC errors)
+                # Validate frame quality (skip corrupted frames from HEVC/H.264 errors)
                 if not is_valid_frame(frame):
                     consecutive_failures += 1
-                    if consecutive_failures > 15:  # Allow more failures due to HEVC errors
+                    consecutive_decode_failures += 1
+                    if consecutive_decode_failures >= MAX_DECODE_FAILURES_BEFORE_RECONNECT:
+                        print(f"Too many decode errors ({consecutive_decode_failures}). Reconnecting RTSP...")
+                        break
+                    if consecutive_failures > 15:
                         print(f"Received {consecutive_failures} corrupted frames. Reconnecting...")
                         break
-                    # Skip corrupted frame - HEVC errors are common but we continue
-                    # No sleep - process immediately for lowest latency
                     continue
                 
                 # Reset failure count on valid frame
                 consecutive_failures = 0
+                consecutive_decode_failures = 0
                 
-                # Resize frame for better display quality (optimized for speed)
+                # Scale for web display — preserve sharpness, never upscale low-res streams
                 try:
+                    frame = scale_frame_for_display(frame)
                     current_height, current_width = frame.shape[:2]
-                    # Only resize if dimensions don't match (skip if already correct size)
-                    if current_width != FRAME_WIDTH or current_height != FRAME_HEIGHT:
-                        if current_width > 0 and current_height > 0:
-                            # Use faster interpolation for lower latency
-                            if current_width < FRAME_WIDTH or current_height < FRAME_HEIGHT:
-                                # Upscaling sub-stream - use INTER_LINEAR for speed (sub-stream is already small)
-                                frame = cv2.resize(frame, (FRAME_WIDTH, FRAME_HEIGHT), interpolation=cv2.INTER_LINEAR)
-                            else:
-                                # Downscaling - use area interpolation
-                                frame = cv2.resize(frame, (FRAME_WIDTH, FRAME_HEIGHT), interpolation=cv2.INTER_AREA)
-                        else:
-                            print(f"Invalid frame dimensions: {current_width}x{current_height}")
-                            consecutive_failures += 1
-                            continue
+                    if current_width <= 0 or current_height <= 0:
+                        print(f"Invalid frame dimensions: {current_width}x{current_height}")
+                        consecutive_failures += 1
+                        continue
+                    FRAME_WIDTH = current_width
+                    FRAME_HEIGHT = current_height
                 except Exception as e:
-                    print(f"Error resizing frame: {e}")
+                    print(f"Error scaling frame: {e}")
                     consecutive_failures += 1
                     continue
                 
@@ -2287,103 +3176,72 @@ def main():
                 # cv2.putText(frame, timestamp, (10, 30), 
                 #            cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
                 
-                # Save frame IMMEDIATELY for lowest latency (before detection)
-                # This ensures web interface gets latest frame without waiting for detection
-                saved = False
                 current_time = time.time()
+
+                # Live web view: save immediately before detection/recording (lowest latency)
+                if save_live_frame(frame, frame_count):
+                    last_frame_time = current_time
                 
                 # Write frame to video recording (before saving for display)
-                if ENABLE_RECORDING and video_writer_info is not None:
+                if ENABLE_RECORDING:
                     try:
-                        # Check if we need to rotate to a new video chunk
-                        if should_rotate_video(video_writer_info, RECORDING_CHUNK_DURATION):
-                            video_writer_info = rotate_video_writer(video_writer_info, FRAME_WIDTH, FRAME_HEIGHT, RECORDING_FPS)
-                        
-                        # Write frame to current video
+                        recording_fps = HTTP_RECORDING_FPS if http_mode else RECORDING_FPS
+                        if video_writer_info is None:
+                            video_writer_info = init_video_writer(FRAME_WIDTH, FRAME_HEIGHT, recording_fps)
+                            if video_writer_info is None:
+                                print("⚠ Warning: Video recording initialization failed, continuing without recording")
                         if video_writer_info is not None:
-                            writer, _, _ = video_writer_info
+                            if should_rotate_video(video_writer_info, RECORDING_CHUNK_DURATION):
+                                video_writer_info = rotate_video_writer(
+                                    video_writer_info, FRAME_WIDTH, FRAME_HEIGHT, recording_fps
+                                )
+                            writer, filename, start_time, recorded_frames, write_fps = video_writer_info
                             if writer is not None and writer.isOpened():
                                 writer.write(frame)
+                                video_writer_info = (writer, filename, start_time, recorded_frames + 1, write_fps)
                     except Exception as e:
-                        # Log error but don't stop processing
-                        if frame_count % 100 == 0:  # Only log occasionally
+                        if frame_count % 100 == 0:
                             print(f"⚠ Warning: Error writing to video: {e}")
                 
-                # CRITICAL: Save frame IMMEDIATELY for real-time viewing
-                # Save EVERY frame - this is essential for second-by-second updates
-                if frame_count % FRAME_SAVE_INTERVAL == 0:
-                    # Alternate between files based on frame count (prevents file locks)
-                    # This ensures web interface can always read fresh frames
-                    use_alt = (frame_count // FRAME_SAVE_INTERVAL) % 2
-                    if use_alt:
-                        target_file = FRAME_FILE_ALT
-                        alt_file = FRAME_FILE
-                    else:
-                        target_file = FRAME_FILE
-                        alt_file = FRAME_FILE_ALT
-                    
-                    # Direct save - optimized for REAL-TIME performance with sub-stream
-                    try:
-                        # Quality 95: High quality for accurate feed display (minimal compression artifacts)
-                        # Higher quality ensures accurate representation of camera feed
-                        encode_params = [cv2.IMWRITE_JPEG_QUALITY, 95]
-                        
-                        # Try to save to target file first
-                        try:
-                            saved = cv2.imwrite(target_file, frame, encode_params)
-                        except Exception:
-                            saved = False
-                        
-                        # If that failed, try alternate file immediately
-                        if not saved:
-                            try:
-                                saved = cv2.imwrite(alt_file, frame, encode_params)
-                            except Exception:
-                                saved = False
-                    except Exception:
-                        saved = False
-                    
-                    if saved:
-                        last_frame_time = current_time
-                        # Frame saved - web interface will pick it up immediately
-                
-                # Run YOLO detection only on every Nth frame to reduce latency
-                # Detection happens AFTER frame is saved, so it doesn't delay display
+                # Run YOLO periodically; reuse last overlay on every frame to avoid box flicker.
                 detections = []
                 if ENABLE_DETECTION and frame_count % DETECTION_INTERVAL == 0:
-                    # Run detection on this frame
                     try:
                         if USE_ULTRALYTICS:
-                            results = model(frame, verbose=False)
+                            results = model(
+                                frame,
+                                verbose=False,
+                                conf=min(CONFIDENCE_THRESHOLD, PLANT_CONFIDENCE_THRESHOLD, PHONE_CONFIDENCE_THRESHOLD),
+                                classes=YOLO_TARGET_CLASS_IDS,
+                                imgsz=640,
+                            )
                         else:
                             results = model(frame)
-                        # Process detections and draw bounding boxes
                         detections = process_detections(results, frame)
-                        
-                        # Update frame with detection info and save again with boxes
-                        if detections:
-                            cv2.putText(frame, f"Objects: {len(detections)}", (10, 60), 
-                                       cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
-                            # Save frame again with bounding boxes (optional - for better visualization)
-                            # This is a second save, so it doesn't delay the initial display
+                        detections = enhance_phone_detections(frame, model, detections)
+                        detections = analyze_crowds_and_groups(frame, detections)
+                        detections = enrich_detections_for_display(detections)
+                        last_overlay_detections = detections
+                        # Always refresh detections.json so the UI stays in sync
+                        if current_time - last_detection_save >= 0.5:
                             try:
-                                cv2.imwrite(target_file, frame, encode_params)
-                            except:
+                                save_detections(detections)
+                                if detections:
+                                    cleanup_old_object_images()
+                                    print(f"[{datetime.now().strftime('%H:%M:%S')}] ✓ Detected {len(detections)} object(s)")
+                                last_detection_save = current_time
+                            except Exception:
                                 pass
                     except Exception as e:
                         print(f"Error running detection: {e}")
-                        # Continue - frame already saved
-                
-                # Save detections more frequently for faster updates
-                if detections and (current_time - last_detection_save >= 0.5):  # Save every 0.5s when detections exist
-                    try:
-                        save_detections(detections)
-                        cleanup_old_object_images()
-                        last_detection_save = current_time
-                        print(f"[{datetime.now().strftime('%H:%M:%S')}] ✓ Detected {len(detections)} objects")
-                    except Exception:
-                        pass
-                
+
+                if last_overlay_detections:
+                    draw_detections_on_frame(frame, last_overlay_detections)
+                    cv2.putText(frame, f"Objects: {len(last_overlay_detections)}", (10, 60),
+                               cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+                    # Refresh live view with detection overlay (non-blocking for next frame)
+                    save_live_frame(frame, frame_count + 1)
+
                 frame_count += 1
                 
                 # No delay - process frames as fast as possible for lowest latency
@@ -2407,26 +3265,13 @@ def main():
             print(f"\n✗ Error in detection loop: {e}")
             # Close video writer before reconnecting
             if video_writer_info is not None:
-                try:
-                    writer, filename, _ = video_writer_info
-                    if writer is not None:
-                        writer.release()
-                except:
-                    pass
+                finalize_video_writer(video_writer_info, discard_short=True)
                 video_writer_info = None
             print("Reconnecting in 3 seconds...")
             time.sleep(RECONNECT_DELAY)
         finally:
-            # Close video writer if recording
             if video_writer_info is not None:
-                try:
-                    writer, filename, _ = video_writer_info
-                    if writer is not None:
-                        writer.release()
-                        if os.path.exists(filename) and os.path.getsize(filename) > 0:
-                            print(f"✓ Finalized recording: {filename}")
-                except Exception as e:
-                    print(f"✗ Error closing video writer: {e}")
+                finalize_video_writer(video_writer_info, discard_short=True)
                 video_writer_info = None
             
             if cap is not None:

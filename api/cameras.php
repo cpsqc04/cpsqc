@@ -50,8 +50,17 @@ function saveCameras($cameras) {
     usort($cameras, function($a, $b) {
         return strcmp($a['cameraId'], $b['cameraId']);
     });
-    file_put_contents($camerasFile, json_encode($cameras, JSON_PRETTY_PRINT));
+    file_put_contents($camerasFile, json_encode($cameras, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
     return true;
+}
+
+function buildRtspUrl(string $ip, string $port, string $username, string $password, string $streamType): string
+{
+    $streamPath = $streamType === 'main' ? 'Preview_01_main' : 'Preview_01_sub';
+    $encodedUser = rawurlencode($username);
+    $encodedPass = rawurlencode($password);
+
+    return "rtsp://{$encodedUser}:{$encodedPass}@{$ip}:{$port}/{$streamPath}";
 }
 
 $method = $_SERVER['REQUEST_METHOD'];
@@ -89,9 +98,7 @@ if ($method === 'GET') {
     $username = $data['username'] ?? '';
     $password = $data['password'] ?? '';
     $streamType = $data['streamType'] ?? 'sub';
-    
-    $streamPath = $streamType === 'main' ? 'h264Preview_01_main' : 'h264Preview_01_sub';
-    $rtspUrl = "rtsp://{$username}:{$password}@{$ip}:{$port}/{$streamPath}";
+    $rtspUrl = buildRtspUrl($ip, $port, $username, $password, $streamType);
     
     $newCamera = [
         'id' => $newId,
@@ -130,20 +137,21 @@ if ($method === 'GET') {
             $camera['ipAddress'] = $data['ipAddress'] ?? $camera['ipAddress'];
             $camera['port'] = $data['port'] ?? $camera['port'];
             $camera['username'] = $data['username'] ?? $camera['username'];
-            $camera['password'] = $data['password'] ?? $camera['password'];
+            if (isset($data['password']) && $data['password'] !== '') {
+                $camera['password'] = $data['password'];
+            }
             $camera['streamType'] = $data['streamType'] ?? $camera['streamType'];
             $camera['status'] = $data['status'] ?? $camera['status'];
             $camera['description'] = $data['description'] ?? $camera['description'];
             $camera['updatedAt'] = date('Y-m-d H:i:s');
-            
-            // Rebuild RTSP URL
-            $ip = $camera['ipAddress'];
-            $port = $camera['port'];
-            $username = $camera['username'];
-            $password = $camera['password'];
-            $streamType = $camera['streamType'];
-            $streamPath = $streamType === 'main' ? 'h264Preview_01_main' : 'h264Preview_01_sub';
-            $camera['rtspUrl'] = "rtsp://{$username}:{$password}@{$ip}:{$port}/{$streamPath}";
+
+            $camera['rtspUrl'] = buildRtspUrl(
+                $camera['ipAddress'],
+                $camera['port'],
+                $camera['username'],
+                $camera['password'],
+                $camera['streamType']
+            );
             
             $found = true;
             break;

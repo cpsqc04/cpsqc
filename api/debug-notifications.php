@@ -63,7 +63,7 @@ try {
     
     // Check volunteers
     try {
-        $stmt = $pdo->query("SELECT COUNT(*) as count FROM volunteers WHERE created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)");
+        $stmt = $pdo->query("SELECT COUNT(*) as count FROM nw_members WHERE created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)");
         $result = $stmt->fetch(PDO::FETCH_ASSOC);
         $activities['volunteers'] = (int)$result['count'];
     } catch (PDOException $e) {

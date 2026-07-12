@@ -6,6 +6,8 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
     header('Location: login.php');
     exit;
 }
+
+require_once __DIR__ . '/db.php';
 ?>
 <!doctype html>
 <html lang="en">
@@ -16,6 +18,8 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
     <link rel="icon" type="image/x-icon" href="images/favicon.ico">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="css/theme.css">
+    <link rel="stylesheet" href="css/admin-sidebar.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <style>
         body {
             margin: 0;
@@ -1011,80 +1015,70 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             line-height: 1.6;
         }
         
-        .dashboard-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        .dashboard-charts {
+            display: flex;
+            flex-direction: column;
             gap: 1.5rem;
             margin-bottom: 2rem;
         }
-        
-        .stat-card {
+
+        .dashboard-charts-row {
+            display: grid;
+            gap: 1.5rem;
+        }
+
+        .dashboard-charts-row--summary {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+
+        .dashboard-charts-row--trends {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        @media (max-width: 1100px) {
+            .dashboard-charts-row--summary {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+        }
+
+        @media (max-width: 768px) {
+            .dashboard-charts-row--summary,
+            .dashboard-charts-row--trends {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .chart-card {
             background: var(--card-bg);
             border: 1px solid var(--border-color);
             border-radius: 12px;
-            padding: 1.5rem;
+            padding: 1.25rem 1.5rem 1.5rem;
             box-shadow: 0 2px 8px var(--shadow);
-            transition: all 0.3s ease;
-            cursor: pointer;
+            min-width: 0;
         }
-        
-        .stat-card:hover {
-            transform: translateY(-4px);
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-        }
-        
-        .stat-card-header {
+
+        .chart-card-header {
             display: flex;
             align-items: center;
             justify-content: space-between;
             margin-bottom: 1rem;
+            gap: 1rem;
         }
-        
-        .stat-card-icon {
-            width: 50px;
-            height: 50px;
-            border-radius: 10px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.5rem;
-            color: #fff;
-        }
-        
-        .stat-card-icon.members { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
-        .stat-card-icon.complaints { background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); }
-        .stat-card-icon.volunteers { background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); }
-        .stat-card-icon.events { background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); }
-        .stat-card-icon.tips { background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); }
-        .stat-card-icon.cameras { background: linear-gradient(135deg, #30cfd0 0%, #330867 100%); }
-        
-        .stat-card-value {
-            font-size: 2rem;
-            font-weight: 700;
-            color: var(--tertiary-color);
+
+        .chart-card-header h3 {
             margin: 0;
+            font-size: 1.05rem;
+            font-weight: 600;
+            color: var(--tertiary-color);
         }
-        
-        .stat-card-label {
-            font-size: 0.9rem;
-            color: var(--text-secondary);
-            margin: 0.5rem 0 0 0;
+
+        .chart-wrapper {
+            position: relative;
+            height: 280px;
         }
-        
-        .stat-card-change {
-            font-size: 0.85rem;
-            margin-top: 0.5rem;
-            display: flex;
-            align-items: center;
-            gap: 0.25rem;
-        }
-        
-        .stat-card-change.positive {
-            color: #10b981;
-        }
-        
-        .stat-card-change.negative {
-            color: #ef4444;
+
+        .chart-wrapper.tall {
+            height: 320px;
         }
         
         .dashboard-section {
@@ -1309,7 +1303,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             </a>
             
             <!-- User Management Module (Admin Only) -->
-            <?php if (isset($_SESSION['user_role']) && $_SESSION['user_role'] === 'Admin'): ?>
+            <?php if (isAdminUser()): ?>
             <div class="nav-module <?php echo (basename($_SERVER['PHP_SELF']) == 'users.php' || basename($_SERVER['PHP_SELF']) == 'login-history.php') ? 'active' : ''; ?>">
                 <div class="nav-module-header" onclick="toggleModule(this)" data-tooltip="User Management">
                     <span class="nav-module-icon"><i class="fas fa-users-cog"></i></span>
@@ -1336,18 +1330,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                     <span class="arrow">▶</span>
                 </div>
                 <div class="nav-submodules">
-                    <a href="member-list.php" class="nav-submodule" data-tooltip="Member List">
-                        <span class="nav-submodule-icon"><i class="fas fa-clipboard-list"></i></span>
-                        <span class="nav-submodule-text">Member List</span>
-                    </a>
-                    <a href="activity-logs.php" class="nav-submodule" data-tooltip="Activity Logs">
-                        <span class="nav-submodule-icon"><i class="fas fa-chart-bar"></i></span>
-                        <span class="nav-submodule-text">Activity Logs</span>
-                    </a>
-                    <a href="incident-feed.php" class="nav-submodule" data-tooltip="Incident Feed">
-                        <span class="nav-submodule-icon"><i class="fas fa-exclamation-triangle"></i></span>
-                        <span class="nav-submodule-text">Incident Feed</span>
-                    </a>
+                    <?php require __DIR__ . '/includes/neighborhood_watch_nav_submodules.php'; ?>
                 </div>
             </div>
             
@@ -1358,10 +1341,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                     <span class="arrow">▶</span>
                 </div>
                 <div class="nav-submodules">
-                    <a href="open-surveillance-app.php" class="nav-submodule" data-tooltip="Open Surveillance App">
-                        <span class="nav-submodule-icon"><i class="fas fa-desktop"></i></span>
-                        <span class="nav-submodule-text">Open Surveillance App</span>
-                    </a>
+                    <?php $cctvNavActive = $cctvNavActive ?? ''; require __DIR__ . '/includes/cctv_nav_submodules.php'; ?>
                 </div>
             </div>
             
@@ -1383,23 +1363,6 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                 </div>
             </div>
             
-            <div class="nav-module">
-                <div class="nav-module-header" onclick="toggleModule(this)" data-tooltip="Volunteer Registry and Scheduling">
-                    <span class="nav-module-icon"><i class="fas fa-handshake"></i></span>
-                    <span class="nav-module-header-text">Volunteer Registry and Scheduling</span>
-                    <span class="arrow">▶</span>
-                </div>
-                <div class="nav-submodules">
-                    <a href="volunteer-list.php" class="nav-submodule" data-tooltip="Volunteer List">
-                        <span class="nav-submodule-icon"><i class="fas fa-user"></i></span>
-                        <span class="nav-submodule-text">Volunteer List</span>
-                    </a>
-                    <a href="schedule-management.php" class="nav-submodule" data-tooltip="Volunteer Request">
-                        <span class="nav-submodule-icon"><i class="fas fa-calendar"></i></span>
-                        <span class="nav-submodule-text">Volunteer Request</span>
-                    </a>
-                </div>
-            </div>
             
             <div class="nav-module">
                 <div class="nav-module-header" onclick="toggleModule(this)" data-tooltip="Patrol Scheduling and Monitoring">
@@ -1408,18 +1371,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                     <span class="arrow">▶</span>
                 </div>
                 <div class="nav-submodules">
-                    <a href="patrol-list.php" class="nav-submodule" data-tooltip="Patrol List">
-                        <span class="nav-submodule-icon"><i class="fas fa-list"></i></span>
-                        <span class="nav-submodule-text">Patrol List</span>
-                    </a>
-                    <a href="patrol-schedule.php" class="nav-submodule" data-tooltip="Patrol Schedule">
-                        <span class="nav-submodule-icon"><i class="fas fa-calendar-alt"></i></span>
-                        <span class="nav-submodule-text">Patrol Schedule</span>
-                    </a>
-                    <a href="patrol-logs.php" class="nav-submodule" data-tooltip="Patrol Logs">
-                        <span class="nav-submodule-icon"><i class="fas fa-file"></i></span>
-                        <span class="nav-submodule-text">Patrol Logs</span>
-                    </a>
+                    <?php $patrolNavActive = $patrolNavActive ?? ''; require __DIR__ . '/includes/patrol_nav_submodules.php'; ?>
                 </div>
             </div>
             
@@ -1480,7 +1432,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                     <span class="time-part" id="currentTime"></span>
                 </div>
                 <div class="notification-container">
-                    <button class="notification-bell" onclick="toggleNotifications()" aria-label="Notifications">
+                    <button class="notification-bell" type="button" onclick="toggleNotifications(event)" aria-label="Notifications">
                         <i class="fas fa-bell"></i>
                         <span class="notification-badge" id="notificationBadge"></span>
                     </button>
@@ -1505,75 +1457,44 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                 <h2>Overview</h2>
                 <p style="margin-bottom: 2rem; color: var(--text-secondary);">Welcome back! Here's what's happening in Barangay San Agustin, Quezon City.</p>
                 
-                <!-- Statistics Cards -->
-                <div class="dashboard-grid">
-                    <div class="stat-card" onclick="window.location.href='member-list.php'">
-                        <div class="stat-card-header">
-                            <div class="stat-card-icon members">
-                                <i class="fas fa-users"></i>
+                <!-- Analytics Charts -->
+                <div class="dashboard-charts">
+                    <div class="dashboard-charts-row dashboard-charts-row--summary">
+                        <div class="chart-card">
+                            <div class="chart-card-header">
+                                <h3>Complaints by Status</h3>
                             </div>
+                            <div class="chart-wrapper"><canvas id="complaintsStatusChart"></canvas></div>
                         </div>
-                        <h3 class="stat-card-value" id="totalMembers">0</h3>
-                        <p class="stat-card-label">Total Members</p>
-                        <div class="stat-card-change positive" id="membersTrend">
-                            <i class="fas fa-arrow-up"></i>
-                            <span>0 this month</span>
+
+                        <div class="chart-card">
+                            <div class="chart-card-header">
+                                <h3>Tips by Status</h3>
+                            </div>
+                            <div class="chart-wrapper"><canvas id="tipsStatusChart"></canvas></div>
+                        </div>
+
+                        <div class="chart-card">
+                            <div class="chart-card-header">
+                                <h3>Events Overview</h3>
+                            </div>
+                            <div class="chart-wrapper"><canvas id="eventsOverviewChart"></canvas></div>
                         </div>
                     </div>
-                    
-                    <div class="stat-card" onclick="window.location.href='track-complaint.php'">
-                        <div class="stat-card-header">
-                            <div class="stat-card-icon complaints">
-                                <i class="fas fa-file-alt"></i>
+
+                    <div class="dashboard-charts-row dashboard-charts-row--trends">
+                        <div class="chart-card">
+                            <div class="chart-card-header">
+                                <h3>Complaints — Last 7 Days</h3>
                             </div>
+                            <div class="chart-wrapper tall"><canvas id="complaintsTrendChart"></canvas></div>
                         </div>
-                        <h3 class="stat-card-value" id="totalComplaints">0</h3>
-                        <p class="stat-card-label">Active Complaints</p>
-                        <div class="stat-card-change positive" id="complaintsTrend">
-                            <i class="fas fa-arrow-down"></i>
-                            <span>0 resolved this week</span>
-                        </div>
-                    </div>
-                    
-                    <div class="stat-card" onclick="window.location.href='volunteer-list.php'">
-                        <div class="stat-card-header">
-                            <div class="stat-card-icon volunteers">
-                                <i class="fas fa-handshake"></i>
+
+                        <div class="chart-card">
+                            <div class="chart-card-header">
+                                <h3>Tips — Last 7 Days</h3>
                             </div>
-                        </div>
-                        <h3 class="stat-card-value" id="totalVolunteers">0</h3>
-                        <p class="stat-card-label">Active Volunteers</p>
-                        <div class="stat-card-change positive" id="volunteersTrend">
-                            <i class="fas fa-arrow-up"></i>
-                            <span>0 this month</span>
-                        </div>
-                    </div>
-                    
-                    <div class="stat-card" onclick="window.location.href='event-list.php'">
-                        <div class="stat-card-header">
-                            <div class="stat-card-icon events">
-                                <i class="fas fa-bullhorn"></i>
-                            </div>
-                        </div>
-                        <h3 class="stat-card-value" id="totalEvents">0</h3>
-                        <p class="stat-card-label">Upcoming Events</p>
-                        <div class="stat-card-change positive" id="eventsTrend">
-                            <i class="fas fa-calendar"></i>
-                            <span>0 this week</span>
-                        </div>
-                    </div>
-                    
-                    <div class="stat-card" onclick="window.location.href='review-tip.php'">
-                        <div class="stat-card-header">
-                            <div class="stat-card-icon tips">
-                                <i class="fas fa-comments"></i>
-                            </div>
-                        </div>
-                        <h3 class="stat-card-value" id="totalTips">0</h3>
-                        <p class="stat-card-label">Pending Tips</p>
-                        <div class="stat-card-change positive" id="tipsTrend">
-                            <i class="fas fa-arrow-up"></i>
-                            <span>0 this week</span>
+                            <div class="chart-wrapper tall"><canvas id="tipsTrendChart"></canvas></div>
                         </div>
                     </div>
                 </div>
@@ -1640,13 +1561,6 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                             </div>
                             <h4 class="quick-link-title">View Events</h4>
                         </a>
-                        
-                        <a href="activity-logs.php" class="quick-link-card">
-                            <div class="quick-link-icon">
-                                <i class="fas fa-chart-bar"></i>
-                            </div>
-                            <h4 class="quick-link-title">Activity Logs</h4>
-                        </a>
                     </div>
                 </div>
             </div>
@@ -1668,55 +1582,18 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
         });
         
         // Load dashboard statistics from API
+        let dashboardCharts = {};
+
         async function loadDashboardData() {
             try {
                 const response = await fetch('api/dashboard.php');
                 const data = await response.json();
                 
-                if (data.success && data.statistics) {
-                    const stats = data.statistics;
-                    const trends = data.trends || {};
-                    
-                    // Update stat cards
-                    document.getElementById('totalMembers').textContent = stats.totalMembers || 0;
-                    document.getElementById('totalComplaints').textContent = stats.activeComplaints || 0;
-                    document.getElementById('totalVolunteers').textContent = stats.activeVolunteers || 0;
-                    document.getElementById('totalEvents').textContent = stats.upcomingEvents || 0;
-                    document.getElementById('totalTips').textContent = stats.pendingTips || 0;
-                    
-                    // Update trends
-                    if (trends.membersTrend) {
-                        const membersTrendEl = document.getElementById('membersTrend');
-                        if (membersTrendEl) {
-                            membersTrendEl.querySelector('span').textContent = trends.membersTrend;
-                        }
+                if (data.success) {
+                    if (data.charts) {
+                        renderDashboardCharts(data.charts);
                     }
-                    if (trends.complaintsTrend) {
-                        const complaintsTrendEl = document.getElementById('complaintsTrend');
-                        if (complaintsTrendEl) {
-                            complaintsTrendEl.querySelector('span').textContent = trends.complaintsTrend;
-                        }
-                    }
-                    if (trends.volunteersTrend) {
-                        const volunteersTrendEl = document.getElementById('volunteersTrend');
-                        if (volunteersTrendEl) {
-                            volunteersTrendEl.querySelector('span').textContent = trends.volunteersTrend;
-                        }
-                    }
-                    if (trends.eventsTrend) {
-                        const eventsTrendEl = document.getElementById('eventsTrend');
-                        if (eventsTrendEl) {
-                            eventsTrendEl.querySelector('span').textContent = trends.eventsTrend;
-                        }
-                    }
-                    if (trends.tipsTrend) {
-                        const tipsTrendEl = document.getElementById('tipsTrend');
-                        if (tipsTrendEl) {
-                            tipsTrendEl.querySelector('span').textContent = trends.tipsTrend;
-                        }
-                    }
-                    
-                    // Update Recent Activity
+
                     if (data.recentActivity && Array.isArray(data.recentActivity)) {
                         displayRecentActivity(data.recentActivity);
                     }
@@ -1728,6 +1605,170 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                     activityList.innerHTML = '<div class="activity-empty" style="text-align: center; padding: 2rem; color: var(--text-secondary);"><p>Error loading activities</p></div>';
                 }
             }
+        }
+
+        function destroyDashboardCharts() {
+            Object.values(dashboardCharts).forEach(chart => {
+                if (chart) chart.destroy();
+            });
+            dashboardCharts = {};
+        }
+
+        function formatChartDate(dateStr) {
+            const date = new Date(dateStr + 'T00:00:00');
+            return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        }
+
+        function mapToChartData(dataObj, fallbackLabel) {
+            const entries = Object.entries(dataObj || {});
+            if (entries.length === 0) {
+                return {
+                    labels: [fallbackLabel || 'No data'],
+                    values: [0]
+                };
+            }
+            return {
+                labels: entries.map(([label]) => label),
+                values: entries.map(([, value]) => value)
+            };
+        }
+
+        function renderDashboardCharts(charts) {
+            if (typeof Chart === 'undefined') {
+                console.error('Chart.js is not loaded');
+                return;
+            }
+
+            destroyDashboardCharts();
+
+            const chartTheme = {
+                primary: '#4c8a89',
+                primaryDark: '#3d6f6e',
+                primaryLight: '#6baa91',
+                primaryLighter: '#8bc4a8',
+                accent: '#10b981',
+                muted: '#94a3b8'
+            };
+            const statusColors = [
+                chartTheme.primary,
+                chartTheme.accent,
+                chartTheme.primaryLight,
+                chartTheme.primaryDark,
+                chartTheme.primaryLighter,
+                chartTheme.muted
+            ];
+            const doughnutOptions = {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: { boxWidth: 12, padding: 14 }
+                    }
+                }
+            };
+
+            const lineBarOptions = {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: { stepSize: 1, precision: 0 }
+                    }
+                }
+            };
+
+            const complaintsStatus = mapToChartData(charts.complaintsByStatus, 'No complaints');
+            dashboardCharts.complaintsStatus = new Chart(document.getElementById('complaintsStatusChart'), {
+                type: 'doughnut',
+                data: {
+                    labels: complaintsStatus.labels,
+                    datasets: [{
+                        data: complaintsStatus.values,
+                        backgroundColor: statusColors,
+                        borderWidth: 0
+                    }]
+                },
+                options: doughnutOptions
+            });
+
+            const tipsStatus = mapToChartData(charts.tipsByStatus, 'No tips');
+            dashboardCharts.tipsStatus = new Chart(document.getElementById('tipsStatusChart'), {
+                type: 'doughnut',
+                data: {
+                    labels: tipsStatus.labels,
+                    datasets: [{
+                        data: tipsStatus.values,
+                        backgroundColor: [
+                            chartTheme.primary,
+                            chartTheme.accent,
+                            chartTheme.primaryLight,
+                            chartTheme.primaryDark,
+                            chartTheme.muted
+                        ],
+                        borderWidth: 0
+                    }]
+                },
+                options: doughnutOptions
+            });
+
+            const complaintsTrend = charts.complaintsOverTime || {};
+            const complaintDates = Object.keys(complaintsTrend);
+            dashboardCharts.complaintsTrend = new Chart(document.getElementById('complaintsTrendChart'), {
+                type: 'bar',
+                data: {
+                    labels: complaintDates.map(formatChartDate),
+                    datasets: [{
+                        label: 'Complaints',
+                        data: complaintDates.map(date => complaintsTrend[date] || 0),
+                        backgroundColor: 'rgba(76, 138, 137, 0.75)',
+                        borderColor: chartTheme.primary,
+                        borderWidth: 1,
+                        borderRadius: 6
+                    }]
+                },
+                options: lineBarOptions
+            });
+
+            const tipsTrend = charts.tipsOverTime || {};
+            const tipDates = Object.keys(tipsTrend);
+            dashboardCharts.tipsTrend = new Chart(document.getElementById('tipsTrendChart'), {
+                type: 'line',
+                data: {
+                    labels: tipDates.map(formatChartDate),
+                    datasets: [{
+                        label: 'Tips',
+                        data: tipDates.map(date => tipsTrend[date] || 0),
+                        borderColor: chartTheme.accent,
+                        backgroundColor: 'rgba(16, 185, 129, 0.15)',
+                        fill: true,
+                        tension: 0.35,
+                        pointBackgroundColor: chartTheme.accent,
+                        pointRadius: 4
+                    }]
+                },
+                options: lineBarOptions
+            });
+
+            const eventsOverview = mapToChartData(charts.eventsOverview, 'No events');
+            dashboardCharts.eventsOverview = new Chart(document.getElementById('eventsOverviewChart'), {
+                type: 'doughnut',
+                data: {
+                    labels: eventsOverview.labels,
+                    datasets: [{
+                        data: eventsOverview.values,
+                        backgroundColor: [
+                            chartTheme.primary,
+                            chartTheme.accent,
+                            chartTheme.muted
+                        ],
+                        borderWidth: 0
+                    }]
+                },
+                options: doughnutOptions
+            });
         }
         
         function displayRecentActivity(activities) {
@@ -1908,222 +1949,8 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
         // Update date/time immediately and then every second
         updateDateTime();
         setInterval(updateDateTime, 1000);
-        
-        // Notification System
-        let notificationDropdown = null;
-        let notificationBadge = null;
-        let notificationList = null;
-        
-        document.addEventListener('DOMContentLoaded', function() {
-            notificationDropdown = document.getElementById('notificationDropdown');
-            notificationBadge = document.getElementById('notificationBadge');
-            notificationList = document.getElementById('notificationList');
-            
-            loadNotifications();
-            // Refresh notifications every 30 seconds
-            setInterval(loadNotifications, 30000);
-            
-            // Close dropdown when clicking outside
-            document.addEventListener('click', function(event) {
-                if (notificationDropdown && !event.target.closest('.notification-container')) {
-                    notificationDropdown.classList.remove('show');
-                }
-            });
-        });
-        
-        function toggleNotifications() {
-            if (notificationDropdown) {
-                notificationDropdown.classList.toggle('show');
-                if (notificationDropdown.classList.contains('show')) {
-                    loadNotifications();
-                }
-            }
-        }
-        
-        async function loadNotifications() {
-            try {
-                // Sync activities first
-                const syncResponse = await fetch('api/notifications.php?action=sync');
-                
-                // Check if sync was successful
-                if (!syncResponse.ok) {
-                    console.error('Notification sync failed:', syncResponse.status, syncResponse.statusText);
-                    // Continue anyway to try loading existing notifications
-                } else {
-                    const syncData = await syncResponse.json();
-                    if (!syncData.success) {
-                        console.error('Notification sync returned error:', syncData.error || 'Unknown error');
-                    }
-                }
-                
-                // Then load notifications
-                const response = await fetch('api/notifications.php?action=list');
-                
-                // Check response status before parsing
-                if (!response.ok) {
-                    console.error('Failed to load notifications:', response.status, response.statusText);
-                    if (response.status === 401) {
-                        console.error('Authentication failed - session may have expired');
-                        // Show error state
-                        if (notificationList) {
-                            notificationList.innerHTML = `
-                                <div class="notification-empty">
-                                    <i class="fas fa-exclamation-triangle"></i>
-                                    <p>Session expired. Please refresh the page.</p>
-                                </div>
-                            `;
-                        }
-                    } else {
-                        // Show error state for other errors
-                        if (notificationList) {
-                            notificationList.innerHTML = `
-                                <div class="notification-empty">
-                                    <i class="fas fa-exclamation-triangle"></i>
-                                    <p>Error loading notifications (${response.status})</p>
-                                </div>
-                            `;
-                        }
-                    }
-                    return;
-                }
-                
-                const data = await response.json();
-                
-                // Check if API returned success
-                if (data.success) {
-                    updateNotificationBadge(data.unread_count);
-                    renderNotifications(data.notifications);
-                } else {
-                    console.error('API returned error:', data.error || 'Unknown error');
-                    // Show empty state if API fails
-                    if (notificationList) {
-                        notificationList.innerHTML = `
-                            <div class="notification-empty">
-                                <i class="fas fa-bell-slash"></i>
-                                <p>No notifications available</p>
-                            </div>
-                        `;
-                    }
-                }
-            } catch (error) {
-                console.error('Error loading notifications:', error);
-                // Show error state
-                if (notificationList) {
-                    notificationList.innerHTML = `
-                        <div class="notification-empty">
-                            <i class="fas fa-exclamation-triangle"></i>
-                            <p>Failed to load notifications</p>
-                            <p style="font-size: 0.8rem; margin-top: 0.5rem; color: var(--text-secondary);">Check console for details</p>
-                        </div>
-                    `;
-                }
-            }
-        }
-        
-        function updateNotificationBadge(count) {
-            if (notificationBadge) {
-                if (count > 0) {
-                    notificationBadge.textContent = count > 99 ? '99+' : count;
-                    notificationBadge.classList.add('show');
-                } else {
-                    notificationBadge.classList.remove('show');
-                }
-            }
-        }
-        
-        function renderNotifications(notifications) {
-            if (!notificationList) return;
-            
-            if (notifications.length === 0) {
-                notificationList.innerHTML = `
-                    <div class="notification-empty">
-                        <i class="fas fa-bell-slash"></i>
-                        <p>No notifications</p>
-                    </div>
-                `;
-                return;
-            }
-            
-            notificationList.innerHTML = notifications.map(notif => {
-                let iconClass, icon;
-                if (notif.type === 'complaint' || notif.type === 'incident') {
-                    iconClass = 'complaint';
-                    icon = 'fa-file-alt';
-                } else if (notif.type === 'tip') {
-                    iconClass = 'tip';
-                    icon = 'fa-comments';
-                } else if (notif.type === 'volunteer' || notif.type === 'volunteer_request') {
-                    iconClass = 'volunteer';
-                    icon = 'fa-handshake';
-                } else if (notif.type === 'login') {
-                    iconClass = 'login';
-                    icon = 'fa-sign-in-alt';
-                } else if (notif.type === 'logout') {
-                    iconClass = 'logout';
-                    icon = 'fa-sign-out-alt';
-                } else if (notif.type === 'event' || notif.type === 'event_report' || notif.type === 'patrol') {
-                    iconClass = 'event';
-                    icon = 'fa-bullhorn';
-                } else {
-                    iconClass = 'event';
-                    icon = 'fa-bullhorn';
-                }
-                
-                return `
-                    <div class="notification-item ${notif.is_read ? '' : 'unread'}" 
-                         onclick="handleNotificationClick(${notif.id}, '${notif.link || ''}')">
-                        <div class="notification-icon ${iconClass}">
-                            <i class="fas ${icon}"></i>
-                        </div>
-                        <div class="notification-content">
-                            <div class="notification-title">${escapeHtml(notif.title)}</div>
-                            <div class="notification-message">${escapeHtml(notif.message)}</div>
-                            <div class="notification-time">${notif.time_ago}</div>
-                        </div>
-                    </div>
-                `;
-            }).join('');
-        }
-        
-        function handleNotificationClick(id, link) {
-            // Mark as read
-            fetch('api/notifications.php?action=mark_read', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: 'id=' + id
-            });
-            
-            // Remove unread class
-            const item = event.currentTarget;
-            item.classList.remove('unread');
-            
-            // Navigate if link exists
-            if (link) {
-                window.location.href = link;
-            }
-            
-            // Reload notifications to update badge
-            loadNotifications();
-        }
-        
-        async function markAllAsRead() {
-            try {
-                await fetch('api/notifications.php?action=mark_read', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
-                });
-                loadNotifications();
-            } catch (error) {
-                console.error('Error marking all as read:', error);
-            }
-        }
-        
-        function escapeHtml(text) {
-            const div = document.createElement('div');
-            div.textContent = text;
-            return div.innerHTML;
-        }
     </script>
+    <?php require __DIR__ . '/includes/admin_notifications_script.php'; ?>
 </body>
 </html>
 

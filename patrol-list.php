@@ -5,6 +5,8 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
     header('Location: login.php');
     exit;
 }
+require_once __DIR__ . '/db.php';
+
 ?>
 <!doctype html>
 <html lang="en">
@@ -15,6 +17,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
     <link rel="icon" type="image/x-icon" href="images/favicon.ico">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="css/theme.css">
+    <link rel="stylesheet" href="css/admin-sidebar.css">
     <style>
         body { margin: 0; padding: 0; font-family: var(--font-family); background-color: var(--bg-color); display: flex; min-height: 100vh; }
         .sidebar { width: 320px; background: var(--tertiary-color); color: #fff; position: fixed; left: 0; top: 0; height: 100vh; overflow: hidden; box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1); z-index: 1000; transition: width 0.3s ease; display: flex; flex-direction: column; }
@@ -399,7 +402,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             </a>
             
             <!-- User Management Module (Admin Only) -->
-            <?php if (isset($_SESSION['user_role']) && $_SESSION['user_role'] === 'Admin'): ?>
+            <?php if (isAdminUser()): ?>
             <div class="nav-module <?php echo (basename($_SERVER['PHP_SELF']) == 'users.php' || basename($_SERVER['PHP_SELF']) == 'login-history.php') ? 'active' : ''; ?>">
                 <div class="nav-module-header" onclick="toggleModule(this)" data-tooltip="User Management">
                     <span class="nav-module-icon"><i class="fas fa-users-cog"></i></span>
@@ -426,18 +429,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                     <span class="arrow">▶</span>
                 </div>
                 <div class="nav-submodules">
-                    <a href="member-list.php" class="nav-submodule" data-tooltip="Member List">
-                        <span class="nav-submodule-icon"><i class="fas fa-clipboard-list"></i></span>
-                        <span class="nav-submodule-text">Member List</span>
-                    </a>
-                    <a href="activity-logs.php" class="nav-submodule" data-tooltip="Activity Logs">
-                        <span class="nav-submodule-icon"><i class="fas fa-chart-bar"></i></span>
-                        <span class="nav-submodule-text">Activity Logs</span>
-                    </a>
-                    <a href="incident-feed.php" class="nav-submodule" data-tooltip="Incident Feed">
-                        <span class="nav-submodule-icon"><i class="fas fa-exclamation-triangle"></i></span>
-                        <span class="nav-submodule-text">Incident Feed</span>
-                    </a>
+                    <?php require __DIR__ . '/includes/neighborhood_watch_nav_submodules.php'; ?>
                 </div>
             </div>
             <div class="nav-module">
@@ -447,10 +439,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                     <span class="arrow">▶</span>
                 </div>
                 <div class="nav-submodules">
-                    <a href="open-surveillance-app.php" class="nav-submodule" data-tooltip="Open Surveillance App">
-                        <span class="nav-submodule-icon"><i class="fas fa-desktop"></i></span>
-                        <span class="nav-submodule-text">Open Surveillance App</span>
-                    </a>
+                    <?php $cctvNavActive = $cctvNavActive ?? ''; require __DIR__ . '/includes/cctv_nav_submodules.php'; ?>
                 </div>
             </div>
             <div class="nav-module">
@@ -470,23 +459,6 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                     </a>
                 </div>
             </div>
-            <div class="nav-module">
-                <div class="nav-module-header" onclick="toggleModule(this)" data-tooltip="Volunteer Registry and Scheduling">
-                    <span class="nav-module-icon"><i class="fas fa-handshake"></i></span>
-                    <span class="nav-module-header-text">Volunteer Registry and Scheduling</span>
-                    <span class="arrow">▶</span>
-                </div>
-                <div class="nav-submodules">
-                    <a href="volunteer-list.php" class="nav-submodule" data-tooltip="Volunteer List">
-                        <span class="nav-submodule-icon"><i class="fas fa-user"></i></span>
-                        <span class="nav-submodule-text">Volunteer List</span>
-                    </a>
-                    <a href="schedule-management.php" class="nav-submodule" data-tooltip="Volunteer Request">
-                        <span class="nav-submodule-icon"><i class="fas fa-calendar"></i></span>
-                        <span class="nav-submodule-text">Volunteer Request</span>
-                    </a>
-                </div>
-            </div>
             <div class="nav-module active">
                 <div class="nav-module-header" onclick="toggleModule(this)" data-tooltip="Patrol Scheduling and Monitoring">
                     <span class="nav-module-icon"><i class="fas fa-walking"></i></span>
@@ -494,18 +466,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                     <span class="arrow">▶</span>
                 </div>
                 <div class="nav-submodules">
-                    <a href="patrol-list.php" class="nav-submodule active" data-tooltip="Patrol List">
-                        <span class="nav-submodule-icon"><i class="fas fa-list"></i></span>
-                        <span class="nav-submodule-text">Patrol List</span>
-                    </a>
-                    <a href="patrol-schedule.php" class="nav-submodule" data-tooltip="Patrol Schedule">
-                        <span class="nav-submodule-icon"><i class="fas fa-calendar-alt"></i></span>
-                        <span class="nav-submodule-text">Patrol Schedule</span>
-                    </a>
-                    <a href="patrol-logs.php" class="nav-submodule" data-tooltip="Patrol Logs">
-                        <span class="nav-submodule-icon"><i class="fas fa-file"></i></span>
-                        <span class="nav-submodule-text">Patrol Logs</span>
-                    </a>
+                    <?php $patrolNavActive = 'patrol-list'; require __DIR__ . '/includes/patrol_nav_submodules.php'; ?>
                 </div>
             </div>
             <div class="nav-module">
@@ -562,7 +523,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                     <span class="time-part" id="currentTime"></span>
                 </div>
                 <div class="notification-container">
-                    <button class="notification-bell" onclick="toggleNotifications()" aria-label="Notifications">
+                    <button class="notification-bell" type="button" onclick="toggleNotifications(event)" aria-label="Notifications">
                         <i class="fas fa-bell"></i>
                         <span class="notification-badge" id="notificationBadge"></span>
                     </button>
@@ -585,18 +546,18 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             <div class="page-content">
                 <div class="search-container">
                     <div class="search-box">
-                        <input type="text" id="searchInput" placeholder="Search patrol officers by name, badge number, or schedule..." onkeyup="filterPatrolOfficers()">
+                        <input type="text" id="searchInput" placeholder="Search BPSO personnel by name, personnel ID, or schedule..." onkeyup="filterPatrolOfficers()">
                     </div>
                     <button class="btn-add" onclick="openAddOfficerModal()">
-                        <i class="fas fa-plus"></i> Add Officer
+                        <i class="fas fa-plus"></i> Add Patrol
                     </button>
                 </div>
                 <div class="table-container">
                     <table id="patrolOfficersTable">
                         <thead>
                             <tr>
-                                <th>Badge Number</th>
-                                <th>Officer Name</th>
+                                <th>BPSO Personnel ID</th>
+                                <th>Personnel Name</th>
                                 <th>Contact Number</th>
                                 <th>Schedule</th>
                                 <th>Status</th>
@@ -604,7 +565,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                             </tr>
                         </thead>
                         <tbody id="patrolOfficersTableBody">
-                            <!-- Patrol officers will be loaded from database via JavaScript -->
+                            <!-- BPSO personnel will be loaded from database via JavaScript -->
                         </tbody>
                     </table>
                 </div>
@@ -612,25 +573,38 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
         </main>
     </div>
 
-    <!-- Add Officer Modal -->
+    <!-- Add BPSO Personnel Modal -->
     <div id="addOfficerModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h2>Add Patrol Officer</h2>
+                <h2>Add BPSO Personnel</h2>
                 <span class="close" onclick="closeAddOfficerModal()">&times;</span>
             </div>
             <form id="addOfficerForm" onsubmit="saveOfficer(event)">
                 <div class="form-group">
-                    <label for="officerBadgeNumber">Badge Number *</label>
+                    <label for="officerBadgeNumber">BPSO Personnel ID *</label>
                     <input type="text" id="officerBadgeNumber" name="badgeNumber" required>
                 </div>
                 <div class="form-group">
-                    <label for="officerName">Officer Name *</label>
+                    <label for="officerName">Personnel Name *</label>
                     <input type="text" id="officerName" name="name" required>
                 </div>
                 <div class="form-group">
                     <label for="officerContact">Contact Number *</label>
                     <input type="text" id="officerContact" name="contact" required>
+                </div>
+                <div class="form-group">
+                    <label for="officerEmail">Email Address *</label>
+                    <input type="email" id="officerEmail" name="email" required>
+                </div>
+                <div class="form-group">
+                    <label for="officerPassword">Create Password *</label>
+                    <input type="password" id="officerPassword" name="password" required minlength="8" autocomplete="new-password">
+                    <small style="display:block;margin-top:0.35rem;color:var(--text-secondary);font-size:0.85rem;">Must include at least one capital letter and one number or special character.</small>
+                </div>
+                <div class="form-group">
+                    <label for="officerConfirmPassword">Confirm Password *</label>
+                    <input type="password" id="officerConfirmPassword" name="confirmPassword" required minlength="8" autocomplete="new-password">
                 </div>
                 <div class="form-group">
                     <label for="officerSchedule">Schedule *</label>
@@ -646,17 +620,17 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                 </div>
                 <div class="form-actions">
                     <button type="button" class="btn-cancel" onclick="closeAddOfficerModal()">Cancel</button>
-                    <button type="submit" class="btn-save">Add Officer</button>
+                    <button type="submit" class="btn-save">Add BPSO Personnel</button>
                 </div>
             </form>
         </div>
     </div>
 
-    <!-- View Officer Modal -->
+    <!-- View BPSO Personnel Modal -->
     <div id="viewOfficerModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h2>Officer Details</h2>
+                <h2>BPSO Personnel Details</h2>
                 <span class="close" onclick="closeViewOfficerModal()">&times;</span>
             </div>
             <div id="viewOfficerContent">
@@ -668,26 +642,39 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
         </div>
     </div>
 
-    <!-- Edit Officer Modal -->
+    <!-- Edit BPSO Personnel Modal -->
     <div id="editOfficerModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h2>Edit Patrol Officer</h2>
+                <h2>Edit BPSO Personnel</h2>
                 <span class="close" onclick="closeEditOfficerModal()">&times;</span>
             </div>
             <form id="editOfficerForm" onsubmit="updateOfficer(event)">
                 <input type="hidden" id="editOfficerId" name="id">
                 <div class="form-group">
-                    <label for="editOfficerBadgeNumber">Badge Number *</label>
+                    <label for="editOfficerBadgeNumber">BPSO Personnel ID *</label>
                     <input type="text" id="editOfficerBadgeNumber" name="badgeNumber" required>
                 </div>
                 <div class="form-group">
-                    <label for="editOfficerName">Officer Name *</label>
+                    <label for="editOfficerName">Personnel Name *</label>
                     <input type="text" id="editOfficerName" name="name" required>
                 </div>
                 <div class="form-group">
                     <label for="editOfficerContact">Contact Number *</label>
                     <input type="text" id="editOfficerContact" name="contact" required>
+                </div>
+                <div class="form-group">
+                    <label for="editOfficerEmail">Email Address *</label>
+                    <input type="email" id="editOfficerEmail" name="email" required>
+                </div>
+                <div class="form-group">
+                    <label for="editOfficerPassword">New Password</label>
+                    <input type="password" id="editOfficerPassword" name="password" minlength="8" autocomplete="new-password">
+                    <small style="display:block;margin-top:0.35rem;color:var(--text-secondary);font-size:0.85rem;">Leave blank to keep the current password. Must include at least one capital letter and one number or special character.</small>
+                </div>
+                <div class="form-group">
+                    <label for="editOfficerConfirmPassword">Confirm New Password</label>
+                    <input type="password" id="editOfficerConfirmPassword" name="confirmPassword" minlength="8" autocomplete="new-password">
                 </div>
                 <div class="form-group">
                     <label for="editOfficerSchedule">Schedule *</label>
@@ -703,7 +690,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                 </div>
                 <div class="form-actions">
                     <button type="button" class="btn-cancel" onclick="closeEditOfficerModal()">Cancel</button>
-                    <button type="submit" class="btn-save">Update Officer</button>
+                    <button type="submit" class="btn-save">Update BPSO Personnel</button>
                 </div>
             </form>
         </div>
@@ -812,8 +799,8 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                                 'status-off-duty';
             
             row.innerHTML = `
-                <td>${officer.badge_number || ''}</td>
-                <td>${officer.officer_name || ''}</td>
+                <td>${officer.bpso_personnel_id || ''}</td>
+                <td>${officer.personnel_name || ''}</td>
                 <td>${officer.contact_number || ''}</td>
                 <td>${officer.schedule || ''}</td>
                 <td><span class="status-badge ${statusClass}">${officer.status || 'Available'}</span></td>
@@ -843,9 +830,10 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             
             const content = `
                 <div style="line-height: 1.8;">
-                    <p><strong>Badge Number:</strong> ${officer.badge_number || ''}</p>
-                    <p><strong>Officer Name:</strong> ${officer.officer_name || ''}</p>
+                    <p><strong>BPSO Personnel ID:</strong> ${officer.bpso_personnel_id || ''}</p>
+                    <p><strong>Personnel Name:</strong> ${officer.personnel_name || ''}</p>
                     <p><strong>Contact Number:</strong> ${officer.contact_number || ''}</p>
+                    <p><strong>Email Address:</strong> ${officer.email || ''}</p>
                     <p><strong>Schedule:</strong> ${officer.schedule || ''}</p>
                     <p><strong>Status:</strong> ${officer.status || 'Available'}</p>
                 </div>
@@ -864,9 +852,12 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             if (!officer) return;
             
             document.getElementById('editOfficerId').value = officer.id;
-            document.getElementById('editOfficerBadgeNumber').value = officer.badge_number || '';
-            document.getElementById('editOfficerName').value = officer.officer_name || '';
+            document.getElementById('editOfficerBadgeNumber').value = officer.bpso_personnel_id || '';
+            document.getElementById('editOfficerName').value = officer.personnel_name || '';
             document.getElementById('editOfficerContact').value = officer.contact_number || '';
+            document.getElementById('editOfficerEmail').value = officer.email || '';
+            document.getElementById('editOfficerPassword').value = '';
+            document.getElementById('editOfficerConfirmPassword').value = '';
             document.getElementById('editOfficerSchedule').value = officer.schedule || '';
             document.getElementById('editOfficerStatus').value = officer.status || 'Available';
             
@@ -886,7 +877,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
         }
 
         function deleteOfficer(id) {
-            if (!confirm('Are you sure you want to delete this patrol officer?')) {
+            if (!confirm('Are you sure you want to delete this BPSO personnel record?')) {
                 return;
             }
             
@@ -903,17 +894,17 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             .then(res => res.json())
             .then(result => {
                 if (!result.success) {
-                    alert(result.message || 'Failed to delete patrol officer.');
+                    alert(result.message || 'Failed to delete BPSO personnel.');
                     return;
                 }
                 
                 // Reload patrols to refresh the table
                 loadPatrols();
-                alert('Patrol officer deleted successfully!');
+                alert('BPSO personnel deleted successfully!');
             })
             .catch(err => {
-                console.error('Error deleting patrol officer:', err);
-                alert('Error deleting patrol officer. Please try again.');
+                console.error('Error deleting BPSO personnel:', err);
+                alert('Error deleting BPSO personnel. Please try again.');
             });
         }
 
@@ -921,17 +912,32 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             event.preventDefault();
             
             const formData = new FormData(event.target);
+            const password = formData.get('password');
+            const confirmPassword = formData.get('confirmPassword');
+
             const apiData = {
                 action: 'create',
-                badge_number: formData.get('badgeNumber').trim(),
-                officer_name: formData.get('name').trim(),
+                bpso_personnel_id: formData.get('badgeNumber').trim(),
+                personnel_name: formData.get('name').trim(),
                 contact_number: formData.get('contact').trim(),
+                email: formData.get('email').trim(),
+                password: password,
                 schedule: formData.get('schedule').trim(),
                 status: formData.get('status')
             };
             
-            if (!apiData.badge_number || !apiData.officer_name || !apiData.contact_number || !apiData.schedule) {
+            if (!apiData.bpso_personnel_id || !apiData.personnel_name || !apiData.contact_number || !apiData.email || !password || !confirmPassword || !apiData.schedule) {
                 alert('Please fill in all required fields.');
+                return;
+            }
+
+            if (password !== confirmPassword) {
+                alert('Passwords do not match.');
+                return;
+            }
+
+            if (!/[A-Z]/.test(password) || !/[0-9!@#$%^&*(),.?":{}|<>]/.test(password)) {
+                alert('Password must contain at least one capital letter and one number or special character.');
                 return;
             }
             
@@ -960,18 +966,18 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             })
             .then(result => {
                 if (!result.success) {
-                    alert(result.message || 'Failed to save patrol officer.');
+                    alert(result.message || 'Failed to save BPSO personnel.');
                     return;
                 }
                 
                 // Reload patrols to refresh the table
                 loadPatrols();
-                alert('Patrol officer added successfully!');
+                alert('BPSO personnel added successfully!');
                 closeAddOfficerModal();
             })
             .catch(err => {
-                console.error('Error saving patrol officer:', err);
-                alert('Error saving patrol officer: ' + (err.message || 'Please try again.'));
+                console.error('Error saving BPSO personnel:', err);
+                alert('Error saving BPSO personnel: ' + (err.message || 'Please try again.'));
             });
         }
 
@@ -980,20 +986,35 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             
             const formData = new FormData(event.target);
             const id = parseInt(formData.get('id'));
+            const password = formData.get('password');
+            const confirmPassword = formData.get('confirmPassword');
             
             const apiData = {
                 action: 'update',
                 id: id,
-                badge_number: formData.get('badgeNumber').trim(),
-                officer_name: formData.get('name').trim(),
+                bpso_personnel_id: formData.get('badgeNumber').trim(),
+                personnel_name: formData.get('name').trim(),
                 contact_number: formData.get('contact').trim(),
+                email: formData.get('email').trim(),
                 schedule: formData.get('schedule').trim(),
                 status: formData.get('status')
             };
             
-            if (!apiData.badge_number || !apiData.officer_name || !apiData.contact_number || !apiData.schedule || !apiData.status) {
+            if (!apiData.bpso_personnel_id || !apiData.personnel_name || !apiData.contact_number || !apiData.email || !apiData.schedule || !apiData.status) {
                 alert('Please fill in all required fields.');
                 return;
+            }
+
+            if (password || confirmPassword) {
+                if (password !== confirmPassword) {
+                    alert('Passwords do not match.');
+                    return;
+                }
+                if (!/[A-Z]/.test(password) || !/[0-9!@#$%^&*(),.?":{}|<>]/.test(password)) {
+                    alert('Password must contain at least one capital letter and one number or special character.');
+                    return;
+                }
+                apiData.password = password;
             }
             
             fetch('api/patrols.php', {
@@ -1021,18 +1042,18 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             })
             .then(result => {
                 if (!result.success) {
-                    alert(result.message || 'Failed to update patrol officer.');
+                    alert(result.message || 'Failed to update BPSO personnel.');
                     return;
                 }
                 
                 // Reload patrols to refresh the table
                 loadPatrols();
-                alert('Patrol officer updated successfully!');
+                alert('BPSO personnel updated successfully!');
                 closeEditOfficerModal();
             })
             .catch(err => {
-                console.error('Error updating patrol officer:', err);
-                alert('Error updating patrol officer: ' + (err.message || 'Please try again.'));
+                console.error('Error updating BPSO personnel:', err);
+                alert('Error updating BPSO personnel: ' + (err.message || 'Please try again.'));
             });
         }
 
@@ -1082,164 +1103,8 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
         // Update date/time immediately and then every second
         updateDateTime();
         setInterval(updateDateTime, 1000);
-        
-        // Notification System
-        let notificationDropdown = null;
-        let notificationBadge = null;
-        let notificationList = null;
-        
-        document.addEventListener('DOMContentLoaded', function() {
-            notificationDropdown = document.getElementById('notificationDropdown');
-            notificationBadge = document.getElementById('notificationBadge');
-            notificationList = document.getElementById('notificationList');
-            
-            if (notificationDropdown && notificationBadge && notificationList) {
-                loadNotifications();
-                // Refresh notifications every 30 seconds
-                setInterval(loadNotifications, 30000);
-                
-                // Close dropdown when clicking outside
-                document.addEventListener('click', function(event) {
-                    if (notificationDropdown && !event.target.closest('.notification-container')) {
-                        notificationDropdown.classList.remove('show');
-                    }
-                });
-            }
-        });
-        
-        function toggleNotifications() {
-            if (notificationDropdown) {
-                notificationDropdown.classList.toggle('show');
-                if (notificationDropdown.classList.contains('show')) {
-                    loadNotifications();
-                }
-            }
-        }
-        
-        async function loadNotifications() {
-            try {
-                // Sync activities first
-                await fetch('api/notifications.php?action=sync');
-                
-                // Then load notifications
-                const response = await fetch('api/notifications.php?action=list');
-                const data = await response.json();
-                
-                if (data.success) {
-                    updateNotificationBadge(data.unread_count);
-                    renderNotifications(data.notifications);
-                }
-            } catch (error) {
-                console.error('Error loading notifications:', error);
-            }
-        }
-        
-        function updateNotificationBadge(count) {
-            if (notificationBadge) {
-                if (count > 0) {
-                    notificationBadge.textContent = count > 99 ? '99+' : count;
-                    notificationBadge.classList.add('show');
-                } else {
-                    notificationBadge.classList.remove('show');
-                }
-            }
-        }
-        
-        function renderNotifications(notifications) {
-            if (!notificationList) return;
-            
-            if (notifications.length === 0) {
-                notificationList.innerHTML = `
-                    <div class="notification-empty">
-                        <i class="fas fa-bell-slash"></i>
-                        <p>No notifications</p>
-                    </div>
-                `;
-                return;
-            }
-            
-            notificationList.innerHTML = notifications.map(notif => {
-                let iconClass, icon;
-                if (notif.type === 'complaint' || notif.type === 'incident') {
-                    iconClass = 'complaint';
-                    icon = 'fa-file-alt';
-                } else if (notif.type === 'tip') {
-                    iconClass = 'tip';
-                    icon = 'fa-comments';
-                } else if (notif.type === 'volunteer' || notif.type === 'volunteer_request') {
-                    iconClass = 'volunteer';
-                    icon = 'fa-handshake';
-                } else if (notif.type === 'login') {
-                    iconClass = 'login';
-                    icon = 'fa-sign-in-alt';
-                } else if (notif.type === 'logout') {
-                    iconClass = 'logout';
-                    icon = 'fa-sign-out-alt';
-                } else if (notif.type === 'event' || notif.type === 'event_report' || notif.type === 'patrol') {
-                    iconClass = 'event';
-                    icon = 'fa-bullhorn';
-                } else {
-                    iconClass = 'event';
-                    icon = 'fa-bullhorn';
-                }
-                
-                const safeLink = (notif.link || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
-                
-                return `
-                    <div class="notification-item ${notif.is_read ? '' : 'unread'}" 
-                         onclick="handleNotificationClick(${notif.id}, '${safeLink}')">
-                        <div class="notification-icon ${iconClass}">
-                            <i class="fas ${icon}"></i>
-                        </div>
-                        <div class="notification-content">
-                            <div class="notification-title">${escapeHtml(notif.title)}</div>
-                            <div class="notification-message">${escapeHtml(notif.message)}</div>
-                            <div class="notification-time">${notif.time_ago}</div>
-                        </div>
-                    </div>
-                `;
-            }).join('');
-        }
-        
-        function handleNotificationClick(id, link) {
-            // Mark as read
-            fetch('api/notifications.php?action=mark_read', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: 'id=' + id
-            });
-            
-            // Remove unread class
-            const item = event.currentTarget;
-            item.classList.remove('unread');
-            
-            // Navigate if link exists
-            if (link && link !== '') {
-                window.location.href = link;
-            }
-            
-            // Reload notifications to update badge
-            loadNotifications();
-        }
-        
-        async function markAllAsRead() {
-            try {
-                await fetch('api/notifications.php?action=mark_read', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
-                });
-                loadNotifications();
-            } catch (error) {
-                console.error('Error marking all as read:', error);
-            }
-        }
-        
-        function escapeHtml(text) {
-            const div = document.createElement('div');
-            div.textContent = text;
-            return div.innerHTML;
-        }
     </script>
+    <?php require __DIR__ . '/includes/admin_notifications_script.php'; ?>
 </body>
 </html>
 

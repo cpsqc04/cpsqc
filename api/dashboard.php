@@ -13,6 +13,14 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
 }
 
 require_once __DIR__ . '/../db.php';
+require_once __DIR__ . '/nw_members_schema.php';
+require_once __DIR__ . '/patrol_logs_schema.php';
+
+try {
+    ensureNwMembersTable($pdo);
+} catch (PDOException $e) {
+    // Continue; stats will fall back to zero if table unavailable.
+}
 
 /**
  * Check if a table exists
@@ -38,17 +46,20 @@ try {
     // Statistics
     $stats = [];
     
-    // Total Members
-    if (tableExists($pdo, 'members')) {
-        $stmt = $pdo->query('SELECT COUNT(*) as count FROM members');
+    // Total active Neighborhood Watch members
+    if (tableExists($pdo, 'nw_members')) {
+        $stmt = $pdo->query("SELECT COUNT(*) as count FROM nw_members WHERE status = 'Active'");
         $stats['totalMembers'] = (int)$stmt->fetch()['count'];
-        
-        // Members this month
-        $stmt = $pdo->query("SELECT COUNT(*) as count FROM members WHERE MONTH(created_at) = MONTH(CURRENT_DATE()) AND YEAR(created_at) = YEAR(CURRENT_DATE())");
+        $stats['activeVolunteers'] = $stats['totalMembers'];
+
+        $stmt = $pdo->query("SELECT COUNT(*) as count FROM nw_members WHERE MONTH(created_at) = MONTH(CURRENT_DATE()) AND YEAR(created_at) = YEAR(CURRENT_DATE())");
         $stats['membersThisMonth'] = (int)$stmt->fetch()['count'];
+        $stats['volunteersThisMonth'] = $stats['membersThisMonth'];
     } else {
         $stats['totalMembers'] = 0;
         $stats['membersThisMonth'] = 0;
+        $stats['activeVolunteers'] = 0;
+        $stats['volunteersThisMonth'] = 0;
     }
     
     // Active Complaints
@@ -64,20 +75,7 @@ try {
         $stats['complaintsResolvedThisWeek'] = 0;
     }
     
-    // Active Volunteers
-    if (tableExists($pdo, 'volunteers')) {
-        $stmt = $pdo->query("SELECT COUNT(*) as count FROM volunteers WHERE status = 'Active'");
-        $stats['activeVolunteers'] = (int)$stmt->fetch()['count'];
-        
-        // Volunteers this month
-        $stmt = $pdo->query("SELECT COUNT(*) as count FROM volunteers WHERE MONTH(created_at) = MONTH(CURRENT_DATE()) AND YEAR(created_at) = YEAR(CURRENT_DATE())");
-        $stats['volunteersThisMonth'] = (int)$stmt->fetch()['count'];
-    } else {
-        $stats['activeVolunteers'] = 0;
-        $stats['volunteersThisMonth'] = 0;
-    }
-    
-    // Upcoming Events (assuming events table exists)
+    // Pending Tips
     if (tableExists($pdo, 'events')) {
         $stmt = $pdo->query("SELECT COUNT(*) as count FROM events WHERE event_date >= CURRENT_DATE()");
         $stats['upcomingEvents'] = (int)$stmt->fetch()['count'];
@@ -173,16 +171,31 @@ try {
         $charts['tipsByStatus'] = [];
     }
     
-    // Volunteers by Category
-    if (tableExists($pdo, 'volunteers')) {
-        $stmt = $pdo->query("SELECT category, COUNT(*) as count FROM volunteers GROUP BY category");
-        $volunteersByCategory = [];
+    // Neighborhood Watch Members by Status
+    if (tableExists($pdo, 'nw_members')) {
+        $stmt = $pdo->query("SELECT status, COUNT(*) as count FROM nw_members GROUP BY status");
+        $membersByStatus = [];
         while ($row = $stmt->fetch()) {
-            $volunteersByCategory[$row['category']] = (int)$row['count'];
+            $status = $row['status'] ?: 'Unknown';
+            $membersByStatus[$status] = (int)$row['count'];
         }
-        $charts['volunteersByCategory'] = $volunteersByCategory;
+        $charts['membersByStatus'] = $membersByStatus;
     } else {
-        $charts['volunteersByCategory'] = [];
+        $charts['membersByStatus'] = [];
+    }
+
+    // Events overview (upcoming vs past)
+    if (tableExists($pdo, 'events')) {
+        $stmt = $pdo->query("SELECT COUNT(*) as count FROM events WHERE event_date >= CURRENT_DATE()");
+        $upcoming = (int)$stmt->fetch()['count'];
+        $stmt = $pdo->query("SELECT COUNT(*) as count FROM events WHERE event_date < CURRENT_DATE()");
+        $past = (int)$stmt->fetch()['count'];
+        $charts['eventsOverview'] = [
+            'Upcoming' => $upcoming,
+            'Past' => $past,
+        ];
+    } else {
+        $charts['eventsOverview'] = [];
     }
     
     $response['charts'] = $charts;
@@ -232,27 +245,14 @@ try {
         }
     }
     
-    // Recent Members
-    if (tableExists($pdo, 'members')) {
-        $stmt = $pdo->query("SELECT name, created_at FROM members ORDER BY created_at DESC LIMIT 10");
+    // Recent Neighborhood Watch applications
+    if (tableExists($pdo, 'nw_members')) {
+        $stmt = $pdo->query("SELECT name, status, created_at FROM nw_members ORDER BY created_at DESC LIMIT 10");
         while ($row = $stmt->fetch()) {
             $recentActivity[] = [
                 'type' => 'member',
-                'title' => 'New Member Registered',
-                'details' => $row['name'] . ' joined the Neighborhood Watch program',
-                'time' => $row['created_at']
-            ];
-        }
-    }
-    
-    // Recent Volunteers
-    if (tableExists($pdo, 'volunteers')) {
-        $stmt = $pdo->query("SELECT name, status, created_at FROM volunteers ORDER BY created_at DESC LIMIT 10");
-        while ($row = $stmt->fetch()) {
-            $recentActivity[] = [
-                'type' => 'volunteer',
-                'title' => 'New Volunteer Registration',
-                'details' => $row['name'] . ' registered as volunteer (Status: ' . ($row['status'] ?? 'Pending') . ')',
+                'title' => 'New Neighborhood Watch Application',
+                'details' => $row['name'] . ' submitted a membership application (Status: ' . ($row['status'] ?? 'Pending') . ')',
                 'time' => $row['created_at']
             ];
         }
@@ -260,15 +260,16 @@ try {
     
     // Check for patrol_logs table (if it exists)
     try {
+        ensurePatrolLogsTable($pdo);
         $stmt = $pdo->query("SHOW TABLES LIKE 'patrol_logs'");
         if ($stmt->rowCount() > 0) {
-            $stmt = $pdo->query("SELECT officer_name, route, date, time, status, created_at FROM patrol_logs WHERE status = 'Completed' ORDER BY created_at DESC LIMIT 10");
+            $stmt = $pdo->query("SELECT personnel_name, route, date, time, status, created_at FROM patrol_logs WHERE status = 'Completed' ORDER BY created_at DESC LIMIT 10");
             while ($row = $stmt->fetch()) {
                 $route = $row['route'] ?? 'Unknown route';
                 $recentActivity[] = [
                     'type' => 'patrol',
                     'title' => 'Patrol Completed',
-                    'details' => ($row['officer_name'] ?? 'Officer') . ' completed patrol route - ' . $route,
+                    'details' => ($row['personnel_name'] ?? 'BPSO Personnel') . ' completed patrol route - ' . $route,
                     'time' => $row['created_at'] ?? $row['date'] . ' ' . ($row['time'] ?? '')
                 ];
             }

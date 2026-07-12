@@ -5,16 +5,22 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
     header('Location: login.php');
     exit;
 }
+require_once __DIR__ . '/includes/admin_auth.php';
+require_once __DIR__ . '/db.php';
+
+$cctvNavActive = 'playback';
+
 ?>
 <!doctype html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Playback - CCTV Recordings</title>
+    <title>Playback - Alertara</title>
     <link rel="icon" type="image/x-icon" href="images/favicon.ico">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="css/theme.css">
+    <link rel="stylesheet" href="css/admin-sidebar.css">
     <style>
         body { margin: 0; padding: 0; font-family: var(--font-family); background-color: var(--bg-color); display: flex; min-height: 100vh; }
         .sidebar { width: 320px; background: var(--tertiary-color); color: #fff; position: fixed; left: 0; top: 0; height: 100vh; overflow: hidden; box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1); z-index: 1000; transition: width 0.3s ease; display: flex; flex-direction: column; }
@@ -27,8 +33,6 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
         .logo-container a:hover { opacity: 0.8; transform: scale(1.05); }
         .logo-container img { height: 130px; width: 130px; object-fit: contain; transition: all 0.3s ease; }
         .sidebar.collapsed .logo-container img { height: 70px; width: 70px; }
-        .user-name-display { color: rgba(255, 255, 255, 0.9); font-size: 0.95rem; font-weight: 500; text-align: center; padding: 0.5rem 1rem; transition: all 0.3s ease; word-break: break-word; max-width: 100%; }
-        .sidebar.collapsed .user-name-display { opacity: 0; height: 0; padding: 0; overflow: hidden; font-size: 0; }
         .sidebar-nav { padding: 0.5rem 0; overflow-y: auto; overflow-x: hidden; flex: 1; display: flex; flex-direction: column; min-height: 0; scrollbar-width: thin; scrollbar-color: rgba(255, 255, 255, 0.3) transparent; }
         .sidebar-nav::-webkit-scrollbar { width: 6px; }
         .sidebar-nav::-webkit-scrollbar-track { background: transparent; }
@@ -81,241 +85,37 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
         .top-header { background: var(--header-bg); padding: 1.5rem 2rem 1rem 2rem; display: flex; justify-content: space-between; align-items: flex-end; position: sticky; top: 0; z-index: 100; border-bottom: 1px solid var(--border-color); }
         .top-header-content { flex: 1; display: flex; align-items: center; gap: 1rem; }
         .user-info { display: flex; align-items: center; gap: 1rem; margin-left: 2rem; }
-        .user-info span { color: var(--text-color); font-weight: 500; }
-        
-        /* Notification Bell */
-        .notification-container {
-            position: relative;
-            display: flex;
-            align-items: center;
-        }
-        
-        .notification-bell {
-            position: relative;
-            width: 40px;
-            height: 40px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: transparent;
-            border: none;
-            color: var(--text-color);
-            font-size: 1.25rem;
-            cursor: pointer;
-            border-radius: 8px;
-            transition: all 0.2s ease;
-        }
-        
-        .notification-bell:hover {
-            background: rgba(28, 37, 65, 0.05);
-            color: var(--primary-color);
-        }
-        
-        .notification-badge {
-            position: absolute;
-            top: 4px;
-            right: 4px;
-            background: #ef4444;
-            color: white;
-            font-size: 0.7rem;
-            font-weight: 600;
-            padding: 2px 6px;
-            border-radius: 10px;
-            min-width: 18px;
-            text-align: center;
-            display: none;
-        }
-        
-        .notification-badge.show {
-            display: block;
-        }
-        
-        .notification-dropdown {
-            position: absolute;
-            top: calc(100% + 10px);
-            right: 0;
-            width: 380px;
-            max-height: 500px;
-            background: white;
-            border-radius: 12px;
-            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
-            display: none;
-            flex-direction: column;
-            z-index: 1000;
-            overflow: hidden;
-        }
-        
-        .notification-dropdown.show {
-            display: flex;
-        }
-        
-        .notification-header {
-            padding: 1.25rem;
-            border-bottom: 1px solid var(--border-color);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            background: var(--header-bg);
-        }
-        
-        .notification-header h3 {
-            margin: 0;
-            font-size: 1.1rem;
-            font-weight: 600;
-            color: var(--text-color);
-        }
-        
-        .notification-header button {
-            background: transparent;
-            border: none;
-            color: var(--primary-color);
-            font-size: 0.85rem;
-            cursor: pointer;
-            padding: 0.25rem 0.5rem;
-            border-radius: 4px;
-            transition: background 0.2s ease;
-        }
-        
-        .notification-header button:hover {
-            background: rgba(76, 138, 137, 0.1);
-        }
-        
-        .notification-list {
-            flex: 1;
-            overflow-y: auto;
-            max-height: 400px;
-        }
-        
-        .notification-item {
-            padding: 1rem 1.25rem;
-            border-bottom: 1px solid var(--border-color);
-            cursor: pointer;
-            transition: background 0.2s ease;
-            display: flex;
-            gap: 0.75rem;
-            position: relative;
-        }
-        
-        .notification-item:hover {
-            background: #f8f9fa;
-        }
-        
-        .notification-item.unread {
-            background: #f0f9ff;
-            border-left: 3px solid var(--primary-color);
-        }
-        
-        .notification-item.unread::before {
-            content: '';
-            position: absolute;
-            left: 0;
-            top: 50%;
-            transform: translateY(-50%);
-            width: 6px;
-            height: 6px;
-            background: var(--primary-color);
-            border-radius: 50%;
-        }
-        
-        .notification-icon {
-            width: 40px;
-            height: 40px;
-            border-radius: 8px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.1rem;
-            flex-shrink: 0;
-        }
-        
-        .notification-icon.complaint {
-            background: #fee2e2;
-            color: #dc2626;
-        }
-        
-        .notification-icon.tip {
-            background: #fef3c7;
-            color: #d97706;
-        }
-        
-        .notification-icon.volunteer {
-            background: #dbeafe;
-            color: #2563eb;
-        }
-        
-        .notification-icon.event {
-            background: #d1fae5;
-            color: #059669;
-        }
-        
-        .notification-icon.login {
-            background: #dbeafe;
-            color: #2563eb;
-        }
-        
-        .notification-icon.logout {
-            background: #e0e7ff;
-            color: #6366f1;
-        }
-        
-        .notification-content {
-            flex: 1;
-            min-width: 0;
-        }
-        
-        .notification-title {
-            font-weight: 600;
-            color: var(--text-color);
-            font-size: 0.95rem;
-            margin: 0 0 0.25rem 0;
-        }
-        
-        .notification-message {
-            color: var(--text-secondary);
-            font-size: 0.85rem;
-            margin: 0 0 0.5rem 0;
-            line-height: 1.4;
-        }
-        
-        .notification-time {
-            color: var(--text-secondary);
-            font-size: 0.75rem;
-        }
-        
-        .notification-empty {
-            padding: 3rem 1.5rem;
-            text-align: center;
-            color: var(--text-secondary);
-        }
-        
-        .notification-empty i {
-            font-size: 3rem;
-            margin-bottom: 1rem;
-            opacity: 0.3;
-        }
-        
-        /* Date and Time Display */
-        .datetime-display {
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            color: var(--text-color);
-            font-size: 0.9rem;
-            font-weight: 500;
-            margin-right: 1rem;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        }
-        
-        .datetime-display .date-part {
-            color: var(--text-secondary);
-        }
-        
-        .datetime-display .time-part {
-            color: var(--text-color);
-            font-weight: 600;
-        }
-        
-        /* Sidebar Logout Button */
+        .notification-container { position: relative; display: flex; align-items: center; }
+        .notification-bell { position: relative; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; background: transparent; border: none; color: var(--text-color); font-size: 1.25rem; cursor: pointer; border-radius: 8px; transition: all 0.2s ease; }
+        .notification-bell:hover { background: rgba(28, 37, 65, 0.05); color: var(--primary-color); }
+        .notification-badge { position: absolute; top: 4px; right: 4px; background: #ef4444; color: white; font-size: 0.7rem; font-weight: 600; padding: 2px 6px; border-radius: 10px; min-width: 18px; text-align: center; display: none; }
+        .notification-badge.show { display: block; }
+        .notification-dropdown { position: absolute; top: calc(100% + 10px); right: 0; width: 380px; max-height: 500px; background: white; border-radius: 12px; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15); display: none; flex-direction: column; z-index: 1000; overflow: hidden; }
+        .notification-dropdown.show { display: flex; }
+        .notification-header { padding: 1.25rem; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; background: var(--header-bg); }
+        .notification-header h3 { margin: 0; font-size: 1.1rem; font-weight: 600; color: var(--text-color); }
+        .notification-header button { background: transparent; border: none; color: var(--primary-color); font-size: 0.85rem; cursor: pointer; padding: 0.25rem 0.5rem; border-radius: 4px; transition: background 0.2s ease; }
+        .notification-header button:hover { background: rgba(76, 138, 137, 0.1); }
+        .notification-list { flex: 1; overflow-y: auto; max-height: 400px; }
+        .notification-item { padding: 1rem 1.25rem; border-bottom: 1px solid var(--border-color); cursor: pointer; transition: background 0.2s ease; display: flex; gap: 0.75rem; position: relative; }
+        .notification-item:hover { background: #f8f9fa; }
+        .notification-item.unread { background: #f0f9ff; border-left: 3px solid var(--primary-color); }
+        .notification-icon { width: 40px; height: 40px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; flex-shrink: 0; }
+        .notification-icon.complaint { background: #fee2e2; color: #dc2626; }
+        .notification-icon.tip { background: #fef3c7; color: #d97706; }
+        .notification-icon.volunteer { background: #dbeafe; color: #2563eb; }
+        .notification-icon.event { background: #d1fae5; color: #059669; }
+        .notification-icon.login { background: #dbeafe; color: #2563eb; }
+        .notification-icon.logout { background: #e0e7ff; color: #6366f1; }
+        .notification-content { flex: 1; min-width: 0; }
+        .notification-title { font-weight: 600; color: var(--text-color); font-size: 0.95rem; margin: 0 0 0.25rem 0; }
+        .notification-message { color: var(--text-secondary); font-size: 0.85rem; margin: 0 0 0.5rem 0; line-height: 1.4; }
+        .notification-time { color: var(--text-secondary); font-size: 0.75rem; }
+        .notification-empty { padding: 3rem 1.5rem; text-align: center; color: var(--text-secondary); }
+        .notification-empty i { font-size: 3rem; margin-bottom: 1rem; opacity: 0.3; }
+        .datetime-display { display: flex; align-items: center; gap: 0.75rem; color: var(--text-color); font-size: 0.9rem; font-weight: 500; margin-right: 1rem; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        .datetime-display .date-part { color: var(--text-secondary); }
+        .datetime-display .time-part { color: var(--text-color); font-weight: 600; }
         .sidebar-footer { margin-top: auto; padding: 1rem; border-top: 1px solid rgba(255, 255, 255, 0.1); }
         .sidebar-logout-btn { display: flex; align-items: center; gap: 0.75rem; padding: 0.875rem 1.5rem; background: rgba(239, 68, 68, 0.1); color: rgba(255, 255, 255, 0.9); text-decoration: none; border-radius: 8px; font-size: 1rem; font-weight: 500; transition: all 0.2s ease; border: 1px solid rgba(239, 68, 68, 0.2); width: 100%; box-sizing: border-box; }
         .sidebar-logout-btn:hover { background: rgba(239, 68, 68, 0.2); border-color: rgba(239, 68, 68, 0.4); color: #fff; }
@@ -323,8 +123,6 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
         .sidebar-logout-btn span { flex: 1; transition: opacity 0.3s ease; }
         .sidebar.collapsed .sidebar-logout-btn span { opacity: 0; width: 0; overflow: hidden; }
         .sidebar.collapsed .sidebar-logout-btn { justify-content: center; padding: 0.875rem; }
-        .logout-btn { padding: 0.5rem 1rem; background: var(--primary-color); color: #fff; text-decoration: none; border-radius: 6px; font-size: 0.9rem; transition: background 0.2s ease; display: none; }
-        .logout-btn:hover { background: #4ca8a6; }
         .content-area { padding: 2rem; flex: 1; background: #f5f5f5; }
         .content-burger-btn { background: transparent; border: none; color: var(--tertiary-color); width: 40px; height: 40px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s ease; flex-shrink: 0; padding: 0; }
         .content-burger-btn:hover { background: rgba(28, 37, 65, 0.05); }
@@ -334,45 +132,72 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
         .content-burger-btn span::after { bottom: -7px; }
         .page-title { font-size: 2rem; font-weight: 700; color: var(--tertiary-color); margin: 0; }
         .page-content { background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 12px; padding: 2rem; box-shadow: 0 2px 8px var(--shadow); margin-top: 1.5rem; }
-        .playback-container { display: flex; flex-direction: column; gap: 1.5rem; }
-        .video-wrapper { display: none; }
-        .video-wrapper.active { display: block; }
-        .playback-controls-panel { display: flex; gap: 1.5rem; flex-wrap: wrap; }
-        .control-group { flex: 1; min-width: 200px; }
-        .control-group label { display: block; margin-bottom: 0.5rem; color: var(--text-color); font-weight: 500; font-size: 0.95rem; }
-        .control-group select, .control-group input { width: 100%; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 8px; font-size: 0.95rem; font-family: var(--font-family); transition: all 0.2s ease; box-sizing: border-box; }
-        .control-group select:focus, .control-group input:focus { outline: none; border-color: var(--primary-color); box-shadow: 0 0 0 3px rgba(76, 138, 137, 0.1); }
-        .btn-search { padding: 0.75rem 1.5rem; background: var(--primary-color); color: #fff; border: none; border-radius: 8px; font-size: 0.95rem; font-weight: 600; cursor: pointer; transition: all 0.2s ease; align-self: flex-end; margin-top: 1.75rem; }
-        .btn-search:hover { background: #4ca8a6; transform: translateY(-2px); box-shadow: 0 4px 8px rgba(76, 138, 137, 0.3); }
-        .video-player-container { background: #000; border-radius: 12px; position: relative; overflow: hidden; aspect-ratio: 16/9; display: none; }
-        .video-player-container.active { display: block; }
-        .video-placeholder { width: 100%; height: 100%; background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%); display: flex; flex-direction: column; align-items: center; justify-content: center; color: #fff; position: relative; }
-        .video-placeholder::before { content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(255, 255, 255, 0.03) 2px, rgba(255, 255, 255, 0.03) 4px); }
-        .video-info { position: absolute; top: 1rem; left: 1rem; background: rgba(0, 0, 0, 0.7); padding: 0.75rem 1rem; border-radius: 8px; color: #fff; z-index: 10; }
-        .video-info p { margin: 0.25rem 0; font-size: 0.9rem; }
-        .playback-controls { background: rgba(0, 0, 0, 0.9); padding: 1rem; border-radius: 8px; display: none; align-items: center; gap: 1rem; margin-top: 0; }
-        .playback-controls.active { display: flex; }
-        .playback-controls button { background: transparent; border: none; color: #fff; font-size: 1.5rem; cursor: pointer; padding: 0.5rem; transition: all 0.2s ease; }
-        .playback-controls button:hover { color: var(--primary-color); }
-        .playback-controls button:disabled { opacity: 0.5; cursor: not-allowed; }
-        .progress-container { flex: 1; position: relative; }
-        .progress-bar { width: 100%; height: 6px; background: rgba(255, 255, 255, 0.3); border-radius: 3px; cursor: pointer; position: relative; }
-        .progress-fill { height: 100%; background: var(--primary-color); border-radius: 3px; width: 0%; transition: width 0.1s ease; }
-        .time-display { color: #fff; font-size: 0.9rem; font-family: 'Courier New', monospace; min-width: 100px; text-align: center; }
-        .recordings-list { margin-top: 1.5rem; }
-        .recordings-list h3 { margin: 0 0 1rem 0; color: var(--tertiary-color); font-size: 1.25rem; font-weight: 600; }
-        .recordings-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 1rem; }
-        .recording-card { background: #f9f9f9; border: 1px solid var(--border-color); border-radius: 8px; padding: 1rem; cursor: pointer; transition: all 0.2s ease; }
-        .recording-card:hover { box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1); transform: translateY(-2px); }
-        .recording-card.active { border-color: var(--primary-color); background: #f0f9f9; }
-        .recording-thumbnail { width: 100%; height: 120px; background: linear-gradient(135deg, #e0e0e0 0%, #d0d0d0 100%); border-radius: 6px; margin-bottom: 0.75rem; display: flex; align-items: center; justify-content: center; color: #999; font-size: 2rem; position: relative; overflow: hidden; }
-        .recording-thumbnail::before { content: ''; position: absolute; top: 0; left: -100%; width: 100%; height: 100%; background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent); animation: scan 3s infinite; }
-        @keyframes scan { 0% { left: -100%; } 100% { left: 100%; } }
-        .recording-info { font-size: 0.9rem; }
-        .recording-info p { margin: 0.25rem 0; }
-        .recording-info strong { color: var(--tertiary-color); }
-        .recording-duration { color: #666; font-size: 0.85rem; }
-        @media (max-width: 768px) { .sidebar { width: 320px; transform: translateX(-100%); transition: transform 0.3s ease; } .sidebar.mobile-open { transform: translateX(0); } .sidebar.collapsed { width: 80px; transform: translateX(0); } .main-wrapper { margin-left: 0; } body.sidebar-collapsed .main-wrapper { margin-left: 80px; } .playback-controls-panel { flex-direction: column; } .recordings-grid { grid-template-columns: 1fr; } }
+        .section-block { margin-bottom: 2.5rem; }
+        .section-block:last-child { margin-bottom: 0; }
+        .section-title { margin: 0 0 1rem; font-size: 1.15rem; font-weight: 600; color: var(--tertiary-color); display: flex; align-items: center; gap: 0.5rem; }
+        .search-container { display: flex; gap: 1rem; margin-bottom: 1rem; align-items: center; flex-wrap: wrap; }
+        .search-box { flex: 1; min-width: 200px; position: relative; }
+        .search-box input { width: 100%; padding: 0.75rem 1rem 0.75rem 2.5rem; border: 1px solid var(--border-color); border-radius: 8px; font-size: 0.95rem; transition: all 0.2s ease; box-sizing: border-box; }
+        .search-box input:focus { outline: none; border-color: var(--primary-color); box-shadow: 0 0 0 3px rgba(76, 138, 137, 0.1); }
+        .search-box::before { content: "🔍"; position: absolute; left: 0.75rem; top: 50%; transform: translateY(-50%); font-size: 1rem; }
+        .date-filter { display: flex; align-items: center; gap: 0.5rem; flex-shrink: 0; }
+        .date-filter label { font-size: 0.9rem; font-weight: 500; color: var(--text-color); white-space: nowrap; }
+        .date-filter input[type="date"] { padding: 0.75rem 1rem; border: 1px solid var(--border-color); border-radius: 8px; font-size: 0.95rem; font-family: var(--font-family); }
+        .date-filter input[type="date"]:focus { outline: none; border-color: var(--primary-color); box-shadow: 0 0 0 3px rgba(76, 138, 137, 0.1); }
+        .table-container { overflow-x: auto; border-radius: 8px; border: 1px solid var(--border-color); }
+        table { width: 100%; border-collapse: collapse; background: var(--card-bg); }
+        thead { background: var(--tertiary-color); color: #fff; }
+        th { padding: 1rem; text-align: left; font-weight: 600; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.5px; }
+        td { padding: 1rem; border-bottom: 1px solid var(--border-color); color: var(--text-color); }
+        tbody tr:hover { background: #f9f9f9; }
+        tbody tr:last-child td { border-bottom: none; }
+        .status-badge { padding: 0.25rem 0.75rem; border-radius: 12px; font-size: 0.85rem; font-weight: 500; display: inline-block; }
+        .status-at-hall { background: #d1e7dd; color: #0f5132; }
+        .status-timed-out { background: #e9ecef; color: #6c757d; }
+        .playback-panel { display: grid; gap: 1.25rem; }
+        .playback-filters { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: flex-end; }
+        .filter-field { display: flex; flex-direction: column; gap: 0.35rem; min-width: 140px; }
+        .filter-field label { font-size: 0.85rem; font-weight: 600; color: var(--text-color); }
+        .filter-field select,
+        .filter-field input { padding: 0.7rem 0.85rem; border: 1px solid var(--border-color); border-radius: 8px; font: inherit; box-sizing: border-box; }
+        .filter-field select:focus,
+        .filter-field input:focus { outline: none; border-color: var(--primary-color); box-shadow: 0 0 0 3px rgba(76, 138, 137, 0.1); }
+        .btn-search { padding: 0.7rem 1.25rem; background: var(--primary-color); color: #fff; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+        .btn-search:hover { background: #4ca8a6; }
+        .playback-error { display: none; margin: 0; padding: 0.85rem 1rem; border-radius: 8px; background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; }
+        .playback-error.show { display: block; }
+        .video-shell { background: #0f172a; border-radius: 12px; overflow: hidden; border: 1px solid var(--border-color); min-height: 360px; display: flex; align-items: center; justify-content: center; position: relative; }
+        .video-shell video { width: 100%; max-height: 70vh; display: none; background: #000; object-fit: contain; }
+        .video-shell video.active { display: block; }
+        .video-shell:fullscreen { border-radius: 0; border: none; min-height: 100vh; width: 100vw; background: #000; }
+        .video-shell:fullscreen video { max-height: 100vh; height: 100vh; width: 100vw; }
+        .fullscreen-btn { position: absolute; top: 0.75rem; right: 0.75rem; z-index: 4; width: 40px; height: 40px; border: none; border-radius: 8px; background: rgba(15, 23, 42, 0.72); color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 1rem; }
+        .fullscreen-btn:hover { background: rgba(76, 138, 137, 0.9); }
+        .video-placeholder { display: flex; flex-direction: column; align-items: center; justify-content: center; color: rgba(255,255,255,0.75); text-align: center; padding: 2rem; min-height: 360px; position: absolute; inset: 0; z-index: 2; }
+        .video-placeholder.hidden { display: none; }
+        .video-placeholder i { font-size: 3rem; margin-bottom: 0.75rem; opacity: 0.8; }
+        .segments-table td { font-size: 0.92rem; }
+        .btn-play-segment { padding: 0.45rem 0.85rem; background: var(--primary-color); color: #fff; border: none; border-radius: 6px; font-size: 0.85rem; cursor: pointer; }
+        .btn-play-segment:hover { background: #4ca8a6; }
+        .btn-play-segment:disabled { background: #94a3b8; cursor: not-allowed; }
+        .btn-download-segment { padding: 0.45rem 0.85rem; background: #475569; color: #fff; border: none; border-radius: 6px; font-size: 0.85rem; cursor: pointer; margin-left: 0.35rem; }
+        .btn-download-segment:hover { background: #334155; }
+        .segment-badge { display: inline-block; padding: 0.15rem 0.5rem; border-radius: 999px; font-size: 0.75rem; font-weight: 600; }
+        .segment-badge.ready { background: #d1e7dd; color: #0f5132; }
+        .segment-badge.legacy { background: #fff3cd; color: #856404; }
+        .segment-badge.empty { background: #e9ecef; color: #6c757d; }
+        .segment-badge.recording { background: #cff4fc; color: #055160; }
+        .request-banner { margin: 0; padding: 0.85rem 1rem; border-radius: 8px; background: #f0fdf4; color: #166534; border: 1px solid #bbf7d0; font-size: 0.9rem; }
+        @media (max-width: 768px) {
+            .sidebar { width: 320px; transform: translateX(-100%); transition: transform 0.3s ease; }
+            .sidebar.mobile-open { transform: translateX(0); }
+            .sidebar.collapsed { width: 80px; transform: translateX(0); }
+            .main-wrapper { margin-left: 0; }
+            body.sidebar-collapsed .main-wrapper { margin-left: 80px; }
+            .search-container { flex-direction: column; align-items: stretch; }
+            .date-filter { width: 100%; }
+            .date-filter input[type="date"] { flex: 1; }
+        }
     </style>
 </head>
 <body>
@@ -382,20 +207,15 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                 <a href="index.php" style="display: block; cursor: pointer;">
                     <img src="images/tara.png" alt="Alertara Logo" style="display: block;">
                 </a>
-                <div class="user-name-display">
-                    <?php echo htmlspecialchars($_SESSION['username'] ?? 'Admin'); ?>
-                </div>
             </div>
         </div>
         <nav class="sidebar-nav">
-            <!-- Dashboard Link -->
             <a href="index.php" class="nav-module-header" data-tooltip="Dashboard" style="text-decoration: none; display: flex; align-items: center; justify-content: space-between; padding: 0.875rem 1.5rem; color: rgba(255, 255, 255, 0.9); cursor: pointer; transition: background-color 0.2s ease; font-weight: 500; user-select: none; gap: 0.75rem; <?php echo basename($_SERVER['PHP_SELF']) == 'index.php' ? 'background: rgba(76, 138, 137, 0.25); border-left: 3px solid #4c8a89;' : ''; ?>">
                 <span class="nav-module-icon"><i class="fas fa-home"></i></span>
                 <span class="nav-module-header-text">Dashboard</span>
             </a>
-            
-            <!-- User Management Module (Admin Only) -->
-            <?php if (isset($_SESSION['user_role']) && $_SESSION['user_role'] === 'Admin'): ?>
+
+            <?php if (isAdminUser()): ?>
             <div class="nav-module <?php echo (basename($_SERVER['PHP_SELF']) == 'users.php' || basename($_SERVER['PHP_SELF']) == 'login-history.php') ? 'active' : ''; ?>">
                 <div class="nav-module-header" onclick="toggleModule(this)" data-tooltip="User Management">
                     <span class="nav-module-icon"><i class="fas fa-users-cog"></i></span>
@@ -414,7 +234,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                 </div>
             </div>
             <?php endif; ?>
-            
+
             <div class="nav-module">
                 <div class="nav-module-header" onclick="toggleModule(this)" data-tooltip="Neighborhood Watch Coordination">
                     <span class="nav-module-icon"><i class="fas fa-users"></i></span>
@@ -422,18 +242,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                     <span class="arrow">▶</span>
                 </div>
                 <div class="nav-submodules">
-                    <a href="member-list.php" class="nav-submodule" data-tooltip="Member List">
-                        <span class="nav-submodule-icon"><i class="fas fa-clipboard-list"></i></span>
-                        <span class="nav-submodule-text">Member List</span>
-                    </a>
-                    <a href="activity-logs.php" class="nav-submodule" data-tooltip="Activity Logs">
-                        <span class="nav-submodule-icon"><i class="fas fa-chart-bar"></i></span>
-                        <span class="nav-submodule-text">Activity Logs</span>
-                    </a>
-                    <a href="incident-feed.php" class="nav-submodule" data-tooltip="Incident Feed">
-                        <span class="nav-submodule-icon"><i class="fas fa-exclamation-triangle"></i></span>
-                        <span class="nav-submodule-text">Incident Feed</span>
-                    </a>
+                    <?php require __DIR__ . '/includes/neighborhood_watch_nav_submodules.php'; ?>
                 </div>
             </div>
             <div class="nav-module active">
@@ -443,10 +252,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                     <span class="arrow">▶</span>
                 </div>
                 <div class="nav-submodules">
-                    <a href="open-surveillance-app.php" class="nav-submodule" data-tooltip="Open Surveillance App">
-                        <span class="nav-submodule-icon"><i class="fas fa-desktop"></i></span>
-                        <span class="nav-submodule-text">Open Surveillance App</span>
-                    </a>
+                    <?php $cctvNavActive = $cctvNavActive ?? ''; require __DIR__ . '/includes/cctv_nav_submodules.php'; ?>
                 </div>
             </div>
             <div class="nav-module">
@@ -467,41 +273,13 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                 </div>
             </div>
             <div class="nav-module">
-                <div class="nav-module-header" onclick="toggleModule(this)" data-tooltip="Volunteer Registry and Scheduling">
-                    <span class="nav-module-icon"><i class="fas fa-handshake"></i></span>
-                    <span class="nav-module-header-text">Volunteer Registry and Scheduling</span>
-                    <span class="arrow">▶</span>
-                </div>
-                <div class="nav-submodules">
-                    <a href="volunteer-list.php" class="nav-submodule" data-tooltip="Volunteer List">
-                        <span class="nav-submodule-icon"><i class="fas fa-user"></i></span>
-                        <span class="nav-submodule-text">Volunteer List</span>
-                    </a>
-                    <a href="schedule-management.php" class="nav-submodule" data-tooltip="Volunteer Request">
-                        <span class="nav-submodule-icon"><i class="fas fa-calendar"></i></span>
-                        <span class="nav-submodule-text">Volunteer Request</span>
-                    </a>
-                </div>
-            </div>
-            <div class="nav-module">
                 <div class="nav-module-header" onclick="toggleModule(this)" data-tooltip="Patrol Scheduling and Monitoring">
                     <span class="nav-module-icon"><i class="fas fa-walking"></i></span>
                     <span class="nav-module-header-text">Patrol Scheduling and Monitoring</span>
                     <span class="arrow">▶</span>
                 </div>
                 <div class="nav-submodules">
-                    <a href="patrol-list.php" class="nav-submodule" data-tooltip="Patrol List">
-                        <span class="nav-submodule-icon"><i class="fas fa-list"></i></span>
-                        <span class="nav-submodule-text">Patrol List</span>
-                    </a>
-                    <a href="patrol-schedule.php" class="nav-submodule" data-tooltip="Patrol Schedule">
-                        <span class="nav-submodule-icon"><i class="fas fa-calendar-alt"></i></span>
-                        <span class="nav-submodule-text">Patrol Schedule</span>
-                    </a>
-                    <a href="patrol-logs.php" class="nav-submodule" data-tooltip="Patrol Logs">
-                        <span class="nav-submodule-icon"><i class="fas fa-file"></i></span>
-                        <span class="nav-submodule-text">Patrol Logs</span>
-                    </a>
+                    <?php $patrolNavActive = $patrolNavActive ?? ''; require __DIR__ . '/includes/patrol_nav_submodules.php'; ?>
                 </div>
             </div>
             <div class="nav-module">
@@ -535,8 +313,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                 </div>
             </div>
         </nav>
-        
-        <!-- Sidebar Footer with Logout -->
+
         <div class="sidebar-footer">
             <a href="logout.php" class="sidebar-logout-btn" data-tooltip="Logout">
                 <i class="fas fa-sign-out-alt"></i>
@@ -544,13 +321,14 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             </a>
         </div>
     </aside>
+
     <div class="main-wrapper">
         <header class="top-header">
             <div class="top-header-content">
                 <button class="content-burger-btn" onclick="toggleSidebar()" aria-label="Toggle sidebar">
                     <span></span>
                 </button>
-                <h1 class="page-title">Playback - CCTV Recordings</h1>
+                <h1 class="page-title">Playback</h1>
             </div>
             <div class="user-info">
                 <div class="datetime-display">
@@ -558,7 +336,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                     <span class="time-part" id="currentTime"></span>
                 </div>
                 <div class="notification-container">
-                    <button class="notification-bell" onclick="toggleNotifications()" aria-label="Notifications">
+                    <button class="notification-bell" type="button" onclick="toggleNotifications(event)" aria-label="Notifications">
                         <i class="fas fa-bell"></i>
                         <span class="notification-badge" id="notificationBadge"></span>
                     </button>
@@ -577,81 +355,76 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                 </div>
             </div>
         </header>
+
         <main class="content-area">
             <div class="page-content">
-                <div class="playback-container">
-                    <!-- Search Controls -->
-                    <div class="playback-controls-panel">
-                        <div class="control-group">
-                            <label for="cameraSelect">Camera</label>
-                            <select id="cameraSelect">
-                                <option value="">All Cameras</option>
-                                <option value="CAM-001">CAM-001 - Main Entrance</option>
-                                <option value="CAM-002">CAM-002 - Barangay Hall</option>
-                                <option value="CAM-003">CAM-003 - Community Center</option>
-                            </select>
-                        </div>
-                        <div class="control-group">
-                            <label for="dateSelect">Date</label>
-                            <input type="date" id="dateSelect" value="<?php echo date('Y-m-d'); ?>">
-                        </div>
-                        <div class="control-group">
-                            <label for="startTime">Start Time</label>
-                            <input type="time" id="startTime" value="00:00">
-                        </div>
-                        <div class="control-group">
-                            <label for="endTime">End Time</label>
-                            <input type="time" id="endTime" value="23:59">
-                        </div>
-                        <button class="btn-search" onclick="searchRecordings()">
-                            <i class="fas fa-search"></i> Search
-                        </button>
-                    </div>
+                <div class="section-block">
+                    <h2 class="section-title"><i class="fas fa-history"></i> Recorded Footage Playback</h2>
+                    <div class="playback-panel">
+                        <p id="requestBanner" class="request-banner" style="display:none;"></p>
+                        <p id="playbackError" class="playback-error"></p>
 
-                    <!-- Video Player -->
-                    <div class="video-player-container" id="videoPlayerContainer">
-                        <div class="video-placeholder" id="videoPlaceholder">
-                            <div class="video-info" id="videoInfo">
-                                <p><strong>Camera:</strong> <span id="currentCamera">-</span></p>
-                                <p><strong>Date:</strong> <span id="currentDate">-</span></p>
-                                <p><strong>Time:</strong> <span id="currentTime">-</span></p>
+                        <div class="playback-filters">
+                            <div class="filter-field">
+                                <label for="cameraSelect">Camera</label>
+                                <select id="cameraSelect">
+                                    <option value="">Loading cameras...</option>
+                                </select>
+                            </div>
+                            <div class="filter-field">
+                                <label for="playbackDate">Date</label>
+                                <input type="date" id="playbackDate">
+                            </div>
+                            <div class="filter-field">
+                                <label for="playbackStart">Start time</label>
+                                <input type="time" id="playbackStart">
+                            </div>
+                            <div class="filter-field">
+                                <label for="playbackEnd">End time</label>
+                                <input type="time" id="playbackEnd">
+                            </div>
+                            <button type="button" class="btn-search" onclick="searchRecordings()">
+                                <i class="fas fa-search"></i> Search
+                            </button>
+                        </div>
+
+                        <div class="video-shell" id="videoShell">
+                            <button type="button" class="fullscreen-btn" id="fullscreenBtn" title="Full screen" aria-label="Toggle full screen">
+                                <i class="fas fa-expand"></i>
+                            </button>
+                            <video id="playbackVideo" controls playsinline></video>
+                            <div class="video-placeholder" id="videoPlaceholder">
+                                <i class="fas fa-film"></i>
+                                <p id="placeholderText">Select a date and search for recordings, or choose a segment below.</p>
                             </div>
                         </div>
-                    </div>
-                    <div class="playback-controls" id="playbackControls">
-                        <button onclick="togglePlayPause()" id="playPauseBtn">
-                            <i class="fas fa-play" id="playPauseIcon"></i>
-                        </button>
-                        <button onclick="skipBackward()">
-                            <i class="fas fa-backward"></i>
-                        </button>
-                        <button onclick="skipForward()">
-                            <i class="fas fa-forward"></i>
-                        </button>
-                        <div class="progress-container">
-                            <div class="progress-bar" onclick="seekTo(event)" id="progressBar">
-                                <div class="progress-fill" id="progressFill"></div>
-                            </div>
-                        </div>
-                        <div class="time-display">
-                            <span id="currentTimeDisplay">00:00</span> / <span id="totalTimeDisplay">00:00</span>
-                        </div>
-                        <button onclick="toggleFullscreen()">
-                            <i class="fas fa-expand"></i>
-                        </button>
-                    </div>
 
-                    <!-- Recordings List -->
-                    <div class="recordings-list">
-                        <h3>Available Recordings</h3>
-                        <div class="recordings-grid" id="recordingsGrid">
-                            <!-- Recordings will be populated here -->
+                        <div>
+                            <h3 class="section-title" style="font-size:1rem;margin-bottom:0.75rem;"><i class="fas fa-list"></i> Available Segments</h3>
+                            <div class="table-container segments-table">
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th>Recording</th>
+                                            <th>Start</th>
+                                            <th>End</th>
+                                            <th>Size</th>
+                                            <th>Status</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="segmentsTableBody">
+                                        <tr><td colspan="6" style="text-align:center;color:var(--text-secondary);">Loading segments...</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
         </main>
     </div>
+
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             const sidebar = document.getElementById('sidebar');
@@ -660,8 +433,268 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                 sidebar.classList.add('collapsed');
                 document.body.classList.add('sidebar-collapsed');
             }
-            initializeRecordings();
+            updateDateTime();
+            setInterval(updateDateTime, 1000);
+            initPlayback();
+            initFullscreen();
         });
+
+        let segmentData = {};
+
+        function initPlayback() {
+            applyQueryParams();
+            loadCameras();
+            loadSegments();
+            initSegmentActions();
+        }
+
+        function initSegmentActions() {
+            const tbody = document.getElementById('segmentsTableBody');
+            if (!tbody || tbody.dataset.actionsBound === '1') return;
+            tbody.dataset.actionsBound = '1';
+            tbody.addEventListener('click', function(e) {
+                const playBtn = e.target.closest('.btn-play-segment');
+                if (playBtn && !playBtn.disabled) {
+                    playSegment(playBtn.dataset.filename || '');
+                    return;
+                }
+                const downloadBtn = e.target.closest('.btn-download-segment');
+                if (downloadBtn) {
+                    downloadSegment(downloadBtn.dataset.filename || '');
+                }
+            });
+        }
+
+        function applyQueryParams() {
+            const params = new URLSearchParams(window.location.search);
+            const date = params.get('date');
+            const start = params.get('start');
+            const end = params.get('end');
+            const requestId = params.get('request_id');
+
+            if (date) document.getElementById('playbackDate').value = date;
+            if (start) document.getElementById('playbackStart').value = start.length === 5 ? start : start.slice(0, 5);
+            if (end) document.getElementById('playbackEnd').value = end.length === 5 ? end : end.slice(0, 5);
+
+            if (requestId) {
+                const banner = document.getElementById('requestBanner');
+                banner.style.display = 'block';
+                banner.innerHTML = '<i class="fas fa-link"></i> Opened from CCTV request <strong>' + escapeHtml(requestId) + '</strong>. Adjust the time range if needed, then click Search.';
+            }
+
+            window.__playbackCameraParam = params.get('camera') || '';
+            window.__autoSearch = !!(date || start || end);
+        }
+
+        async function loadCameras() {
+            const select = document.getElementById('cameraSelect');
+            try {
+                const res = await fetch('api/cameras.php');
+                const result = await res.json();
+                const cameras = result.cameras || result.data || [];
+                if (!cameras.length) {
+                    select.innerHTML = '<option value="">No cameras configured</option>';
+                    return;
+                }
+                select.innerHTML = cameras.map(function(cam) {
+                    const id = cam.cameraId || cam.camera_id || '';
+                    const label = (cam.name || id) + (cam.location ? ' — ' + cam.location : '');
+                    return '<option value="' + escapeHtml(id) + '">' + escapeHtml(label) + '</option>';
+                }).join('');
+
+                if (window.__playbackCameraParam) {
+                    select.value = window.__playbackCameraParam;
+                }
+            } catch (e) {
+                select.innerHTML = '<option value="">Unable to load cameras</option>';
+            }
+        }
+
+        function showPlaybackError(message) {
+            const el = document.getElementById('playbackError');
+            if (!message) {
+                el.textContent = '';
+                el.classList.remove('show');
+                return;
+            }
+            el.textContent = message;
+            el.classList.add('show');
+        }
+
+        function escapeHtml(value) {
+            return String(value ?? '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;');
+        }
+
+        async function loadSegments() {
+            const date = document.getElementById('playbackDate').value;
+            const url = 'api/recordings.php?action=list' + (date ? '&date=' + encodeURIComponent(date) : '');
+            await fetchAndRenderSegments(url, false);
+            if (window.__autoSearch) {
+                window.__autoSearch = false;
+                searchRecordings();
+            }
+        }
+
+        async function searchRecordings() {
+            const date = document.getElementById('playbackDate').value;
+            const start = document.getElementById('playbackStart').value;
+            const end = document.getElementById('playbackEnd').value;
+
+            showPlaybackError('');
+
+            if (!date) {
+                showPlaybackError('Please select a date to search.');
+                return;
+            }
+
+            let url = 'api/recordings.php?action=find&date=' + encodeURIComponent(date);
+            if (start) url += '&start=' + encodeURIComponent(start);
+            if (end) url += '&end=' + encodeURIComponent(end);
+
+            await fetchAndRenderSegments(url, true);
+        }
+
+        async function fetchAndRenderSegments(url, autoPlayFirst) {
+            const tbody = document.getElementById('segmentsTableBody');
+            tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-secondary);">Searching...</td></tr>';
+
+            try {
+                const res = await fetch(url);
+                const result = await res.json();
+                if (!result.success) throw new Error(result.message || 'Failed to load recordings');
+
+                renderSegments(result.data || [], autoPlayFirst);
+
+                if (!result.data || !result.data.length) {
+                    showPlaybackError('No recordings found for the selected date and time. Make sure the detection script was running during that period.');
+                }
+            } catch (e) {
+                tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#b91c1c;">Failed to load recordings.</td></tr>';
+                showPlaybackError(e.message || 'Failed to load recordings.');
+            }
+        }
+
+        function segmentStatusBadge(item) {
+            if (item.status === 'empty') return '<span class="segment-badge empty">Empty</span>';
+            if (item.status === 'recording') return '<span class="segment-badge recording">Recording…</span>';
+            if (item.legacy_codec) return '<span class="segment-badge legacy">Needs convert</span>';
+            return '<span class="segment-badge ready">Ready</span>';
+        }
+
+        function renderSegments(segments, autoPlayFirst) {
+            const tbody = document.getElementById('segmentsTableBody');
+            segmentData = {};
+
+            if (!segments.length) {
+                tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-secondary);">No recordings found.</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = segments.map(function(item) {
+                segmentData[item.filename] = item;
+                const canPlay = !!item.playable;
+                return `
+                    <tr>
+                        <td>${escapeHtml(item.filename)}</td>
+                        <td>${escapeHtml(item.start_at)}</td>
+                        <td>${escapeHtml(item.end_at)}</td>
+                        <td>${escapeHtml(item.size_label)}</td>
+                        <td>${segmentStatusBadge(item)}</td>
+                        <td>
+                            <button type="button" class="btn-play-segment" data-filename="${escapeHtml(item.filename)}" ${canPlay ? '' : 'disabled'}>Play</button>
+                            <button type="button" class="btn-download-segment" data-filename="${escapeHtml(item.filename)}">Download</button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+
+            const firstPlayable = segments.find(function(item) { return item.playable; });
+            if (autoPlayFirst && firstPlayable) {
+                playSegment(firstPlayable.filename);
+            } else if (autoPlayFirst && segments.some(function(item) { return item.legacy_codec; })) {
+                showPlaybackError('Matching recordings use a legacy codec. Run: py api/convert_recordings.py');
+            }
+        }
+
+        function downloadSegment(filename) {
+            window.location.href = 'api/recordings.php?action=download&file=' + encodeURIComponent(filename);
+        }
+
+        function playSegment(filename) {
+            const segment = segmentData[filename];
+            if (!segment) return;
+
+            if (!segment.playable) {
+                if (segment.status === 'recording') {
+                    showPlaybackError('This segment is still recording. Wait until the 5-minute chunk finishes, then play again.');
+                } else if (segment.legacy_codec) {
+                    showPlaybackError('This recording needs conversion first. Run: py api/convert_recordings.py');
+                } else {
+                    showPlaybackError('This recording file is empty or incomplete.');
+                }
+                return;
+            }
+
+            const video = document.getElementById('playbackVideo');
+            const placeholder = document.getElementById('videoPlaceholder');
+            const src = 'api/recordings.php?action=stream&file=' + encodeURIComponent(filename);
+
+            showPlaybackError('');
+            video.pause();
+            video.removeAttribute('src');
+            video.load();
+            video.src = src;
+            video.classList.add('active');
+            placeholder.classList.add('hidden');
+
+            video.onloadeddata = function() {
+                video.play().catch(function() {});
+            };
+            video.onerror = function() {
+                video.classList.remove('active');
+                placeholder.classList.remove('hidden');
+                showPlaybackError('Unable to play this recording in the browser. Try Download and open it in VLC.');
+            };
+
+            video.load();
+        }
+
+        function initFullscreen() {
+            const videoShell = document.getElementById('videoShell');
+            const fullscreenBtn = document.getElementById('fullscreenBtn');
+            const video = document.getElementById('playbackVideo');
+            if (!videoShell || !fullscreenBtn) return;
+
+            const updateIcon = function() {
+                const isFullscreen = document.fullscreenElement === videoShell;
+                const icon = fullscreenBtn.querySelector('i');
+                if (icon) icon.className = isFullscreen ? 'fas fa-compress' : 'fas fa-expand';
+            };
+
+            fullscreenBtn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                if (document.fullscreenElement === videoShell) {
+                    document.exitFullscreen();
+                } else {
+                    videoShell.requestFullscreen();
+                }
+            });
+
+            video.addEventListener('dblclick', function() {
+                if (document.fullscreenElement === videoShell) {
+                    document.exitFullscreen();
+                } else {
+                    videoShell.requestFullscreen();
+                }
+            });
+
+            document.addEventListener('fullscreenchange', updateIcon);
+        }
+
         function toggleSidebar() {
             const sidebar = document.getElementById('sidebar');
             const isCollapsed = sidebar.classList.contains('collapsed');
@@ -674,6 +707,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             }
             localStorage.setItem('sidebarCollapsed', !isCollapsed);
         }
+
         function toggleModule(element) {
             const sidebar = document.getElementById('sidebar');
             const module = element.closest('.nav-module');
@@ -695,447 +729,26 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             if (!isActive) { module.classList.add('active'); }
         }
 
-        let recordings = [];
-        let currentRecording = null;
-        let isPlaying = false;
-        let currentTime = 0;
-        let totalTime = 0;
-        let playbackInterval = null;
-
-        function initializeRecordings() {
-            recordings = [
-                {
-                    id: 1,
-                    camera: 'CAM-001',
-                    cameraName: 'Main Entrance',
-                    date: '2025-01-15',
-                    startTime: '08:00:00',
-                    endTime: '08:30:00',
-                    duration: '30:00',
-                    location: 'Susano Road, Barangay San Agustin, Quezon City'
-                },
-                {
-                    id: 2,
-                    camera: 'CAM-002',
-                    cameraName: 'Barangay Hall',
-                    date: '2025-01-15',
-                    startTime: '14:30:00',
-                    endTime: '15:00:00',
-                    duration: '30:00',
-                    location: 'Paraiso St., Barangay San Agustin, Quezon City'
-                },
-                {
-                    id: 3,
-                    camera: 'CAM-001',
-                    cameraName: 'Main Entrance',
-                    date: '2025-01-15',
-                    startTime: '18:00:00',
-                    endTime: '18:45:00',
-                    duration: '45:00',
-                    location: 'Susano Road, Barangay San Agustin, Quezon City'
-                },
-                {
-                    id: 4,
-                    camera: 'CAM-003',
-                    cameraName: 'Community Center',
-                    date: '2025-01-14',
-                    startTime: '10:00:00',
-                    endTime: '10:20:00',
-                    duration: '20:00',
-                    location: 'Clemente St., Barangay San Agustin, Quezon City'
-                },
-                {
-                    id: 5,
-                    camera: 'CAM-002',
-                    cameraName: 'Barangay Hall',
-                    date: '2025-01-14',
-                    startTime: '16:00:00',
-                    endTime: '17:00:00',
-                    duration: '60:00',
-                    location: 'Paraiso St., Barangay San Agustin, Quezon City'
-                },
-                {
-                    id: 6,
-                    camera: 'CAM-001',
-                    cameraName: 'Main Entrance',
-                    date: '2025-01-13',
-                    startTime: '12:00:00',
-                    endTime: '12:30:00',
-                    duration: '30:00',
-                    location: 'Susano Road, Barangay San Agustin, Quezon City'
-                }
-            ];
-            displayRecordings();
-        }
-
-        function displayRecordings() {
-            const grid = document.getElementById('recordingsGrid');
-            grid.innerHTML = '';
-            
-            recordings.forEach(recording => {
-                const card = document.createElement('div');
-                card.className = 'recording-card';
-                card.onclick = (e) => selectRecording(recording, e);
-                
-                card.innerHTML = `
-                    <div class="recording-thumbnail">📹</div>
-                    <div class="recording-info">
-                        <p><strong>${recording.camera}</strong> - ${recording.cameraName}</p>
-                        <p>${recording.date} ${recording.startTime} - ${recording.endTime}</p>
-                        <p class="recording-duration">Duration: ${recording.duration}</p>
-                        <p style="font-size: 0.8rem; color: #666;">${recording.location}</p>
-                    </div>
-                `;
-                
-                grid.appendChild(card);
-            });
-        }
-
-        function selectRecording(recording, event) {
-            currentRecording = recording;
-            document.querySelectorAll('.recording-card').forEach(card => {
-                card.classList.remove('active');
-            });
-            event.currentTarget.classList.add('active');
-            
-            document.getElementById('currentCamera').textContent = `${recording.camera} - ${recording.cameraName}`;
-            document.getElementById('currentDate').textContent = recording.date;
-            document.getElementById('currentTime').textContent = `${recording.startTime} - ${recording.endTime}`;
-            
-            const [hours, minutes, seconds] = recording.duration.split(':').map(Number);
-            totalTime = hours * 3600 + minutes * 60 + seconds;
-            currentTime = 0;
-            
-            document.getElementById('totalTimeDisplay').textContent = formatTime(totalTime);
-            document.getElementById('currentTimeDisplay').textContent = '00:00';
-            document.getElementById('progressFill').style.width = '0%';
-            
-            document.getElementById('videoPlayerContainer').classList.add('active');
-            document.getElementById('videoInfo').style.display = 'block';
-            document.getElementById('playbackControls').classList.add('active');
-            
-            pausePlayback();
-        }
-
-        function togglePlayPause() {
-            if (!currentRecording) return;
-            
-            isPlaying = !isPlaying;
-            const icon = document.getElementById('playPauseIcon');
-            
-            if (isPlaying) {
-                icon.classList.remove('fa-play');
-                icon.classList.add('fa-pause');
-                playbackInterval = setInterval(() => {
-                    currentTime += 1;
-                    updateProgress();
-                    if (currentTime >= totalTime) {
-                        pausePlayback();
-                    }
-                }, 1000);
-            } else {
-                pausePlayback();
-            }
-        }
-
-        function pausePlayback() {
-            isPlaying = false;
-            const icon = document.getElementById('playPauseIcon');
-            icon.classList.remove('fa-pause');
-            icon.classList.add('fa-play');
-            if (playbackInterval) {
-                clearInterval(playbackInterval);
-                playbackInterval = null;
-            }
-        }
-
-        function skipBackward() {
-            if (!currentRecording) return;
-            currentTime = Math.max(0, currentTime - 10);
-            updateProgress();
-        }
-
-        function skipForward() {
-            if (!currentRecording) return;
-            currentTime = Math.min(totalTime, currentTime + 10);
-            updateProgress();
-        }
-
-        function seekTo(event) {
-            if (!currentRecording) return;
-            const progressBar = document.getElementById('progressBar');
-            const rect = progressBar.getBoundingClientRect();
-            const x = event.clientX - rect.left;
-            const percentage = x / rect.width;
-            currentTime = Math.floor(totalTime * percentage);
-            updateProgress();
-        }
-
-        function updateProgress() {
-            const percentage = (currentTime / totalTime) * 100;
-            document.getElementById('progressFill').style.width = percentage + '%';
-            document.getElementById('currentTimeDisplay').textContent = formatTime(currentTime);
-        }
-
-        function formatTime(seconds) {
-            const hours = Math.floor(seconds / 3600);
-            const minutes = Math.floor((seconds % 3600) / 60);
-            const secs = seconds % 60;
-            if (hours > 0) {
-                return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-            }
-            return `${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-        }
-
-        function toggleFullscreen() {
-            const container = document.querySelector('.video-player-container');
-            if (!document.fullscreenElement) {
-                container.requestFullscreen().catch(err => {
-                    alert('Error attempting to enable fullscreen');
-                });
-            } else {
-                document.exitFullscreen();
-            }
-        }
-
-        function searchRecordings() {
-            const camera = document.getElementById('cameraSelect').value;
-            const date = document.getElementById('dateSelect').value;
-            const startTime = document.getElementById('startTime').value;
-            const endTime = document.getElementById('endTime').value;
-            
-            let filtered = recordings;
-            
-            if (camera) {
-                filtered = filtered.filter(r => r.camera === camera);
-            }
-            
-            if (date) {
-                filtered = filtered.filter(r => r.date === date);
-            }
-            
-            if (startTime && endTime) {
-                filtered = filtered.filter(r => {
-                    const recStart = r.startTime.split(':').slice(0, 2).join(':');
-                    const recEnd = r.endTime.split(':').slice(0, 2).join(':');
-                    return recStart >= startTime && recEnd <= endTime;
-                });
-            }
-            
-            const grid = document.getElementById('recordingsGrid');
-            grid.innerHTML = '';
-            
-            if (filtered.length === 0) {
-                grid.innerHTML = '<p style="grid-column: 1 / -1; text-align: center; color: #999; padding: 2rem;">No recordings found matching your criteria.</p>';
-                return;
-            }
-            
-            filtered.forEach(recording => {
-                const card = document.createElement('div');
-                card.className = 'recording-card';
-                card.onclick = (e) => selectRecording(recording, e);
-                
-                card.innerHTML = `
-                    <div class="recording-thumbnail">📹</div>
-                    <div class="recording-info">
-                        <p><strong>${recording.camera}</strong> - ${recording.cameraName}</p>
-                        <p>${recording.date} ${recording.startTime} - ${recording.endTime}</p>
-                        <p class="recording-duration">Duration: ${recording.duration}</p>
-                        <p style="font-size: 0.8rem; color: #666;">${recording.location}</p>
-                    </div>
-                `;
-                
-                grid.appendChild(card);
-            });
-        }
-        
-        // Date and Time Display
         function updateDateTime() {
             const now = new Date();
-            const dateOptions = { 
-                weekday: 'short', 
-                year: 'numeric', 
-                month: 'short', 
-                day: 'numeric' 
-            };
-            const timeOptions = { 
-                hour: '2-digit', 
-                minute: '2-digit', 
+            const dateStr = now.toLocaleDateString('en-US', {
+                weekday: 'short',
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric'
+            });
+            const timeStr = now.toLocaleTimeString('en-US', {
+                hour: '2-digit',
+                minute: '2-digit',
                 second: '2-digit',
-                hour12: true 
-            };
-            
-            const dateStr = now.toLocaleDateString('en-US', dateOptions);
-            const timeStr = now.toLocaleTimeString('en-US', timeOptions);
-            
+                hour12: true
+            });
             const dateEl = document.getElementById('currentDate');
             const timeEl = document.getElementById('currentTime');
-            
             if (dateEl) dateEl.textContent = dateStr;
             if (timeEl) timeEl.textContent = timeStr;
         }
-        
-        // Update date/time immediately and then every second
-        updateDateTime();
-        setInterval(updateDateTime, 1000);
-        
-        // Notification System
-        let notificationDropdown = null;
-        let notificationBadge = null;
-        let notificationList = null;
-        
-        document.addEventListener('DOMContentLoaded', function() {
-            notificationDropdown = document.getElementById('notificationDropdown');
-            notificationBadge = document.getElementById('notificationBadge');
-            notificationList = document.getElementById('notificationList');
-            
-            if (notificationDropdown && notificationBadge && notificationList) {
-                loadNotifications();
-                // Refresh notifications every 30 seconds
-                setInterval(loadNotifications, 30000);
-                
-                // Close dropdown when clicking outside
-                document.addEventListener('click', function(event) {
-                    if (notificationDropdown && !event.target.closest('.notification-container')) {
-                        notificationDropdown.classList.remove('show');
-                    }
-                });
-            }
-        });
-        
-        function toggleNotifications() {
-            if (notificationDropdown) {
-                notificationDropdown.classList.toggle('show');
-                if (notificationDropdown.classList.contains('show')) {
-                    loadNotifications();
-                }
-            }
-        }
-        
-        async function loadNotifications() {
-            try {
-                // Sync activities first
-                await fetch('api/notifications.php?action=sync');
-                
-                // Then load notifications
-                const response = await fetch('api/notifications.php?action=list');
-                const data = await response.json();
-                
-                if (data.success) {
-                    updateNotificationBadge(data.unread_count);
-                    renderNotifications(data.notifications);
-                }
-            } catch (error) {
-                console.error('Error loading notifications:', error);
-            }
-        }
-        
-        function updateNotificationBadge(count) {
-            if (notificationBadge) {
-                if (count > 0) {
-                    notificationBadge.textContent = count > 99 ? '99+' : count;
-                    notificationBadge.classList.add('show');
-                } else {
-                    notificationBadge.classList.remove('show');
-                }
-            }
-        }
-        
-        function renderNotifications(notifications) {
-            if (!notificationList) return;
-            
-            if (notifications.length === 0) {
-                notificationList.innerHTML = `
-                    <div class="notification-empty">
-                        <i class="fas fa-bell-slash"></i>
-                        <p>No notifications</p>
-                    </div>
-                `;
-                return;
-            }
-            
-            notificationList.innerHTML = notifications.map(notif => {
-                let iconClass, icon;
-                if (notif.type === 'complaint' || notif.type === 'incident') {
-                    iconClass = 'complaint';
-                    icon = 'fa-file-alt';
-                } else if (notif.type === 'tip') {
-                    iconClass = 'tip';
-                    icon = 'fa-comments';
-                } else if (notif.type === 'volunteer' || notif.type === 'volunteer_request') {
-                    iconClass = 'volunteer';
-                    icon = 'fa-handshake';
-                } else if (notif.type === 'login') {
-                    iconClass = 'login';
-                    icon = 'fa-sign-in-alt';
-                } else if (notif.type === 'logout') {
-                    iconClass = 'logout';
-                    icon = 'fa-sign-out-alt';
-                } else if (notif.type === 'event' || notif.type === 'event_report' || notif.type === 'patrol') {
-                    iconClass = 'event';
-                    icon = 'fa-bullhorn';
-                } else {
-                    iconClass = 'event';
-                    icon = 'fa-bullhorn';
-                }
-                
-                const safeLink = (notif.link || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
-                
-                return `
-                    <div class="notification-item ${notif.is_read ? '' : 'unread'}" 
-                         onclick="handleNotificationClick(${notif.id}, '${safeLink}')">
-                        <div class="notification-icon ${iconClass}">
-                            <i class="fas ${icon}"></i>
-                        </div>
-                        <div class="notification-content">
-                            <div class="notification-title">${escapeHtml(notif.title)}</div>
-                            <div class="notification-message">${escapeHtml(notif.message)}</div>
-                            <div class="notification-time">${notif.time_ago}</div>
-                        </div>
-                    </div>
-                `;
-            }).join('');
-        }
-        
-        function handleNotificationClick(id, link) {
-            // Mark as read
-            fetch('api/notifications.php?action=mark_read', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: 'id=' + id
-            });
-            
-            // Remove unread class
-            const item = event.currentTarget;
-            item.classList.remove('unread');
-            
-            // Navigate if link exists
-            if (link && link !== '') {
-                window.location.href = link;
-            }
-            
-            // Reload notifications to update badge
-            loadNotifications();
-        }
-        
-        async function markAllAsRead() {
-            try {
-                await fetch('api/notifications.php?action=mark_read', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
-                });
-                loadNotifications();
-            } catch (error) {
-                console.error('Error marking all as read:', error);
-            }
-        }
-        
-        function escapeHtml(text) {
-            const div = document.createElement('div');
-            div.textContent = text;
-            return div.innerHTML;
-        }
     </script>
+    <?php require __DIR__ . '/includes/admin_notifications_script.php'; ?>
 </body>
 </html>
-

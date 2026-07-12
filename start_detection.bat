@@ -1,12 +1,13 @@
-@echo off
+@echo Open
 echo ========================================
-echo Starting YOLO Object Detection System
+echo Starting YOLO IP Camera Detection
 echo ========================================
 echo.
-cd /d C:\xampp\htdocs\cps
+cd /d "%~dp0"
+set "PATH=%~dp0;%PATH%"
 echo Current directory: %CD%
 echo.
-echo Starting detection script...
+echo Starting IP camera detection script...
 echo Press Ctrl+C to stop
 echo.
 py detect.py

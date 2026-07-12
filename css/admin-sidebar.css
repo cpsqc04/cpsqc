@@ -1,0 +1,75 @@
+/* Admin portal sidebar — compact layout, hidden scrollbar */
+.sidebar-header {
+    padding: 1rem !important;
+    min-height: 118px !important;
+    flex-shrink: 0;
+}
+.sidebar.collapsed .sidebar-header {
+    min-height: 96px !important;
+    padding: 0.75rem 0.5rem !important;
+}
+.logo-container {
+    gap: 0.35rem !important;
+}
+.logo-container img {
+    height: 80px !important;
+    width: 80px !important;
+}
+.sidebar.collapsed .logo-container img {
+    height: 52px !important;
+    width: 52px !important;
+}
+.sidebar-nav {
+    padding: 0.25rem 0 !important;
+    scrollbar-width: none !important;
+    -ms-overflow-style: none !important;
+}
+.sidebar-nav::-webkit-scrollbar {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+}
+.sidebar.collapsed .sidebar-nav {
+    scrollbar-width: none !important;
+    -ms-overflow-style: none !important;
+}
+.sidebar-footer {
+    flex-shrink: 0;
+    padding: 0.75rem 1rem !important;
+}
+.sidebar-logout-btn {
+    padding: 0.75rem 1.25rem !important;
+    font-size: 0.95rem !important;
+}
+.nav-module {
+    margin-bottom: 0 !important;
+}
+.nav-module-header {
+    padding: 0.7rem 1.25rem !important;
+    font-size: 0.84rem !important;
+    line-height: 1.3 !important;
+    gap: 0.65rem !important;
+}
+.sidebar.collapsed .nav-module-header {
+    padding: 0.6rem !important;
+    min-height: 42px !important;
+    max-height: 42px !important;
+    margin: 0.15rem 0.4rem !important;
+}
+.nav-submodule {
+    padding: 0.6rem 1.25rem 0.6rem 3rem !important;
+    font-size: 0.8rem !important;
+}
+.nav-submodule:hover {
+    padding-left: 3.25rem !important;
+}
+.sidebar.collapsed .nav-submodule {
+    min-height: 40px !important;
+    padding: 0.6rem !important;
+}
+.sidebar.collapsed .nav-submodule:hover {
+    padding-left: 0.6rem !important;
+}
+a.nav-module-header {
+    padding: 0.7rem 1.25rem !important;
+}

@@ -117,3 +117,9 @@ try {
     // Don't die() - let the calling code handle the error
     // This prevents 500 errors and allows proper error responses
 }
+
+require_once __DIR__ . '/includes/admin_auth.php';
+
+if ($pdo instanceof PDO && session_status() === PHP_SESSION_ACTIVE) {
+    syncAdminSessionRole($pdo);
+}

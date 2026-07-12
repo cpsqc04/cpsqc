@@ -49,9 +49,12 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
 // Load database connection with error handling
 try {
     require_once __DIR__ . '/../db.php';
-    if (!isset($pdo)) {
+    require_once __DIR__ . '/patrol_logs_schema.php';
+    require_once __DIR__ . '/notifications_schema.php';
+    if (!($pdo instanceof PDO)) {
         throw new Exception('Database connection not available');
     }
+    ensureNotificationsTable($pdo);
 } catch (Exception $e) {
     ob_clean();
     http_response_code(500);
@@ -66,25 +69,19 @@ try {
 
 // Ensure notifications table exists
 try {
-    $pdo->exec("CREATE TABLE IF NOT EXISTS notifications (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        user_id INT DEFAULT NULL,
-        type VARCHAR(50) NOT NULL,
-        title VARCHAR(255) NOT NULL,
-        message TEXT NOT NULL,
-        link VARCHAR(255) DEFAULT NULL,
-        is_read TINYINT(1) DEFAULT 0,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        INDEX idx_user_id (user_id),
-        INDEX idx_is_read (is_read),
-        INDEX idx_created_at (created_at)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+    ensureNotificationsTable($pdo);
 } catch (PDOException $e) {
     // Table might already exist, continue
 }
 
 $action = $_GET['action'] ?? 'list';
 $userId = $_SESSION['user_id'] ?? null;
+
+function notificationsIsAdmin(): bool
+{
+    $userRole = trim((string) ($_SESSION['user_role'] ?? ''));
+    return $userRole === '' || strcasecmp($userRole, 'Admin') === 0;
+}
 
 // Debug mode - only log in development
 $debugMode = isset($_ENV['ENVIRONMENT']) && $_ENV['ENVIRONMENT'] !== 'production';
@@ -95,8 +92,7 @@ if ($debugMode) {
 try {
     if ($action === 'list') {
         // Get user role
-        $userRole = $_SESSION['user_role'] ?? 'User';
-        $isAdmin = ($userRole === 'Admin');
+        $isAdmin = notificationsIsAdmin();
         
         // Initialize variables
         $notifications = [];
@@ -216,8 +212,7 @@ try {
         
     } elseif ($action === 'mark_read') {
         $notificationId = $_POST['id'] ?? null;
-        $userRole = $_SESSION['user_role'] ?? 'User';
-        $isAdmin = ($userRole === 'Admin');
+        $isAdmin = notificationsIsAdmin();
         
         if ($notificationId) {
             // Users can only mark their own notifications as read
@@ -256,19 +251,15 @@ try {
                 ORDER BY submitted_at DESC
             ");
             while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
-                // Check if notification already exists
-                $checkStmt = $pdo->prepare("SELECT id FROM notifications WHERE type = 'complaint' AND link = :link LIMIT 1");
-                $checkStmt->execute([':link' => 'track-complaint.php?id=' . $row['complaint_id']]);
-                if (!$checkStmt->fetch()) {
-                    $insertStmt = $pdo->prepare("
-                        INSERT INTO notifications (type, title, message, link, created_at) 
-                        VALUES ('complaint', 'New Complaint Submitted', :message, :link, :created_at)
-                    ");
-                    $insertStmt->execute([
-                        ':message' => 'Complaint #' . $row['complaint_id'] . ' - ' . ($row['complaint_type'] ?? 'Unknown') . ' at ' . ($row['location'] ?? 'Unknown location'),
-                        ':link' => 'track-complaint.php?id=' . $row['complaint_id'],
-                        ':created_at' => $row['submitted_at']
-                    ]);
+                if (createAdminNotification(
+                    $pdo,
+                    'complaint',
+                    'New Complaint Submitted',
+                    'Complaint #' . $row['complaint_id'] . ' - ' . ($row['complaint_type'] ?? 'Unknown') . ' from ' . ($row['complainant_name'] ?? 'Unknown'),
+                    'track-complaint.php?id=' . $row['complaint_id'],
+                    null,
+                    $row['submitted_at']
+                )) {
                     $synced++;
                 }
             }
@@ -285,18 +276,15 @@ try {
                 ORDER BY submitted_at DESC
             ");
             while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
-                $checkStmt = $pdo->prepare("SELECT id FROM notifications WHERE type = 'tip' AND link = :link LIMIT 1");
-                $checkStmt->execute([':link' => 'review-tip.php?id=' . $row['tip_id']]);
-                if (!$checkStmt->fetch()) {
-                    $insertStmt = $pdo->prepare("
-                        INSERT INTO notifications (type, title, message, link, created_at) 
-                        VALUES ('tip', 'New Tip Received', :message, :link, :created_at)
-                    ");
-                    $insertStmt->execute([
-                        ':message' => 'Tip #' . $row['tip_id'] . ' - ' . ($row['location'] ?? 'Unknown location'),
-                        ':link' => 'review-tip.php?id=' . $row['tip_id'],
-                        ':created_at' => $row['submitted_at']
-                    ]);
+                if (createAdminNotification(
+                    $pdo,
+                    'tip',
+                    'New Tip Received',
+                    'Tip #' . $row['tip_id'] . ' - ' . ($row['location'] ?? 'Unknown location'),
+                    'review-tip.php?id=' . $row['tip_id'],
+                    null,
+                    $row['submitted_at']
+                )) {
                     $synced++;
                 }
             }
@@ -304,25 +292,25 @@ try {
             // Tips table doesn't exist, skip
         }
         
-        // Sync recent volunteers (last 7 days)
+        // Sync recent neighborhood watch applications (last 7 days)
         try {
             $stmt = $pdo->query("
                 SELECT id, name, status, created_at 
-                FROM volunteers 
+                FROM nw_members 
                 WHERE created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
                 ORDER BY created_at DESC
             ");
             while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
                 $checkStmt = $pdo->prepare("SELECT id FROM notifications WHERE type = 'volunteer' AND link = :link LIMIT 1");
-                $checkStmt->execute([':link' => 'volunteer-list.php?id=' . $row['id']]);
+                $checkStmt->execute([':link' => 'neighborhood-watch-application.php?id=' . $row['id']]);
                 if (!$checkStmt->fetch()) {
                     $insertStmt = $pdo->prepare("
                         INSERT INTO notifications (type, title, message, link, created_at) 
-                        VALUES ('volunteer', 'New Volunteer Registration', :message, :link, :created_at)
+                        VALUES ('volunteer', 'New Neighborhood Watch Application', :message, :link, :created_at)
                     ");
                     $insertStmt->execute([
-                        ':message' => $row['name'] . ' registered as volunteer (Status: ' . $row['status'] . ')',
-                        ':link' => 'volunteer-list.php?id=' . $row['id'],
+                        ':message' => $row['name'] . ' submitted a neighborhood watch membership application (Status: ' . $row['status'] . ')',
+                        ':link' => 'neighborhood-watch-application.php?id=' . $row['id'],
                         ':created_at' => $row['created_at']
                     ]);
                     $synced++;
@@ -409,7 +397,7 @@ try {
                     ");
                     while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
                         $checkStmt = $pdo->prepare("SELECT id FROM notifications WHERE type = 'incident' AND link = :link LIMIT 1");
-                        $checkStmt->execute([':link' => 'incident-feed.php?id=' . ($row['incident_id'] ?? $row['id'])]);
+                        $checkStmt->execute([':link' => 'patrol-schedule.php?id=' . ($row['incident_id'] ?? $row['id'])]);
                         if (!$checkStmt->fetch()) {
                             $insertStmt = $pdo->prepare("
                                 INSERT INTO notifications (type, title, message, link, created_at) 
@@ -460,44 +448,14 @@ try {
             // Table check failed, skip
         }
         
-        // Sync volunteer requests for events (last 7 days)
-        try {
-            $stmt = $pdo->query("SHOW TABLES LIKE 'volunteer_requests'");
-            if ($stmt->rowCount() > 0) {
-                $stmt = $pdo->query("
-                    SELECT id, request_id, event_name, volunteers_needed, request_date, created_at 
-                    FROM volunteer_requests 
-                    WHERE created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
-                    ORDER BY created_at DESC
-                ");
-                while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
-                    $checkStmt = $pdo->prepare("SELECT id FROM notifications WHERE type = 'volunteer_request' AND link = :link LIMIT 1");
-                    $checkStmt->execute([':link' => 'schedule-management.php?id=' . ($row['request_id'] ?? $row['id'])]);
-                    if (!$checkStmt->fetch()) {
-                        $insertStmt = $pdo->prepare("
-                            INSERT INTO notifications (type, title, message, link, created_at) 
-                            VALUES ('volunteer_request', 'Volunteer Request for Event', :message, :link, :created_at)
-                        ");
-                        $insertStmt->execute([
-                            ':message' => 'Volunteer request for ' . ($row['event_name'] ?? 'Event') . ' - ' . ($row['volunteers_needed'] ?? 0) . ' volunteers needed',
-                            ':link' => 'schedule-management.php?id=' . ($row['request_id'] ?? $row['id']),
-                            ':created_at' => $row['created_at']
-                        ]);
-                        $synced++;
-                    }
-                }
-            }
-        } catch (PDOException $e) {
-            // volunteer_requests table doesn't exist, skip
-        }
-        
         // Sync recent patrol logs (last 7 days) - for completed patrols or new assignments
         try {
+            ensurePatrolLogsTable($pdo);
             $stmt = $pdo->query("SHOW TABLES LIKE 'patrol_logs'");
             if ($stmt->rowCount() > 0) {
                 // New patrol assignments
                 $stmt = $pdo->query("
-                    SELECT id, officer_name, route, date, time, status, created_at 
+                    SELECT id, personnel_name, route, date, time, status, created_at 
                     FROM patrol_logs 
                     WHERE created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
                     AND status != 'Completed'
@@ -512,7 +470,7 @@ try {
                             VALUES ('patrol', 'New Patrol Assignment', :message, :link, :created_at)
                         ");
                         $insertStmt->execute([
-                            ':message' => ($row['officer_name'] ?? 'Officer') . ' assigned to patrol route: ' . ($row['route'] ?? 'Unknown route'),
+                            ':message' => ($row['personnel_name'] ?? 'BPSO Personnel') . ' assigned to patrol route: ' . ($row['route'] ?? 'Unknown route'),
                             ':link' => 'patrol-logs.php?id=' . $row['id'],
                             ':created_at' => $row['created_at']
                         ]);

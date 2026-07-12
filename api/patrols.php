@@ -4,49 +4,60 @@ session_start();
 header('Content-Type: application/json');
 
 require_once __DIR__ . '/../db.php';
+require_once __DIR__ . '/patrol_logs_schema.php';
 
 /**
  * Ensure the patrols table (and required columns) exist in the database.
  */
 function ensurePatrolsTable(PDO $pdo): void
 {
-    // Get existing columns
     $columns = [];
     $tableExists = false;
-    
+
     try {
         foreach ($pdo->query('SHOW COLUMNS FROM patrols') as $row) {
             $columns[$row['Field']] = true;
             $tableExists = true;
         }
     } catch (PDOException $e) {
-        // Table doesn't exist yet, will create it
         $tableExists = false;
     }
 
-    // Create table if it doesn't exist
     if (!$tableExists) {
         $pdo->exec("CREATE TABLE patrols (
             id INT AUTO_INCREMENT PRIMARY KEY,
-            badge_number VARCHAR(50) NOT NULL UNIQUE,
-            officer_name VARCHAR(255) NOT NULL,
+            bpso_personnel_id VARCHAR(50) NOT NULL UNIQUE,
+            personnel_name VARCHAR(255) NOT NULL,
             contact_number VARCHAR(50) NOT NULL,
             schedule VARCHAR(255) NOT NULL,
             status VARCHAR(50) NOT NULL DEFAULT 'Available',
+            email VARCHAR(255) NULL,
+            password_hash VARCHAR(255) NULL,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
-        return; // Table created with all columns, no need to check further
+        return;
     }
 
-    // Table exists - check and add missing columns
-    if (!isset($columns['badge_number'])) {
-        $pdo->exec('ALTER TABLE patrols ADD COLUMN badge_number VARCHAR(50) NOT NULL UNIQUE DEFAULT "" AFTER id');
+    if (isset($columns['badge_number']) && !isset($columns['bpso_personnel_id'])) {
+        $pdo->exec('ALTER TABLE patrols CHANGE badge_number bpso_personnel_id VARCHAR(50) NOT NULL');
+        unset($columns['badge_number']);
+        $columns['bpso_personnel_id'] = true;
     }
-    if (!isset($columns['officer_name'])) {
-        $pdo->exec('ALTER TABLE patrols ADD COLUMN officer_name VARCHAR(255) NOT NULL DEFAULT "" AFTER badge_number');
+
+    if (isset($columns['officer_name']) && !isset($columns['personnel_name'])) {
+        $pdo->exec('ALTER TABLE patrols CHANGE officer_name personnel_name VARCHAR(255) NOT NULL');
+        unset($columns['officer_name']);
+        $columns['personnel_name'] = true;
+    }
+
+    if (!isset($columns['bpso_personnel_id'])) {
+        $pdo->exec('ALTER TABLE patrols ADD COLUMN bpso_personnel_id VARCHAR(50) NOT NULL UNIQUE DEFAULT "" AFTER id');
+    }
+    if (!isset($columns['personnel_name'])) {
+        $pdo->exec('ALTER TABLE patrols ADD COLUMN personnel_name VARCHAR(255) NOT NULL DEFAULT "" AFTER bpso_personnel_id');
     }
     if (!isset($columns['contact_number'])) {
-        $pdo->exec('ALTER TABLE patrols ADD COLUMN contact_number VARCHAR(50) NOT NULL DEFAULT "" AFTER officer_name');
+        $pdo->exec('ALTER TABLE patrols ADD COLUMN contact_number VARCHAR(50) NOT NULL DEFAULT "" AFTER personnel_name');
     }
     if (!isset($columns['schedule'])) {
         $pdo->exec('ALTER TABLE patrols ADD COLUMN schedule VARCHAR(255) NOT NULL DEFAULT "" AFTER contact_number');
@@ -54,30 +65,32 @@ function ensurePatrolsTable(PDO $pdo): void
     if (!isset($columns['status'])) {
         $pdo->exec('ALTER TABLE patrols ADD COLUMN status VARCHAR(50) NOT NULL DEFAULT "Available" AFTER schedule');
     }
+    if (!isset($columns['email'])) {
+        $pdo->exec('ALTER TABLE patrols ADD COLUMN email VARCHAR(255) NULL UNIQUE AFTER status');
+    }
+    if (!isset($columns['password_hash'])) {
+        $pdo->exec('ALTER TABLE patrols ADD COLUMN password_hash VARCHAR(255) NULL AFTER email');
+    }
     if (!isset($columns['created_at'])) {
         $pdo->exec('ALTER TABLE patrols ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP');
     }
-    
-    // Handle existing badge_number UNIQUE constraint if it causes issues
-    if (isset($columns['badge_number'])) {
-        try {
-            // Check if there are duplicate empty badge numbers and fix them
-            $pdo->exec("UPDATE patrols SET badge_number = CONCAT('PO-', id) WHERE badge_number = '' OR badge_number IS NULL");
-        } catch (PDOException $e) {
-            // Ignore if update fails
-        }
+
+    try {
+        $pdo->exec("UPDATE patrols SET bpso_personnel_id = CONCAT('BPSO-', id) WHERE bpso_personnel_id = '' OR bpso_personnel_id IS NULL");
+    } catch (PDOException $e) {
+        // Ignore if update fails
     }
 }
 
 try {
     ensurePatrolsTable($pdo);
+    ensurePatrolLogsTable($pdo);
 } catch (PDOException $e) {
     http_response_code(500);
-    echo json_encode(['success' => false, 'message' => 'Failed to prepare patrols table: ' . $e->getMessage()]);
+    echo json_encode(['success' => false, 'message' => 'Failed to prepare patrol tables: ' . $e->getMessage()]);
     exit;
 }
 
-// Basic auth check – only allow logged-in admins to use this API
 if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
     http_response_code(401);
     echo json_encode(['success' => false, 'message' => 'Unauthorized']);
@@ -87,9 +100,8 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
 $method = $_SERVER['REQUEST_METHOD'];
 
 if ($method === 'GET') {
-    // Return all patrols
     try {
-        $stmt = $pdo->query('SELECT id, badge_number, officer_name, contact_number, schedule, status, created_at FROM patrols ORDER BY id DESC');
+        $stmt = $pdo->query('SELECT id, bpso_personnel_id, personnel_name, contact_number, email, schedule, status, created_at FROM patrols ORDER BY id DESC');
         $patrols = $stmt->fetchAll();
 
         echo json_encode([
@@ -103,30 +115,55 @@ if ($method === 'GET') {
     exit;
 }
 
-// For create/update/delete we expect JSON
 $input = json_decode(file_get_contents('php://input'), true) ?? [];
 $action = $input['action'] ?? '';
 
 if ($method === 'POST') {
     if ($action === 'create') {
-        $badgeNumber = trim($input['badge_number'] ?? '');
-        $officerName = trim($input['officer_name'] ?? '');
+        $personnelId = trim($input['bpso_personnel_id'] ?? '');
+        $personnelName = trim($input['personnel_name'] ?? '');
         $contactNumber = trim($input['contact_number'] ?? '');
+        $email = trim($input['email'] ?? '');
+        $password = $input['password'] ?? '';
         $schedule = trim($input['schedule'] ?? '');
         $status = trim($input['status'] ?? 'Available');
 
-        if ($badgeNumber === '' || $officerName === '' || $contactNumber === '' || $schedule === '') {
+        if ($personnelId === '' || $personnelName === '' || $contactNumber === '' || $email === '' || $password === '' || $schedule === '') {
             http_response_code(400);
             echo json_encode(['success' => false, 'message' => 'Missing required fields.']);
             exit;
         }
 
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'message' => 'Invalid email address.']);
+            exit;
+        }
+
+        if (!preg_match('/[A-Z]/', $password) || !preg_match('/[0-9!@#$%^&*(),.?":{}|<>]/', $password)) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'message' => 'Password must contain at least one capital letter and one number or special character.']);
+            exit;
+        }
+
+        $passwordHash = password_hash($password, PASSWORD_DEFAULT);
+
         try {
-            $stmt = $pdo->prepare('INSERT INTO patrols (badge_number, officer_name, contact_number, schedule, status) VALUES (:badge_number, :officer_name, :contact_number, :schedule, :status)');
+            $emailCheck = $pdo->prepare('SELECT COUNT(*) FROM patrols WHERE email = :email');
+            $emailCheck->execute([':email' => $email]);
+            if ($emailCheck->fetchColumn() > 0) {
+                http_response_code(400);
+                echo json_encode(['success' => false, 'message' => 'Email address already exists.']);
+                exit;
+            }
+
+            $stmt = $pdo->prepare('INSERT INTO patrols (bpso_personnel_id, personnel_name, contact_number, email, password_hash, schedule, status) VALUES (:bpso_personnel_id, :personnel_name, :contact_number, :email, :password_hash, :schedule, :status)');
             $stmt->execute([
-                ':badge_number' => $badgeNumber,
-                ':officer_name' => $officerName,
+                ':bpso_personnel_id' => $personnelId,
+                ':personnel_name' => $personnelName,
                 ':contact_number' => $contactNumber,
+                ':email' => $email,
+                ':password_hash' => $passwordHash,
                 ':schedule' => $schedule,
                 ':status' => $status,
             ]);
@@ -137,9 +174,10 @@ if ($method === 'POST') {
                 'success' => true,
                 'data' => [
                     'id' => $id,
-                    'badge_number' => $badgeNumber,
-                    'officer_name' => $officerName,
+                    'bpso_personnel_id' => $personnelId,
+                    'personnel_name' => $personnelName,
                     'contact_number' => $contactNumber,
+                    'email' => $email,
                     'schedule' => $schedule,
                     'status' => $status,
                 ],
@@ -147,9 +185,13 @@ if ($method === 'POST') {
         } catch (PDOException $e) {
             http_response_code(500);
             if (strpos($e->getMessage(), 'Duplicate entry') !== false) {
-                echo json_encode(['success' => false, 'message' => 'Badge number already exists. Please use a unique badge number.']);
+                if (strpos($e->getMessage(), 'email') !== false) {
+                    echo json_encode(['success' => false, 'message' => 'Email address already exists.']);
+                } else {
+                    echo json_encode(['success' => false, 'message' => 'BPSO Personnel ID already exists. Please use a unique BPSO Personnel ID.']);
+                }
             } else {
-                echo json_encode(['success' => false, 'message' => 'Failed to save patrol officer: ' . $e->getMessage()]);
+                echo json_encode(['success' => false, 'message' => 'Failed to save BPSO personnel: ' . $e->getMessage()]);
             }
         }
         exit;
@@ -157,58 +199,108 @@ if ($method === 'POST') {
 
     if ($action === 'update') {
         $id = (int)($input['id'] ?? 0);
-        $badgeNumber = trim($input['badge_number'] ?? '');
-        $officerName = trim($input['officer_name'] ?? '');
+        $personnelId = trim($input['bpso_personnel_id'] ?? '');
+        $personnelName = trim($input['personnel_name'] ?? '');
         $contactNumber = trim($input['contact_number'] ?? '');
+        $email = trim($input['email'] ?? '');
+        $password = $input['password'] ?? '';
         $schedule = trim($input['schedule'] ?? '');
         $status = trim($input['status'] ?? '');
 
-        if ($id <= 0 || $badgeNumber === '' || $officerName === '' || $contactNumber === '' || $schedule === '' || $status === '') {
+        if ($id <= 0 || $personnelId === '' || $personnelName === '' || $contactNumber === '' || $email === '' || $schedule === '' || $status === '') {
             http_response_code(400);
             echo json_encode(['success' => false, 'message' => 'Missing required fields.']);
             exit;
         }
 
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'message' => 'Invalid email address.']);
+            exit;
+        }
+
+        if ($password !== '') {
+            if (!preg_match('/[A-Z]/', $password) || !preg_match('/[0-9!@#$%^&*(),.?":{}|<>]/', $password)) {
+                http_response_code(400);
+                echo json_encode(['success' => false, 'message' => 'Password must contain at least one capital letter and one number or special character.']);
+                exit;
+            }
+        }
+
         try {
-            // Check if badge number is being changed and if new one already exists
-            $checkStmt = $pdo->prepare('SELECT badge_number FROM patrols WHERE id = :id');
+            $checkStmt = $pdo->prepare('SELECT bpso_personnel_id FROM patrols WHERE id = :id');
             $checkStmt->execute([':id' => $id]);
             $current = $checkStmt->fetch();
-            
-            if ($current && $current['badge_number'] !== $badgeNumber) {
-                $duplicateStmt = $pdo->prepare('SELECT COUNT(*) FROM patrols WHERE badge_number = :badge_number AND id != :id');
-                $duplicateStmt->execute([':badge_number' => $badgeNumber, ':id' => $id]);
+
+            if (!$current) {
+                http_response_code(404);
+                echo json_encode(['success' => false, 'message' => 'BPSO personnel not found.']);
+                exit;
+            }
+
+            if ($current['bpso_personnel_id'] !== $personnelId) {
+                $duplicateStmt = $pdo->prepare('SELECT COUNT(*) FROM patrols WHERE bpso_personnel_id = :bpso_personnel_id AND id != :id');
+                $duplicateStmt->execute([':bpso_personnel_id' => $personnelId, ':id' => $id]);
                 if ($duplicateStmt->fetchColumn() > 0) {
                     http_response_code(400);
-                    echo json_encode(['success' => false, 'message' => 'Badge number already exists. Please use a unique badge number.']);
+                    echo json_encode(['success' => false, 'message' => 'BPSO Personnel ID already exists. Please use a unique BPSO Personnel ID.']);
                     exit;
                 }
             }
 
-            $stmt = $pdo->prepare('UPDATE patrols SET badge_number = :badge_number, officer_name = :officer_name, contact_number = :contact_number, schedule = :schedule, status = :status WHERE id = :id');
-            $stmt->execute([
-                ':badge_number' => $badgeNumber,
-                ':officer_name' => $officerName,
-                ':contact_number' => $contactNumber,
-                ':schedule' => $schedule,
-                ':status' => $status,
-                ':id' => $id,
-            ]);
+            $emailCheck = $pdo->prepare('SELECT COUNT(*) FROM patrols WHERE email = :email AND id != :id');
+            $emailCheck->execute([':email' => $email, ':id' => $id]);
+            if ($emailCheck->fetchColumn() > 0) {
+                http_response_code(400);
+                echo json_encode(['success' => false, 'message' => 'Email address already exists.']);
+                exit;
+            }
+
+            if ($password !== '') {
+                $passwordHash = password_hash($password, PASSWORD_DEFAULT);
+                $stmt = $pdo->prepare('UPDATE patrols SET bpso_personnel_id = :bpso_personnel_id, personnel_name = :personnel_name, contact_number = :contact_number, email = :email, password_hash = :password_hash, schedule = :schedule, status = :status WHERE id = :id');
+                $stmt->execute([
+                    ':bpso_personnel_id' => $personnelId,
+                    ':personnel_name' => $personnelName,
+                    ':contact_number' => $contactNumber,
+                    ':email' => $email,
+                    ':password_hash' => $passwordHash,
+                    ':schedule' => $schedule,
+                    ':status' => $status,
+                    ':id' => $id,
+                ]);
+            } else {
+                $stmt = $pdo->prepare('UPDATE patrols SET bpso_personnel_id = :bpso_personnel_id, personnel_name = :personnel_name, contact_number = :contact_number, email = :email, schedule = :schedule, status = :status WHERE id = :id');
+                $stmt->execute([
+                    ':bpso_personnel_id' => $personnelId,
+                    ':personnel_name' => $personnelName,
+                    ':contact_number' => $contactNumber,
+                    ':email' => $email,
+                    ':schedule' => $schedule,
+                    ':status' => $status,
+                    ':id' => $id,
+                ]);
+            }
 
             echo json_encode([
                 'success' => true,
                 'data' => [
                     'id' => $id,
-                    'badge_number' => $badgeNumber,
-                    'officer_name' => $officerName,
+                    'bpso_personnel_id' => $personnelId,
+                    'personnel_name' => $personnelName,
                     'contact_number' => $contactNumber,
+                    'email' => $email,
                     'schedule' => $schedule,
                     'status' => $status,
                 ],
             ]);
         } catch (PDOException $e) {
             http_response_code(500);
-            echo json_encode(['success' => false, 'message' => 'Failed to update patrol officer: ' . $e->getMessage()]);
+            if (strpos($e->getMessage(), 'Duplicate entry') !== false && strpos($e->getMessage(), 'email') !== false) {
+                echo json_encode(['success' => false, 'message' => 'Email address already exists.']);
+            } else {
+                echo json_encode(['success' => false, 'message' => 'Failed to update BPSO personnel: ' . $e->getMessage()]);
+            }
         }
         exit;
     }
@@ -217,7 +309,7 @@ if ($method === 'POST') {
         $id = (int)($input['id'] ?? 0);
         if ($id <= 0) {
             http_response_code(400);
-            echo json_encode(['success' => false, 'message' => 'Invalid patrol officer ID.']);
+            echo json_encode(['success' => false, 'message' => 'Invalid BPSO personnel record ID.']);
             exit;
         }
 
@@ -228,7 +320,7 @@ if ($method === 'POST') {
             echo json_encode(['success' => true]);
         } catch (PDOException $e) {
             http_response_code(500);
-            echo json_encode(['success' => false, 'message' => 'Failed to delete patrol officer: ' . $e->getMessage()]);
+            echo json_encode(['success' => false, 'message' => 'Failed to delete BPSO personnel: ' . $e->getMessage()]);
         }
         exit;
     }
@@ -236,4 +328,3 @@ if ($method === 'POST') {
 
 http_response_code(405);
 echo json_encode(['success' => false, 'message' => 'Method not allowed.']);
-

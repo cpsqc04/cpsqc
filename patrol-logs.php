@@ -5,6 +5,8 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
     header('Location: login.php');
     exit;
 }
+require_once __DIR__ . '/db.php';
+
 ?>
 <!doctype html>
 <html lang="en">
@@ -15,6 +17,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
     <link rel="icon" type="image/x-icon" href="images/favicon.ico">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="css/theme.css">
+    <link rel="stylesheet" href="css/admin-sidebar.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <style>
         body { margin: 0; padding: 0; font-family: var(--font-family); background-color: var(--bg-color); display: flex; min-height: 100vh; }
@@ -389,7 +392,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             </a>
             
             <!-- User Management Module (Admin Only) -->
-            <?php if (isset($_SESSION['user_role']) && $_SESSION['user_role'] === 'Admin'): ?>
+            <?php if (isAdminUser()): ?>
             <div class="nav-module <?php echo (basename($_SERVER['PHP_SELF']) == 'users.php' || basename($_SERVER['PHP_SELF']) == 'login-history.php') ? 'active' : ''; ?>">
                 <div class="nav-module-header" onclick="toggleModule(this)" data-tooltip="User Management">
                     <span class="nav-module-icon"><i class="fas fa-users-cog"></i></span>
@@ -416,18 +419,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                     <span class="arrow">▶</span>
                 </div>
                 <div class="nav-submodules">
-                    <a href="member-list.php" class="nav-submodule" data-tooltip="Member List">
-                        <span class="nav-submodule-icon"><i class="fas fa-clipboard-list"></i></span>
-                        <span class="nav-submodule-text">Member List</span>
-                    </a>
-                    <a href="activity-logs.php" class="nav-submodule" data-tooltip="Activity Logs">
-                        <span class="nav-submodule-icon"><i class="fas fa-chart-bar"></i></span>
-                        <span class="nav-submodule-text">Activity Logs</span>
-                    </a>
-                    <a href="incident-feed.php" class="nav-submodule" data-tooltip="Incident Feed">
-                        <span class="nav-submodule-icon"><i class="fas fa-exclamation-triangle"></i></span>
-                        <span class="nav-submodule-text">Incident Feed</span>
-                    </a>
+                    <?php require __DIR__ . '/includes/neighborhood_watch_nav_submodules.php'; ?>
                 </div>
             </div>
             <div class="nav-module">
@@ -437,10 +429,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                     <span class="arrow">▶</span>
                 </div>
                 <div class="nav-submodules">
-                    <a href="open-surveillance-app.php" class="nav-submodule" data-tooltip="Open Surveillance App">
-                        <span class="nav-submodule-icon"><i class="fas fa-desktop"></i></span>
-                        <span class="nav-submodule-text">Open Surveillance App</span>
-                    </a>
+                    <?php $cctvNavActive = $cctvNavActive ?? ''; require __DIR__ . '/includes/cctv_nav_submodules.php'; ?>
                 </div>
             </div>
             <div class="nav-module">
@@ -460,23 +449,6 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                     </a>
                 </div>
             </div>
-            <div class="nav-module">
-                <div class="nav-module-header" onclick="toggleModule(this)" data-tooltip="Volunteer Registry and Scheduling">
-                    <span class="nav-module-icon"><i class="fas fa-handshake"></i></span>
-                    <span class="nav-module-header-text">Volunteer Registry and Scheduling</span>
-                    <span class="arrow">▶</span>
-                </div>
-                <div class="nav-submodules">
-                    <a href="volunteer-list.php" class="nav-submodule" data-tooltip="Volunteer List">
-                        <span class="nav-submodule-icon"><i class="fas fa-user"></i></span>
-                        <span class="nav-submodule-text">Volunteer List</span>
-                    </a>
-                    <a href="schedule-management.php" class="nav-submodule" data-tooltip="Volunteer Request">
-                        <span class="nav-submodule-icon"><i class="fas fa-calendar"></i></span>
-                        <span class="nav-submodule-text">Volunteer Request</span>
-                    </a>
-                </div>
-            </div>
             <div class="nav-module active">
                 <div class="nav-module-header" onclick="toggleModule(this)" data-tooltip="Patrol Scheduling and Monitoring">
                     <span class="nav-module-icon"><i class="fas fa-walking"></i></span>
@@ -484,18 +456,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                     <span class="arrow">▶</span>
                 </div>
                 <div class="nav-submodules">
-                    <a href="patrol-list.php" class="nav-submodule" data-tooltip="Patrol List">
-                        <span class="nav-submodule-icon"><i class="fas fa-list"></i></span>
-                        <span class="nav-submodule-text">Patrol List</span>
-                    </a>
-                    <a href="patrol-schedule.php" class="nav-submodule" data-tooltip="Patrol Schedule">
-                        <span class="nav-submodule-icon"><i class="fas fa-calendar-alt"></i></span>
-                        <span class="nav-submodule-text">Patrol Schedule</span>
-                    </a>
-                    <a href="patrol-logs.php" class="nav-submodule active" data-tooltip="Patrol Logs">
-                        <span class="nav-submodule-icon"><i class="fas fa-file"></i></span>
-                        <span class="nav-submodule-text">Patrol Logs</span>
-                    </a>
+                    <?php $patrolNavActive = 'patrol-logs'; require __DIR__ . '/includes/patrol_nav_submodules.php'; ?>
                 </div>
             </div>
             <div class="nav-module">
@@ -552,7 +513,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                     <span class="time-part" id="currentTime"></span>
                 </div>
                 <div class="notification-container">
-                    <button class="notification-bell" onclick="toggleNotifications()" aria-label="Notifications">
+                    <button class="notification-bell" type="button" onclick="toggleNotifications(event)" aria-label="Notifications">
                         <i class="fas fa-bell"></i>
                         <span class="notification-badge" id="notificationBadge"></span>
                     </button>
@@ -574,14 +535,14 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
         <main class="content-area">
             <div class="page-content">
                 <div class="search-box">
-                    <input type="text" id="searchInput" placeholder="Search patrol logs by date, officer, or incident..." onkeyup="filterLogs()">
+                    <input type="text" id="searchInput" placeholder="Search patrol logs by date, BPSO personnel, or incident..." onkeyup="filterLogs()">
                 </div>
                 <div class="table-container">
                     <table id="logsTable">
                         <thead>
                             <tr>
                                 <th>Date & Time</th>
-                                <th>Officer</th>
+                                <th>BPSO Personnel</th>
                                 <th>Route</th>
                                 <th>Incidents</th>
                                 <th>Status</th>
@@ -589,84 +550,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                             </tr>
                         </thead>
                         <tbody id="logsTableBody">
-                            <tr data-log-id="1">
-                                <td>2025-01-20 08:00</td>
-                                <td>Juan Dela Cruz</td>
-                                <td>San Agustin Street to Quezon Avenue Extension</td>
-                                <td>None</td>
-                                <td><span class="status-badge status-completed">Completed</span></td>
-                                <td>
-                                    <div class="action-buttons">
-                                        <button class="btn-view" onclick="viewLog('1')">View</button>
-                                        <button class="btn-export" onclick="exportLog('1')">Export</button>
-                                    </div>
-                                </td>
-                            </tr>
-                            <tr data-log-id="2">
-                                <td>2025-01-19 16:00</td>
-                                <td>Maria Santos</td>
-                                <td>Rizal Street to Luna Avenue</td>
-                                <td>Minor disturbance reported</td>
-                                <td><span class="status-badge status-completed">Completed</span></td>
-                                <td>
-                                    <div class="action-buttons">
-                                        <button class="btn-view" onclick="viewLog('2')">View</button>
-                                        <button class="btn-export" onclick="exportLog('2')">Export</button>
-                                    </div>
-                                </td>
-                            </tr>
-                            <tr data-log-id="3">
-                                <td>2025-01-18 00:00</td>
-                                <td>Roberto Reyes</td>
-                                <td>Mabini Street corner Quezon Avenue</td>
-                                <td>None</td>
-                                <td><span class="status-badge status-in-progress">In Progress</span></td>
-                                <td>
-                                    <div class="action-buttons">
-                                        <button class="btn-view" onclick="viewLog('3')">View</button>
-                                        <button class="btn-export" onclick="exportLog('3')">Export</button>
-                                    </div>
-                                </td>
-                            </tr>
-                            <tr data-log-id="4">
-                                <td>2025-01-17 08:00</td>
-                                <td>Ana Garcia</td>
-                                <td>Bonifacio Street Area</td>
-                                <td>None</td>
-                                <td><span class="status-badge status-completed">Completed</span></td>
-                                <td>
-                                    <div class="action-buttons">
-                                        <button class="btn-view" onclick="viewLog('4')">View</button>
-                                        <button class="btn-export" onclick="exportLog('4')">Export</button>
-                                    </div>
-                                </td>
-                            </tr>
-                            <tr data-log-id="5">
-                                <td>2025-01-16 16:00</td>
-                                <td>Carlos Torres</td>
-                                <td>Commonwealth Avenue Extension</td>
-                                <td>Assisted elderly resident</td>
-                                <td><span class="status-badge status-completed">Completed</span></td>
-                                <td>
-                                    <div class="action-buttons">
-                                        <button class="btn-view" onclick="viewLog('5')">View</button>
-                                        <button class="btn-export" onclick="exportLog('5')">Export</button>
-                                    </div>
-                                </td>
-                            </tr>
-                            <tr data-log-id="6">
-                                <td>2025-01-15 00:00</td>
-                                <td>Liza Fernandez</td>
-                                <td>Aguinaldo Street to Commonwealth Avenue</td>
-                                <td>None</td>
-                                <td><span class="status-badge status-scheduled">Scheduled</span></td>
-                                <td>
-                                    <div class="action-buttons">
-                                        <button class="btn-view" onclick="viewLog('6')">View</button>
-                                        <button class="btn-export" onclick="exportLog('6')">Export</button>
-                                    </div>
-                                </td>
-                            </tr>
+                            <tr><td colspan="6" style="text-align:center;padding:2rem;color:#666;">Loading patrol logs...</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -698,6 +582,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                 sidebar.classList.add('collapsed');
                 document.body.classList.add('sidebar-collapsed');
             }
+            loadPatrolLogs();
         });
         function toggleSidebar() {
             const sidebar = document.getElementById('sidebar');
@@ -746,75 +631,72 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                 }
             }
         }
-        // Initialize patrol log data
-        let patrolLogData = {
-            '1': {
-                id: '1',
-                date: '2025-01-20',
-                time: '08:00 - 16:00',
-                officer: 'Juan Dela Cruz',
-                route: 'San Agustin Street to Quezon Avenue Extension',
-                status: 'Completed',
-                incidents: 'None',
-                details: 'Routine morning patrol conducted along San Agustin Street to Quezon Avenue Extension. All areas were secure. Checked streetlights and reported one non-functional light near the Barangay Hall. No suspicious activities observed.',
-                location: 'Barangay San Agustin, Quezon City'
-            },
-            '2': {
-                id: '2',
-                date: '2025-01-19',
-                time: '16:00 - 00:00',
-                officer: 'Maria Santos',
-                route: 'Rizal Street to Luna Avenue',
-                status: 'Completed',
-                incidents: 'Minor disturbance reported',
-                details: 'Evening patrol along Rizal Street to Luna Avenue. Responded to a minor disturbance call near Luna Avenue. Upon investigation, it was determined to be a false alarm - neighbors were moving furniture. Situation resolved peacefully. All other areas were secure.',
-                location: 'Rizal Street to Luna Avenue, Barangay San Agustin, Quezon City'
-            },
-            '3': {
-                id: '3',
-                date: '2025-01-18',
-                time: '00:00 - 08:00',
-                officer: 'Roberto Reyes',
-                route: 'Mabini Street corner Quezon Avenue',
-                status: 'In Progress',
-                incidents: 'None',
-                details: 'Night patrol currently in progress along Mabini Street corner Quezon Avenue. Monitoring traffic flow and pedestrian safety. All security measures in place. Regular checkpoints established.',
-                location: 'Mabini Street corner Quezon Avenue, Barangay San Agustin, Quezon City'
-            },
-            '4': {
-                id: '4',
-                date: '2025-01-17',
-                time: '08:00 - 16:00',
-                officer: 'Ana Garcia',
-                route: 'Bonifacio Street Area',
-                status: 'Completed',
-                incidents: 'None',
-                details: 'Morning patrol conducted in Bonifacio Street Area. Checked all entry points and common areas. Everything was in order. Noted that garbage collection was completed on schedule. All residential areas were secure.',
-                location: 'Bonifacio Street Area, Barangay San Agustin, Quezon City'
-            },
-            '5': {
-                id: '5',
-                date: '2025-01-16',
-                time: '16:00 - 00:00',
-                officer: 'Carlos Torres',
-                route: 'Commonwealth Avenue Extension',
-                status: 'Completed',
-                incidents: 'Assisted elderly resident',
-                details: 'Afternoon patrol along Commonwealth Avenue Extension. Assisted an elderly resident crossing the street. Checked commercial establishments and residential areas. All security measures in place. No incidents reported.',
-                location: 'Commonwealth Avenue Extension, Barangay San Agustin, Quezon City'
-            },
-            '6': {
-                id: '6',
-                date: '2025-01-15',
-                time: '00:00 - 08:00',
-                officer: 'Liza Fernandez',
-                route: 'Aguinaldo Street to Commonwealth Avenue',
-                status: 'Scheduled',
-                incidents: 'None',
-                details: 'Night patrol scheduled for Aguinaldo Street to Commonwealth Avenue. Patrol assignment has been confirmed and officer is prepared for duty.',
-                location: 'Aguinaldo Street to Commonwealth Avenue, Barangay San Agustin, Quezon City'
+        // Patrol log data loaded from database
+        let patrolLogData = {};
+
+        function statusClass(status) {
+            if (status === 'Completed') return 'status-completed';
+            if (status === 'In Progress') return 'status-in-progress';
+            return 'status-scheduled';
+        }
+
+        async function loadPatrolLogs() {
+            const tableBody = document.getElementById('logsTableBody');
+            try {
+                const response = await fetch('api/patrol_logs.php');
+                const result = await response.json();
+
+                if (!result.success) {
+                    tableBody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:2rem;color:#666;">Failed to load patrol logs.</td></tr>';
+                    return;
+                }
+
+                patrolLogData = {};
+                const rows = result.data || [];
+
+                if (rows.length === 0) {
+                    tableBody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:2rem;color:#666;">No patrol logs yet.</td></tr>';
+                    return;
+                }
+
+                tableBody.innerHTML = rows.map(row => {
+                    patrolLogData[row.id] = {
+                        id: String(row.id),
+                        date: row.date,
+                        time: row.time || '',
+                        personnel_name: row.personnel_name,
+                        route: row.route,
+                        status: row.status,
+                        incidents: row.incidents || 'None',
+                        details: row.details || '',
+                        location: row.location || ''
+                    };
+                    const dateTime = `${row.date}${row.time ? ' ' + row.time : ''}`;
+                    return `<tr data-log-id="${row.id}">
+                        <td>${escapeHtml(dateTime)}</td>
+                        <td>${escapeHtml(row.personnel_name)}</td>
+                        <td>${escapeHtml(row.route)}</td>
+                        <td>${escapeHtml(row.incidents || 'None')}</td>
+                        <td><span class="status-badge ${statusClass(row.status)}">${escapeHtml(row.status)}</span></td>
+                        <td>
+                            <div class="action-buttons">
+                                <button class="btn-view" onclick="viewLog('${row.id}')">View</button>
+                                <button class="btn-export" onclick="exportLog('${row.id}')">Export</button>
+                            </div>
+                        </td>
+                    </tr>`;
+                }).join('');
+            } catch (e) {
+                console.error('Error loading patrol logs:', e);
+                tableBody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:2rem;color:#666;">Error loading patrol logs.</td></tr>';
             }
-        };
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text ?? '';
+            return div.innerHTML;
+        }
 
         function viewLog(id) {
             const log = patrolLogData[id];
@@ -823,19 +705,17 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                 return;
             }
             
-            const statusClass = log.status === 'Completed' ? 'status-completed' : 
-                                log.status === 'In Progress' ? 'status-in-progress' : 
-                                'status-scheduled';
+            const statusClassName = statusClass(log.status);
             
             const content = `
-                <p><strong>Date:</strong> ${log.date}</p>
-                <p><strong>Time:</strong> ${log.time}</p>
-                <p><strong>Officer:</strong> ${log.officer}</p>
-                <p><strong>Route:</strong> ${log.route}</p>
-                <p><strong>Location:</strong> ${log.location}</p>
-                <p><strong>Status:</strong> <span class="status-badge ${statusClass}">${log.status}</span></p>
-                <p><strong>Incidents:</strong> ${log.incidents}</p>
-                <p><strong>Details:</strong><br>${log.details}</p>
+                <p><strong>Date:</strong> ${escapeHtml(log.date)}</p>
+                <p><strong>Time:</strong> ${escapeHtml(log.time)}</p>
+                <p><strong>BPSO Personnel:</strong> ${escapeHtml(log.personnel_name)}</p>
+                <p><strong>Route:</strong> ${escapeHtml(log.route)}</p>
+                <p><strong>Location:</strong> ${escapeHtml(log.location)}</p>
+                <p><strong>Status:</strong> <span class="status-badge ${statusClassName}">${escapeHtml(log.status)}</span></p>
+                <p><strong>Incidents:</strong> ${escapeHtml(log.incidents)}</p>
+                <p><strong>Details:</strong><br>${escapeHtml(log.details)}</p>
             `;
             
             document.getElementById('viewLogContent').innerHTML = content;
@@ -937,10 +817,10 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
 '        <w:p>\n' +
 '            <w:r>\n' +
 '                <w:rPr><w:b/></w:rPr>\n' +
-'                <w:t>Officer:</w:t>\n' +
+'                <w:t>BPSO Personnel:</w:t>\n' +
 '            </w:r>\n' +
 '            <w:r>\n' +
-'                <w:t> ' + escapeXml(log.officer) + '</w:t>\n' +
+'                <w:t> ' + escapeXml(log.personnel_name) + '</w:t>\n' +
 '            </w:r>\n' +
 '        </w:p>\n' +
 '        <w:p>\n' +
@@ -1035,7 +915,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
 
                 // Generate the DOCX file
                 const blob = await zip.generateAsync({ type: "blob", mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" });
-                const fileName = `patrol_log_${log.officer.replace(/\s+/g, '_')}_${log.date}.docx`;
+                const fileName = `patrol_log_${log.personnel_name.replace(/\s+/g, '_')}_${log.date}.docx`;
                 
                 const link = document.createElement("a");
                 link.href = URL.createObjectURL(blob);
@@ -1081,164 +961,8 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
         // Update date/time immediately and then every second
         updateDateTime();
         setInterval(updateDateTime, 1000);
-        
-        // Notification System
-        let notificationDropdown = null;
-        let notificationBadge = null;
-        let notificationList = null;
-        
-        document.addEventListener('DOMContentLoaded', function() {
-            notificationDropdown = document.getElementById('notificationDropdown');
-            notificationBadge = document.getElementById('notificationBadge');
-            notificationList = document.getElementById('notificationList');
-            
-            if (notificationDropdown && notificationBadge && notificationList) {
-                loadNotifications();
-                // Refresh notifications every 30 seconds
-                setInterval(loadNotifications, 30000);
-                
-                // Close dropdown when clicking outside
-                document.addEventListener('click', function(event) {
-                    if (notificationDropdown && !event.target.closest('.notification-container')) {
-                        notificationDropdown.classList.remove('show');
-                    }
-                });
-            }
-        });
-        
-        function toggleNotifications() {
-            if (notificationDropdown) {
-                notificationDropdown.classList.toggle('show');
-                if (notificationDropdown.classList.contains('show')) {
-                    loadNotifications();
-                }
-            }
-        }
-        
-        async function loadNotifications() {
-            try {
-                // Sync activities first
-                await fetch('api/notifications.php?action=sync');
-                
-                // Then load notifications
-                const response = await fetch('api/notifications.php?action=list');
-                const data = await response.json();
-                
-                if (data.success) {
-                    updateNotificationBadge(data.unread_count);
-                    renderNotifications(data.notifications);
-                }
-            } catch (error) {
-                console.error('Error loading notifications:', error);
-            }
-        }
-        
-        function updateNotificationBadge(count) {
-            if (notificationBadge) {
-                if (count > 0) {
-                    notificationBadge.textContent = count > 99 ? '99+' : count;
-                    notificationBadge.classList.add('show');
-                } else {
-                    notificationBadge.classList.remove('show');
-                }
-            }
-        }
-        
-        function renderNotifications(notifications) {
-            if (!notificationList) return;
-            
-            if (notifications.length === 0) {
-                notificationList.innerHTML = `
-                    <div class="notification-empty">
-                        <i class="fas fa-bell-slash"></i>
-                        <p>No notifications</p>
-                    </div>
-                `;
-                return;
-            }
-            
-            notificationList.innerHTML = notifications.map(notif => {
-                let iconClass, icon;
-                if (notif.type === 'complaint' || notif.type === 'incident') {
-                    iconClass = 'complaint';
-                    icon = 'fa-file-alt';
-                } else if (notif.type === 'tip') {
-                    iconClass = 'tip';
-                    icon = 'fa-comments';
-                } else if (notif.type === 'volunteer' || notif.type === 'volunteer_request') {
-                    iconClass = 'volunteer';
-                    icon = 'fa-handshake';
-                } else if (notif.type === 'login') {
-                    iconClass = 'login';
-                    icon = 'fa-sign-in-alt';
-                } else if (notif.type === 'logout') {
-                    iconClass = 'logout';
-                    icon = 'fa-sign-out-alt';
-                } else if (notif.type === 'event' || notif.type === 'event_report' || notif.type === 'patrol') {
-                    iconClass = 'event';
-                    icon = 'fa-bullhorn';
-                } else {
-                    iconClass = 'event';
-                    icon = 'fa-bullhorn';
-                }
-                
-                const safeLink = (notif.link || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
-                
-                return `
-                    <div class="notification-item ${notif.is_read ? '' : 'unread'}" 
-                         onclick="handleNotificationClick(${notif.id}, '${safeLink}')">
-                        <div class="notification-icon ${iconClass}">
-                            <i class="fas ${icon}"></i>
-                        </div>
-                        <div class="notification-content">
-                            <div class="notification-title">${escapeHtml(notif.title)}</div>
-                            <div class="notification-message">${escapeHtml(notif.message)}</div>
-                            <div class="notification-time">${notif.time_ago}</div>
-                        </div>
-                    </div>
-                `;
-            }).join('');
-        }
-        
-        function handleNotificationClick(id, link) {
-            // Mark as read
-            fetch('api/notifications.php?action=mark_read', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: 'id=' + id
-            });
-            
-            // Remove unread class
-            const item = event.currentTarget;
-            item.classList.remove('unread');
-            
-            // Navigate if link exists
-            if (link && link !== '') {
-                window.location.href = link;
-            }
-            
-            // Reload notifications to update badge
-            loadNotifications();
-        }
-        
-        async function markAllAsRead() {
-            try {
-                await fetch('api/notifications.php?action=mark_read', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
-                });
-                loadNotifications();
-            } catch (error) {
-                console.error('Error marking all as read:', error);
-            }
-        }
-        
-        function escapeHtml(text) {
-            const div = document.createElement('div');
-            div.textContent = text;
-            return div.innerHTML;
-        }
     </script>
+    <?php require __DIR__ . '/includes/admin_notifications_script.php'; ?>
 </body>
 </html>
 

@@ -5,6 +5,8 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
     header('Location: login.php');
     exit;
 }
+require_once __DIR__ . '/db.php';
+
 ?>
 <!doctype html>
 <html lang="en">
@@ -15,6 +17,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
     <link rel="icon" type="image/x-icon" href="images/favicon.ico">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="css/theme.css">
+    <link rel="stylesheet" href="css/admin-sidebar.css">
     <style>
         body {
             margin: 0;
@@ -980,33 +983,10 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             background: #f8d7da;
             color: #842029;
         }
-        
-        .priority-badge {
-            padding: 0.25rem 0.75rem;
-            border-radius: 12px;
-            font-size: 0.85rem;
-            font-weight: 500;
-            display: inline-block;
-        }
-        
-        .priority-low {
-            background: #e7f3ff;
-            color: #0066cc;
-        }
-        
-        .priority-medium {
-            background: #fff4e6;
-            color: #cc6600;
-        }
-        
-        .priority-high {
-            background: #ffe6e6;
-            color: #cc0000;
-        }
-        
-        .priority-urgent {
-            background: #ff0000;
-            color: #fff;
+
+        .status-forwarded {
+            background: #e2d9f3;
+            color: #432874;
         }
         
         .action-buttons {
@@ -1014,7 +994,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             gap: 0.5rem;
         }
         
-        .btn-view, .btn-edit {
+        .btn-view, .btn-manage {
             padding: 0.5rem 1rem;
             background: var(--primary-color);
             color: #fff;
@@ -1029,12 +1009,18 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             background: #4ca8a6;
         }
         
-        .btn-edit {
+        .btn-manage {
             background: #ff9800;
         }
         
-        .btn-edit:hover {
+        .btn-manage:hover {
             background: #f57c00;
+        }
+
+        .manage-complaint-ref {
+            margin: 0 0 0.75rem;
+            color: var(--tertiary-color);
+            font-weight: 600;
         }
         
         /* Modal Styles */
@@ -1236,6 +1222,27 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
         .btn-save:hover {
             background: #4ca8a6;
         }
+
+        .btn-forward {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            background: #5b4b8a;
+            color: #fff;
+        }
+
+        .btn-forward:hover {
+            background: #4a3d72;
+        }
+
+        .btn-forward:disabled {
+            background: #b8b0cc;
+            cursor: not-allowed;
+        }
         
         @media (max-width: 768px) {
             .sidebar {
@@ -1284,7 +1291,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             </a>
             
             <!-- User Management Module (Admin Only) -->
-            <?php if (isset($_SESSION['user_role']) && $_SESSION['user_role'] === 'Admin'): ?>
+            <?php if (isAdminUser()): ?>
             <div class="nav-module <?php echo (basename($_SERVER['PHP_SELF']) == 'users.php' || basename($_SERVER['PHP_SELF']) == 'login-history.php') ? 'active' : ''; ?>">
                 <div class="nav-module-header" onclick="toggleModule(this)" data-tooltip="User Management">
                     <span class="nav-module-icon"><i class="fas fa-users-cog"></i></span>
@@ -1311,18 +1318,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                     <span class="arrow">▶</span>
                 </div>
                 <div class="nav-submodules">
-                    <a href="member-list.php" class="nav-submodule" data-tooltip="Member List">
-                        <span class="nav-submodule-icon"><i class="fas fa-clipboard-list"></i></span>
-                        <span class="nav-submodule-text">Member List</span>
-                    </a>
-                    <a href="activity-logs.php" class="nav-submodule" data-tooltip="Activity Logs">
-                        <span class="nav-submodule-icon"><i class="fas fa-chart-bar"></i></span>
-                        <span class="nav-submodule-text">Activity Logs</span>
-                    </a>
-                    <a href="incident-feed.php" class="nav-submodule" data-tooltip="Incident Feed">
-                        <span class="nav-submodule-icon"><i class="fas fa-exclamation-triangle"></i></span>
-                        <span class="nav-submodule-text">Incident Feed</span>
-                    </a>
+                    <?php require __DIR__ . '/includes/neighborhood_watch_nav_submodules.php'; ?>
                 </div>
             </div>
             
@@ -1333,10 +1329,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                     <span class="arrow">▶</span>
                 </div>
                 <div class="nav-submodules">
-                    <a href="open-surveillance-app.php" class="nav-submodule" data-tooltip="Open Surveillance App">
-                        <span class="nav-submodule-icon"><i class="fas fa-desktop"></i></span>
-                        <span class="nav-submodule-text">Open Surveillance App</span>
-                    </a>
+                    <?php $cctvNavActive = $cctvNavActive ?? ''; require __DIR__ . '/includes/cctv_nav_submodules.php'; ?>
                 </div>
             </div>
             
@@ -1358,23 +1351,6 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                 </div>
             </div>
             
-            <div class="nav-module">
-                <div class="nav-module-header" onclick="toggleModule(this)" data-tooltip="Volunteer Registry and Scheduling">
-                    <span class="nav-module-icon"><i class="fas fa-handshake"></i></span>
-                    <span class="nav-module-header-text">Volunteer Registry and Scheduling</span>
-                    <span class="arrow">▶</span>
-                </div>
-                <div class="nav-submodules">
-                    <a href="volunteer-list.php" class="nav-submodule" data-tooltip="Volunteer List">
-                        <span class="nav-submodule-icon"><i class="fas fa-user"></i></span>
-                        <span class="nav-submodule-text">Volunteer List</span>
-                    </a>
-                    <a href="schedule-management.php" class="nav-submodule" data-tooltip="Volunteer Request">
-                        <span class="nav-submodule-icon"><i class="fas fa-calendar"></i></span>
-                        <span class="nav-submodule-text">Volunteer Request</span>
-                    </a>
-                </div>
-            </div>
             
             <div class="nav-module">
                 <div class="nav-module-header" onclick="toggleModule(this)" data-tooltip="Patrol Scheduling and Monitoring">
@@ -1383,18 +1359,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                     <span class="arrow">▶</span>
                 </div>
                 <div class="nav-submodules">
-                    <a href="patrol-list.php" class="nav-submodule" data-tooltip="Patrol List">
-                        <span class="nav-submodule-icon"><i class="fas fa-list"></i></span>
-                        <span class="nav-submodule-text">Patrol List</span>
-                    </a>
-                    <a href="patrol-schedule.php" class="nav-submodule" data-tooltip="Patrol Schedule">
-                        <span class="nav-submodule-icon"><i class="fas fa-calendar-alt"></i></span>
-                        <span class="nav-submodule-text">Patrol Schedule</span>
-                    </a>
-                    <a href="patrol-logs.php" class="nav-submodule" data-tooltip="Patrol Logs">
-                        <span class="nav-submodule-icon"><i class="fas fa-file"></i></span>
-                        <span class="nav-submodule-text">Patrol Logs</span>
-                    </a>
+                    <?php $patrolNavActive = $patrolNavActive ?? ''; require __DIR__ . '/includes/patrol_nav_submodules.php'; ?>
                 </div>
             </div>
             
@@ -1455,7 +1420,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                     <span class="time-part" id="currentTime"></span>
                 </div>
                 <div class="notification-container">
-                    <button class="notification-bell" onclick="toggleNotifications()" aria-label="Notifications">
+                    <button class="notification-bell" type="button" onclick="toggleNotifications(event)" aria-label="Notifications">
                         <i class="fas fa-bell"></i>
                         <span class="notification-badge" id="notificationBadge"></span>
                     </button>
@@ -1478,7 +1443,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
         <main class="content-area">
             <div class="page-content">
                 <div class="search-box">
-                    <input type="text" id="searchInput" placeholder="Search by complaint ID, complainant name, or contact number..." onkeyup="filterComplaints()">
+                    <input type="text" id="searchInput" placeholder="Search by complaint ID, complainant, defendant, or contact number..." onkeyup="filterComplaints()">
                 </div>
                 
                 <div class="table-container">
@@ -1487,9 +1452,10 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                             <tr>
                                 <th>Complaint ID</th>
                                 <th>Complainant</th>
+                                <th>Defendant</th>
                                 <th>Type</th>
                                 <th>Date</th>
-                                <th>Priority</th>
+                                <th>Time</th>
                                 <th>Status</th>
                                 <th>Actions</th>
                             </tr>
@@ -1516,92 +1482,45 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
         </div>
     </div>
     
-    <!-- Edit Complaint Modal -->
-    <div id="editComplaintModal" class="modal">
+    <!-- Manage Complaint Modal -->
+    <div id="manageComplaintModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h2>Edit Complaint</h2>
-                <button class="close-modal" onclick="closeEditComplaintModal()">&times;</button>
+                <h2>Manage Complaint</h2>
+                <button class="close-modal" onclick="closeManageComplaintModal()">&times;</button>
             </div>
-            <form id="editComplaintForm" onsubmit="saveComplaintEdit(event)">
-                <input type="hidden" id="editComplaintId" name="complaintId">
-                
-                <div class="form-group">
-                    <label for="editComplainant">Complainant Name *</label>
-                    <input type="text" id="editComplainant" name="complainant" required>
-                </div>
-                
-                <div class="form-group">
-                    <label for="editContact">Contact Number *</label>
-                    <input type="text" id="editContact" name="contact" required>
-                </div>
-                
-                <div class="form-group">
-                    <label for="editAddress">Address *</label>
-                    <input type="text" id="editAddress" name="address" required>
-                </div>
-                
-                <div class="form-group">
-                    <label for="editIncidentDate">Date of Incident *</label>
-                    <input type="date" id="editIncidentDate" name="incidentDate" required>
-                </div>
-                
-                <div class="form-group">
-                    <label for="editType">Complaint Type *</label>
-                    <select id="editType" name="type" required>
-                        <option value="">Select Type</option>
-                        <option value="Noise">Noise Complaint</option>
-                        <option value="Vandalism">Vandalism</option>
-                        <option value="Trespassing">Trespassing</option>
-                        <option value="Safety">Safety Concern</option>
-                        <option value="Other">Other</option>
+            <p class="manage-complaint-ref" id="manageComplaintRef"></p>
+            <form id="manageComplaintForm" onsubmit="saveComplaintManage(event)">
+                <input type="hidden" id="manageComplaintId" name="complaintId">
+
+                <div class="form-group" id="manageAssignedPatrolGroup">
+                    <label for="manageAssignedPatrol">Assign BPSO Personnel</label>
+                    <select id="manageAssignedPatrol" name="assignedPatrol">
+                        <option value="">Pending Assignment</option>
                     </select>
+                    <small style="display:block;margin-top:0.35rem;color:var(--text-secondary);font-size:0.85rem;">Only personnel <strong>currently at the barangay hall</strong> (timed in today) are shown.</small>
                 </div>
-                
+
                 <div class="form-group">
-                    <label for="editPriority">Priority *</label>
-                    <select id="editPriority" name="priority" required>
-                        <option value="">Select Priority</option>
-                        <option value="Low">Low</option>
-                        <option value="Medium">Medium</option>
-                        <option value="High">High</option>
-                        <option value="Urgent">Urgent</option>
-                    </select>
-                </div>
-                
-                <div class="form-group">
-                    <label for="editStatus">Status *</label>
-                    <select id="editStatus" name="status" required>
+                    <label for="manageStatus">Status *</label>
+                    <select id="manageStatus" name="status" required>
                         <option value="">Select Status</option>
                         <option value="Pending">Pending</option>
                         <option value="Processing">Processing</option>
                         <option value="Resolved">Resolved</option>
                         <option value="Rejected">Rejected</option>
+                        <option value="Forwarded to Digital Blotter">Forwarded to Digital Blotter</option>
                     </select>
                 </div>
-                
+
                 <div class="form-group">
-                    <label for="editLocation">Location *</label>
-                    <input type="text" id="editLocation" name="location" required>
+                    <label for="manageNotes">Admin Notes (internal)</label>
+                    <textarea id="manageNotes" name="notes" placeholder="Internal notes visible to admins only"></textarea>
                 </div>
-                
-                <div class="form-group">
-                    <label for="editDescription">Description *</label>
-                    <textarea id="editDescription" name="description" required></textarea>
-                </div>
-                
-                <div class="form-group">
-                    <label for="editAssignedTo">Assigned To</label>
-                    <input type="text" id="editAssignedTo" name="assignedTo">
-                </div>
-                
-                <div class="form-group">
-                    <label for="editNotes">Notes</label>
-                    <textarea id="editNotes" name="notes"></textarea>
-                </div>
-                
+
                 <div class="form-actions">
-                    <button type="button" class="btn-cancel" onclick="closeEditComplaintModal()">Cancel</button>
+                    <button type="button" class="btn-forward" id="manageForwardBtn" onclick="forwardComplaintFromManage()">Forward to Digital Blotter</button>
+                    <button type="button" class="btn-cancel" onclick="closeManageComplaintModal()">Cancel</button>
                     <button type="submit" class="btn-save">Save Changes</button>
                 </div>
             </form>
@@ -1665,6 +1584,17 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             }
         }
         
+        function formatIncidentTime(timeValue) {
+            if (!timeValue) return '—';
+            const normalized = timeValue.length === 5 ? `${timeValue}:00` : timeValue;
+            return new Date(`1970-01-01T${normalized}`).toLocaleTimeString('en-US', {
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: true,
+                timeZone: 'Asia/Manila'
+            });
+        }
+        
         function filterComplaints() {
             const input = document.getElementById('searchInput');
             const filter = input.value.toLowerCase();
@@ -1684,6 +1614,98 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
         
         // Complaint data storage (loaded from database)
         let complaintData = {};
+        let originalAssignedPatrolId = '';
+
+        function statusClass(status) {
+            const map = {
+                'Pending': 'pending',
+                'Processing': 'processing',
+                'Resolved': 'resolved',
+                'Rejected': 'rejected',
+                'Forwarded to Digital Blotter': 'forwarded'
+            };
+            return map[status] || String(status || '').toLowerCase().replace(/\s+/g, '-');
+        }
+
+        function formatComplaintTypeLabel(complaint) {
+            const type = (complaint.complaint_type || '').trim();
+            const other = (complaint.complaint_type_other || '').trim();
+            if (type === 'Other' && other !== '') {
+                return 'Other — ' + other;
+            }
+            const legacyMatch = type.match(/^Other:\s*(.+)$/i);
+            if (legacyMatch) {
+                return 'Other — ' + legacyMatch[1].trim();
+            }
+            return type || 'Unknown';
+        }
+
+        function toggleManageFieldsForForwarded(complaint) {
+            const forwarded = isComplaintForwarded(complaint);
+            const patrolGroup = document.getElementById('manageAssignedPatrolGroup');
+            const statusSelect = document.getElementById('manageStatus');
+            if (patrolGroup) {
+                patrolGroup.style.display = forwarded ? 'none' : '';
+            }
+            if (statusSelect) {
+                statusSelect.disabled = forwarded;
+            }
+        }
+
+        function isComplaintForwarded(complaint) {
+            return Boolean(complaint && (complaint.forwarded_at || complaint.status === 'Forwarded to Digital Blotter'));
+        }
+
+        function updateForwardButtonState(button, complaint) {
+            if (!button) {
+                return;
+            }
+            const forwarded = isComplaintForwarded(complaint);
+            button.disabled = forwarded;
+            button.textContent = forwarded ? 'Already Forwarded' : 'Forward to Digital Blotter';
+        }
+
+        function updateAssignedPatrolFieldVisibility(complaint) {
+            toggleManageFieldsForForwarded(complaint);
+        }
+
+        async function loadAvailablePersonnel(selectedPatrolId) {
+            const select = document.getElementById('manageAssignedPatrol');
+            if (!select) return;
+
+            select.innerHTML = '<option value="">Pending Assignment</option>';
+
+            try {
+                const [patrolResponse, hallResponse] = await Promise.all([
+                    fetch('api/patrols.php'),
+                    fetch('api/bpso_attendance.php?view=at_hall')
+                ]);
+                const result = await patrolResponse.json();
+                const hallResult = await hallResponse.json();
+                if (!result.success || !result.data) return;
+
+                const atHallIds = new Set(
+                    (hallResult.success ? (hallResult.data || []) : [])
+                        .map(row => String(row.patrol_id))
+                );
+
+                result.data
+                    .filter(p => atHallIds.has(String(p.id)) || String(p.id) === String(selectedPatrolId || ''))
+                    .forEach(personnel => {
+                        const option = document.createElement('option');
+                        option.value = personnel.id;
+                        const atHall = atHallIds.has(String(personnel.id));
+                        const statusLabel = atHall ? 'At Hall' : 'Not at Hall';
+                        option.textContent = `${personnel.bpso_personnel_id} - ${personnel.personnel_name} (${statusLabel})`;
+                        if (String(personnel.id) === String(selectedPatrolId || '')) {
+                            option.selected = true;
+                        }
+                        select.appendChild(option);
+                    });
+            } catch (e) {
+                console.error('Error loading BPSO personnel:', e);
+            }
+        }
         
         // Load complaints from database
         async function loadComplaints() {
@@ -1714,25 +1736,20 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                     // Format date
                     const date = new Date(c.incident_date);
                     const formattedDate = date.toLocaleDateString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit', timeZone: 'Asia/Manila' });
-                    
-                    // Format submitted_at for time display
-                    let timeDisplay = '';
-                    if (c.submitted_at) {
-                        const submittedDate = new Date(c.submitted_at);
-                        timeDisplay = submittedDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'Asia/Manila' });
-                    }
+                    const formattedTime = formatIncidentTime(c.incident_time);
                     
                     row.innerHTML = `
                         <td>${c.complaint_id}</td>
                         <td>${c.complainant_name}</td>
-                        <td>${c.complaint_type}</td>
+                        <td>${c.defendant_name || '—'}</td>
+                        <td>${formatComplaintTypeLabel(c)}</td>
                         <td>${formattedDate}</td>
-                        <td><span class="priority-badge priority-${c.priority.toLowerCase()}">${c.priority}</span></td>
-                        <td><span class="status-badge status-${c.status.toLowerCase()}">${c.status}</span></td>
+                        <td>${formattedTime}</td>
+                        <td><span class="status-badge status-${statusClass(c.status)}">${c.status}</span></td>
                         <td>
                             <div class="action-buttons">
                                 <button class="btn-view" onclick="viewComplaint('${c.complaint_id}')">View</button>
-                                <button class="btn-edit" onclick="editComplaint('${c.complaint_id}')">Edit</button>
+                                <button class="btn-manage" onclick="manageComplaint('${c.complaint_id}')">Manage</button>
                             </div>
                         </td>
                     `;
@@ -1754,14 +1771,14 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                 alert('Complaint details not found for: ' + complaintId);
                 return;
             }
-            
+
             const modal = document.getElementById('complaintModal');
             const detailsContainer = document.getElementById('complaintDetails');
             
             // Format dates
             const incidentDate = new Date(complaint.incident_date);
             const formattedIncidentDate = incidentDate.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'Asia/Manila' });
-            const formattedTime = incidentDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'Asia/Manila' });
+            const formattedTime = formatIncidentTime(complaint.incident_time);
             
             let lastUpdated = 'N/A';
             if (complaint.submitted_at) {
@@ -1785,42 +1802,52 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                 
                 <div class="detail-row inline">
                     <span class="detail-label">Status:</span>
-                    <span class="status-badge status-${complaint.status.toLowerCase()}">${complaint.status}</span>
-                </div>
-                
-                <div class="detail-row inline">
-                    <span class="detail-label">Priority:</span>
-                    <span class="priority-badge priority-${complaint.priority.toLowerCase()}">${complaint.priority}</span>
+                    <span class="status-badge status-${statusClass(complaint.status)}">${complaint.status}</span>
                 </div>
                 
                 <div class="detail-row">
-                    <span class="detail-label">Complainant Name:</span>
+                    <span class="detail-label">Complainant's Name:</span>
                     <span class="detail-value">${complaint.complainant_name}</span>
                 </div>
                 
                 <div class="detail-row">
-                    <span class="detail-label">Contact Number:</span>
-                    <span class="detail-value">${complaint.contact_number}</span>
-                </div>
-                
-                <div class="detail-row">
-                    <span class="detail-label">Address:</span>
+                    <span class="detail-label">Complainant's Address:</span>
                     <span class="detail-value">${complaint.address}</span>
                 </div>
                 
                 <div class="detail-row">
+                    <span class="detail-label">Complainant's Contact Number:</span>
+                    <span class="detail-value">${complaint.contact_number}</span>
+                </div>
+
+                <div class="detail-row">
+                    <span class="detail-label">Date:</span>
+                    <span class="detail-value">${formattedIncidentDate}</span>
+                </div>
+
+                <div class="detail-row">
+                    <span class="detail-label">Time:</span>
+                    <span class="detail-value">${formattedTime}</span>
+                </div>
+
+                <div class="detail-row">
+                    <span class="detail-label">Defendant's Name:</span>
+                    <span class="detail-value">${complaint.defendant_name || 'N/A'}</span>
+                </div>
+
+                <div class="detail-row">
+                    <span class="detail-label">Defendant's Address:</span>
+                    <span class="detail-value">${complaint.defendant_address || 'N/A'}</span>
+                </div>
+
+                <div class="detail-row">
+                    <span class="detail-label">Defendant's Contact Number:</span>
+                    <span class="detail-value">${complaint.defendant_contact_number || 'N/A'}</span>
+                </div>
+                
+                <div class="detail-row">
                     <span class="detail-label">Complaint Type:</span>
-                    <span class="detail-value">${complaint.complaint_type}</span>
-                </div>
-                
-                <div class="detail-row">
-                    <span class="detail-label">Date & Time:</span>
-                    <span class="detail-value">${formattedIncidentDate} at ${formattedTime}</span>
-                </div>
-                
-                <div class="detail-row">
-                    <span class="detail-label">Location:</span>
-                    <span class="detail-value">${complaint.location}</span>
+                    <span class="detail-value">${formatComplaintTypeLabel(complaint)}</span>
                 </div>
                 
                 <div class="detail-row">
@@ -1828,10 +1855,40 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                     <div class="detail-value description">${complaint.description}</div>
                 </div>
                 
+                ${!isComplaintForwarded(complaint) ? `
                 <div class="detail-row">
                     <span class="detail-label">Assigned To:</span>
                     <span class="detail-value">${complaint.assigned_to || 'Pending Assignment'}</span>
                 </div>
+                ` : ''}
+                
+                ${complaint.resolution_report ? `
+                <div class="detail-row">
+                    <span class="detail-label">Resolution Report:</span>
+                    <div class="detail-value description">${complaint.resolution_report}</div>
+                </div>
+                ` : ''}
+                
+                ${complaint.resolved_at ? `
+                <div class="detail-row">
+                    <span class="detail-label">Resolved At:</span>
+                    <span class="detail-value">${new Date(complaint.resolved_at).toLocaleString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: true })}</span>
+                </div>
+                ` : ''}
+                
+                ${complaint.blotter_reference_id ? `
+                <div class="detail-row">
+                    <span class="detail-label">Digital Blotter Reference:</span>
+                    <span class="detail-value"><strong>${complaint.blotter_reference_id}</strong></span>
+                </div>
+                ` : ''}
+
+                ${complaint.forwarded_at ? `
+                <div class="detail-row">
+                    <span class="detail-label">Forwarded At:</span>
+                    <span class="detail-value">${new Date(complaint.forwarded_at).toLocaleString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: true })}</span>
+                </div>
+                ` : ''}
                 
                 <div class="detail-row">
                     <span class="detail-label">Last Updated:</span>
@@ -1852,104 +1909,177 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             document.getElementById('complaintModal').classList.remove('active');
         }
         
-        function editComplaint(complaintId) {
+        function manageComplaint(complaintId) {
             const complaint = complaintData[complaintId];
             if (!complaint) {
                 alert('Complaint details not found for: ' + complaintId);
                 return;
             }
-            
-            // Populate form fields
-            document.getElementById('editComplaintId').value = complaint.id;
-            document.getElementById('editComplainant').value = complaint.complainant_name;
-            document.getElementById('editContact').value = complaint.contact_number;
-            document.getElementById('editAddress').value = complaint.address || '';
-            document.getElementById('editIncidentDate').value = complaint.incident_date || '';
-            document.getElementById('editType').value = complaint.complaint_type;
-            document.getElementById('editPriority').value = complaint.priority;
-            document.getElementById('editStatus').value = complaint.status;
-            document.getElementById('editLocation').value = complaint.location;
-            document.getElementById('editDescription').value = complaint.description;
-            document.getElementById('editAssignedTo').value = complaint.assigned_to || '';
-            document.getElementById('editNotes').value = complaint.notes || '';
-            
-            // Open modal
-            document.getElementById('editComplaintModal').classList.add('active');
+
+            document.getElementById('manageComplaintId').value = complaint.id;
+            document.getElementById('manageComplaintRef').textContent = 'Complaint ID: ' + complaint.complaint_id;
+            document.getElementById('manageStatus').value = complaint.status;
+            document.getElementById('manageNotes').value = complaint.notes || '';
+            originalAssignedPatrolId = complaint.assigned_patrol_id || '';
+            loadAvailablePersonnel(originalAssignedPatrolId);
+            updateForwardButtonState(document.getElementById('manageForwardBtn'), complaint);
+            updateAssignedPatrolFieldVisibility(complaint);
+
+            document.getElementById('manageComplaintModal').classList.add('active');
         }
-        
-        function closeEditComplaintModal() {
-            document.getElementById('editComplaintModal').classList.remove('active');
-            document.getElementById('editComplaintForm').reset();
+
+        function closeManageComplaintModal() {
+            document.getElementById('manageComplaintModal').classList.remove('active');
+            document.getElementById('manageComplaintForm').reset();
+            document.getElementById('manageStatus').disabled = false;
         }
-        
-        function saveComplaintEdit(event) {
+
+        function forwardComplaintFromManage() {
+            const id = parseInt(document.getElementById('manageComplaintId').value, 10);
+            if (!id) {
+                alert('Invalid complaint ID.');
+                return;
+            }
+            forwardComplaintById(id);
+        }
+
+        function saveComplaintManage(event) {
             event.preventDefault();
-            
-            const id = parseInt(document.getElementById('editComplaintId').value);
+
+            const id = parseInt(document.getElementById('manageComplaintId').value);
             if (!id) {
                 alert('Invalid complaint ID!');
                 return;
             }
-            
-            // Find the complaint by database ID to get address and incident_date
+
             const complaint = Object.values(complaintData).find(c => c.id === id);
             if (!complaint) {
                 alert('Complaint not found!');
                 return;
             }
-            
-            const formData = {
-                action: 'update',
-                id: id,
-                complainant_name: document.getElementById('editComplainant').value.trim(),
-                contact_number: document.getElementById('editContact').value.trim(),
-                address: document.getElementById('editAddress').value.trim(),
-                incident_date: document.getElementById('editIncidentDate').value,
-                complaint_type: document.getElementById('editType').value,
-                priority: document.getElementById('editPriority').value,
-                status: document.getElementById('editStatus').value,
-                location: document.getElementById('editLocation').value.trim(),
-                description: document.getElementById('editDescription').value.trim(),
-                assigned_to: document.getElementById('editAssignedTo').value.trim(),
-                notes: document.getElementById('editNotes').value.trim()
+
+            const newPatrolId = document.getElementById('manageAssignedPatrol').value;
+            const assignmentChanged = String(newPatrolId || '') !== String(originalAssignedPatrolId || '');
+
+            const saveManage = () => fetch('api/complaints.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    action: 'manage',
+                    id: id,
+                    status: document.getElementById('manageStatus').value,
+                    notes: document.getElementById('manageNotes').value.trim()
+                })
+            }).then(res => res.json());
+
+            const assignIfNeeded = () => {
+                if (!assignmentChanged || isComplaintForwarded(complaint)) {
+                    return Promise.resolve({ success: true });
+                }
+                return fetch('api/complaints.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        action: 'assign',
+                        id: id,
+                        assigned_patrol_id: parseInt(newPatrolId, 10) || 0
+                    })
+                }).then(res => res.json());
             };
-            
+
+            assignIfNeeded()
+                .then(assignResult => {
+                    if (!assignResult.success) {
+                        alert(assignResult.message || 'Failed to assign complaint.');
+                        return null;
+                    }
+                    return saveManage();
+                })
+                .then(result => {
+                    if (!result) return;
+                    if (!result.success) {
+                        alert(result.message || 'Failed to update complaint.');
+                        return;
+                    }
+                    loadComplaints();
+                    alert('Complaint updated successfully!');
+                    closeManageComplaintModal();
+                })
+                .catch(err => {
+                    console.error('Error updating complaint:', err);
+                    alert('Error updating complaint. Please try again.');
+                });
+        }
+
+        function forwardComplaintById(dbId) {
+            const complaint = Object.values(complaintData).find(c => c.id === dbId);
+            if (!complaint) {
+                alert('Complaint not found.');
+                return;
+            }
+
+            if (isComplaintForwarded(complaint)) {
+                alert('This complaint was already forwarded to the Digital Blotter System.');
+                return;
+            }
+
+            if (!confirm('Forward this complaint to the Digital Blotter System? Group 1 will receive the full complaint details via API.')) {
+                return;
+            }
+
+            const forwardBtn = document.getElementById('manageForwardBtn');
+            if (forwardBtn) {
+                forwardBtn.disabled = true;
+                forwardBtn.textContent = 'Forwarding...';
+            }
+
             fetch('api/complaints.php', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(formData)
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'forward', id: dbId })
             })
-            .then(res => res.json())
-            .then(result => {
-                if (!result.success) {
-                    alert(result.message || 'Failed to update complaint.');
-                    return;
+            .then(response => response.json().then(data => ({ ok: response.ok, data })))
+            .then(({ ok, data }) => {
+                if (!ok || !data.success) {
+                    throw new Error(data.message || 'Failed to forward complaint.');
                 }
-                
-                // Reload complaints to refresh the table
+
+                complaint.status = data.data?.status || 'Forwarded to Digital Blotter';
+                complaint.forwarded_at = data.data?.forwarded_at || new Date().toISOString();
+                complaint.blotter_reference_id = data.data?.blotter_reference_id || '';
+                if (data.data?.blotter_reference_id) {
+                    const timestamp = new Date().toLocaleString('en-US');
+                    const refNote = `[${timestamp}] Forwarded to Digital Blotter System (Ref: ${data.data.blotter_reference_id}).`;
+                    complaint.notes = (complaint.notes || '') + '\n\n' + refNote;
+                }
+
                 loadComplaints();
-                
-                alert('Complaint updated successfully!');
-                closeEditComplaintModal();
+
+                let message = data.message || 'Complaint forwarded successfully.';
+                if (data.data?.blotter_reference_id) {
+                    message += '\nDigital Blotter Reference: ' + data.data.blotter_reference_id;
+                }
+                alert(message);
+
+                updateForwardButtonState(forwardBtn, complaint);
+                updateAssignedPatrolFieldVisibility(complaint);
             })
-            .catch(err => {
-                console.error('Error updating complaint:', err);
-                alert('Error updating complaint. Please try again.');
+            .catch(error => {
+                alert(error.message || 'Failed to forward complaint.');
+                updateForwardButtonState(forwardBtn, complaint);
             });
         }
         
         // Close modal when clicking outside
         window.onclick = function(event) {
             const viewModal = document.getElementById('complaintModal');
-            const editModal = document.getElementById('editComplaintModal');
+            const manageModal = document.getElementById('manageComplaintModal');
             
             if (event.target == viewModal) {
                 closeComplaintModal();
             }
-            if (event.target == editModal) {
-                closeEditComplaintModal();
+            if (event.target == manageModal) {
+                closeManageComplaintModal();
             }
         }
         
@@ -1982,164 +2112,8 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
         // Update date/time immediately and then every second
         updateDateTime();
         setInterval(updateDateTime, 1000);
-        
-        // Notification System
-        let notificationDropdown = null;
-        let notificationBadge = null;
-        let notificationList = null;
-        
-        document.addEventListener('DOMContentLoaded', function() {
-            notificationDropdown = document.getElementById('notificationDropdown');
-            notificationBadge = document.getElementById('notificationBadge');
-            notificationList = document.getElementById('notificationList');
-            
-            if (notificationDropdown && notificationBadge && notificationList) {
-                loadNotifications();
-                // Refresh notifications every 30 seconds
-                setInterval(loadNotifications, 30000);
-                
-                // Close dropdown when clicking outside
-                document.addEventListener('click', function(event) {
-                    if (notificationDropdown && !event.target.closest('.notification-container')) {
-                        notificationDropdown.classList.remove('show');
-                    }
-                });
-            }
-        });
-        
-        function toggleNotifications() {
-            if (notificationDropdown) {
-                notificationDropdown.classList.toggle('show');
-                if (notificationDropdown.classList.contains('show')) {
-                    loadNotifications();
-                }
-            }
-        }
-        
-        async function loadNotifications() {
-            try {
-                // Sync activities first
-                await fetch('api/notifications.php?action=sync');
-                
-                // Then load notifications
-                const response = await fetch('api/notifications.php?action=list');
-                const data = await response.json();
-                
-                if (data.success) {
-                    updateNotificationBadge(data.unread_count);
-                    renderNotifications(data.notifications);
-                }
-            } catch (error) {
-                console.error('Error loading notifications:', error);
-            }
-        }
-        
-        function updateNotificationBadge(count) {
-            if (notificationBadge) {
-                if (count > 0) {
-                    notificationBadge.textContent = count > 99 ? '99+' : count;
-                    notificationBadge.classList.add('show');
-                } else {
-                    notificationBadge.classList.remove('show');
-                }
-            }
-        }
-        
-        function renderNotifications(notifications) {
-            if (!notificationList) return;
-            
-            if (notifications.length === 0) {
-                notificationList.innerHTML = `
-                    <div class="notification-empty">
-                        <i class="fas fa-bell-slash"></i>
-                        <p>No notifications</p>
-                    </div>
-                `;
-                return;
-            }
-            
-            notificationList.innerHTML = notifications.map(notif => {
-                let iconClass, icon;
-                if (notif.type === 'complaint' || notif.type === 'incident') {
-                    iconClass = 'complaint';
-                    icon = 'fa-file-alt';
-                } else if (notif.type === 'tip') {
-                    iconClass = 'tip';
-                    icon = 'fa-comments';
-                } else if (notif.type === 'volunteer' || notif.type === 'volunteer_request') {
-                    iconClass = 'volunteer';
-                    icon = 'fa-handshake';
-                } else if (notif.type === 'login') {
-                    iconClass = 'login';
-                    icon = 'fa-sign-in-alt';
-                } else if (notif.type === 'logout') {
-                    iconClass = 'logout';
-                    icon = 'fa-sign-out-alt';
-                } else if (notif.type === 'event' || notif.type === 'event_report' || notif.type === 'patrol') {
-                    iconClass = 'event';
-                    icon = 'fa-bullhorn';
-                } else {
-                    iconClass = 'event';
-                    icon = 'fa-bullhorn';
-                }
-                
-                const safeLink = (notif.link || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
-                
-                return `
-                    <div class="notification-item ${notif.is_read ? '' : 'unread'}" 
-                         onclick="handleNotificationClick(${notif.id}, '${safeLink}')">
-                        <div class="notification-icon ${iconClass}">
-                            <i class="fas ${icon}"></i>
-                        </div>
-                        <div class="notification-content">
-                            <div class="notification-title">${escapeHtml(notif.title)}</div>
-                            <div class="notification-message">${escapeHtml(notif.message)}</div>
-                            <div class="notification-time">${notif.time_ago}</div>
-                        </div>
-                    </div>
-                `;
-            }).join('');
-        }
-        
-        function handleNotificationClick(id, link) {
-            // Mark as read
-            fetch('api/notifications.php?action=mark_read', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: 'id=' + id
-            });
-            
-            // Remove unread class
-            const item = event.currentTarget;
-            item.classList.remove('unread');
-            
-            // Navigate if link exists
-            if (link && link !== '') {
-                window.location.href = link;
-            }
-            
-            // Reload notifications to update badge
-            loadNotifications();
-        }
-        
-        async function markAllAsRead() {
-            try {
-                await fetch('api/notifications.php?action=mark_read', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
-                });
-                loadNotifications();
-            } catch (error) {
-                console.error('Error marking all as read:', error);
-            }
-        }
-        
-        function escapeHtml(text) {
-            const div = document.createElement('div');
-            div.textContent = text;
-            return div.innerHTML;
-        }
     </script>
+    <?php require __DIR__ . '/includes/admin_notifications_script.php'; ?>
 </body>
 </html>
 

@@ -30,10 +30,10 @@ CREATE TABLE IF NOT EXISTS `admins` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- =====================================================
--- Table: volunteers
--- Description: Volunteer registration data
+-- Table: nw_members (formerly volunteers)
+-- Description: Neighborhood Watch member applications and active members
 -- =====================================================
-CREATE TABLE IF NOT EXISTS `volunteers` (
+CREATE TABLE IF NOT EXISTS `nw_members` (
     `id` INT AUTO_INCREMENT PRIMARY KEY,
     `name` VARCHAR(255) NOT NULL,
     `contact` VARCHAR(50) NOT NULL,
@@ -66,9 +66,11 @@ CREATE TABLE IF NOT EXISTS `tips` (
     `tip_id` VARCHAR(255) UNIQUE NOT NULL,
     `location` TEXT NOT NULL,
     `description` TEXT NOT NULL,
+    `contact_number` VARCHAR(50) DEFAULT NULL,
     `photo_data` LONGTEXT NULL,
     `status` VARCHAR(50) NOT NULL DEFAULT 'Under Review',
     `outcome` VARCHAR(100) DEFAULT 'No Outcome Yet',
+    `police_backup_reason` TEXT DEFAULT NULL,
     `submitted_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
     `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     INDEX `idx_tip_id` (`tip_id`),
@@ -78,34 +80,63 @@ CREATE TABLE IF NOT EXISTS `tips` (
 
 -- =====================================================
 -- Table: patrols
--- Description: Patrol officers information
+-- Description: BPSO personnel information
 -- =====================================================
 CREATE TABLE IF NOT EXISTS `patrols` (
     `id` INT AUTO_INCREMENT PRIMARY KEY,
-    `badge_number` VARCHAR(50) NOT NULL UNIQUE,
-    `officer_name` VARCHAR(255) NOT NULL,
+    `bpso_personnel_id` VARCHAR(50) NOT NULL UNIQUE,
+    `personnel_name` VARCHAR(255) NOT NULL,
     `contact_number` VARCHAR(50) NOT NULL,
     `schedule` VARCHAR(255) NOT NULL,
     `status` VARCHAR(50) NOT NULL DEFAULT 'Available',
+    `email` VARCHAR(255) NULL UNIQUE,
+    `password_hash` VARCHAR(255) NULL,
     `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    INDEX `idx_badge_number` (`badge_number`),
+    INDEX `idx_bpso_personnel_id` (`bpso_personnel_id`),
     INDEX `idx_status` (`status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- =====================================================
--- Table: members
--- Description: Neighborhood watch members
+-- Table: patrol_logs
+-- Description: BPSO patrol activity logs
 -- =====================================================
-CREATE TABLE IF NOT EXISTS `members` (
+CREATE TABLE IF NOT EXISTS `patrol_logs` (
     `id` INT AUTO_INCREMENT PRIMARY KEY,
-    `name` VARCHAR(255) NOT NULL,
-    `age` INT NOT NULL,
-    `address` TEXT NOT NULL,
-    `gender` VARCHAR(20) NOT NULL,
-    `photo_data` LONGTEXT NULL,
-    `id_data` LONGTEXT NULL,
+    `patrol_id` INT NULL,
+    `schedule_id` INT NULL,
+    `personnel_name` VARCHAR(255) NOT NULL,
+    `route` VARCHAR(255) NOT NULL DEFAULT '',
+    `date` DATE NOT NULL,
+    `time` VARCHAR(50) DEFAULT NULL,
+    `status` VARCHAR(50) NOT NULL DEFAULT 'Scheduled',
+    `incidents` TEXT DEFAULT NULL,
+    `details` TEXT DEFAULT NULL,
+    `location` TEXT DEFAULT NULL,
     `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    INDEX `idx_name` (`name`)
+    INDEX `idx_patrol_id` (`patrol_id`),
+    INDEX `idx_schedule_id` (`schedule_id`),
+    INDEX `idx_status` (`status`),
+    INDEX `idx_date` (`date`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- =====================================================
+-- Table: patrol_schedules
+-- Description: Admin-assigned patrol schedules for BPSO personnel
+-- =====================================================
+CREATE TABLE IF NOT EXISTS `patrol_schedules` (
+    `id` INT AUTO_INCREMENT PRIMARY KEY,
+    `patrol_id` INT NOT NULL,
+    `personnel_name` VARCHAR(255) NOT NULL,
+    `route` VARCHAR(255) NOT NULL,
+    `location` TEXT DEFAULT NULL,
+    `schedule_date` DATE NOT NULL,
+    `schedule_time` VARCHAR(50) NOT NULL,
+    `notes` TEXT DEFAULT NULL,
+    `status` VARCHAR(50) NOT NULL DEFAULT 'Scheduled',
+    `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX `idx_patrol_id` (`patrol_id`),
+    INDEX `idx_schedule_date` (`schedule_date`),
+    INDEX `idx_status` (`status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- =====================================================
@@ -119,12 +150,20 @@ CREATE TABLE IF NOT EXISTS `complaints` (
     `contact_number` VARCHAR(50) NOT NULL,
     `address` TEXT NOT NULL,
     `incident_date` DATE NOT NULL,
+    `incident_time` TIME DEFAULT NULL,
+    `defendant_name` VARCHAR(255) NOT NULL DEFAULT '',
+    `defendant_address` TEXT NOT NULL DEFAULT '',
+    `defendant_contact_number` VARCHAR(50) NOT NULL DEFAULT '',
     `complaint_type` VARCHAR(100) NOT NULL,
-    `location` TEXT NOT NULL,
+    `location` TEXT NOT NULL DEFAULT '',
     `description` TEXT NOT NULL,
     `priority` VARCHAR(20) NOT NULL DEFAULT 'Low',
     `status` VARCHAR(50) NOT NULL DEFAULT 'Pending',
     `assigned_to` VARCHAR(255) DEFAULT 'Pending Assignment',
+    `assigned_patrol_id` INT NULL,
+    `resolution_report` TEXT DEFAULT NULL,
+    `assigned_at` DATETIME DEFAULT NULL,
+    `resolved_at` DATETIME DEFAULT NULL,
     `notes` TEXT DEFAULT NULL,
     `submitted_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
     `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
