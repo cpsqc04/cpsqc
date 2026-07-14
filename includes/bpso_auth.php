@@ -19,7 +19,7 @@ function isBpsoLoggedIn(): bool
 function requireBpsoLogin(): void
 {
     if (!isBpsoLoggedIn()) {
-        header('Location: bpso-login.php');
+        header('Location: patrol-login.php');
         exit;
     }
 }

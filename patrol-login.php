@@ -1,7 +1,6 @@
 <?php
-require_once __DIR__ . '/includes/nw_member_auth.php';
+require_once __DIR__ . '/includes/bpso_auth.php';
 require_once __DIR__ . '/db.php';
-require_once __DIR__ . '/api/nw_members_schema.php';
 
 $autoloadPath = __DIR__ . DIRECTORY_SEPARATOR . 'vendor' . DIRECTORY_SEPARATOR . 'autoload.php';
 if (file_exists($autoloadPath)) {
@@ -9,14 +8,10 @@ if (file_exists($autoloadPath)) {
 }
 require_once __DIR__ . '/includes/login_otp.php';
 
-nwMemberSessionStart();
+bpsoSessionStart();
 
-if (isNwMemberLoggedIn()) {
-    if (nwMemberMustChangePassword()) {
-        header('Location: nw-change-password.php');
-    } else {
-        header('Location: nw-dashboard.php');
-    }
+if (isBpsoLoggedIn()) {
+    header('Location: bpso-dashboard.php');
     exit;
 }
 
@@ -28,17 +23,17 @@ $otpExpiresAtText = null;
 $otpResendCooldown = 0;
 
 if (isset($_GET['cancel_otp'])) {
-    unset($_SESSION['pending_nw_member_login']);
-    header('Location: nw-login.php');
+    unset($_SESSION['pending_bpso_login']);
+    header('Location: patrol-login.php');
     exit;
 }
 
-if (isset($_SESSION['pending_nw_member_login'])) {
-    $pendingLoginSession = $_SESSION['pending_nw_member_login'];
+if (isset($_SESSION['pending_bpso_login'])) {
+    $pendingLoginSession = $_SESSION['pending_bpso_login'];
     $pendingExpiresAt = strtotime((string) ($pendingLoginSession['expires_at'] ?? ''));
 
     if ($pendingExpiresAt === false || $pendingExpiresAt < time()) {
-        unset($_SESSION['pending_nw_member_login']);
+        unset($_SESSION['pending_bpso_login']);
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
             $error = 'OTP has expired. Please log in again.';
         }
@@ -54,13 +49,13 @@ if (isset($_SESSION['pending_nw_member_login'])) {
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (isset($_POST['resend_login_otp'])) {
-        $pendingLogin = $_SESSION['pending_nw_member_login'] ?? null;
+        $pendingLogin = $_SESSION['pending_bpso_login'] ?? null;
 
         if (!$pendingLogin) {
             $error = 'No pending login verification found. Please log in again.';
             $showOtpForm = false;
         } elseif (strtotime((string) ($pendingLogin['expires_at'] ?? '')) < time()) {
-            unset($_SESSION['pending_nw_member_login']);
+            unset($_SESSION['pending_bpso_login']);
             $error = 'OTP has expired. Please log in again.';
             $showOtpForm = false;
         } else {
@@ -74,20 +69,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $otpExpiresAtText = $otpView['otp_expires_at_text'];
             } else {
                 $otp = generateLoginOTP();
-                $_SESSION['pending_nw_member_login']['otp'] = $otp;
-                $_SESSION['pending_nw_member_login']['expires_at'] = date('Y-m-d H:i:s', strtotime('+10 minutes'));
-                $_SESSION['pending_nw_member_login']['attempts'] = 0;
-                $_SESSION['pending_nw_member_login']['last_resend_at'] = time();
+                $_SESSION['pending_bpso_login']['otp'] = $otp;
+                $_SESSION['pending_bpso_login']['expires_at'] = date('Y-m-d H:i:s', strtotime('+10 minutes'));
+                $_SESSION['pending_bpso_login']['attempts'] = 0;
+                $_SESSION['pending_bpso_login']['last_resend_at'] = time();
 
                 $otpSent = sendLoginOTPEmail(
                     $pendingLogin['email'] ?? '',
-                    $pendingLogin['member_name'] ?? 'Neighborhood Watch Member',
+                    $pendingLogin['personnel_name'] ?? 'BPSO Personnel',
                     $otp,
-                    'nw_member'
+                    'bpso'
                 );
 
                 if ($otpSent) {
-                    $otpView = populateOtpViewData($_SESSION['pending_nw_member_login'], false, true);
+                    $otpView = populateOtpViewData($_SESSION['pending_bpso_login'], false, true);
                     $otpPrompt = $otpView['otp_prompt'];
                     $otpEmailMasked = $otpView['otp_email_masked'];
                     $otpExpiresAtText = $otpView['otp_expires_at_text'];
@@ -105,7 +100,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($isOtpVerification && $error === null) {
         $enteredOtp = trim($_POST['login_otp'] ?? '');
-        $pendingLogin = $_SESSION['pending_nw_member_login'] ?? null;
+        $pendingLogin = $_SESSION['pending_bpso_login'] ?? null;
 
         if (!$pendingLogin) {
             $error = 'No pending login verification found. Please log in again.';
@@ -114,18 +109,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $error = 'Please enter a valid 6-digit OTP.';
             $showOtpForm = true;
         } elseif (strtotime($pendingLogin['expires_at']) < time()) {
-            unset($_SESSION['pending_nw_member_login']);
+            unset($_SESSION['pending_bpso_login']);
             $error = 'OTP has expired. Please log in again.';
             $showOtpForm = false;
         } elseif (($pendingLogin['attempts'] ?? 0) >= 5) {
-            unset($_SESSION['pending_nw_member_login']);
+            unset($_SESSION['pending_bpso_login']);
             $error = 'Too many failed OTP attempts. Please log in again.';
             $showOtpForm = false;
         } elseif (!hash_equals((string) $pendingLogin['otp'], $enteredOtp)) {
-            $_SESSION['pending_nw_member_login']['attempts'] = (int) ($pendingLogin['attempts'] ?? 0) + 1;
-            $remainingOtpAttempts = max(0, 5 - (int) $_SESSION['pending_nw_member_login']['attempts']);
+            $_SESSION['pending_bpso_login']['attempts'] = (int) ($pendingLogin['attempts'] ?? 0) + 1;
+            $remainingOtpAttempts = max(0, 5 - (int) $_SESSION['pending_bpso_login']['attempts']);
             if ($remainingOtpAttempts === 0) {
-                unset($_SESSION['pending_nw_member_login']);
+                unset($_SESSION['pending_bpso_login']);
                 $error = 'Too many failed OTP attempts. Please log in again.';
                 $showOtpForm = false;
             } else {
@@ -133,52 +128,43 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $showOtpForm = true;
             }
         } else {
-            $_SESSION['nw_member_logged_in'] = true;
-            $_SESSION['nw_member_id'] = (int) $pendingLogin['volunteer_id'];
-            $_SESSION['nw_member_name'] = $pendingLogin['member_name'];
-            $_SESSION['nw_member_code'] = $pendingLogin['member_code'];
-            $_SESSION['nw_member_email'] = $pendingLogin['email'];
-            $_SESSION['nw_member_must_change_password'] = !empty($pendingLogin['must_change_password']);
-            unset($_SESSION['pending_nw_member_login']);
-            if (!empty($pendingLogin['must_change_password'])) {
-                header('Location: nw-change-password.php');
-            } else {
-                header('Location: nw-dashboard.php');
-            }
+            $_SESSION['bpso_logged_in'] = true;
+            $_SESSION['bpso_patrol_id'] = (int) $pendingLogin['patrol_id'];
+            $_SESSION['bpso_personnel_name'] = $pendingLogin['personnel_name'];
+            $_SESSION['bpso_personnel_code'] = $pendingLogin['personnel_code'];
+            $_SESSION['bpso_email'] = $pendingLogin['email'];
+            unset($_SESSION['pending_bpso_login']);
+            header('Location: bpso-dashboard.php');
             exit;
         }
     } elseif (!isset($_POST['resend_login_otp']) && $error === null) {
         $email = trim($_POST['email'] ?? '');
         $password = $_POST['password'] ?? '';
 
-        unset($_SESSION['pending_nw_member_login']);
+        unset($_SESSION['pending_bpso_login']);
         $showOtpForm = false;
 
         if ($email === '' || $password === '') {
             $error = 'Please enter both email and password.';
         } else {
             try {
-                ensureNwMembersTable($pdo);
-                $stmt = $pdo->prepare('SELECT id, name, email, member_code, password_hash, must_change_password, status FROM nw_members WHERE email = :email LIMIT 1');
+                $stmt = $pdo->prepare('SELECT id, personnel_name, bpso_personnel_id, email, password_hash FROM patrols WHERE email = :email LIMIT 1');
                 $stmt->execute([':email' => $email]);
-                $member = $stmt->fetch(PDO::FETCH_ASSOC);
+                $personnel = $stmt->fetch(PDO::FETCH_ASSOC);
 
-                if (!$member || ($member['status'] ?? '') !== 'Active') {
+                if (!$personnel || empty($personnel['password_hash']) || !password_verify($password, $personnel['password_hash'])) {
                     $error = 'Invalid email or password.';
-                } elseif (empty($member['password_hash']) || !password_verify($password, $member['password_hash'])) {
-                    $error = 'Invalid email or password.';
-                } elseif (empty($member['email'])) {
+                } elseif (empty($personnel['email'])) {
                     $error = 'This account has no registered email. Please contact an administrator.';
                 } else {
                     $otp = generateLoginOTP();
                     $expiresAt = date('Y-m-d H:i:s', strtotime('+10 minutes'));
 
-                    $_SESSION['pending_nw_member_login'] = [
-                        'volunteer_id' => (int) $member['id'],
-                        'member_name' => $member['name'],
-                        'member_code' => $member['member_code'] ?? '',
-                        'email' => $member['email'],
-                        'must_change_password' => (int) ($member['must_change_password'] ?? 0),
+                    $_SESSION['pending_bpso_login'] = [
+                        'patrol_id' => (int) $personnel['id'],
+                        'personnel_name' => $personnel['personnel_name'],
+                        'personnel_code' => $personnel['bpso_personnel_id'],
+                        'email' => $personnel['email'],
                         'otp' => $otp,
                         'expires_at' => $expiresAt,
                         'attempts' => 0,
@@ -186,16 +172,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         'last_resend_at' => time(),
                     ];
 
-                    $otpSent = sendLoginOTPEmail($member['email'], $member['name'], $otp, 'nw_member');
+                    $otpSent = sendLoginOTPEmail($personnel['email'], $personnel['personnel_name'], $otp, 'bpso');
                     if ($otpSent) {
-                        $otpView = populateOtpViewData($_SESSION['pending_nw_member_login']);
+                        $otpView = populateOtpViewData($_SESSION['pending_bpso_login']);
                         $otpPrompt = $otpView['otp_prompt'];
                         $otpEmailMasked = $otpView['otp_email_masked'];
                         $otpExpiresAtText = $otpView['otp_expires_at_text'];
                         $otpResendCooldown = 60;
                         $showOtpForm = true;
                     } else {
-                        unset($_SESSION['pending_nw_member_login']);
+                        unset($_SESSION['pending_bpso_login']);
                         $error = 'Failed to send login OTP. Please contact administrator or try again later.';
                     }
                 }
@@ -206,8 +192,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-if ($showOtpForm && empty($otpPrompt) && isset($_SESSION['pending_nw_member_login'])) {
-    $otpView = populateOtpViewData($_SESSION['pending_nw_member_login'], true);
+if ($showOtpForm && empty($otpPrompt) && isset($_SESSION['pending_bpso_login'])) {
+    $otpView = populateOtpViewData($_SESSION['pending_bpso_login'], true);
     $otpPrompt = $otpView['otp_prompt'];
     $otpEmailMasked = $otpView['otp_email_masked'];
     $otpExpiresAtText = $otpView['otp_expires_at_text'];
@@ -221,7 +207,7 @@ $autoOpenLogin = !empty($showOtpForm) || ($error !== null);
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>Neighborhood Watch Login - AlerTara QC</title>
+    <title>Patrol Login - AlerTara QC</title>
     <link rel="icon" type="image/x-icon" href="images/favicon.ico">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -257,13 +243,13 @@ $autoOpenLogin = !empty($showOtpForm) || ($error !== null);
             <div class="hero-scan" aria-hidden="true"></div>
             <div class="hero-radar" aria-hidden="true"><div class="radar-beam"></div></div>
             <div class="hero-content">
-                <p class="portal-pill"><i class="fas fa-house-user"></i> Neighborhood Watch Portal</p>
+                <p class="portal-pill"><i class="fas fa-route"></i> Patrol Portal</p>
                 <div class="brand-mark" aria-label="AlerTara QC">
                     <img src="images/tara.png" alt="">
                     <span class="ler">ler</span><span class="rest">Tara QC</span>
                 </div>
-                <h1>Neighborhood Watch Sign-In</h1>
-                <p class="lead">Secure access for approved neighborhood watch members in Barangay San Agustin to report incidents and support community awareness.</p>
+                <h1>Patrol Sign-In</h1>
+                <p class="lead">Secure access for patrol personnel in Barangay San Agustin to view schedules, submit reports, and coordinate with barangay responders.</p>
                 <div class="hero-ctas">
                     <button type="button" class="btn" onclick="openLoginModal()">Sign in</button>
                     <a class="btn btn-ghost" href="login.php">Back to main page</a>
@@ -277,24 +263,24 @@ $autoOpenLogin = !empty($showOtpForm) || ($error !== null);
         <section class="section about-section" id="about">
             <div class="section-inner">
                 <p class="section-label reveal">About this portal</p>
-                <h2 class="reveal reveal-delay-1">Eyes and ears of Barangay San Agustin</h2>
-                <p class="sub reveal reveal-delay-2">This portal is for approved neighborhood watch members serving Barangay San Agustin, Novaliches, Quezon City.</p>
+                <h2 class="reveal reveal-delay-1">Field coverage for Barangay San Agustin</h2>
+                <p class="sub reveal reveal-delay-2">This portal is for patrol personnel serving Barangay San Agustin, Novaliches, Quezon City.</p>
                 <p class="about-copy reveal reveal-delay-3">
-                    Sign in to report incidents, share tips with BPSO, and help keep your community informed.
+                    Sign in to review assigned schedules, log patrol activity, and support coordinated barangay response.
                     For full system details—including Who Uses This, FAQs, and policies—return to the main landing page.
                 </p>
                 <ul class="feature-list">
                     <li class="reveal">
-                        <strong>Report incidents</strong>
-                        Submit neighborhood tips and observations to support barangay response.
+                        <strong>Patrol schedules</strong>
+                        View assignments and stay aligned with barangay operations.
                     </li>
                     <li class="reveal reveal-delay-1">
-                        <strong>Stay coordinated</strong>
-                        Work with patrols and BPSO administrators under one shared platform.
+                        <strong>Field reporting</strong>
+                        Submit patrol logs and updates from on-ground activity.
                     </li>
                     <li class="reveal reveal-delay-2">
                         <strong>Secure access</strong>
-                        OTP-verified sign-in protects sensitive community safety information.
+                        OTP-verified sign-in protects operational information.
                     </li>
                 </ul>
             </div>
@@ -357,7 +343,7 @@ $autoOpenLogin = !empty($showOtpForm) || ($error !== null);
                 <button type="button" onclick="openLegalModal('cookies')">Cookie Policy</button>
                 <a href="#contact">Contact</a>
             </div>
-            <p class="footer-copy">&copy; <?php echo date('Y'); ?> AlerTara QC — Neighborhood Watch Portal for Barangay San Agustin. All rights reserved.</p>
+            <p class="footer-copy">&copy; <?php echo date('Y'); ?> AlerTara QC — Patrol Portal for Barangay San Agustin. All rights reserved.</p>
         </div>
     </footer>
 
@@ -375,7 +361,7 @@ $autoOpenLogin = !empty($showOtpForm) || ($error !== null);
             <?php endif; ?>
             <?php if ($showOtpForm): ?>
                 <?php renderLoginOtpForm(
-                    'nw-login.php?cancel_otp=1',
+                    'patrol-login.php?cancel_otp=1',
                     $otpEmailMasked,
                     $otpExpiresAtText,
                     (int) $otpResendCooldown
@@ -402,6 +388,6 @@ $autoOpenLogin = !empty($showOtpForm) || ($error !== null);
     </div>
 
 <?php
-$forgotApiEndpoint = 'api/nw-forgot-password.php';
-$portalHomePath = 'nw-login.php';
+$forgotApiEndpoint = 'api/bpso-forgot-password.php';
+$portalHomePath = 'patrol-login.php';
 require __DIR__ . '/includes/portal_landing_modals.php';

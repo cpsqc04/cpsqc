@@ -780,513 +780,1214 @@ if (isset($_SESSION['admin_logged_in']) && $_SESSION['admin_logged_in'] === true
     header('Location: index.php');
     exit;
 }
+
+$autoOpenLogin = !empty($showOtpForm) || isset($error) || isset($_SESSION['registration_success']);
 ?>
 <!doctype html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Community Policing and Surveillance</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>AlerTara QC — Community Policing &amp; Surveillance</title>
     <link rel="icon" type="image/x-icon" href="images/favicon.ico">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="css/theme.css">
     <style>
-        :root { --radius: 12px; }
+        :root {
+            --teal: #4c8a89;
+            --teal-bright: #5ba8a6;
+            --teal-deep: #2a5a59;
+            --navy: #1c2541;
+            --ink: #0b132b;
+            --mist: #d7eceb;
+            --sand: #e8f0ef;
+            --text: #f4f7f7;
+            --muted: rgba(244, 247, 247, 0.72);
+            --radius: 14px;
+            --font-display: "Outfit", sans-serif;
+            --font-body: "Source Serif 4", Georgia, serif;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        html {
+            scroll-behavior: smooth;
+            scrollbar-width: thin;
+            scrollbar-color: var(--teal) var(--ink);
+        }
+
         body {
-            background: linear-gradient(135deg, #f5f7fa 0%, #e8ecf1 100%);
-            display: flex;
-            flex-direction: column;
-            min-height: 100vh;
-            padding: 2rem clamp(1rem, 3vw, 2.5rem);
+            font-family: var(--font-body);
+            color: var(--text);
+            background: var(--ink);
+            overflow-x: hidden;
+            line-height: 1.6;
         }
-        .page {
-            width: 100%;
-            max-width: 1400px;
-            margin: 0 auto;
-            display: flex;
-            flex-direction: column;
-            gap: 5rem;
-            flex: 1;
-        }
-        .main-content {
-            display: grid;
-            grid-template-columns: 1fr minmax(480px, 580px);
-            gap: clamp(1.5rem, 3vw, 2.5rem);
-            align-items: center;
-            flex: 1;
-            margin-top: 5rem;
-        }
-        .hero {
-            display: flex;
-            flex-direction: column;
-            gap: 2rem;
-            color: var(--text-color);
-            align-items: center;
-            justify-content: center;
-        }
-        .hero h1 {
-            font-size: clamp(4rem, 6vw, 6.5rem);
-            letter-spacing: -0.02em;
-            margin: 0;
-            font-weight: 700;
-            display: flex;
-            align-items: center;
-            gap: 0.25rem;
-            text-align: center;
-        }
-        .hero h1 .logo-inline {
-            height: 1.15em;
-            width: auto;
-            display: inline-block;
-            vertical-align: middle;
-            flex-shrink: 0;
-        }
-        .hero h1 .text-ler {
-            color: var(--primary-color);
-        }
-        .hero h1 .text-taraqc {
-            color: #2a2a2a;
-        }
-        .logo-wrap {
-            margin-bottom: 0;
-        }
-        .logo-wrap img {
-            height: 300px;
-            width: auto;
-            object-fit: contain;
-            filter: drop-shadow(0 10px 20px rgba(0, 0, 0, 0.1));
-        }
-        .hero .welcome-text {
-            margin-top: 0;
-            margin-left: 0;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            text-align: center;
-        }
-        .hero .welcome-text p {
-            max-width: 540px;
-            color: var(--text-secondary);
-            line-height: 1.8;
-            margin: 0;
-            font-size: clamp(1.3rem, 2vw, 1.6rem);
-            text-align: left;
-        }
-        .login-card {
-            background: linear-gradient(145deg, var(--tertiary-color), var(--secondary-color));
-            border: 1px solid rgba(255, 255, 255, 0.08);
-            border-radius: var(--radius);
-            box-shadow: 0 20px 50px -25px rgba(0, 0, 0, 0.5);
-            padding: clamp(2.5rem, 4vw, 3.5rem);
-            display: grid;
-            gap: 1.75rem;
-            width: 100%;
-        }
-        .login-card h2 {
-            margin: 0;
-            color: #f8fafc;
-            font-size: 1.75rem;
-            font-weight: 600;
-        }
-        .field {
-            display: grid;
-            gap: 0.35rem;
-        }
-        .field label {
-            font-size: 1.1rem;
-            color: rgba(255, 255, 255, 0.8);
-            font-weight: 500;
-        }
-        .field input {
-            width: 100%;
-            padding: 1.15rem 1.5rem;
-            border: 1px solid rgba(255, 255, 255, 0.16);
-            border-radius: var(--radius);
-            font: inherit;
-            font-size: 1.1rem;
-            color: #f8fafc;
-            background: rgba(255, 255, 255, 0.08);
-            transition: border-color 0.2s ease, box-shadow 0.2s ease;
-            box-sizing: border-box;
-        }
-        .field input:focus {
-            outline: none;
-            border-color: var(--primary-color);
-            box-shadow: 0 0 0 3px rgba(76, 138, 137, 0.25);
-        }
-        .actions {
+
+        a { color: inherit; text-decoration: none; }
+        img { max-width: 100%; display: block; }
+
+        /* —— Nav —— */
+        .site-nav {
+            position: fixed;
+            inset: 0 0 auto 0;
+            z-index: 900;
             display: flex;
             align-items: center;
             justify-content: space-between;
             gap: 1rem;
+            padding: 0.85rem clamp(1rem, 4vw, 2.5rem);
+            background: rgba(11, 19, 43, 0.55);
+            backdrop-filter: blur(14px);
+            border-bottom: 1px solid transparent;
+            transition: background 0.35s ease, border-color 0.35s ease, padding 0.35s ease;
         }
-        .actions a {
-            color: var(--primary-color);
-            text-decoration: none;
+        .site-nav.scrolled {
+            background: rgba(11, 19, 43, 0.92);
+            border-bottom-color: rgba(76, 138, 137, 0.28);
+            padding-top: 0.65rem;
+            padding-bottom: 0.65rem;
+        }
+        .nav-brand {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            font-family: var(--font-display);
+            font-weight: 700;
+            font-size: 1.15rem;
+            letter-spacing: -0.02em;
+            min-width: 0;
+        }
+        .nav-brand img { height: 64px; width: auto; flex-shrink: 0; }
+        .nav-brand-title {
+            color: #ffffff;
+            font-size: clamp(1rem, 2vw, 1.25rem);
+            font-weight: 700;
+            line-height: 1.25;
+            letter-spacing: -0.01em;
+            max-width: 16rem;
+        }
+        .nav-brand > span:not(.nav-brand-title) { color: var(--teal-bright); }
+        .nav-links {
+            display: flex;
+            align-items: center;
+            gap: clamp(0.6rem, 1.5vw, 1.4rem);
+            list-style: none;
+            font-family: var(--font-display);
+            font-size: 0.88rem;
+            font-weight: 500;
+        }
+        .nav-links a {
+            color: var(--muted);
+            transition: color 0.2s ease;
+        }
+        .nav-links a:hover,
+        .nav-links a.active { color: #fff; }
+        .nav-cta {
+            font-family: var(--font-display);
+            font-weight: 600;
+            font-size: 0.9rem;
+            padding: 0.65rem 1.2rem;
+            border: none;
+            border-radius: 999px;
+            cursor: pointer;
+            color: #fff;
+            background: linear-gradient(135deg, var(--teal), var(--teal-deep));
+            box-shadow: 0 10px 28px -12px rgba(76, 138, 137, 0.85);
+            transition: transform 0.2s ease, filter 0.2s ease;
+        }
+        .nav-cta:hover { transform: translateY(-1px); filter: brightness(1.06); }
+        .nav-toggle {
+            display: none;
+            background: transparent;
+            border: 1px solid rgba(255,255,255,0.2);
+            color: #fff;
+            width: 42px;
+            height: 42px;
+            border-radius: 10px;
+            cursor: pointer;
             font-size: 1.1rem;
         }
-        .actions a:hover {
-            text-decoration: underline;
-        }
-        .button-group {
-            display: flex;
-            gap: 0.75rem;
-            margin-top: 0.5rem;
-        }
-        .button-group .btn {
-            flex: 1;
-        }
-        .btn-secondary {
-            background: transparent;
-            color: #ffffff;
-            border: 1px solid rgba(255, 255, 255, 0.25);
-            box-shadow: none;
-        }
-        .btn-secondary:hover {
-            background: rgba(255, 255, 255, 0.08);
-            border-color: var(--primary-color);
-            transform: translateY(-1px);
-        }
-        .btn-secondary:disabled {
-            opacity: 0.55;
-            cursor: not-allowed;
-            transform: none;
-        }
-        .otp-form {
-            display: grid;
-            gap: 1.75rem;
-        }
-        .otp-meta {
-            margin: 0;
-            font-size: 0.9rem;
-            color: rgba(255, 255, 255, 0.75);
-            line-height: 1.5;
-        }
-        .otp-meta strong {
-            color: #f8fafc;
-        }
-        .otp-actions {
-            justify-content: center;
-            margin-top: -0.5rem;
-        }
+
+        /* —— Buttons —— */
         .btn {
+            font-family: var(--font-display);
             display: inline-flex;
-            justify-content: center;
             align-items: center;
-            padding: 1.15rem 1.75rem;
-            border-radius: var(--radius);
+            justify-content: center;
+            gap: 0.5rem;
+            padding: 0.95rem 1.55rem;
+            border-radius: 999px;
             border: none;
             cursor: pointer;
             font-weight: 600;
-            font-size: 1.1rem;
+            font-size: 0.98rem;
             color: #fff;
-            background: var(--primary-color);
-            box-shadow: 0 12px 30px -15px var(--primary-color);
-            transition: transform 0.15s ease, box-shadow 0.2s ease, filter 0.2s ease;
+            background: linear-gradient(135deg, var(--teal), var(--teal-deep));
+            box-shadow: 0 14px 34px -16px rgba(76, 138, 137, 0.9);
+            transition: transform 0.2s ease, filter 0.2s ease;
         }
-        .btn:hover {
-            background: #4ca8a6;
-            transform: translateY(-1px);
-            filter: brightness(1.02);
+        .btn:hover { transform: translateY(-2px); filter: brightness(1.05); }
+        .btn-ghost {
+            background: transparent;
+            border: 1px solid rgba(255,255,255,0.28);
+            box-shadow: none;
+            color: #fff;
         }
-        .btn:active {
+        .btn-ghost:hover { background: rgba(255,255,255,0.06); border-color: var(--teal); }
+        .btn-secondary {
+            background: transparent;
+            color: #fff;
+            border: 1px solid rgba(255,255,255,0.25);
+            box-shadow: none;
+        }
+        .btn-secondary:hover { background: rgba(255,255,255,0.08); }
+        .btn-secondary:disabled { opacity: 0.55; cursor: not-allowed; transform: none; }
+
+        /* —— Progressive reveal —— */
+        .reveal {
+            opacity: 0;
+            transform: translateY(36px);
+            transition: opacity 0.8s cubic-bezier(0.22, 1, 0.36, 1), transform 0.8s cubic-bezier(0.22, 1, 0.36, 1);
+        }
+        .reveal.in {
+            opacity: 1;
             transform: translateY(0);
-            box-shadow: 0 8px 20px -16px var(--secondary-color);
         }
-        .mv-section {
-            background: rgba(255, 255, 255, 0.8);
-            backdrop-filter: blur(10px);
-            border-radius: var(--radius);
-            padding: 3rem clamp(2rem, 4vw, 3rem);
-            box-shadow: 0 10px 40px -15px rgba(0, 0, 0, 0.1);
-            margin-top: -1rem;
+        .reveal-delay-1 { transition-delay: 0.12s; }
+        .reveal-delay-2 { transition-delay: 0.24s; }
+        .reveal-delay-3 { transition-delay: 0.36s; }
+
+        /* —— Hero —— */
+        .hero {
+            position: relative;
+            min-height: 100vh;
+            display: grid;
+            align-items: end;
+            padding: 7rem clamp(1.25rem, 5vw, 4rem) 4rem;
+            overflow: hidden;
+            isolation: isolate;
         }
-        .mv-grid {
+        .hero-bg {
+            position: absolute;
+            inset: 0;
+            z-index: -2;
+            background:
+                radial-gradient(ellipse 80% 55% at 70% 20%, rgba(76, 138, 137, 0.35), transparent 55%),
+                radial-gradient(ellipse 60% 50% at 15% 80%, rgba(42, 90, 89, 0.4), transparent 50%),
+                linear-gradient(165deg, #0b132b 0%, #142038 42%, #1c2541 100%);
+        }
+        .hero-bg::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background-image:
+                linear-gradient(rgba(76, 138, 137, 0.07) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(76, 138, 137, 0.07) 1px, transparent 1px);
+            background-size: 56px 56px;
+            mask-image: radial-gradient(ellipse 70% 60% at 60% 40%, #000 20%, transparent 75%);
+            animation: gridDrift 28s linear infinite;
+        }
+        .hero-scan {
+            position: absolute;
+            inset: 0;
+            z-index: -1;
+            pointer-events: none;
+            background: linear-gradient(180deg, transparent 0%, rgba(91, 168, 166, 0.12) 50%, transparent 100%);
+            height: 28%;
+            animation: scanSweep 7s ease-in-out infinite;
+        }
+        .hero-radar {
+            position: absolute;
+            right: clamp(-4rem, -2vw, 2rem);
+            top: 18%;
+            width: min(52vw, 520px);
+            aspect-ratio: 1;
+            border-radius: 50%;
+            border: 1px solid rgba(76, 138, 137, 0.28);
+            z-index: -1;
+            pointer-events: none;
+        }
+        .hero-radar::before,
+        .hero-radar::after {
+            content: "";
+            position: absolute;
+            inset: 18%;
+            border-radius: 50%;
+            border: 1px solid rgba(76, 138, 137, 0.22);
+        }
+        .hero-radar::after { inset: 36%; }
+        .radar-beam {
+            position: absolute;
+            inset: 0;
+            border-radius: 50%;
+            background: conic-gradient(from 0deg, transparent 0deg, rgba(91, 168, 166, 0.35) 40deg, transparent 70deg);
+            animation: radarSpin 5.5s linear infinite;
+            opacity: 0.55;
+        }
+        @keyframes radarSpin { to { transform: rotate(360deg); } }
+        @keyframes scanSweep {
+            0%, 100% { transform: translateY(-20%); opacity: 0.2; }
+            50% { transform: translateY(220%); opacity: 0.65; }
+        }
+        @keyframes gridDrift {
+            from { transform: translateY(0); }
+            to { transform: translateY(56px); }
+        }
+        .hero-content {
+            max-width: 720px;
+            display: grid;
+            gap: 1.35rem;
+        }
+        .brand-mark {
+            font-family: var(--font-display);
+            display: flex;
+            align-items: center;
+            gap: 0.35rem;
+            font-size: clamp(2.8rem, 8vw, 5.2rem);
+            font-weight: 800;
+            letter-spacing: -0.04em;
+            line-height: 1;
+            animation: brandRise 1.1s cubic-bezier(0.22, 1, 0.36, 1) both;
+        }
+        .brand-mark img {
+            height: 0.95em;
+            width: auto;
+            filter: drop-shadow(0 12px 28px rgba(76, 138, 137, 0.45));
+        }
+        .brand-mark .ler { color: var(--teal-bright); }
+        .brand-mark .rest { color: #fff; }
+        @keyframes brandRise {
+            from { opacity: 0; transform: translateY(28px) scale(0.98); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        .hero h1 {
+            font-family: var(--font-display);
+            font-size: clamp(1.55rem, 3.6vw, 2.45rem);
+            font-weight: 600;
+            letter-spacing: -0.025em;
+            line-height: 1.2;
+            max-width: 16ch;
+            color: var(--muted);
+            animation: brandRise 1.1s 0.15s cubic-bezier(0.22, 1, 0.36, 1) both;
+        }
+        .hero p.lead {
+            font-size: clamp(1.05rem, 2vw, 1.25rem);
+            color: var(--muted);
+            max-width: 44ch;
+            animation: brandRise 1.1s 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
+        }
+        .hero-ctas {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.85rem;
+            margin-top: 0.5rem;
+            animation: brandRise 1.1s 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+        }
+        .scroll-cue {
+            position: absolute;
+            bottom: 1.5rem;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 44px;
+            height: 44px;
+            border: 1px solid rgba(91, 168, 166, 0.45);
+            border-radius: 50%;
+            color: var(--teal-bright);
+            font-size: 1.15rem;
+            animation: cueBounce 2.2s ease-in-out infinite;
+            text-decoration: none;
+        }
+        @keyframes cueBounce {
+            0%, 100% { opacity: 0.55; transform: translate(-50%, 0); }
+            50% { opacity: 1; transform: translate(-50%, 8px); }
+        }
+
+        /* —— Sections —— */
+        .section {
+            position: relative;
+            padding: clamp(4rem, 9vw, 7rem) clamp(1.25rem, 5vw, 4rem);
+        }
+        .section-inner { max-width: 1100px; margin: 0 auto; }
+        .section-label {
+            font-family: var(--font-display);
+            font-size: 0.78rem;
+            font-weight: 600;
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
+            color: var(--teal-bright);
+            margin-bottom: 0.85rem;
+        }
+        .section h2 {
+            font-family: var(--font-display);
+            font-size: clamp(1.85rem, 4vw, 2.75rem);
+            font-weight: 700;
+            letter-spacing: -0.03em;
+            line-height: 1.15;
+            margin-bottom: 1.1rem;
+            max-width: 18ch;
+        }
+        .section .sub {
+            font-size: 1.12rem;
+            color: var(--muted);
+            max-width: 52ch;
+            margin-bottom: 2.25rem;
+        }
+
+        .about-section {
+            background:
+                linear-gradient(180deg, rgba(28, 37, 65, 0.95), rgba(11, 19, 43, 1)),
+                radial-gradient(ellipse at 0% 50%, rgba(76, 138, 137, 0.18), transparent 55%);
+        }
+        .about-copy {
+            font-size: 1.15rem;
+            color: var(--muted);
+            max-width: 62ch;
+        }
+
+        .who-section {
+            background:
+                radial-gradient(ellipse at 50% 0%, rgba(76, 138, 137, 0.2), transparent 55%),
+                linear-gradient(180deg, #0b132b, #121c34 45%, #0b132b);
+        }
+        .role-grid {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
-            gap: 2.5rem;
+            gap: 1.35rem;
+            margin-top: 2rem;
         }
-        .mv-item {
+        .role-card {
             display: flex;
             flex-direction: column;
+            gap: 1rem;
+            padding: 1.6rem 1.45rem 1.45rem;
+            border-radius: 16px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            background: linear-gradient(160deg, rgba(28, 37, 65, 0.9), rgba(15, 24, 44, 0.95));
+            box-shadow: 0 18px 40px -28px rgba(0, 0, 0, 0.7);
+            scroll-margin-top: 5.5rem;
+            transition: transform 0.25s ease, border-color 0.25s ease;
         }
-        .mv-item h3 {
-            font-size: 1.5rem;
-            color: var(--tertiary-color);
-            margin: 0 0 1rem 0;
+        .role-card:hover {
+            transform: translateY(-4px);
+            border-color: rgba(76, 138, 137, 0.45);
+        }
+        .role-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            display: grid;
+            place-items: center;
+            background: rgba(76, 138, 137, 0.18);
+            color: var(--teal-bright);
+            font-size: 1.25rem;
+        }
+        .role-card h3 {
+            font-family: var(--font-display);
+            font-size: 1.3rem;
             font-weight: 700;
+            letter-spacing: -0.02em;
+        }
+        .role-card > p {
+            color: var(--muted);
+            font-size: 0.98rem;
+            flex: 1;
+        }
+        .role-list {
+            list-style: none;
+            display: grid;
+            gap: 0.55rem;
+            margin: 0.25rem 0 0.5rem;
+        }
+        .role-list li {
             position: relative;
-            padding-bottom: 0.75rem;
+            padding-left: 1.15rem;
+            color: rgba(244, 247, 247, 0.82);
+            font-size: 0.92rem;
+            line-height: 1.45;
         }
-        .mv-item h3::after {
-            content: '';
+        .role-list li::before {
+            content: "";
             position: absolute;
-            bottom: 0;
             left: 0;
-            width: 50px;
-            height: 3px;
-            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
-            border-radius: 2px;
+            top: 0.55em;
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--teal-bright);
         }
-        .mv-item p {
-            color: var(--text-secondary);
-            line-height: 1.8;
-            margin: 0;
-            font-size: 0.95rem;
+        .role-card .btn {
+            width: 100%;
+            margin-top: auto;
+            border-radius: 12px;
+            text-decoration: none;
         }
-        @media (max-width: 900px) {
-            .main-content {
-                grid-template-columns: 1fr;
-            }
-            .login-card { order: 2; }
-            .hero { order: 1; }
-            .mv-grid {
-                grid-template-columns: 1fr;
-                gap: 2rem;
-            }
-            .mv-section {
-                padding: 2rem 1.5rem;
-            }
-            .login-card h2 { color: #ffffff; }
-            .field label { color: #a1a1aa; }
+
+        .importance-section {
+            background:
+                radial-gradient(ellipse at 100% 0%, rgba(76, 138, 137, 0.22), transparent 45%),
+                linear-gradient(160deg, #0f1a30, #13233d 60%, #0b132b);
         }
-        .action-buttons-section {
+        .importance-list {
+            display: grid;
+            gap: 1.75rem;
+            counter-reset: importance;
+            list-style: none;
+            margin-top: 2rem;
+        }
+        .importance-list li {
+            display: grid;
+            grid-template-columns: auto 1fr;
+            gap: 1.25rem;
+            align-items: start;
+            padding-bottom: 1.5rem;
+            border-bottom: 1px solid rgba(255,255,255,0.08);
+        }
+        .importance-list li::before {
+            counter-increment: importance;
+            content: counter(importance, decimal-leading-zero);
+            font-family: var(--font-display);
+            font-weight: 700;
+            font-size: 1.4rem;
+            color: var(--teal-bright);
+            line-height: 1;
+        }
+        .importance-list h3 {
+            font-family: var(--font-display);
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-bottom: 0.35rem;
+        }
+        .importance-list p { color: var(--muted); max-width: 58ch; }
+
+        .mvv-section {
+            background: linear-gradient(180deg, #0b132b, #152540 50%, #0b132b);
+        }
+        .mvv-stack {
+            display: grid;
+            gap: 3.5rem;
+        }
+        .mvv-block {
+            display: grid;
+            gap: 0.75rem;
+            padding-left: 1.25rem;
+            border-left: 3px solid var(--teal);
+            scroll-margin-top: 5.5rem;
+        }
+        .mvv-block h3 {
+            font-family: var(--font-display);
+            font-size: clamp(1.4rem, 3vw, 1.85rem);
+            font-weight: 700;
+        }
+        .mvv-block p {
+            color: var(--muted);
+            font-size: 1.08rem;
+            max-width: 58ch;
+        }
+
+        .faq-section {
+            background:
+                radial-gradient(ellipse at 20% 100%, rgba(42, 90, 89, 0.25), transparent 50%),
+                #101a32;
+        }
+        .faq-list { display: grid; gap: 0.75rem; margin-top: 1.5rem; }
+        details.faq {
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            padding: 1rem 0;
+        }
+        details.faq summary {
+            font-family: var(--font-display);
+            font-weight: 600;
+            font-size: 1.05rem;
+            cursor: pointer;
+            list-style: none;
             display: flex;
-            justify-content: center;
+            justify-content: space-between;
             align-items: center;
+            gap: 1rem;
         }
-        @media (max-width: 768px) {
-            body {
-                padding: 1.5rem 1rem;
-            }
-            .logo-wrap img {
-                height: 200px;
-            }
-            .action-buttons-section {
-                padding: 1.5rem 1rem !important;
-            }
-            .action-buttons-section button {
-                min-width: 100% !important;
-                width: 100%;
-            }
+        details.faq summary::-webkit-details-marker { display: none; }
+        details.faq summary::after {
+            content: "+";
+            font-size: 1.4rem;
+            color: var(--teal-bright);
+            transition: transform 0.25s ease;
         }
-        .modal input:focus, .modal textarea:focus, .modal select:focus {
+        details.faq[open] summary::after { transform: rotate(45deg); }
+        details.faq p {
+            margin-top: 0.85rem;
+            color: var(--muted);
+            max-width: 62ch;
+            animation: faqOpen 0.35s ease;
+        }
+        @keyframes faqOpen {
+            from { opacity: 0; transform: translateY(-6px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .contact-section {
+            background: linear-gradient(165deg, #122038, #1c2541 55%, #0b132b);
+        }
+        .contact-info { display: grid; gap: 1.25rem; color: var(--muted); max-width: 42rem; }
+        .contact-info strong {
+            display: block;
+            font-family: var(--font-display);
+            color: #fff;
+            font-weight: 600;
+            margin-bottom: 0.2rem;
+        }
+        .field input {
+            width: 100%;
+            padding: 0.95rem 1.1rem;
+            border-radius: 12px;
+            border: 1px solid rgba(255,255,255,0.16);
+            background: rgba(255,255,255,0.06);
+            color: #fff;
+            font: inherit;
+            font-size: 1rem;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+        .field input:focus {
             outline: none;
-            border-color: var(--primary-color);
+            border-color: var(--teal);
             box-shadow: 0 0 0 3px rgba(76, 138, 137, 0.25);
         }
-        .modal .close:hover {
-            background: rgba(255, 255, 255, 0.1);
-            color: #fff;
+
+        /* —— Footer —— */
+        .site-footer {
+            padding: 3rem clamp(1.25rem, 5vw, 4rem) 2rem;
+            background: #080e20;
+            border-top: 1px solid rgba(76, 138, 137, 0.2);
         }
+        .footer-inner {
+            max-width: 1100px;
+            margin: 0 auto;
+            display: grid;
+            gap: 2rem;
+        }
+        .footer-brand {
+            font-family: var(--font-display);
+            font-weight: 700;
+            font-size: 1.25rem;
+        }
+        .footer-brand span { color: var(--teal-bright); }
+        .footer-links {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem 1.75rem;
+            font-family: var(--font-display);
+            font-size: 0.9rem;
+        }
+        .footer-links button,
+        .footer-links a {
+            background: none;
+            border: none;
+            color: var(--muted);
+            cursor: pointer;
+            font: inherit;
+            padding: 0;
+            transition: color 0.2s ease;
+        }
+        .footer-links button:hover,
+        .footer-links a:hover { color: #fff; }
+        .footer-copy {
+            font-size: 0.85rem;
+            color: rgba(244, 247, 247, 0.45);
+        }
+
+        /* —— Progress bar —— */
+        .progress-bar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 3px;
+            width: 0%;
+            z-index: 1000;
+            background: linear-gradient(90deg, var(--teal-bright), var(--teal));
+            transition: width 0.1s linear;
+        }
+
+        /* —— Modals —— */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            z-index: 2000;
+            background: rgba(5, 10, 24, 0.72);
+            backdrop-filter: blur(6px);
+            align-items: center;
+            justify-content: center;
+            padding: 1rem;
+            animation: fadeIn 0.3s ease;
+        }
+        .modal-overlay.open { display: flex; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(28px) scale(0.97); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        .modal-panel {
+            width: min(480px, 100%);
+            max-height: 90vh;
+            overflow-y: auto;
+            background: linear-gradient(155deg, #1c2541, #152238 55%, #122033);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: var(--radius);
+            box-shadow: 0 28px 60px -20px rgba(0,0,0,0.65);
+            padding: clamp(1.5rem, 4vw, 2.25rem);
+            animation: slideUp 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+        }
+        .modal-panel.wide { width: min(640px, 100%); }
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 1.35rem;
+            padding-bottom: 0.9rem;
+            border-bottom: 1px solid rgba(255,255,255,0.12);
+        }
+        .modal-header h2 {
+            font-family: var(--font-display);
+            font-size: 1.45rem;
+            font-weight: 650;
+            margin: 0;
+        }
+        .modal-close {
+            width: 36px;
+            height: 36px;
+            display: grid;
+            place-items: center;
+            border-radius: 8px;
+            border: none;
+            background: transparent;
+            color: rgba(255,255,255,0.75);
+            font-size: 1.5rem;
+            cursor: pointer;
+            line-height: 1;
+        }
+        .modal-close:hover { background: rgba(255,255,255,0.08); color: #fff; }
+        .field { display: grid; gap: 0.4rem; margin-bottom: 1rem; }
+        .field label {
+            font-family: var(--font-display);
+            font-size: 0.92rem;
+            color: rgba(255,255,255,0.78);
+            font-weight: 500;
+        }
+        .login-actions {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 0.25rem 0 1rem;
+            font-family: var(--font-display);
+            font-size: 0.9rem;
+        }
+        .login-actions a { color: var(--teal-bright); }
+        .login-actions a:hover { text-decoration: underline; }
+        .button-group { display: flex; gap: 0.75rem; }
+        .button-group .btn { flex: 1; border-radius: 12px; }
+        .alert {
+            font-size: 0.9rem;
+            padding: 0.75rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+        }
+        .alert-error {
+            color: #fecaca;
+            background: rgba(239, 68, 68, 0.12);
+            border: 1px solid rgba(239, 68, 68, 0.25);
+        }
+        .alert-success {
+            color: #a7f3d0;
+            background: rgba(16, 185, 129, 0.12);
+            border: 1px solid rgba(16, 185, 129, 0.25);
+        }
+        .alert-warn {
+            color: #fde68a;
+            background: rgba(245, 158, 11, 0.12);
+            border: 1px solid rgba(245, 158, 11, 0.25);
+        }
+        .otp-form { display: grid; gap: 1.25rem; }
+        .otp-meta { margin: 0; font-size: 0.9rem; color: rgba(255,255,255,0.72); }
+        .otp-meta strong { color: #fff; }
+        .otp-actions { justify-content: center; }
+        .actions a { color: var(--teal-bright); font-family: var(--font-display); font-size: 0.9rem; }
+        .actions a:hover { text-decoration: underline; }
+        .legal-body {
+            color: var(--muted);
+            font-size: 0.98rem;
+            display: grid;
+            gap: 0.9rem;
+        }
+        .legal-body h3 {
+            font-family: var(--font-display);
+            color: #fff;
+            font-size: 1.05rem;
+            margin-top: 0.5rem;
+        }
+
         .success-modal {
             display: none;
             position: fixed;
             z-index: 2500;
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: 100%;
+            inset: 0;
             background: rgba(0, 0, 0, 0.7);
             backdrop-filter: blur(6px);
             align-items: center;
             justify-content: center;
-            animation: fadeIn 0.3s ease;
         }
-        .success-modal.active {
-            display: flex;
-        }
-        @keyframes fadeIn {
-            from { opacity: 0; }
-            to { opacity: 1; }
-        }
-        @keyframes slideUp {
-            from {
-                opacity: 0;
-                transform: translateY(30px) scale(0.95);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0) scale(1);
-            }
-        }
+        .success-modal.active { display: flex; }
         .success-modal-content {
             background: linear-gradient(145deg, #ffffff, #f8fafc);
             border-radius: var(--radius);
-            padding: 3rem clamp(2rem, 4vw, 3rem);
-            max-width: 520px;
+            padding: 2.5rem;
+            max-width: 480px;
             width: 90%;
-            box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.4);
             text-align: center;
-            position: relative;
             animation: slideUp 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
         }
         .success-icon-wrapper {
-            width: 100px;
-            height: 100px;
-            margin: 0 auto 1.5rem;
+            width: 88px;
+            height: 88px;
+            margin: 0 auto 1.25rem;
             background: linear-gradient(135deg, #10b981, #059669);
             border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 3.5rem;
-            color: #ffffff;
-            box-shadow: 0 10px 30px -10px rgba(16, 185, 129, 0.5);
-            animation: scaleIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) 0.2s both;
-        }
-        @keyframes scaleIn {
-            from {
-                transform: scale(0);
-            }
-            to {
-                transform: scale(1);
-            }
-        }
-        @keyframes slideIn {
-            from {
-                opacity: 0;
-                transform: translateY(-20px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-        .success-icon-wrapper i {
-            animation: checkmark 0.6s ease 0.3s both;
-        }
-        @keyframes checkmark {
-            0% {
-                transform: scale(0) rotate(-45deg);
-            }
-            50% {
-                transform: scale(1.2) rotate(-45deg);
-            }
-            100% {
-                transform: scale(1) rotate(0deg);
-            }
+            display: grid;
+            place-items: center;
+            color: #fff;
+            font-size: 2.5rem;
         }
         .success-modal-content h2 {
-            color: var(--tertiary-color);
-            margin: 0 0 1rem 0;
-            font-size: 1.75rem;
-            font-weight: 700;
+            color: var(--navy);
+            font-family: var(--font-display);
+            margin-bottom: 0.75rem;
         }
-        .success-modal-content p {
-            color: var(--text-secondary);
-            margin: 0 0 1.5rem 0;
-            font-size: 1.05rem;
-            line-height: 1.6;
-        }
-        .success-modal-actions {
-            display: flex;
-            gap: 1rem;
-            justify-content: center;
-            margin-top: 2rem;
-        }
-        .success-modal-actions .btn {
-            min-width: 140px;
+        .success-modal-content p { color: #575757; margin-bottom: 1.5rem; }
+        .success-modal-actions .btn { min-width: 140px; color: #fff; }
+
+            @media (max-width: 860px) {
+            .nav-toggle { display: grid; place-items: center; }
+            .site-nav {
+                flex-wrap: wrap;
+                gap: 0.65rem;
+                padding: 0.7rem 1rem;
+                padding-top: calc(0.7rem + env(safe-area-inset-top, 0px));
+            }
+            .nav-brand {
+                flex: 1 1 auto;
+                min-width: 0;
+                gap: 0.5rem;
+            }
+            .nav-brand img { height: 48px; }
+            .nav-brand-title {
+                font-size: 0.9rem;
+                max-width: 9.5rem;
+                color: #ffffff;
+                font-weight: 700;
+            }
+            .nav-cta {
+                order: 2;
+                padding: 0.55rem 1rem;
+                font-size: 0.85rem;
+            }
+            .nav-toggle { order: 3; }
+            .nav-links {
+                order: 4;
+                position: static;
+                width: 100%;
+                flex-direction: column;
+                align-items: stretch;
+                gap: 0;
+                padding: 0.5rem;
+                background: rgba(11, 19, 43, 0.96);
+                border: 1px solid rgba(255,255,255,0.1);
+                border-radius: 14px;
+                display: none;
+                max-height: min(70vh, 28rem);
+                overflow-y: auto;
+            }
+            .nav-links.open { display: flex; }
+            .nav-links a {
+                padding: 0.85rem 1rem;
+                border-radius: 10px;
+            }
+            .nav-links a:hover { background: rgba(255,255,255,0.05); }
+
+            .hero {
+                min-height: 100svh;
+                padding: 6.5rem 1.15rem 3.5rem;
+                align-items: center;
+            }
+            .hero-content { max-width: 100%; width: 100%; }
+            .hero-radar { opacity: 0.25; width: min(88vw, 320px); right: -18%; top: 12%; }
+            .brand-mark { font-size: clamp(2.2rem, 12vw, 3.4rem); }
+            .hero h1 {
+                max-width: none;
+                font-size: clamp(1.45rem, 6.5vw, 2rem);
+            }
+            .hero p.lead {
+                max-width: none;
+                font-size: 1.02rem;
+            }
+            .hero-ctas {
+                width: 100%;
+                flex-direction: column;
+            }
+            .hero-ctas .btn,
+            .hero-ctas .btn-ghost {
+                width: 100%;
+            }
+            .scroll-cue { bottom: calc(1rem + env(safe-area-inset-bottom, 0px)); }
+
+            .section {
+                padding: 3.25rem 1.15rem;
+            }
+            .section h2 { max-width: none; }
+            .section .sub,
+            .about-copy { max-width: none; }
+            .role-grid { grid-template-columns: 1fr; }
+            .role-card { padding: 1.35rem 1.2rem; }
+            .mvv-block { scroll-margin-top: 5rem; }
+            .importance-list li {
+                grid-template-columns: auto 1fr;
+                gap: 0.85rem;
+            }
+            .footer-inner { gap: 1.25rem; }
+            .footer-links {
+                gap: 0.75rem 1.1rem;
+            }
+            .site-footer {
+                padding: 2.25rem 1.15rem calc(2rem + env(safe-area-inset-bottom, 0px));
+            }
+
+            .modal-overlay {
+                align-items: flex-end;
+                padding: 0;
+            }
+            .modal-panel,
+            .modal-panel.wide {
+                width: 100%;
+                max-width: 100%;
+                max-height: min(92vh, 100%);
+                border-radius: 18px 18px 0 0;
+                padding: 1.25rem 1.15rem calc(1.25rem + env(safe-area-inset-bottom, 0px));
+            }
+            .field input,
+            .contact-form input,
+            .contact-form textarea {
+                font-size: 16px;
+            }
+            .button-group {
+                flex-direction: column;
+            }
+            .button-group .btn { width: 100%; }
         }
 
+        @media (max-width: 480px) {
+            .nav-brand img { height: 42px; }
+            .nav-brand-title {
+                font-size: 0.8rem;
+                max-width: 7.5rem;
+            }
+            .hero {
+                padding-top: 5.75rem;
+                padding-bottom: 3rem;
+            }
+            .brand-mark { font-size: clamp(1.9rem, 11vw, 2.6rem); }
+            .hero h1 { font-size: clamp(1.35rem, 7vw, 1.75rem); }
+            .section-label { letter-spacing: 0.14em; }
+        }
     </style>
 </head>
 <body>
-    <main class="page">
-        <div class="main-content">
-            <section class="hero">
-                <div class="welcome-text">
-                    <h1>
-                        <img src="images/tara.png" alt="A" class="logo-inline">
-                        <span class="text-ler">ler</span><span class="text-taraqc">TaraQC</span>
-                    </h1>
-                    <p>24/7 surveillance and instant alert system for potential threats.</p>
+    <div class="progress-bar" id="progressBar" aria-hidden="true"></div>
+
+    <header class="site-nav" id="siteNav">
+        <a href="#top" class="nav-brand">
+            <img src="images/logo.svg" alt="AlerTara QC">
+            <span class="nav-brand-title">Community Policing and Surveillance</span>
+        </a>
+        <button class="nav-toggle" id="navToggle" aria-label="Menu"><i class="fas fa-bars"></i></button>
+        <ul class="nav-links" id="navLinks">
+            <li><a href="#about">About</a></li>
+            <li><a href="#who-uses">Who Uses This</a></li>
+            <li><a href="#importance">Why It Matters</a></li>
+            <li><a href="#mission">Mission</a></li>
+            <li><a href="#vision">Vision</a></li>
+            <li><a href="#values">Values</a></li>
+            <li><a href="#faqs">FAQs</a></li>
+            <li><a href="#contact">Contact</a></li>
+        </ul>
+        <button type="button" class="nav-cta" onclick="openLoginModal()">Login</button>
+    </header>
+
+    <main id="top">
+        <section class="hero" aria-label="Hero">
+            <div class="hero-bg"></div>
+            <div class="hero-scan" aria-hidden="true"></div>
+            <div class="hero-radar" aria-hidden="true"><div class="radar-beam"></div></div>
+            <div class="hero-content">
+                <div class="brand-mark" aria-label="AlerTara QC">
+                    <img src="images/tara.png" alt="">
+                    <span class="ler">ler</span><span class="rest">Tara QC</span>
                 </div>
-            </section>
+                <h1>Community Policing and Surveillance</h1>
+                <p class="lead">24/7 community policing and surveillance that connects responders across Barangay San Agustin, Novaliches, Quezon City in real time.</p>
+                <div class="hero-ctas">
+                    <button type="button" class="btn" onclick="openLoginModal()">Login</button>
+                    <a class="btn btn-ghost" href="#about">Learn more</a>
+                </div>
+            </div>
+            <a class="scroll-cue" href="#about" aria-label="Scroll to about section">
+                <i class="fas fa-chevron-down" aria-hidden="true"></i>
+            </a>
+        </section>
 
-            <section class="login-card" aria-labelledby="login-title">
-                <h2 id="login-title">Login</h2>
-                <?php if (isset($_SESSION['registration_success'])): ?>
-                    <div style="color: #10b981; font-size: 0.9rem; padding: 0.75rem; background: rgba(16, 185, 129, 0.1); border-radius: 6px; margin-bottom: 1rem; border: 1px solid rgba(16, 185, 129, 0.2);">
-                        Registration successful! You can now login using your registered email address.
-                    </div>
-                    <?php unset($_SESSION['registration_success'], $_SESSION['registered_username']); ?>
-                <?php endif; ?>
-                <?php if (isset($error)): ?>
-                    <div style="color: #ef4444; font-size: 0.9rem; padding: 0.75rem; background: rgba(239, 68, 68, 0.1); border-radius: 6px; border: 1px solid rgba(239, 68, 68, 0.2);">
-                        <?php echo htmlspecialchars($error); ?>
-                    </div>
-                <?php endif; ?>
-                <?php if (!empty($otpPrompt)): ?>
-                    <div style="color: #10b981; font-size: 0.9rem; padding: 0.75rem; background: rgba(16, 185, 129, 0.1); border-radius: 6px; border: 1px solid rgba(16, 185, 129, 0.2);">
-                        <?php echo htmlspecialchars($otpPrompt); ?>
-                    </div>
-                <?php endif; ?>
-                <?php if (!$showOtpForm && isset($attemptsRemaining) && $attemptsRemaining > 0 && $attemptsRemaining < 3): ?>
-                    <div style="color: #f59e0b; font-size: 0.9rem; padding: 0.75rem; background: rgba(245, 158, 11, 0.1); border-radius: 6px; margin-bottom: 1rem; border: 1px solid rgba(245, 158, 11, 0.2); display: flex; align-items: center; gap: 0.5rem;">
-                        <i class="fas fa-exclamation-triangle"></i>
-                        <span><strong>Warning:</strong> You have <?php echo $attemptsRemaining; ?> more <?php echo $attemptsRemaining === 1 ? 'attempt' : 'attempts'; ?> remaining before your account is locked for 30 minutes.</span>
-                    </div>
-                <?php elseif (!$showOtpForm && isset($_POST['email']) && isset($attemptsRemaining) && $attemptsRemaining === 0): ?>
-                    <div style="color: #ef4444; font-size: 0.9rem; padding: 0.75rem; background: rgba(239, 68, 68, 0.1); border-radius: 6px; margin-bottom: 1rem; border: 1px solid rgba(239, 68, 68, 0.2); display: flex; align-items: center; gap: 0.5rem;">
-                        <i class="fas fa-lock"></i>
-                        <span><strong>Account Locked:</strong> Your account has been locked due to multiple failed login attempts. Please wait 30 minutes or contact an administrator.</span>
-                    </div>
-                <?php endif; ?>
-                <?php if ($showOtpForm): ?>
-                    <?php renderLoginOtpForm(
-                        'login.php?cancel_otp=1',
-                        $otpEmailMasked,
-                        $otpExpiresAtText,
-                        (int) $otpResendCooldown
-                    ); ?>
-                <?php else: ?>
-                    <form method="POST" action="">
-                        <div class="field">
-                            <label for="email">Email</label>
-                            <input id="email" name="email" type="email" placeholder="Enter your email" required>
-                        </div>
-                        <div class="field">
-                            <label for="password">Password</label>
-                            <input id="password" name="password" type="password" placeholder="••••••••" required>
-                        </div>
-                        <div class="actions">
-                            <a href="#" onclick="event.preventDefault(); openForgotPasswordModal();" style="cursor: pointer;">Forgot password?</a>
-                        </div>
-                        <div class="button-group">
-                            <button class="btn" type="submit" style="width: 100%;">Sign in</button>
-                        </div>
-                    </form>
-                <?php endif; ?>
-            </section>
-        </div>
+        <section class="section about-section" id="about">
+            <div class="section-inner">
+                <p class="section-label reveal">About</p>
+                <h2 class="reveal reveal-delay-1">A unified platform for community safety</h2>
+                <p class="sub reveal reveal-delay-2">AlerTara QC brings surveillance intelligence and community policing into one coordinated system for Barangay San Agustin, Novaliches, Quezon City.</p>
+                <p class="about-copy reveal reveal-delay-3">
+                    Built for administrators, barangay peacekeeping officers, and neighborhood watch partners in Barangay San Agustin,
+                    AlerTara QC streamlines alerts, incident awareness, and coordinated response—
+                    so residents stay informed and protected around the clock.
+                </p>
+            </div>
+        </section>
 
-        <section class="mv-section">
-            <div class="mv-grid">
-                <div class="mv-item">
+        <section class="section who-section" id="who-uses">
+            <div class="section-inner">
+                <p class="section-label reveal">Who uses this</p>
+                <h2 class="reveal reveal-delay-1">Choose your portal</h2>
+                <p class="sub reveal reveal-delay-2">Three access paths keep Barangay San Agustin community partners, patrol teams, and BPSO administrators in sync—with the right tools for each role.</p>
+                <div class="role-grid">
+                    <article class="role-card reveal">
+                        <div class="role-icon" aria-hidden="true"><i class="fas fa-house-user"></i></div>
+                        <h3>Neighborhood Watcher</h3>
+                        <p>Approved community volunteers who observe local activity and help keep Barangay San Agustin informed.</p>
+                        <ul class="role-list">
+                            <li>Report incidents and tips to BPSO</li>
+                            <li>Track neighborhood watch updates</li>
+                            <li>Support early community awareness</li>
+                        </ul>
+                        <a class="btn" href="nw-login.php">Visit</a>
+                    </article>
+                    <article class="role-card reveal reveal-delay-1">
+                        <div class="role-icon" aria-hidden="true"><i class="fas fa-route"></i></div>
+                        <h3>Patrol</h3>
+                        <p>Field patrol personnel who move through assigned areas in Barangay San Agustin and document on-ground activity.</p>
+                        <ul class="role-list">
+                            <li>View assigned patrol schedules</li>
+                            <li>Submit patrol logs and reports</li>
+                            <li>Coordinate with barangay responders</li>
+                        </ul>
+                        <a class="btn" href="patrol-login.php">Visit</a>
+                    </article>
+                    <article class="role-card reveal reveal-delay-2">
+                        <div class="role-icon" aria-hidden="true"><i class="fas fa-shield-halved"></i></div>
+                        <h3>BPSO Administrator</h3>
+                        <p>Barangay peace and security administrators who manage response coordination and community safety operations in Barangay San Agustin.</p>
+                        <ul class="role-list">
+                            <li>Oversee community policing and surveillance</li>
+                            <li>Review patrol and incident reports</li>
+                            <li>Coordinate public-safety response</li>
+                        </ul>
+                        <button type="button" class="btn" onclick="openLoginModal()">Visit</button>
+                    </article>
+                </div>
+            </div>
+        </section>
+
+        <section class="section importance-section" id="importance">
+            <div class="section-inner">
+                <p class="section-label reveal">Why it matters</p>
+                <h2 class="reveal reveal-delay-1">Community policing &amp; surveillance</h2>
+                <p class="sub reveal reveal-delay-2">Technology only works when people and process stay connected. Here’s why this platform matters for Barangay San Agustin.</p>
+                <ol class="importance-list">
+                    <li class="reveal">
+                        <div>
+                            <h3>Faster shared awareness</h3>
+                            <p>Real-time visibility helps officers and partners in Barangay San Agustin spot risks early and move resources where they are needed most.</p>
+                        </div>
+                    </li>
+                    <li class="reveal reveal-delay-1">
+                        <div>
+                            <h3>Stronger community trust</h3>
+                            <p>Transparent coordination between the barangay, patrols, and watch volunteers builds confidence in public safety efforts across San Agustin.</p>
+                        </div>
+                    </li>
+                    <li class="reveal reveal-delay-2">
+                        <div>
+                            <h3>Proactive protection</h3>
+                            <p>Continuous monitoring turns reactive reporting into preventive action—reducing harm in our barangay before incidents escalate.</p>
+                        </div>
+                    </li>
+                </ol>
+            </div>
+        </section>
+
+        <section class="section mvv-section">
+            <div class="section-inner mvv-stack">
+                <div class="mvv-block reveal" id="mission">
+                    <p class="section-label">Mission</p>
                     <h3>Our Mission</h3>
-                    <p>To provide a unified, efficient, and responsive emergency management system that protects lives and property through seamless inter-departmental coordination and real-time information sharing.</p>
+                    <p>To provide a unified, efficient, and responsive emergency management system for Barangay San Agustin that protects lives and property through seamless coordination and real-time information sharing.</p>
                 </div>
-                
-                <div class="mv-item">
+                <div class="mvv-block reveal" id="vision">
+                    <p class="section-label">Vision</p>
                     <h3>Our Vision</h3>
-                    <p>To become the model for smart city emergency management in the Philippines, leveraging technology to create safer, more resilient communities through proactive and coordinated public safety initiatives.</p>
+                    <p>To become a model barangay for community policing and surveillance in Novaliches, Quezon City—leveraging technology to create a safer, more resilient Barangay San Agustin through proactive and coordinated public safety initiatives.</p>
                 </div>
-                
-                <div class="mv-item">
+                <div class="mvv-block reveal" id="values">
+                    <p class="section-label">Values</p>
                     <h3>Our Values</h3>
-                    <p>Integrity, Excellence, Collaboration, and Innovation guide our commitment to serving the people of Quezon City with dedication and professionalism in every emergency response and public safety operation.</p>
+                    <p>Integrity, Excellence, Collaboration, and Innovation guide our commitment to serving the people of Barangay San Agustin, Novaliches, Quezon City with dedication and professionalism in every emergency response and public safety operation.</p>
+                </div>
+            </div>
+        </section>
+
+        <section class="section faq-section" id="faqs">
+            <div class="section-inner">
+                <p class="section-label reveal">FAQs</p>
+                <h2 class="reveal reveal-delay-1">Questions, answered</h2>
+                <div class="faq-list">
+                    <details class="faq reveal">
+                        <summary>Who can log in to AlerTara QC?</summary>
+                        <p>Authorized administrators and designated personnel assigned to Barangay San Agustin. Access is role-based and protected with OTP verification.</p>
+                    </details>
+                    <details class="faq reveal reveal-delay-1">
+                        <summary>Why is an OTP required after signing in?</summary>
+                        <p>One-time passwords add an extra layer of security so only verified account holders can access sensitive community safety data for Barangay San Agustin.</p>
+                    </details>
+                    <details class="faq reveal reveal-delay-2">
+                        <summary>What should I do if I forgot my password?</summary>
+                        <p>Use Forgot Password on the login modal. We’ll send a short-lived OTP to your registered email so you can reset securely.</p>
+                    </details>
+                    <details class="faq reveal">
+                        <summary>Is community surveillance used responsibly?</summary>
+                        <p>Yes. The platform supports lawful public-safety operations for Barangay San Agustin with accountability measures for authorized barangay partners.</p>
+                    </details>
+                </div>
+            </div>
+        </section>
+
+        <section class="section contact-section" id="contact">
+            <div class="section-inner">
+                <p class="section-label reveal">Contact us</p>
+                <h2 class="reveal reveal-delay-1">Let’s keep Barangay San Agustin safer together</h2>
+                <div class="contact-info reveal reveal-delay-1">
+                    <p>Reach the AlerTara QC team in Barangay San Agustin for support, partnership inquiries, or account assistance.</p>
+                    <div>
+                        <strong>Email</strong>
+                        contactcps@alertaraqc.gov.ph
+                    </div>
+                    <div>
+                        <strong>Location</strong>
+                        Barangay San Agustin, Novaliches, Quezon City, Metro Manila Philippines
+                    </div>
+                    <div>
+                        <strong>Hours</strong>
+                        8:00 A.M. - 5:00 P.M.
+                    </div>
                 </div>
             </div>
         </section>
     </main>
 
+    <footer class="site-footer">
+        <div class="footer-inner">
+            <div class="footer-brand">Aler<span>Tara</span> QC</div>
+            <div class="footer-links">
+                <button type="button" onclick="openLoginModal()">Login</button>
+                <a href="#about">Learn more</a>
+                <button type="button" onclick="openLegalModal('privacy')">Privacy Policy</button>
+                <button type="button" onclick="openLegalModal('terms')">Terms of Service</button>
+                <button type="button" onclick="openLegalModal('cookies')">Cookie Policy</button>
+                <a href="#contact">Contact</a>
+            </div>
+            <p class="footer-copy">&copy; <?php echo date('Y'); ?> AlerTara QC — Community Policing and Surveillance for Barangay San Agustin, Novaliches, Quezon City. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <!-- Login Modal -->
+    <div class="modal-overlay" id="loginModal" role="dialog" aria-modal="true" aria-labelledby="login-title">
+        <div class="modal-panel">
+            <div class="modal-header">
+                <h2 id="login-title">Login</h2>
+                <button type="button" class="modal-close" onclick="closeLoginModal()" aria-label="Close">&times;</button>
+            </div>
+            <?php if (isset($_SESSION['registration_success'])): ?>
+                <div class="alert alert-success">
+                    Registration successful! You can now login using your registered email address.
+                </div>
+                <?php unset($_SESSION['registration_success'], $_SESSION['registered_username']); ?>
+            <?php endif; ?>
+            <?php if (isset($error)): ?>
+                <div class="alert alert-error"><?php echo htmlspecialchars($error); ?></div>
+            <?php endif; ?>
+            <?php if (!empty($otpPrompt)): ?>
+                <div class="alert alert-success"><?php echo htmlspecialchars($otpPrompt); ?></div>
+            <?php endif; ?>
+            <?php if (!$showOtpForm && isset($attemptsRemaining) && $attemptsRemaining > 0 && $attemptsRemaining < 3): ?>
+                <div class="alert alert-warn">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <strong>Warning:</strong> You have <?php echo $attemptsRemaining; ?> more <?php echo $attemptsRemaining === 1 ? 'attempt' : 'attempts'; ?> remaining before your account is locked for 30 minutes.
+                </div>
+            <?php elseif (!$showOtpForm && isset($_POST['email']) && isset($attemptsRemaining) && $attemptsRemaining === 0): ?>
+                <div class="alert alert-error">
+                    <i class="fas fa-lock"></i>
+                    <strong>Account Locked:</strong> Your account has been locked due to multiple failed login attempts. Please wait 30 minutes or contact an administrator.
+                </div>
+            <?php endif; ?>
+            <?php if ($showOtpForm): ?>
+                <?php renderLoginOtpForm(
+                    'login.php?cancel_otp=1',
+                    $otpEmailMasked,
+                    $otpExpiresAtText,
+                    (int) $otpResendCooldown
+                ); ?>
+            <?php else: ?>
+                <form method="POST" action="">
+                    <div class="field">
+                        <label for="email">Email</label>
+                        <input id="email" name="email" type="email" placeholder="Enter your email" required value="<?php echo htmlspecialchars($_POST['email'] ?? ''); ?>">
+                    </div>
+                    <div class="field">
+                        <label for="password">Password</label>
+                        <input id="password" name="password" type="password" placeholder="••••••••" required>
+                    </div>
+                    <div class="login-actions">
+                        <a href="#" onclick="event.preventDefault(); closeLoginModal(); openForgotPasswordModal();">Forgot password?</a>
+                    </div>
+                    <div class="button-group">
+                        <button class="btn" type="submit" style="width:100%; border-radius:12px;">Sign in</button>
+                    </div>
+                </form>
+            <?php endif; ?>
+        </div>
+    </div>
+
+    <!-- Legal Modal -->
+    <div class="modal-overlay" id="legalModal" role="dialog" aria-modal="true">
+        <div class="modal-panel wide">
+            <div class="modal-header">
+                <h2 id="legalTitle">Policy</h2>
+                <button type="button" class="modal-close" onclick="closeLegalModal()" aria-label="Close">&times;</button>
+            </div>
+            <div class="legal-body" id="legalBody"></div>
+        </div>
+    </div>
+
     <!-- Registration Success Modal -->
     <div id="registrationSuccessModal" class="success-modal">
         <div class="success-modal-content">
-            <div class="success-icon-wrapper">
-                <i class="fas fa-check"></i>
-            </div>
+            <div class="success-icon-wrapper"><i class="fas fa-check"></i></div>
             <h2>Registration Successful!</h2>
             <p>Registration submitted successfully! Please proceed to the barangay hall to get your physical ID.</p>
             <div class="success-modal-actions">
@@ -1296,61 +1997,55 @@ if (isset($_SESSION['admin_logged_in']) && $_SESSION['admin_logged_in'] === true
     </div>
 
     <!-- Forgot Password Modal -->
-    <div id="forgotPasswordModal" class="modal" style="display: none; position: fixed; z-index: 2000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.6); backdrop-filter: blur(4px); align-items: center; justify-content: center;">
-        <div class="modal-content" style="background: linear-gradient(145deg, var(--tertiary-color), var(--secondary-color)); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: var(--radius); box-shadow: 0 20px 50px -25px rgba(0, 0, 0, 0.5); padding: clamp(2.5rem, 4vw, 3.5rem); max-width: 500px; width: 90%; max-height: 90vh; overflow-y: auto;">
-            <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.75rem; padding-bottom: 1rem; border-bottom: 1px solid rgba(255, 255, 255, 0.16);">
-                <h2 id="forgotPasswordTitle" style="margin: 0; color: #f8fafc; font-size: 1.75rem; font-weight: 600;">Forgot Password</h2>
-                <span class="close" onclick="closeForgotPasswordModal()" style="color: rgba(255, 255, 255, 0.8); font-size: 1.75rem; cursor: pointer; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; border-radius: 6px; transition: all 0.2s ease; line-height: 1;">&times;</span>
+    <div id="forgotPasswordModal" class="modal-overlay" style="z-index:2100;">
+        <div class="modal-panel">
+            <div class="modal-header">
+                <h2 id="forgotPasswordTitle">Forgot Password</h2>
+                <button type="button" class="modal-close" onclick="closeForgotPasswordModal()" aria-label="Close">&times;</button>
             </div>
-            
-            <!-- Step 1: Request OTP -->
             <div id="forgotPasswordStep1">
-                <p style="color: rgba(255, 255, 255, 0.85); margin-bottom: 1.5rem; line-height: 1.6;">Enter your email to receive an OTP code.</p>
-                <form id="forgotPasswordForm1" onsubmit="requestOTP(event)" style="display: grid; gap: 1.75rem;">
+                <p style="color: rgba(255,255,255,0.85); margin-bottom: 1.25rem;">Enter your email to receive an OTP code.</p>
+                <form id="forgotPasswordForm1" onsubmit="requestOTP(event)">
                     <div class="field">
-                        <label for="forgotEmail" style="font-size: 1.1rem; color: rgba(255, 255, 255, 0.8); font-weight: 500;">Email *</label>
-                        <input id="forgotEmail" name="email" type="email" placeholder="Enter your email" required style="width: 100%; padding: 1.15rem 1.5rem; border: 1px solid rgba(255, 255, 255, 0.16); border-radius: var(--radius); font: inherit; font-size: 1.1rem; color: #f8fafc; background: rgba(255, 255, 255, 0.08); transition: border-color 0.2s ease, box-shadow 0.2s ease; box-sizing: border-box;">
+                        <label for="forgotEmail">Email *</label>
+                        <input id="forgotEmail" name="email" type="email" placeholder="Enter your email" required>
                     </div>
-                    <div id="forgotPasswordMessage" style="display: none; padding: 0.75rem; border-radius: 6px; margin-bottom: 1rem; font-size: 0.9rem;"></div>
-                    <div class="button-group" style="margin-top: 0.5rem;">
-                        <button type="button" class="btn btn-secondary" onclick="closeForgotPasswordModal()" style="flex: 1;">Cancel</button>
-                        <button type="submit" class="btn" style="flex: 1;">Send OTP</button>
+                    <div id="forgotPasswordMessage" style="display:none;" class="alert"></div>
+                    <div class="button-group">
+                        <button type="button" class="btn btn-secondary" onclick="closeForgotPasswordModal()">Cancel</button>
+                        <button type="submit" class="btn">Send OTP</button>
                     </div>
                 </form>
             </div>
-            
-            <!-- Step 2: Verify OTP -->
-            <div id="forgotPasswordStep2" style="display: none;">
-                <p style="color: rgba(255, 255, 255, 0.85); margin-bottom: 1.5rem; line-height: 1.6;">Enter the 6-digit OTP code sent to your email address.</p>
-                <form id="forgotPasswordForm2" onsubmit="verifyOTP(event)" style="display: grid; gap: 1.75rem;">
+            <div id="forgotPasswordStep2" style="display:none;">
+                <p style="color: rgba(255,255,255,0.85); margin-bottom: 1.25rem;">Enter the 6-digit OTP code sent to your email address.</p>
+                <form id="forgotPasswordForm2" onsubmit="verifyOTP(event)">
                     <div class="field">
-                        <label for="forgotOTP" style="font-size: 1.1rem; color: rgba(255, 255, 255, 0.8); font-weight: 500;">OTP Code *</label>
-                        <input id="forgotOTP" name="otp" type="text" placeholder="Enter 6-digit OTP" maxlength="6" required style="width: 100%; padding: 1.15rem 1.5rem; border: 1px solid rgba(255, 255, 255, 0.16); border-radius: var(--radius); font: inherit; font-size: 1.5rem; color: #f8fafc; background: rgba(255, 255, 255, 0.08); transition: border-color 0.2s ease, box-shadow 0.2s ease; box-sizing: border-box; text-align: center; letter-spacing: 0.5rem;">
+                        <label for="forgotOTP">OTP Code *</label>
+                        <input id="forgotOTP" name="otp" type="text" placeholder="Enter 6-digit OTP" maxlength="6" required style="text-align:center; letter-spacing:0.4rem; font-size:1.35rem;">
                     </div>
-                    <div id="forgotPasswordMessage2" style="display: none; padding: 0.75rem; border-radius: 6px; margin-bottom: 1rem; font-size: 0.9rem;"></div>
-                    <div class="button-group" style="margin-top: 0.5rem;">
-                        <button type="button" class="btn btn-secondary" onclick="backToStep1()" style="flex: 1;">Back</button>
-                        <button type="submit" class="btn" style="flex: 1;">Verify OTP</button>
+                    <div id="forgotPasswordMessage2" style="display:none;" class="alert"></div>
+                    <div class="button-group">
+                        <button type="button" class="btn btn-secondary" onclick="backToStep1()">Back</button>
+                        <button type="submit" class="btn">Verify OTP</button>
                     </div>
                 </form>
             </div>
-            
-            <!-- Step 3: Reset Password -->
-            <div id="forgotPasswordStep3" style="display: none;">
-                <p style="color: rgba(255, 255, 255, 0.85); margin-bottom: 1.5rem; line-height: 1.6;">Enter your new password.</p>
-                <form id="forgotPasswordForm3" onsubmit="resetPassword(event)" style="display: grid; gap: 1.75rem;">
+            <div id="forgotPasswordStep3" style="display:none;">
+                <p style="color: rgba(255,255,255,0.85); margin-bottom: 1.25rem;">Enter your new password.</p>
+                <form id="forgotPasswordForm3" onsubmit="resetPassword(event)">
                     <div class="field">
-                        <label for="newPassword" style="font-size: 1.1rem; color: rgba(255, 255, 255, 0.8); font-weight: 500;">New Password *</label>
-                        <input id="newPassword" name="new_password" type="password" placeholder="Enter new password" required style="width: 100%; padding: 1.15rem 1.5rem; border: 1px solid rgba(255, 255, 255, 0.16); border-radius: var(--radius); font: inherit; font-size: 1.1rem; color: #f8fafc; background: rgba(255, 255, 255, 0.08); transition: border-color 0.2s ease, box-shadow 0.2s ease; box-sizing: border-box;">
+                        <label for="newPassword">New Password *</label>
+                        <input id="newPassword" name="new_password" type="password" placeholder="Enter new password" required>
                     </div>
                     <div class="field">
-                        <label for="confirmPassword" style="font-size: 1.1rem; color: rgba(255, 255, 255, 0.8); font-weight: 500;">Confirm Password *</label>
-                        <input id="confirmPassword" name="confirm_password" type="password" placeholder="Confirm new password" required style="width: 100%; padding: 1.15rem 1.5rem; border: 1px solid rgba(255, 255, 255, 0.16); border-radius: var(--radius); font: inherit; font-size: 1.1rem; color: #f8fafc; background: rgba(255, 255, 255, 0.08); transition: border-color 0.2s ease, box-shadow 0.2s ease; box-sizing: border-box;">
+                        <label for="confirmPassword">Confirm Password *</label>
+                        <input id="confirmPassword" name="confirm_password" type="password" placeholder="Confirm new password" required>
                     </div>
-                    <div id="forgotPasswordMessage3" style="display: none; padding: 0.75rem; border-radius: 6px; margin-bottom: 1rem; font-size: 0.9rem;"></div>
-                    <div class="button-group" style="margin-top: 0.5rem;">
-                        <button type="button" class="btn btn-secondary" onclick="backToStep2()" style="flex: 1;">Back</button>
-                        <button type="submit" class="btn" style="flex: 1;">Reset Password</button>
+                    <div id="forgotPasswordMessage3" style="display:none;" class="alert"></div>
+                    <div class="button-group">
+                        <button type="button" class="btn btn-secondary" onclick="backToStep2()">Back</button>
+                        <button type="submit" class="btn">Reset Password</button>
                     </div>
                 </form>
             </div>
@@ -1358,30 +2053,103 @@ if (isset($_SESSION['admin_logged_in']) && $_SESSION['admin_logged_in'] === true
     </div>
 
     <!-- Success Message Modal -->
-    <div id="successModal" class="modal" style="display: none; position: fixed; z-index: 3000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.6); backdrop-filter: blur(4px); align-items: center; justify-content: center;">
-        <div class="modal-content" style="background: linear-gradient(145deg, #10b981, #059669); border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 16px; box-shadow: 0 20px 50px -25px rgba(0, 0, 0, 0.5); padding: 2.5rem; max-width: 500px; width: 90%; text-align: center; animation: slideIn 0.3s ease-out;">
-            <div style="margin-bottom: 1.5rem;">
-                <div style="width: 80px; height: 80px; margin: 0 auto; background: rgba(255, 255, 255, 0.2); border-radius: 50%; display: flex; align-items: center; justify-content: center; animation: scaleIn 0.3s ease-out;">
-                    <i class="fas fa-check-circle" style="font-size: 3rem; color: #fff;"></i>
-                </div>
+    <div id="successModal" class="modal-overlay" style="z-index:3000;">
+        <div class="modal-panel" style="text-align:center; background: linear-gradient(145deg, #10b981, #059669);">
+            <div style="width:72px;height:72px;margin:0 auto 1rem;background:rgba(255,255,255,0.2);border-radius:50%;display:grid;place-items:center;">
+                <i class="fas fa-check-circle" style="font-size:2.2rem;color:#fff;"></i>
             </div>
-            <h2 style="margin: 0 0 1rem 0; color: #fff; font-size: 1.75rem; font-weight: 600;">Success!</h2>
-            <p id="successMessage" style="margin: 0 0 2rem 0; color: rgba(255, 255, 255, 0.95); font-size: 1.1rem; line-height: 1.6;"></p>
-            <button onclick="closeSuccessModal()" style="padding: 0.875rem 2rem; background: rgba(255, 255, 255, 0.2); color: #fff; border: 2px solid rgba(255, 255, 255, 0.3); border-radius: 8px; font-size: 1rem; font-weight: 500; cursor: pointer; transition: all 0.2s ease; width: 100%;">OK</button>
+            <h2 style="margin:0 0 0.75rem;color:#fff;font-family:var(--font-display);">Success!</h2>
+            <p id="successMessage" style="margin:0 0 1.5rem;color:rgba(255,255,255,0.95);"></p>
+            <button class="btn btn-ghost" onclick="closeSuccessModal()" style="width:100%;">OK</button>
         </div>
     </div>
 
     <script>
+        const autoOpenLogin = <?php echo !empty($autoOpenLogin) ? 'true' : 'false'; ?>;
+
+        const legalContent = {
+            privacy: {
+                title: 'Privacy Policy',
+                html: `
+                    <p>AlerTara QC respects your privacy and handles account and operational data responsibly for community safety purposes.</p>
+                    <h3>Information we process</h3>
+                    <p>Account details (such as name, email, and role), authentication logs, and system activity needed to secure and operate the platform.</p>
+                    <h3>How we use information</h3>
+                    <p>To verify identity, send OTP and security notices, maintain service integrity, and support authorized public-safety operations.</p>
+                    <h3>Sharing</h3>
+                    <p>Data is shared only with authorized Barangay San Agustin partners and service providers under appropriate controls, or when required by law.</p>
+                    <h3>Your choices</h3>
+                    <p>Contact administrators to update account details or raise privacy concerns related to your access.</p>
+                `
+            },
+            terms: {
+                title: 'Terms of Service',
+                html: `
+                    <p>By accessing AlerTara QC, you agree to use the platform only for lawful community policing and surveillance operations in Barangay San Agustin, Novaliches, Quezon City.</p>
+                    <h3>Acceptable use</h3>
+                    <p>Users must protect credentials, follow role permissions, and avoid unauthorized disclosure of sensitive information.</p>
+                    <h3>Accounts</h3>
+                    <p>Accounts are for designated personnel. Repeated failed logins may trigger temporary lockouts for security.</p>
+                    <h3>Availability</h3>
+                    <p>We strive for continuous uptime, but maintenance or unforeseen issues may temporarily affect access.</p>
+                    <h3>Changes</h3>
+                    <p>These terms may be updated to reflect operational or legal requirements. Continued use means you accept the latest version.</p>
+                `
+            },
+            cookies: {
+                title: 'Cookie Policy',
+                html: `
+                    <p>AlerTara QC uses essential cookies and session storage to keep you signed in securely and remember critical login state.</p>
+                    <h3>Essential cookies</h3>
+                    <p>Required for authentication sessions, OTP verification flow, and basic security protections.</p>
+                    <h3>Preferences</h3>
+                    <p>We may store limited interface preferences to improve your experience on return visits.</p>
+                    <h3>Control</h3>
+                    <p>You can clear cookies in your browser, but doing so may sign you out and require login again.</p>
+                `
+            }
+        };
+
+        function openLoginModal() {
+            document.getElementById('loginModal').classList.add('open');
+            document.body.style.overflow = 'hidden';
+            const email = document.getElementById('email');
+            if (email) setTimeout(() => email.focus(), 120);
+        }
+        function closeLoginModal() {
+            document.getElementById('loginModal').classList.remove('open');
+            if (![...document.querySelectorAll('.modal-overlay.open')].length) {
+                document.body.style.overflow = '';
+            }
+        }
+
+        function openLegalModal(key) {
+            const item = legalContent[key];
+            if (!item) return;
+            document.getElementById('legalTitle').textContent = item.title;
+            document.getElementById('legalBody').innerHTML = item.html;
+            document.getElementById('legalModal').classList.add('open');
+            document.body.style.overflow = 'hidden';
+        }
+        function closeLegalModal() {
+            document.getElementById('legalModal').classList.remove('open');
+            if (![...document.querySelectorAll('.modal-overlay.open')].length) {
+                document.body.style.overflow = '';
+            }
+        }
+
+        function closeRegistrationSuccessModal() {
+            document.getElementById('registrationSuccessModal').classList.remove('active');
+        }
+
         function showSuccessModal(title, message, isError = false) {
             const modal = document.getElementById('successModal');
             const titleElement = modal.querySelector('h2');
             const messageElement = document.getElementById('successMessage');
             const iconElement = modal.querySelector('i');
-            const modalContent = modal.querySelector('.modal-content');
-            
+            const modalContent = modal.querySelector('.modal-panel');
             titleElement.textContent = title;
             messageElement.innerHTML = message;
-            
             if (isError) {
                 modalContent.style.background = 'linear-gradient(145deg, #ef4444, #dc2626)';
                 iconElement.className = 'fas fa-exclamation-circle';
@@ -1389,25 +2157,24 @@ if (isset($_SESSION['admin_logged_in']) && $_SESSION['admin_logged_in'] === true
                 modalContent.style.background = 'linear-gradient(145deg, #10b981, #059669)';
                 iconElement.className = 'fas fa-check-circle';
             }
-            
-            modal.style.display = 'flex';
+            modal.classList.add('open');
         }
-
         function closeSuccessModal() {
-            document.getElementById('successModal').style.display = 'none';
+            document.getElementById('successModal').classList.remove('open');
         }
 
-        // Forgot Password Functions
         function openForgotPasswordModal() {
-            document.getElementById('forgotPasswordModal').style.display = 'flex';
+            document.getElementById('forgotPasswordModal').classList.add('open');
             resetForgotPasswordModal();
+            document.body.style.overflow = 'hidden';
         }
-
         function closeForgotPasswordModal() {
-            document.getElementById('forgotPasswordModal').style.display = 'none';
+            document.getElementById('forgotPasswordModal').classList.remove('open');
             resetForgotPasswordModal();
+            if (![...document.querySelectorAll('.modal-overlay.open')].length) {
+                document.body.style.overflow = '';
+            }
         }
-
         function resetForgotPasswordModal() {
             document.getElementById('forgotPasswordStep1').style.display = 'block';
             document.getElementById('forgotPasswordStep2').style.display = 'none';
@@ -1415,75 +2182,58 @@ if (isset($_SESSION['admin_logged_in']) && $_SESSION['admin_logged_in'] === true
             document.getElementById('forgotPasswordForm1').reset();
             document.getElementById('forgotPasswordForm2').reset();
             document.getElementById('forgotPasswordForm3').reset();
-            document.getElementById('forgotPasswordMessage').style.display = 'none';
-            document.getElementById('forgotPasswordMessage2').style.display = 'none';
-            document.getElementById('forgotPasswordMessage3').style.display = 'none';
+            ['forgotPasswordMessage','forgotPasswordMessage2','forgotPasswordMessage3'].forEach(id => {
+                const el = document.getElementById(id);
+                el.style.display = 'none';
+                el.textContent = '';
+            });
             document.getElementById('forgotPasswordTitle').textContent = 'Forgot Password';
         }
-
         function backToStep1() {
             document.getElementById('forgotPasswordStep1').style.display = 'block';
             document.getElementById('forgotPasswordStep2').style.display = 'none';
             document.getElementById('forgotPasswordTitle').textContent = 'Forgot Password';
         }
-
         function backToStep2() {
             document.getElementById('forgotPasswordStep2').style.display = 'block';
             document.getElementById('forgotPasswordStep3').style.display = 'none';
             document.getElementById('forgotPasswordTitle').textContent = 'Verify OTP';
         }
 
+        function setMsg(el, text, ok) {
+            el.textContent = text;
+            el.style.display = 'block';
+            el.className = 'alert ' + (ok ? 'alert-success' : 'alert-error');
+        }
+
         async function requestOTP(event) {
             event.preventDefault();
             const email = document.getElementById('forgotEmail').value.trim();
             const messageDiv = document.getElementById('forgotPasswordMessage');
-            
-            if (!email) {
-                messageDiv.textContent = 'Please enter your email.';
-                messageDiv.style.display = 'block';
-                messageDiv.style.color = '#ef4444';
-                messageDiv.style.background = 'rgba(239, 68, 68, 0.1)';
-                messageDiv.style.border = '1px solid rgba(239, 68, 68, 0.2)';
-                return;
-            }
-            
+            if (!email) return setMsg(messageDiv, 'Please enter your email.', false);
             try {
                 const response = await fetch('api/forgot-password.php?action=request', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ email })
                 });
-                
-                const result = await response.json();
-                
+                const raw = await response.text();
+                let result;
+                try { result = JSON.parse(raw); }
+                catch (e) { throw new Error('Invalid server response while requesting OTP.'); }
                 if (result.success) {
-                    messageDiv.textContent = result.message;
-                    messageDiv.style.display = 'block';
-                    messageDiv.style.color = '#10b981';
-                    messageDiv.style.background = 'rgba(16, 185, 129, 0.1)';
-                    messageDiv.style.border = '1px solid rgba(16, 185, 129, 0.2)';
-                    
-                    // Move to step 2
+                    setMsg(messageDiv, result.message, true);
                     setTimeout(() => {
                         document.getElementById('forgotPasswordStep1').style.display = 'none';
                         document.getElementById('forgotPasswordStep2').style.display = 'block';
                         document.getElementById('forgotPasswordTitle').textContent = 'Verify OTP';
                         document.getElementById('forgotOTP').focus();
-                    }, 1000);
+                    }, 900);
                 } else {
-                    messageDiv.textContent = result.message;
-                    messageDiv.style.display = 'block';
-                    messageDiv.style.color = '#ef4444';
-                    messageDiv.style.background = 'rgba(239, 68, 68, 0.1)';
-                    messageDiv.style.border = '1px solid rgba(239, 68, 68, 0.2)';
+                    setMsg(messageDiv, result.message || 'An error occurred. Please try again.', false);
                 }
             } catch (err) {
-                console.error('Error requesting OTP:', err);
-                messageDiv.textContent = 'An error occurred. Please try again.';
-                messageDiv.style.display = 'block';
-                messageDiv.style.color = '#ef4444';
-                messageDiv.style.background = 'rgba(239, 68, 68, 0.1)';
-                messageDiv.style.border = '1px solid rgba(239, 68, 68, 0.2)';
+                setMsg(messageDiv, err.message || 'An error occurred. Please try again.', false);
             }
         }
 
@@ -1491,45 +2241,24 @@ if (isset($_SESSION['admin_logged_in']) && $_SESSION['admin_logged_in'] === true
             event.preventDefault();
             const otp = document.getElementById('forgotOTP').value.trim();
             const messageDiv = document.getElementById('forgotPasswordMessage2');
-            
-            if (!otp || otp.length !== 6) {
-                messageDiv.textContent = 'Please enter a valid 6-digit OTP code.';
-                messageDiv.style.display = 'block';
-                messageDiv.style.color = '#ef4444';
-                messageDiv.style.background = 'rgba(239, 68, 68, 0.1)';
-                messageDiv.style.border = '1px solid rgba(239, 68, 68, 0.2)';
-                return;
-            }
-            
+            if (!otp || otp.length !== 6) return setMsg(messageDiv, 'Please enter a valid 6-digit OTP code.', false);
             try {
                 const response = await fetch('api/forgot-password.php?action=verify', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ otp })
                 });
-                
                 const result = await response.json();
-                
                 if (result.success) {
-                    // Move to step 3
                     document.getElementById('forgotPasswordStep2').style.display = 'none';
                     document.getElementById('forgotPasswordStep3').style.display = 'block';
                     document.getElementById('forgotPasswordTitle').textContent = 'Reset Password';
                     document.getElementById('newPassword').focus();
                 } else {
-                    messageDiv.textContent = result.message;
-                    messageDiv.style.display = 'block';
-                    messageDiv.style.color = '#ef4444';
-                    messageDiv.style.background = 'rgba(239, 68, 68, 0.1)';
-                    messageDiv.style.border = '1px solid rgba(239, 68, 68, 0.2)';
+                    setMsg(messageDiv, result.message, false);
                 }
             } catch (err) {
-                console.error('Error verifying OTP:', err);
-                messageDiv.textContent = 'An error occurred. Please try again.';
-                messageDiv.style.display = 'block';
-                messageDiv.style.color = '#ef4444';
-                messageDiv.style.background = 'rgba(239, 68, 68, 0.1)';
-                messageDiv.style.border = '1px solid rgba(239, 68, 68, 0.2)';
+                setMsg(messageDiv, 'An error occurred. Please try again.', false);
             }
         }
 
@@ -1538,102 +2267,104 @@ if (isset($_SESSION['admin_logged_in']) && $_SESSION['admin_logged_in'] === true
             const newPassword = document.getElementById('newPassword').value;
             const confirmPassword = document.getElementById('confirmPassword').value;
             const messageDiv = document.getElementById('forgotPasswordMessage3');
-            
-            if (!newPassword || !confirmPassword) {
-                messageDiv.textContent = 'Please fill in all fields.';
-                messageDiv.style.display = 'block';
-                messageDiv.style.color = '#ef4444';
-                messageDiv.style.background = 'rgba(239, 68, 68, 0.1)';
-                messageDiv.style.border = '1px solid rgba(239, 68, 68, 0.2)';
-                return;
-            }
-            
-            if (newPassword !== confirmPassword) {
-                messageDiv.textContent = 'Passwords do not match.';
-                messageDiv.style.display = 'block';
-                messageDiv.style.color = '#ef4444';
-                messageDiv.style.background = 'rgba(239, 68, 68, 0.1)';
-                messageDiv.style.border = '1px solid rgba(239, 68, 68, 0.2)';
-                return;
-            }
-            
-            if (newPassword.length < 6) {
-                messageDiv.textContent = 'Password must be at least 6 characters long.';
-                messageDiv.style.display = 'block';
-                messageDiv.style.color = '#ef4444';
-                messageDiv.style.background = 'rgba(239, 68, 68, 0.1)';
-                messageDiv.style.border = '1px solid rgba(239, 68, 68, 0.2)';
-                return;
-            }
-            
+            if (!newPassword || !confirmPassword) return setMsg(messageDiv, 'Please fill in all fields.', false);
+            if (newPassword !== confirmPassword) return setMsg(messageDiv, 'Passwords do not match.', false);
+            if (newPassword.length < 6) return setMsg(messageDiv, 'Password must be at least 6 characters long.', false);
             try {
                 const response = await fetch('api/forgot-password.php?action=reset', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ new_password: newPassword, confirm_password: confirmPassword })
                 });
-                
                 const result = await response.json();
-                
                 if (result.success) {
                     closeForgotPasswordModal();
                     showSuccessModal('Password Reset Successful!', result.message, false);
-                    setTimeout(() => {
-                        window.location.href = 'login.php';
-                    }, 2000);
+                    setTimeout(() => { window.location.href = 'login.php'; }, 2000);
                 } else {
-                    messageDiv.textContent = result.message;
-                    messageDiv.style.display = 'block';
-                    messageDiv.style.color = '#ef4444';
-                    messageDiv.style.background = 'rgba(239, 68, 68, 0.1)';
-                    messageDiv.style.border = '1px solid rgba(239, 68, 68, 0.2)';
+                    setMsg(messageDiv, result.message, false);
                 }
             } catch (err) {
-                console.error('Error resetting password:', err);
-                messageDiv.textContent = 'An error occurred. Please try again.';
-                messageDiv.style.display = 'block';
-                messageDiv.style.color = '#ef4444';
-                messageDiv.style.background = 'rgba(239, 68, 68, 0.1)';
-                messageDiv.style.border = '1px solid rgba(239, 68, 68, 0.2)';
+                setMsg(messageDiv, 'An error occurred. Please try again.', false);
             }
         }
 
-        // Auto-format OTP input
-        document.addEventListener('DOMContentLoaded', function() {
-            const otpInput = document.getElementById('forgotOTP');
-            if (otpInput) {
-                otpInput.addEventListener('input', function(e) {
-                    e.target.value = e.target.value.replace(/\D/g, '').slice(0, 6);
-                });
-            }
+        document.addEventListener('DOMContentLoaded', () => {
+            // Scroll progress + nav state
+            const nav = document.getElementById('siteNav');
+            const bar = document.getElementById('progressBar');
+            const onScroll = () => {
+                const max = document.documentElement.scrollHeight - window.innerHeight;
+                const pct = max > 0 ? (window.scrollY / max) * 100 : 0;
+                bar.style.width = pct + '%';
+                nav.classList.toggle('scrolled', window.scrollY > 24);
+            };
+            window.addEventListener('scroll', onScroll, { passive: true });
+            onScroll();
 
-            const loginOtpInput = document.getElementById('login_otp');
-            if (loginOtpInput) {
-                loginOtpInput.addEventListener('input', function(e) {
-                    e.target.value = e.target.value.replace(/\D/g, '').slice(0, 6);
+            // Progressive reveals
+            const io = new IntersectionObserver((entries) => {
+                entries.forEach((entry) => {
+                    if (entry.isIntersecting) {
+                        entry.target.classList.add('in');
+                        io.unobserve(entry.target);
+                    }
                 });
+            }, { threshold: 0.16, rootMargin: '0px 0px -8% 0px' });
+            document.querySelectorAll('.reveal').forEach((el) => io.observe(el));
+
+            // Active nav links
+            const sections = [
+                ...document.querySelectorAll('section[id]'),
+                ...document.querySelectorAll('#mission, #vision, #values')
+            ];
+            const links = [...document.querySelectorAll('#navLinks a')];
+            const spy = new IntersectionObserver((entries) => {
+                entries.forEach((entry) => {
+                    if (!entry.isIntersecting) return;
+                    const id = entry.target.id;
+                    links.forEach((a) => a.classList.toggle('active', a.getAttribute('href') === '#' + id));
+                });
+            }, { threshold: 0.35 });
+            sections.forEach((s) => spy.observe(s));
+
+            // Mobile nav
+            const toggle = document.getElementById('navToggle');
+            const navLinks = document.getElementById('navLinks');
+            toggle.addEventListener('click', () => navLinks.classList.toggle('open'));
+            navLinks.querySelectorAll('a').forEach((a) => a.addEventListener('click', () => navLinks.classList.remove('open')));
+
+            // OTP inputs
+            const otpInput = document.getElementById('forgotOTP');
+            if (otpInput) otpInput.addEventListener('input', (e) => {
+                e.target.value = e.target.value.replace(/\D/g, '').slice(0, 6);
+            });
+            const loginOtpInput = document.getElementById('login_otp');
+            if (loginOtpInput) loginOtpInput.addEventListener('input', (e) => {
+                e.target.value = e.target.value.replace(/\D/g, '').slice(0, 6);
+            });
+
+            if (autoOpenLogin) openLoginModal();
+            if (window.location.search.includes('reset=1')) {
+                openForgotPasswordModal();
+                window.history.replaceState({}, document.title, window.location.pathname);
             }
         });
 
-        // Close modals when clicking outside
-        window.onclick = function(event) {
-            const forgotPasswordModal = document.getElementById('forgotPasswordModal');
-            const successModal = document.getElementById('successModal');
-            
-            if (event.target === forgotPasswordModal) {
+        window.addEventListener('click', (event) => {
+            if (event.target === document.getElementById('loginModal')) closeLoginModal();
+            if (event.target === document.getElementById('legalModal')) closeLegalModal();
+            if (event.target === document.getElementById('forgotPasswordModal')) closeForgotPasswordModal();
+            if (event.target === document.getElementById('successModal')) closeSuccessModal();
+        });
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                closeLoginModal();
+                closeLegalModal();
                 closeForgotPasswordModal();
-            }
-            if (event.target === successModal) {
                 closeSuccessModal();
             }
-        };
-        
-        // Check if reset=1 is in URL and open forgot password modal
-        if (window.location.search.includes('reset=1')) {
-            openForgotPasswordModal();
-            // Remove reset=1 from URL without reload
-            window.history.replaceState({}, document.title, window.location.pathname);
-        }
+        });
     </script>
 </body>
 </html>

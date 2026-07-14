@@ -350,12 +350,12 @@ function sendPasswordResetOTPEmail(string $email, string $otp, string $portal = 
             $mail->Body = $body;
             $mail->send();
             return true;
-        } catch (Exception $e) {
+        } catch (Throwable $e) {
             error_log('Password reset OTP email send failed: ' . ($mail->ErrorInfo ?? $e->getMessage()));
             return false;
         }
     }
 
-    $headers = "MIME-Version: 1.0\r\nContent-Type: text/html; charset=UTF-8\r\nFrom: {$mailConfig['from_name']} <{$mailConfig['from']}>\r\n";
-    return mail($email, $subject, $body, $headers);
+    error_log('Password reset OTP email failed: PHPMailer is not available.');
+    return false;
 }

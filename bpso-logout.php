@@ -11,5 +11,5 @@ unset(
     $_SESSION['bpso_email']
 );
 
-header('Location: bpso-login.php');
+header('Location: patrol-login.php');
 exit;
