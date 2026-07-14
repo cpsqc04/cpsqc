@@ -611,7 +611,7 @@ $nwSearchPlaceholder = $nwIsMemberList
                 <h2>Add Neighborhood Watch Member</h2>
                 <button class="close-modal" onclick="closeAddMemberModal()">&times;</button>
             </div>
-            <form id="addMemberForm" onsubmit="saveMember(event)">
+            <form id="addMemberForm" onsubmit="saveMember(event)" autocomplete="off">
                 <input type="hidden" id="addMemberId" value="">
                 <div class="form-row">
                     <div class="form-group">
@@ -620,7 +620,7 @@ $nwSearchPlaceholder = $nwIsMemberList
                     </div>
                     <div class="form-group">
                         <label for="memberContact">Contact Number *</label>
-                        <input type="tel" id="memberContact" name="memberContact" required>
+                        <input type="tel" id="memberContact" name="memberContact" class="contact-number-input" required>
                     </div>
                 </div>
                 
@@ -654,7 +654,7 @@ $nwSearchPlaceholder = $nwIsMemberList
                     </div>
                     <div class="form-group">
                         <label for="memberEmergencyContact">Emergency Contact Number *</label>
-                        <input type="tel" id="memberEmergencyContact" name="memberEmergencyContact" required>
+                        <input type="tel" id="memberEmergencyContact" name="memberEmergencyContact" class="contact-number-input" required>
                     </div>
                 </div>
                 
@@ -695,7 +695,7 @@ $nwSearchPlaceholder = $nwIsMemberList
                 <h2>Edit Neighborhood Watch Member</h2>
                 <button class="close-modal" onclick="closeEditMemberModal()">&times;</button>
             </div>
-            <form id="editMemberForm" onsubmit="updateMember(event)">
+            <form id="editMemberForm" onsubmit="updateMember(event)" autocomplete="off">
                 <input type="hidden" id="editMemberId" name="memberId">
                 
                 <div class="form-row">
@@ -705,7 +705,7 @@ $nwSearchPlaceholder = $nwIsMemberList
                     </div>
                     <div class="form-group">
                         <label for="editMemberContact">Contact Number *</label>
-                        <input type="tel" id="editMemberContact" name="memberContact" required>
+                        <input type="tel" id="editMemberContact" name="memberContact" class="contact-number-input" required>
                     </div>
                 </div>
                 
@@ -727,7 +727,7 @@ $nwSearchPlaceholder = $nwIsMemberList
                     </div>
                     <div class="form-group">
                         <label for="editMemberEmergencyContact">Emergency Contact Number *</label>
-                        <input type="tel" id="editMemberEmergencyContact" name="memberEmergencyContact" required>
+                        <input type="tel" id="editMemberEmergencyContact" name="memberEmergencyContact" class="contact-number-input" required>
                     </div>
                 </div>
 
@@ -795,6 +795,7 @@ $nwSearchPlaceholder = $nwIsMemberList
         </div>
     </div>
     
+    <script src="js/form-contact-validation.js"></script>
     <script>
         const NW_PAGE_MODE = <?php echo json_encode(NW_PAGE_MODE); ?>;
 
@@ -1017,6 +1018,17 @@ $nwSearchPlaceholder = $nwIsMemberList
             const photoIdFile = document.getElementById('memberPhotoId').files[0];
             const emergencyName = document.getElementById('memberEmergencyName').value.trim();
             const emergencyContact = document.getElementById('memberEmergencyContact').value.trim();
+            
+            const contactError = AlertaraFormEnhancements.validateContactInput(document.getElementById('memberContact'), 'Contact number');
+            if (contactError) {
+                alert(contactError);
+                return;
+            }
+            const emergencyContactError = AlertaraFormEnhancements.validateContactInput(document.getElementById('memberEmergencyContact'), 'Emergency contact number');
+            if (emergencyContactError) {
+                alert(emergencyContactError);
+                return;
+            }
             
             if (!photoFile) {
                 alert('Member photo is required!');
@@ -1418,6 +1430,17 @@ $nwSearchPlaceholder = $nwIsMemberList
             const emergencyContact = document.getElementById('editMemberEmergencyContact').value.trim();
             const memberPhotoFile = document.getElementById('editMemberPhoto').files[0];
             const photoIdFile = document.getElementById('editMemberPhotoId').files[0];
+
+            const contactError = AlertaraFormEnhancements.validateContactInput(document.getElementById('editMemberContact'), 'Contact number');
+            if (contactError) {
+                alert(contactError);
+                return;
+            }
+            const emergencyContactError = AlertaraFormEnhancements.validateContactInput(document.getElementById('editMemberEmergencyContact'), 'Emergency contact number');
+            if (emergencyContactError) {
+                alert(emergencyContactError);
+                return;
+            }
 
             const uploadPromises = [];
             let photoSrc = null;

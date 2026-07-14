@@ -210,6 +210,8 @@ $cctvNavActive = 'open-surveillance';
         }
         .detection-card .tag.plant { background: #059669; }
         .detection-card .tag.phone { background: #2563eb; }
+        .detection-card .tag.backpack { background: #7c3aed; }
+        .detection-card .tag.suitcase { background: #d97706; }
         .detection-card .tag.group { background: #7c3aed; }
         .detection-card .tag.crowd { background: #db2777; }
         .detection-card .tag.person { background: #0ea5e9; }
@@ -675,6 +677,8 @@ $cctvNavActive = 'open-surveillance';
             const labels = {
                 person: 'Person',
                 phone: 'Phone',
+                backpack: 'Backpack',
+                suitcase: 'Suitcase',
                 plant: 'Plant',
                 vehicle: 'Vehicle',
                 animal: 'Animal',
@@ -722,7 +726,7 @@ $cctvNavActive = 'open-surveillance';
 
         function renderDetectionCard(item) {
             const cat = item.category || item.class || 'object';
-            const tagClass = ['plant', 'phone', 'group', 'crowd', 'person', 'vehicle', 'animal'].includes(cat) ? cat : '';
+            const tagClass = ['plant', 'phone', 'backpack', 'suitcase', 'group', 'crowd', 'person', 'vehicle', 'animal'].includes(cat) ? cat : '';
             const attrs = renderDetectionAttributes(item);
             const thumb = item.image
                 ? `<img class="detection-thumb" src="${escapeHtml(item.image)}?t=${Date.now()}" alt="${escapeHtml(categoryLabel(cat))}">`
@@ -760,7 +764,7 @@ $cctvNavActive = 'open-surveillance';
                     return;
                 }
 
-                const priority = { person: 0, crowd: 1, group: 2, phone: 3, weapon: 4, vehicle: 5, animal: 6, plant: 7 };
+                const priority = { person: 0, crowd: 1, group: 2, phone: 3, backpack: 4, suitcase: 5, weapon: 6, vehicle: 7, animal: 8, plant: 9 };
                 const sorted = detections.slice().sort((a, b) => {
                     const pa = priority[a.category] ?? 99;
                     const pb = priority[b.category] ?? 99;

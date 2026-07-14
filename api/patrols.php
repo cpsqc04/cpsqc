@@ -5,6 +5,25 @@ header('Content-Type: application/json');
 
 require_once __DIR__ . '/../db.php';
 require_once __DIR__ . '/patrol_logs_schema.php';
+require_once __DIR__ . '/../includes/contact_validation.php';
+
+/**
+ * Generate the next BPSO personnel ID in PER-XX format.
+ */
+function generateNextBpsoPersonnelId(PDO $pdo): string
+{
+    $stmt = $pdo->query('SELECT bpso_personnel_id FROM patrols');
+    $max = 0;
+
+    while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+        $id = strtoupper(trim((string)($row['bpso_personnel_id'] ?? '')));
+        if (preg_match('/^PER-(\d+)$/', $id, $matches)) {
+            $max = max($max, (int)$matches[1]);
+        }
+    }
+
+    return sprintf('PER-%02d', $max + 1);
+}
 
 /**
  * Ensure the patrols table (and required columns) exist in the database.
@@ -101,6 +120,16 @@ $method = $_SERVER['REQUEST_METHOD'];
 
 if ($method === 'GET') {
     try {
+        if (isset($_GET['next_id'])) {
+            echo json_encode([
+                'success' => true,
+                'data' => [
+                    'bpso_personnel_id' => generateNextBpsoPersonnelId($pdo),
+                ],
+            ]);
+            exit;
+        }
+
         $stmt = $pdo->query('SELECT id, bpso_personnel_id, personnel_name, contact_number, email, schedule, status, created_at FROM patrols ORDER BY id DESC');
         $patrols = $stmt->fetchAll();
 
@@ -120,7 +149,6 @@ $action = $input['action'] ?? '';
 
 if ($method === 'POST') {
     if ($action === 'create') {
-        $personnelId = trim($input['bpso_personnel_id'] ?? '');
         $personnelName = trim($input['personnel_name'] ?? '');
         $contactNumber = trim($input['contact_number'] ?? '');
         $email = trim($input['email'] ?? '');
@@ -128,9 +156,17 @@ if ($method === 'POST') {
         $schedule = trim($input['schedule'] ?? '');
         $status = trim($input['status'] ?? 'Available');
 
-        if ($personnelId === '' || $personnelName === '' || $contactNumber === '' || $email === '' || $password === '' || $schedule === '') {
+        if ($personnelName === '' || $contactNumber === '' || $email === '' || $password === '' || $schedule === '') {
             http_response_code(400);
             echo json_encode(['success' => false, 'message' => 'Missing required fields.']);
+            exit;
+        }
+
+        $contactNumber = normalizeContactDigits($contactNumber);
+        $contactError = validateContactNumber($contactNumber, 'Contact number');
+        if ($contactError !== null) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'message' => $contactError]);
             exit;
         }
 
@@ -157,16 +193,37 @@ if ($method === 'POST') {
                 exit;
             }
 
+            $personnelId = generateNextBpsoPersonnelId($pdo);
             $stmt = $pdo->prepare('INSERT INTO patrols (bpso_personnel_id, personnel_name, contact_number, email, password_hash, schedule, status) VALUES (:bpso_personnel_id, :personnel_name, :contact_number, :email, :password_hash, :schedule, :status)');
-            $stmt->execute([
-                ':bpso_personnel_id' => $personnelId,
-                ':personnel_name' => $personnelName,
-                ':contact_number' => $contactNumber,
-                ':email' => $email,
-                ':password_hash' => $passwordHash,
-                ':schedule' => $schedule,
-                ':status' => $status,
-            ]);
+
+            $inserted = false;
+            for ($attempt = 0; $attempt < 5; $attempt++) {
+                try {
+                    $stmt->execute([
+                        ':bpso_personnel_id' => $personnelId,
+                        ':personnel_name' => $personnelName,
+                        ':contact_number' => $contactNumber,
+                        ':email' => $email,
+                        ':password_hash' => $passwordHash,
+                        ':schedule' => $schedule,
+                        ':status' => $status,
+                    ]);
+                    $inserted = true;
+                    break;
+                } catch (PDOException $e) {
+                    if (strpos($e->getMessage(), 'Duplicate entry') !== false && strpos($e->getMessage(), 'email') === false) {
+                        $personnelId = generateNextBpsoPersonnelId($pdo);
+                        continue;
+                    }
+                    throw $e;
+                }
+            }
+
+            if (!$inserted) {
+                http_response_code(500);
+                echo json_encode(['success' => false, 'message' => 'Failed to generate a unique BPSO Personnel ID.']);
+                exit;
+            }
 
             $id = (int)$pdo->lastInsertId();
 
@@ -184,12 +241,8 @@ if ($method === 'POST') {
             ]);
         } catch (PDOException $e) {
             http_response_code(500);
-            if (strpos($e->getMessage(), 'Duplicate entry') !== false) {
-                if (strpos($e->getMessage(), 'email') !== false) {
-                    echo json_encode(['success' => false, 'message' => 'Email address already exists.']);
-                } else {
-                    echo json_encode(['success' => false, 'message' => 'BPSO Personnel ID already exists. Please use a unique BPSO Personnel ID.']);
-                }
+            if (strpos($e->getMessage(), 'Duplicate entry') !== false && strpos($e->getMessage(), 'email') !== false) {
+                echo json_encode(['success' => false, 'message' => 'Email address already exists.']);
             } else {
                 echo json_encode(['success' => false, 'message' => 'Failed to save BPSO personnel: ' . $e->getMessage()]);
             }
@@ -210,6 +263,14 @@ if ($method === 'POST') {
         if ($id <= 0 || $personnelId === '' || $personnelName === '' || $contactNumber === '' || $email === '' || $schedule === '' || $status === '') {
             http_response_code(400);
             echo json_encode(['success' => false, 'message' => 'Missing required fields.']);
+            exit;
+        }
+
+        $contactNumber = normalizeContactDigits($contactNumber);
+        $contactError = validateContactNumber($contactNumber, 'Contact number');
+        if ($contactError !== null) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'message' => $contactError]);
             exit;
         }
 

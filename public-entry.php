@@ -244,7 +244,7 @@ session_start();
                 <h2 style="margin: 0; color: #f8fafc; font-size: 1.75rem; font-weight: 600;">Submit Anonymous Tip</h2>
                 <span class="close" onclick="closeTipModal()" style="color: rgba(255, 255, 255, 0.8); font-size: 1.75rem; cursor: pointer; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; border-radius: 6px; transition: all 0.2s ease; line-height: 1;">&times;</span>
             </div>
-            <form id="tipForm" onsubmit="submitTip(event)" style="display: grid; gap: 1.75rem;" enctype="multipart/form-data">
+            <form id="tipForm" onsubmit="submitTip(event)" autocomplete="off" style="display: grid; gap: 1.75rem;" enctype="multipart/form-data">
                 <div class="field">
                     <label for="tipLocation" style="font-size: 1.1rem; color: rgba(255, 255, 255, 0.8); font-weight: 500;">Location *</label>
                     <input id="tipLocation" name="location" type="text" placeholder="Enter location where the incident occurred" required style="width: 100%; padding: 1.15rem 1.5rem; border: 1px solid rgba(255, 255, 255, 0.16); border-radius: var(--radius); font: inherit; font-size: 1.1rem; color: #f8fafc; background: rgba(255, 255, 255, 0.08); transition: border-color 0.2s ease, box-shadow 0.2s ease; box-sizing: border-box;">
@@ -291,14 +291,14 @@ session_start();
                 <h2 style="margin: 0; color: #f8fafc; font-size: 1.75rem; font-weight: 600;">Neighborhood Watch Application</h2>
                 <span class="close" onclick="closeMemberApplicationModal()" style="color: rgba(255, 255, 255, 0.8); font-size: 1.75rem; cursor: pointer; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; border-radius: 6px; transition: all 0.2s ease; line-height: 1;">&times;</span>
             </div>
-            <form id="memberApplicationForm" onsubmit="submitMemberApplication(event)" style="display: grid; gap: 1.75rem;">
+            <form id="memberApplicationForm" onsubmit="submitMemberApplication(event)" autocomplete="off" style="display: grid; gap: 1.75rem;">
                 <div class="field">
                     <label for="memberName" style="font-size: 1.1rem; color: rgba(255, 255, 255, 0.8); font-weight: 500;">Full Name *</label>
                     <input id="memberName" name="name" type="text" required style="width: 100%; padding: 1.15rem 1.5rem; border: 1px solid rgba(255, 255, 255, 0.16); border-radius: var(--radius); font: inherit; font-size: 1.1rem; color: #f8fafc; background: rgba(255, 255, 255, 0.08); transition: border-color 0.2s ease, box-shadow 0.2s ease; box-sizing: border-box;">
                 </div>
                 <div class="field">
                     <label for="memberContact" style="font-size: 1.1rem; color: rgba(255, 255, 255, 0.8); font-weight: 500;">Contact Number *</label>
-                    <input id="memberContact" name="contact" type="tel" required style="width: 100%; padding: 1.15rem 1.5rem; border: 1px solid rgba(255, 255, 255, 0.16); border-radius: var(--radius); font: inherit; font-size: 1.1rem; color: #f8fafc; background: rgba(255, 255, 255, 0.08); transition: border-color 0.2s ease, box-shadow 0.2s ease; box-sizing: border-box;">
+                    <input id="memberContact" name="contact" type="tel" class="contact-number-input" placeholder="" required style="width: 100%; padding: 1.15rem 1.5rem; border: 1px solid rgba(255, 255, 255, 0.16); border-radius: var(--radius); font: inherit; font-size: 1.1rem; color: #f8fafc; background: rgba(255, 255, 255, 0.08); transition: border-color 0.2s ease, box-shadow 0.2s ease; box-sizing: border-box;">
                 </div>
                 <div class="field">
                     <label for="memberEmail" style="font-size: 1.1rem; color: rgba(255, 255, 255, 0.8); font-weight: 500;">Email Address *</label>
@@ -306,7 +306,7 @@ session_start();
                 </div>
                 <div class="field">
                     <label for="memberAddress" style="font-size: 1.1rem; color: rgba(255, 255, 255, 0.8); font-weight: 500;">Home Address *</label>
-                    <input id="memberAddress" name="address" type="text" required placeholder="e.g., 123 Bonifacio Street, Barangay San Agustin, Quezon City" style="width: 100%; padding: 1.15rem 1.5rem; border: 1px solid rgba(255, 255, 255, 0.16); border-radius: var(--radius); font: inherit; font-size: 1.1rem; color: #f8fafc; background: rgba(255, 255, 255, 0.08); transition: border-color 0.2s ease, box-shadow 0.2s ease; box-sizing: border-box;">
+                    <input id="memberAddress" name="address" type="text" required style="width: 100%; padding: 1.15rem 1.5rem; border: 1px solid rgba(255, 255, 255, 0.16); border-radius: var(--radius); font: inherit; font-size: 1.1rem; color: #f8fafc; background: rgba(255, 255, 255, 0.08); transition: border-color 0.2s ease, box-shadow 0.2s ease; box-sizing: border-box;">
                 </div>
                 <div class="field">
                     <label for="memberEmergencyName" style="font-size: 1.1rem; color: rgba(255, 255, 255, 0.8); font-weight: 500;">Emergency Contact Full Name *</label>
@@ -314,7 +314,7 @@ session_start();
                 </div>
                 <div class="field">
                     <label for="memberEmergencyContact" style="font-size: 1.1rem; color: rgba(255, 255, 255, 0.8); font-weight: 500;">Emergency Contact Number *</label>
-                    <input id="memberEmergencyContact" name="emergencyContact" type="tel" required style="width: 100%; padding: 1.15rem 1.5rem; border: 1px solid rgba(255, 255, 255, 0.16); border-radius: var(--radius); font: inherit; font-size: 1.1rem; color: #f8fafc; background: rgba(255, 255, 255, 0.08); transition: border-color 0.2s ease, box-shadow 0.2s ease; box-sizing: border-box;">
+                    <input id="memberEmergencyContact" name="emergencyContact" type="tel" class="contact-number-input" placeholder="" required style="width: 100%; padding: 1.15rem 1.5rem; border: 1px solid rgba(255, 255, 255, 0.16); border-radius: var(--radius); font: inherit; font-size: 1.1rem; color: #f8fafc; background: rgba(255, 255, 255, 0.08); transition: border-color 0.2s ease, box-shadow 0.2s ease; box-sizing: border-box;">
                 </div>
                 <div class="field">
                     <label for="memberPhoto" style="font-size: 1.1rem; color: rgba(255, 255, 255, 0.8); font-weight: 500;">Neighborhood Watch Member Photo *</label>
@@ -354,6 +354,7 @@ session_start();
         </div>
     </div>
 
+    <script src="js/form-contact-validation.js"></script>
     <script>
         function openTipModal() {
             document.getElementById('memberApplicationModal').classList.remove('active');
@@ -575,6 +576,17 @@ session_start();
             
             if (!name || !contact || !email || !address || !emergencyName || !emergencyContact || !photoFile || !photoIdFile) {
                 showSuccessModal('Validation Error', 'Please fill in all required fields.', true);
+                return;
+            }
+
+            const contactError = AlertaraFormEnhancements.validateContactInput(document.getElementById('memberContact'), 'Contact number');
+            if (contactError) {
+                showSuccessModal('Validation Error', contactError, true);
+                return;
+            }
+            const emergencyContactError = AlertaraFormEnhancements.validateContactInput(document.getElementById('memberEmergencyContact'), 'Emergency contact number');
+            if (emergencyContactError) {
+                showSuccessModal('Validation Error', emergencyContactError, true);
                 return;
             }
 

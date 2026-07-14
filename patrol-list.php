@@ -580,10 +580,10 @@ require_once __DIR__ . '/db.php';
                 <h2>Add BPSO Personnel</h2>
                 <span class="close" onclick="closeAddOfficerModal()">&times;</span>
             </div>
-            <form id="addOfficerForm" onsubmit="saveOfficer(event)">
+            <form id="addOfficerForm" onsubmit="saveOfficer(event)" autocomplete="off">
                 <div class="form-group">
                     <label for="officerBadgeNumber">BPSO Personnel ID *</label>
-                    <input type="text" id="officerBadgeNumber" name="badgeNumber" required>
+                    <input type="text" id="officerBadgeNumber" name="badgeNumber" readonly required>
                 </div>
                 <div class="form-group">
                     <label for="officerName">Personnel Name *</label>
@@ -591,7 +591,7 @@ require_once __DIR__ . '/db.php';
                 </div>
                 <div class="form-group">
                     <label for="officerContact">Contact Number *</label>
-                    <input type="text" id="officerContact" name="contact" required>
+                    <input type="tel" id="officerContact" name="contact" class="contact-number-input" placeholder="" required>
                 </div>
                 <div class="form-group">
                     <label for="officerEmail">Email Address *</label>
@@ -649,11 +649,11 @@ require_once __DIR__ . '/db.php';
                 <h2>Edit BPSO Personnel</h2>
                 <span class="close" onclick="closeEditOfficerModal()">&times;</span>
             </div>
-            <form id="editOfficerForm" onsubmit="updateOfficer(event)">
+            <form id="editOfficerForm" onsubmit="updateOfficer(event)" autocomplete="off">
                 <input type="hidden" id="editOfficerId" name="id">
                 <div class="form-group">
                     <label for="editOfficerBadgeNumber">BPSO Personnel ID *</label>
-                    <input type="text" id="editOfficerBadgeNumber" name="badgeNumber" required>
+                    <input type="text" id="editOfficerBadgeNumber" name="badgeNumber" readonly required>
                 </div>
                 <div class="form-group">
                     <label for="editOfficerName">Personnel Name *</label>
@@ -661,7 +661,7 @@ require_once __DIR__ . '/db.php';
                 </div>
                 <div class="form-group">
                     <label for="editOfficerContact">Contact Number *</label>
-                    <input type="text" id="editOfficerContact" name="contact" required>
+                    <input type="tel" id="editOfficerContact" name="contact" class="contact-number-input" placeholder="" required>
                 </div>
                 <div class="form-group">
                     <label for="editOfficerEmail">Email Address *</label>
@@ -696,6 +696,7 @@ require_once __DIR__ . '/db.php';
         </div>
     </div>
 
+    <script src="js/form-contact-validation.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             const sidebar = document.getElementById('sidebar');
@@ -815,9 +816,25 @@ require_once __DIR__ . '/db.php';
             tbody.appendChild(row);
         }
 
-        function openAddOfficerModal() {
-            document.getElementById('addOfficerModal').style.display = 'block';
+        async function openAddOfficerModal() {
             document.getElementById('addOfficerForm').reset();
+            document.getElementById('officerBadgeNumber').value = 'Generating...';
+            document.getElementById('addOfficerModal').style.display = 'block';
+
+            try {
+                const response = await fetch('api/patrols.php?next_id=1');
+                const result = await response.json();
+                if (result.success && result.data && result.data.bpso_personnel_id) {
+                    document.getElementById('officerBadgeNumber').value = result.data.bpso_personnel_id;
+                } else {
+                    document.getElementById('officerBadgeNumber').value = '';
+                    alert(result.message || 'Failed to generate BPSO Personnel ID.');
+                }
+            } catch (err) {
+                console.error('Error generating BPSO Personnel ID:', err);
+                document.getElementById('officerBadgeNumber').value = '';
+                alert('Failed to generate BPSO Personnel ID.');
+            }
         }
 
         function closeAddOfficerModal() {
@@ -917,7 +934,6 @@ require_once __DIR__ . '/db.php';
 
             const apiData = {
                 action: 'create',
-                bpso_personnel_id: formData.get('badgeNumber').trim(),
                 personnel_name: formData.get('name').trim(),
                 contact_number: formData.get('contact').trim(),
                 email: formData.get('email').trim(),
@@ -926,11 +942,23 @@ require_once __DIR__ . '/db.php';
                 status: formData.get('status')
             };
             
-            if (!apiData.bpso_personnel_id || !apiData.personnel_name || !apiData.contact_number || !apiData.email || !password || !confirmPassword || !apiData.schedule) {
+            if (!apiData.personnel_name || !apiData.contact_number || !apiData.email || !password || !confirmPassword || !apiData.schedule) {
                 alert('Please fill in all required fields.');
                 return;
             }
 
+            const previewId = (formData.get('badgeNumber') || '').trim();
+            if (!previewId || previewId === 'Generating...') {
+                alert('BPSO Personnel ID is still being generated. Please wait a moment and try again.');
+                return;
+            }
+
+            const contactError = AlertaraFormEnhancements.validateContactInput(document.getElementById('officerContact'), 'Contact number');
+            if (contactError) {
+                alert(contactError);
+                return;
+            }
+            
             if (password !== confirmPassword) {
                 alert('Passwords do not match.');
                 return;
@@ -1002,6 +1030,12 @@ require_once __DIR__ . '/db.php';
             
             if (!apiData.bpso_personnel_id || !apiData.personnel_name || !apiData.contact_number || !apiData.email || !apiData.schedule || !apiData.status) {
                 alert('Please fill in all required fields.');
+                return;
+            }
+
+            const contactError = AlertaraFormEnhancements.validateContactInput(document.getElementById('editOfficerContact'), 'Contact number');
+            if (contactError) {
+                alert(contactError);
                 return;
             }
 

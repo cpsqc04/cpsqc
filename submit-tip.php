@@ -520,7 +520,7 @@ require_once __DIR__ . '/db.php';
         <main class="content-area">
             <div class="page-content">
                 <div style="max-width: 600px;">
-                    <form id="tipForm" onsubmit="submitTip(event)">
+                    <form id="tipForm" onsubmit="submitTip(event)" autocomplete="off">
                         <div style="margin-bottom: 1.5rem;">
                             <label style="display: block; margin-bottom: 0.5rem; font-weight: 500;">Tip Category *</label>
                             <select id="tipCategory" required style="width: 100%; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 8px;">
@@ -545,6 +545,7 @@ require_once __DIR__ . '/db.php';
             </div>
         </main>
     </div>
+    <script src="js/form-contact-validation.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             const sidebar = document.getElementById('sidebar');

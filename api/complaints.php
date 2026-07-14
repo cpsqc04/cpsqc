@@ -8,6 +8,7 @@ require_once __DIR__ . '/complaints_schema.php';
 require_once __DIR__ . '/bpso_attendance_schema.php';
 require_once __DIR__ . '/notifications_schema.php';
 require_once __DIR__ . '/../includes/blotter_forward.php';
+require_once __DIR__ . '/../includes/contact_validation.php';
 
 try {
     ensureComplaintsTable($pdo);
@@ -68,6 +69,21 @@ if ($method === 'POST') {
         if ($complaintId === '' || $complainantName === '' || $contactNumber === '' || $address === '' || $incidentDate === '' || $incidentTime === '' || $defendantName === '' || $defendantAddress === '' || $complaintType === '' || $description === '') {
             http_response_code(400);
             echo json_encode(['success' => false, 'message' => 'Missing required fields.']);
+            exit;
+        }
+
+        $contactNumber = normalizeContactDigits($contactNumber);
+        $defendantContactNumber = normalizeContactDigits($defendantContactNumber);
+        $contactError = validateContactNumber($contactNumber, "Complainant's contact number");
+        if ($contactError !== null) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'message' => $contactError]);
+            exit;
+        }
+        $defendantContactError = validateContactNumberOptional($defendantContactNumber, "Defendant's contact number");
+        if ($defendantContactError !== null) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'message' => $defendantContactError]);
             exit;
         }
 

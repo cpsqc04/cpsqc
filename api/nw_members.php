@@ -5,6 +5,7 @@ header('Content-Type: application/json');
 
 require_once __DIR__ . '/../db.php';
 require_once __DIR__ . '/nw_members_schema.php';
+require_once __DIR__ . '/../includes/contact_validation.php';
 require_once __DIR__ . '/../includes/volunteer_media.php';
 require_once __DIR__ . '/../includes/volunteer_notifications.php';
 require_once __DIR__ . '/../includes/nw_member_credentials.php';
@@ -77,6 +78,21 @@ if ($method === 'POST') {
         if ($name === '' || $contact === '' || $email === '' || $address === '' || $emergencyName === '' || $emergencyContact === '') {
             http_response_code(400);
             echo json_encode(['success' => false, 'message' => 'Missing required fields.']);
+            exit;
+        }
+
+        $contact = normalizeContactDigits($contact);
+        $emergencyContact = normalizeContactDigits($emergencyContact);
+        $contactError = validateContactNumber($contact, 'Contact number');
+        if ($contactError !== null) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'message' => $contactError]);
+            exit;
+        }
+        $emergencyContactError = validateContactNumber($emergencyContact, 'Emergency contact number');
+        if ($emergencyContactError !== null) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'message' => $emergencyContactError]);
             exit;
         }
 
@@ -226,6 +242,21 @@ if ($method === 'POST') {
         if ($id <= 0 || $name === '' || $contact === '' || $email === '' || $address === '' || $status === '' || $emergencyName === '' || $emergencyContact === '') {
             http_response_code(400);
             echo json_encode(['success' => false, 'message' => 'Missing required fields.']);
+            exit;
+        }
+
+        $contact = normalizeContactDigits($contact);
+        $emergencyContact = normalizeContactDigits($emergencyContact);
+        $contactError = validateContactNumber($contact, 'Contact number');
+        if ($contactError !== null) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'message' => $contactError]);
+            exit;
+        }
+        $emergencyContactError = validateContactNumber($emergencyContact, 'Emergency contact number');
+        if ($emergencyContactError !== null) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'message' => $emergencyContactError]);
             exit;
         }
 

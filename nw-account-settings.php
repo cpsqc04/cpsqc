@@ -121,7 +121,7 @@ $nwActiveNav = 'account';
                 <section class="section-block">
                     <h2 class="section-heading"><i class="fas fa-user"></i> Personal Information</h2>
                     <div id="profileAlert" class="alert"></div>
-                    <form id="profileForm">
+                    <form id="profileForm" autocomplete="off">
                         <div class="form-grid">
                             <div class="form-group">
                                 <label for="profileName">Full Name *</label>
@@ -129,7 +129,7 @@ $nwActiveNav = 'account';
                             </div>
                             <div class="form-group">
                                 <label for="profileContact">Contact Number *</label>
-                                <input id="profileContact" type="text" required>
+                                <input id="profileContact" type="tel" class="contact-number-input" required>
                             </div>
                             <div class="form-group">
                                 <label for="profileEmail">Email *</label>
@@ -149,7 +149,7 @@ $nwActiveNav = 'account';
                             </div>
                             <div class="form-group">
                                 <label for="profileEmergencyContact">Emergency Contact Number *</label>
-                                <input id="profileEmergencyContact" type="text" required>
+                                <input id="profileEmergencyContact" type="tel" class="contact-number-input" required>
                             </div>
                         </div>
                         <button type="submit" class="btn-submit"><i class="fas fa-save"></i> Save Personal Info</button>
@@ -159,7 +159,7 @@ $nwActiveNav = 'account';
                 <section class="section-block">
                     <h2 class="section-heading"><i class="fas fa-key"></i> Change Password</h2>
                     <div id="passwordAlert" class="alert"></div>
-                    <form id="passwordForm">
+                    <form id="passwordForm" autocomplete="off">
                         <div class="form-grid">
                             <div class="form-group full-width">
                                 <label for="currentPassword">Current Password *</label>
@@ -181,6 +181,7 @@ $nwActiveNav = 'account';
         </main>
     </div>
 
+    <script src="js/form-contact-validation.js"></script>
     <script>
         function toggleSidebar() {
             const sidebar = document.getElementById('sidebar');
@@ -247,6 +248,18 @@ $nwActiveNav = 'account';
 
         document.getElementById('profileForm').addEventListener('submit', async function(e) {
             e.preventDefault();
+
+            const contactError = AlertaraFormEnhancements.validateContactInput(document.getElementById('profileContact'), 'Contact number');
+            if (contactError) {
+                showAlert('profileAlert', contactError, true);
+                return;
+            }
+            const emergencyContactError = AlertaraFormEnhancements.validateContactInput(document.getElementById('profileEmergencyContact'), 'Emergency contact number');
+            if (emergencyContactError) {
+                showAlert('profileAlert', emergencyContactError, true);
+                return;
+            }
+
             try {
                 const response = await fetch('api/nw_member_profile.php', {
                     method: 'POST',

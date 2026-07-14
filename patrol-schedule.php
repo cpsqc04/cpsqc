@@ -579,7 +579,7 @@ require_once __DIR__ . '/db.php';
                 </div>
                 <div class="search-container">
                     <div class="search-box">
-                        <input type="text" id="searchInput" placeholder="Search by personnel, route, location, or status..." onkeyup="filterPatrols()">
+                        <input type="text" id="searchInput" placeholder="Search by personnel, route, or status..." onkeyup="filterPatrols()">
                     </div>
                     <button type="button" class="btn-add" onclick="openAssignPatrolModal()" style="white-space: nowrap;">
                         <i class="fas fa-plus"></i> Assign Patrol
@@ -591,7 +591,6 @@ require_once __DIR__ . '/db.php';
                             <tr>
                                 <th>BPSO Personnel</th>
                                 <th>Route</th>
-                                <th>Location</th>
                                 <th>Date</th>
                                 <th>Time</th>
                                 <th>Status</th>
@@ -599,7 +598,7 @@ require_once __DIR__ . '/db.php';
                             </tr>
                         </thead>
                         <tbody id="patrolsTableBody">
-                            <tr><td colspan="7" style="text-align:center;padding:2rem;color:#666;">Loading patrol schedules...</td></tr>
+                            <tr><td colspan="6" style="text-align:center;padding:2rem;color:#666;">Loading patrol schedules...</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -633,10 +632,6 @@ require_once __DIR__ . '/db.php';
                 <div class="form-group">
                     <label for="patrolRoute">Route *</label>
                     <input type="text" id="patrolRoute" name="route" required placeholder="e.g. San Agustin Street to Quezon Avenue">
-                </div>
-                <div class="form-group">
-                    <label for="patrolLocation">Location</label>
-                    <input type="text" id="patrolLocation" name="location" placeholder="Barangay San Agustin, Quezon City">
                 </div>
                 <div class="form-group">
                     <label for="patrolNotes">Notes</label>
@@ -817,7 +812,6 @@ require_once __DIR__ . '/db.php';
             }
             await openAssignPatrolModal({
                 route: hotspot.route_suggestion || hotspot.area_name || hotspot.location || '',
-                location: hotspot.location || hotspot.area_name || '',
                 notes: buildHotspotNotes(hotspot)
             });
         }
@@ -835,7 +829,7 @@ require_once __DIR__ . '/db.php';
                 const result = await response.json();
 
                 if (!result.success) {
-                    tableBody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:2rem;color:#666;">Failed to load patrol schedules.</td></tr>';
+                    tableBody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:2rem;color:#666;">Failed to load patrol schedules.</td></tr>';
                     return;
                 }
 
@@ -843,7 +837,7 @@ require_once __DIR__ . '/db.php';
                 const rows = result.data || [];
 
                 if (rows.length === 0) {
-                    tableBody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:2rem;color:#666;">No patrol assignments yet. Click "Assign Patrol" to create one.</td></tr>';
+                    tableBody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:2rem;color:#666;">No patrol assignments yet. Click "Assign Patrol" to create one.</td></tr>';
                     return;
                 }
 
@@ -852,7 +846,6 @@ require_once __DIR__ . '/db.php';
                     return `<tr data-schedule-id="${row.id}">
                         <td>${escapeHtml(row.personnel_name)}</td>
                         <td>${escapeHtml(row.route)}</td>
-                        <td>${escapeHtml(row.location || '—')}</td>
                         <td>${escapeHtml(row.schedule_date)}</td>
                         <td>${escapeHtml(row.schedule_time)}</td>
                         <td><span class="status-badge ${statusClass(row.status)}">${escapeHtml(row.status)}</span></td>
@@ -865,7 +858,7 @@ require_once __DIR__ . '/db.php';
                 }).join('');
             } catch (e) {
                 console.error('Error loading patrol schedules:', e);
-                tableBody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:2rem;color:#666;">Error loading patrol schedules.</td></tr>';
+                tableBody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:2rem;color:#666;">Error loading patrol schedules.</td></tr>';
             }
         }
 
@@ -882,12 +875,10 @@ require_once __DIR__ . '/db.php';
             const today = new Date().toISOString().split('T')[0];
             document.getElementById('patrolDate').value = today;
             document.getElementById('patrolRoute').value = '';
-            document.getElementById('patrolLocation').value = '';
             document.getElementById('patrolNotes').value = '';
 
             if (prefill) {
                 document.getElementById('patrolRoute').value = prefill.route || '';
-                document.getElementById('patrolLocation').value = prefill.location || '';
                 document.getElementById('patrolNotes').value = prefill.notes || '';
             }
 
@@ -946,7 +937,6 @@ require_once __DIR__ . '/db.php';
                 <div style="line-height: 1.8;">
                     <p><strong>BPSO Personnel:</strong> ${escapeHtml(schedule.personnel_name)}</p>
                     <p><strong>Route:</strong> ${escapeHtml(schedule.route)}</p>
-                    <p><strong>Location:</strong> ${escapeHtml(schedule.location || '—')}</p>
                     <p><strong>Date:</strong> ${escapeHtml(schedule.schedule_date)}</p>
                     <p><strong>Time:</strong> ${escapeHtml(schedule.schedule_time)}</p>
                     <p><strong>Status:</strong> <span class="status-badge ${statusClass(schedule.status)}">${escapeHtml(schedule.status)}</span></p>
@@ -983,7 +973,7 @@ require_once __DIR__ . '/db.php';
                 schedule_date: formData.get('date'),
                 schedule_time: formData.get('time'),
                 route: formData.get('route'),
-                location: formData.get('location') || '',
+                location: '',
                 notes: formData.get('notes') || ''
             };
 

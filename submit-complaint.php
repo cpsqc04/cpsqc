@@ -1280,7 +1280,7 @@ require_once __DIR__ . '/db.php';
         
         <main class="content-area">
             <div class="page-content">
-                <form id="complaintForm" onsubmit="submitComplaint(event)">
+                <form id="complaintForm" onsubmit="submitComplaint(event)" autocomplete="off">
                     <div class="form-row">
                         <div class="form-group">
                             <label for="complaintDate">Date *</label>
@@ -1304,7 +1304,7 @@ require_once __DIR__ . '/db.php';
 
                     <div class="form-group">
                         <label for="complainantContact">Complainant's Contact Number *</label>
-                        <input type="tel" id="complainantContact" name="complainantContact" required>
+                        <input type="tel" id="complainantContact" name="complainantContact" class="contact-number-input" placeholder="" required>
                     </div>
 
                     <div class="form-group">
@@ -1319,7 +1319,7 @@ require_once __DIR__ . '/db.php';
 
                     <div class="form-group">
                         <label for="defendantContact">Defendant's Contact Number</label>
-                        <input type="tel" id="defendantContact" name="defendantContact">
+                        <input type="tel" id="defendantContact" name="defendantContact" class="contact-number-input" placeholder="" data-contact-required="false">
                     </div>
                     
                     <div class="form-group">
@@ -1368,6 +1368,7 @@ require_once __DIR__ . '/db.php';
         </div>
     </div>
     
+    <script src="js/form-contact-validation.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             const sidebar = document.getElementById('sidebar');
@@ -1461,6 +1462,23 @@ require_once __DIR__ . '/db.php';
                 submitBtn.disabled = false;
                 submitBtn.textContent = 'Submit Complaint';
                 document.getElementById('complaintTypeOther').focus();
+                return;
+            }
+
+            const complainantContactError = AlertaraFormEnhancements.validateContactInput(document.getElementById('complainantContact'), 'Complainant contact number');
+            if (complainantContactError) {
+                alert(complainantContactError);
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Submit Complaint';
+                document.getElementById('complainantContact').focus();
+                return;
+            }
+            const defendantContactError = AlertaraFormEnhancements.validateContactInput(document.getElementById('defendantContact'), 'Defendant contact number');
+            if (defendantContactError) {
+                alert(defendantContactError);
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Submit Complaint';
+                document.getElementById('defendantContact').focus();
                 return;
             }
             

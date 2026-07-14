@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 YOLO Object Detection Script for RTSP Camera Stream
-Detects: person, group/crowd, vehicle, animal, plant, phone (and weapon when model supports it)
+Detects: person, group/crowd, vehicle, animal, plant, phone, backpack, suitcase (and weapon when model supports it)
 Stable, offline-capable, with auto-reconnection
 """
 
@@ -171,8 +171,7 @@ PRIORITIZE_FRAME_SAVING = True  # Save frame BEFORE detection to minimize latenc
 # Class mapping for YOLO
 # COCO dataset classes: 0=person, 2=car, 3=motorcycle, 5=bus, 7=truck (vehicles)
 # 14=bird, 15=cat, 16=dog, 17=horse, 18=sheep, 19=cow, 20=elephant, 21=bear, 22=zebra, 23=giraffe (animals)
-# 58=potted plant, 67=cell phone
-# Custom model needed for weapon detection, or use general "object" class
+# 58=potted plant, 67=cell phone, 24=backpack, 28=suitcase
 CLASS_NAMES = {
     0: "person",
     2: "vehicle",  # car
@@ -189,19 +188,21 @@ CLASS_NAMES = {
     21: "animal",  # bear
     22: "animal",  # zebra
     23: "animal",  # giraffe
+    24: "backpack",  # backpack
+    28: "suitcase",  # suitcase / luggage
     58: "plant",   # potted plant
     67: "phone",   # cell phone / smartphone
 }
 
 # Target classes we want to detect
-TARGET_CLASSES = ["person", "vehicle", "animal", "plant", "phone"]
+TARGET_CLASSES = ["person", "vehicle", "animal", "plant", "phone", "backpack", "suitcase"]
 
 # For weapon detection, we'll use a separate approach or custom model
 # For now, we'll detect weapons as "knife", "gun", etc. if available in model
 WEAPON_CLASSES = ["knife", "gun", "pistol", "rifle", "weapon"]
 
-# YOLO class IDs we care about (speeds inference and keeps plant/phone enabled)
-YOLO_TARGET_CLASS_IDS = [0, 2, 3, 5, 7, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 58, 67]
+# YOLO class IDs we care about (speeds inference and keeps plant/phone/bag enabled)
+YOLO_TARGET_CLASS_IDS = [0, 2, 3, 5, 7, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 28, 58, 67]
 
 
 def get_rtsp_bases(rtsp_url):
@@ -395,8 +396,105 @@ def clamp_bbox(bbox, width, height):
         'y2': max(0, min(height, int(bbox['y2']))),
     }
 
+def shrink_bbox(bbox, shrink_x=0.08, shrink_y=0.12, min_size=12):
+    """Pull box edges inward so overlays sit tighter on the object."""
+    x1, y1, x2, y2 = int(bbox['x1']), int(bbox['y1']), int(bbox['x2']), int(bbox['y2'])
+    width = max(1, x2 - x1)
+    height = max(1, y2 - y1)
+    dx = int(width * shrink_x)
+    dy = int(height * shrink_y)
+
+    nx1 = x1 + dx
+    ny1 = y1 + dy
+    nx2 = x2 - dx
+    ny2 = y2 - dy
+
+    if nx2 - nx1 < min_size:
+        cx = (x1 + x2) // 2
+        nx1 = cx - min_size // 2
+        nx2 = nx1 + min_size
+    if ny2 - ny1 < min_size:
+        cy = (y1 + y2) // 2
+        ny1 = cy - min_size // 2
+        ny2 = ny1 + min_size
+
+    return {'x1': nx1, 'y1': ny1, 'x2': nx2, 'y2': ny2}
+
+def refine_bbox_to_content(frame, bbox, pad_ratio=0.04):
+    """
+    Tighten a loose YOLO box using edges/content inside the crop.
+    Falls back to the original bbox if refinement is unreliable.
+    """
+    height, width = frame.shape[:2]
+    bbox = clamp_bbox(bbox, width, height)
+    x1, y1, x2, y2 = bbox['x1'], bbox['y1'], bbox['x2'], bbox['y2']
+    if x2 - x1 < 16 or y2 - y1 < 16:
+        return bbox
+
+    crop = frame[y1:y2, x1:x2]
+    if crop.size == 0:
+        return bbox
+
+    gray = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
+    blur = cv2.GaussianBlur(gray, (3, 3), 0)
+    edges = cv2.Canny(blur, 50, 150)
+    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
+    edges = cv2.dilate(edges, kernel, iterations=1)
+
+    ys, xs = np.where(edges > 0)
+    if len(xs) < 20:
+        # Fallback: keep darker object mass (phones / electronics)
+        _, mask = cv2.threshold(blur, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+        ys, xs = np.where(mask > 0)
+        if len(xs) < 20:
+            return bbox
+
+    cx1, cx2 = int(xs.min()), int(xs.max()) + 1
+    cy1, cy2 = int(ys.min()), int(ys.max()) + 1
+    crop_w = max(1, x2 - x1)
+    crop_h = max(1, y2 - y1)
+    content_area = max(1, (cx2 - cx1) * (cy2 - cy1))
+    box_area = crop_w * crop_h
+
+    # Ignore refinement if content fills almost the whole box already,
+    # or if the mask collapsed to a tiny noisy blob.
+    if content_area >= box_area * 0.92 or content_area < box_area * 0.08:
+        return bbox
+
+    pad_x = max(2, int((cx2 - cx1) * pad_ratio))
+    pad_y = max(2, int((cy2 - cy1) * pad_ratio))
+    refined = {
+        'x1': x1 + max(0, cx1 - pad_x),
+        'y1': y1 + max(0, cy1 - pad_y),
+        'x2': x1 + min(crop_w, cx2 + pad_x),
+        'y2': y1 + min(crop_h, cy2 + pad_y),
+    }
+    return clamp_bbox(refined, width, height)
+
+def tighten_detection_bbox(frame, bbox, category):
+    """Category-aware tightening so drawn boxes are not oversized."""
+    height, width = frame.shape[:2]
+    bbox = clamp_bbox(bbox, width, height)
+
+    if category == 'phone':
+        bbox = shrink_bbox(bbox, shrink_x=0.10, shrink_y=0.16, min_size=14)
+        bbox = refine_bbox_to_content(frame, bbox, pad_ratio=0.05)
+    elif category in ('backpack', 'suitcase'):
+        bbox = shrink_bbox(bbox, shrink_x=0.06, shrink_y=0.08, min_size=16)
+        bbox = refine_bbox_to_content(frame, bbox, pad_ratio=0.05)
+    elif category in ('plant', 'weapon'):
+        bbox = shrink_bbox(bbox, shrink_x=0.06, shrink_y=0.08, min_size=16)
+        bbox = refine_bbox_to_content(frame, bbox, pad_ratio=0.06)
+    elif category in ('vehicle', 'animal'):
+        bbox = shrink_bbox(bbox, shrink_x=0.03, shrink_y=0.03, min_size=20)
+    else:
+        # Persons: slight shrink only (faces/pose need more of the box)
+        bbox = shrink_bbox(bbox, shrink_x=0.02, shrink_y=0.02, min_size=24)
+
+    return clamp_bbox(bbox, width, height)
+
 def append_phone_detection(detections, frame, bbox, confidence, class_name='cell phone', source='scan'):
-    bbox = clamp_bbox(bbox, frame.shape[1], frame.shape[0])
+    bbox = tighten_detection_bbox(frame, bbox, 'phone')
     if bbox['x2'] <= bbox['x1'] or bbox['y2'] <= bbox['y1']:
         return detections
 
@@ -629,6 +727,8 @@ def confidence_threshold_for_category(category):
         return PLANT_CONFIDENCE_THRESHOLD
     if category == "phone":
         return PHONE_CONFIDENCE_THRESHOLD
+    if category in ("backpack", "suitcase"):
+        return 0.30
     return CONFIDENCE_THRESHOLD
 
 def map_class_to_category(class_id, class_name):
@@ -653,6 +753,12 @@ def map_class_to_category(class_id, class_name):
     # Check for phones / smartphones
     if any(p in class_lower for p in ["cell phone", "cellphone", "mobile phone", "smartphone", "phone"]):
         return "phone"
+
+    # Check for luggage / bags
+    if "backpack" in class_lower:
+        return "backpack"
+    if any(b in class_lower for b in ["suitcase", "luggage"]):
+        return "suitcase"
     
     # Check for weapons
     if any(w in class_lower for w in WEAPON_CLASSES):
@@ -1527,15 +1633,16 @@ def process_detections(results, frame):
                         # Get bounding box coordinates
                         x1, y1, x2, y2 = box.xyxy[0].tolist()
                         
-                        bbox = {
+                        bbox = tighten_detection_bbox(frame, {
                             "x1": int(x1),
                             "y1": int(y1),
                             "x2": int(x2),
                             "y2": int(y2)
-                        }
+                        }, category)
+                        x1, y1, x2, y2 = bbox['x1'], bbox['y1'], bbox['x2'], bbox['y2']
                         
-                        # Filter out ground motion (false positives at ground level); keep plants/phones
-                        if category not in ("plant", "phone") and is_ground_motion(bbox, frame_height):
+                        # Filter out ground motion (false positives at ground level); keep plants/phones/bags
+                        if category not in ("plant", "phone", "backpack", "suitcase") and is_ground_motion(bbox, frame_height):
                             continue  # Skip this detection - it's ground motion/noise
                         
                         # Generate unique ID for this detection
@@ -1573,7 +1680,12 @@ def process_detections(results, frame):
                                         weapon_detected = {
                                             "class": weapon_class,
                                             "confidence": round(weapon_conf, 2),
-                                            "bbox": {"x1": int(wx1), "y1": int(wy1), "x2": int(wx2), "y2": int(wy2)}
+                                            "bbox": tighten_detection_bbox(frame, {
+                                                "x1": int(wx1),
+                                                "y1": int(wy1),
+                                                "x2": int(wx2),
+                                                "y2": int(wy2)
+                                            }, "weapon")
                                         }
                                         break
                         
@@ -1622,15 +1734,15 @@ def process_detections(results, frame):
                     continue
                 
                 if category and category in TARGET_CLASSES + ["weapon"]:
-                    bbox = {
+                    bbox = tighten_detection_bbox(frame, {
                         "x1": int(x1),
                         "y1": int(y1),
                         "x2": int(x2),
                         "y2": int(y2)
-                    }
+                    }, category)
                     
                     # Filter out ground motion (false positives at ground level); keep plants/phones
-                    if category not in ("plant", "phone") and is_ground_motion(bbox, frame_height):
+                    if category not in ("plant", "phone", "backpack", "suitcase") and is_ground_motion(bbox, frame_height):
                         continue  # Skip this detection - it's ground motion/noise
                     
                     # Generate unique ID for this detection
@@ -1798,14 +1910,14 @@ def draw_detections_on_frame(frame, detections):
         class_name = detection.get('class', category)
         conf = detection.get('confidence', 0)
         color = get_color_for_category(category)
-        thickness = 3 if category in ("plant", "phone", "group", "crowd") else 2
+        thickness = 2 if category in ("plant", "phone", "group", "crowd") else 2
         cv2.rectangle(frame, (int(x1), int(y1)), (int(x2), int(y2)), color, thickness)
         if category in ("group", "crowd"):
             people_count = detection.get('people_count', detection.get('group_size', 0))
             label = f"{category}: {people_count} people"
         else:
             label = f"{category}: {class_name} {conf:.2f}"
-        font_scale = 0.7 if category in ("plant", "phone", "group", "crowd") else 0.55
+        font_scale = 0.7 if category in ("plant", "phone", "backpack", "suitcase", "group", "crowd") else 0.55
         font_thickness = 2
         (tw, th), baseline = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, font_scale, font_thickness)
         label_y = max(int(y1) - 8, th + 8)
@@ -1822,7 +1934,7 @@ def draw_detections_on_frame(frame, detections):
             (int(x1) + 4, label_y - 2),
             cv2.FONT_HERSHEY_SIMPLEX,
             font_scale,
-            (0, 0, 0) if category in ("plant", "phone", "group", "crowd") else (255, 255, 255),
+            (0, 0, 0) if category in ("plant", "phone", "backpack", "suitcase", "group", "crowd") else (255, 255, 255),
             font_thickness
         )
 
@@ -1834,6 +1946,8 @@ def get_color_for_category(category):
         "animal": (0, 255, 255),    # Yellow
         "plant": (72, 187, 120),    # Light green
         "phone": (59, 130, 246),    # Blue
+        "backpack": (168, 85, 247), # Purple
+        "suitcase": (245, 158, 11), # Amber
         "group": (168, 85, 247),    # Purple
         "crowd": (236, 72, 153),    # Pink / magenta
         "weapon": (0, 0, 255)       # Red
