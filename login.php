@@ -790,9 +790,6 @@ $autoOpenLogin = !empty($showOtpForm) || isset($error) || isset($_SESSION['regis
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>AlerTara QC — Community Policing &amp; Surveillance</title>
     <link rel="icon" type="image/x-icon" href="images/favicon.ico">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         :root {
@@ -806,8 +803,8 @@ $autoOpenLogin = !empty($showOtpForm) || isset($error) || isset($_SESSION['regis
             --text: #f4f7f7;
             --muted: rgba(244, 247, 247, 0.72);
             --radius: 14px;
-            --font-display: "Outfit", sans-serif;
-            --font-body: "Source Serif 4", Georgia, serif;
+            --font-display: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            --font-body: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
         }
 
         * { margin: 0; padding: 0; box-sizing: border-box; }
