@@ -21,34 +21,96 @@ if (!isAdminUser()) {
     exit;
 }
 
+function tableHasColumn(PDO $pdo, string $table, string $column): bool
+{
+    try {
+        $stmt = $pdo->prepare('SHOW COLUMNS FROM `' . str_replace('`', '``', $table) . '` LIKE :column');
+        $stmt->execute([':column' => $column]);
+        return (bool) $stmt->fetch(PDO::FETCH_ASSOC);
+    } catch (PDOException $e) {
+        return false;
+    }
+}
+
 function ensureUsersTable(PDO $pdo): void
 {
-    $columns = [];
+    $adminColumns = [];
     foreach ($pdo->query('SHOW COLUMNS FROM admins') as $row) {
-        $columns[$row['Field']] = true;
+        $adminColumns[$row['Field']] = true;
     }
 
-    if (!isset($columns['email'])) {
+    if (!isset($adminColumns['email'])) {
         $pdo->exec('ALTER TABLE admins ADD COLUMN email VARCHAR(255) DEFAULT NULL');
     }
 
-    if (!isset($columns['full_name'])) {
+    if (!isset($adminColumns['full_name'])) {
         $pdo->exec('ALTER TABLE admins ADD COLUMN full_name VARCHAR(255) DEFAULT NULL');
     }
 
-    if (!isset($columns['created_at'])) {
+    if (!isset($adminColumns['created_at'])) {
         $pdo->exec('ALTER TABLE admins ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP');
     }
 
-    if (!isset($columns['role'])) {
+    if (!isset($adminColumns['role'])) {
         $pdo->exec('ALTER TABLE admins ADD COLUMN role VARCHAR(50) DEFAULT "Admin"');
     }
 
-    if (!isset($columns['status'])) {
+    if (!isset($adminColumns['status'])) {
         $pdo->exec('ALTER TABLE admins ADD COLUMN status VARCHAR(20) DEFAULT "Active"');
     }
 
+    // Cross-check email uniqueness against BPSO accounts — ensure that table/column exists too.
+    $patrolColumns = [];
+    $patrolsExist = false;
+    try {
+        foreach ($pdo->query('SHOW COLUMNS FROM patrols') as $row) {
+            $patrolColumns[$row['Field']] = true;
+            $patrolsExist = true;
+        }
+    } catch (PDOException $e) {
+        $patrolsExist = false;
+    }
+
+    if ($patrolsExist && !isset($patrolColumns['email'])) {
+        $pdo->exec('ALTER TABLE patrols ADD COLUMN email VARCHAR(255) NULL');
+    }
+
     $pdo->exec("UPDATE admins SET role = 'BPSO Personnel' WHERE role = 'User'");
+}
+
+/**
+ * Returns true when another row already uses this email.
+ * Skips checks for tables/columns that are not present yet.
+ */
+function emailExistsOnAccountTables(PDO $pdo, string $email, ?string $excludeType = null, ?int $excludeId = null): bool
+{
+    if (tableHasColumn($pdo, 'admins', 'email')) {
+        if ($excludeType === 'admin' && $excludeId) {
+            $stmt = $pdo->prepare('SELECT id FROM admins WHERE email = :email AND id != :id LIMIT 1');
+            $stmt->execute([':email' => $email, ':id' => $excludeId]);
+        } else {
+            $stmt = $pdo->prepare('SELECT id FROM admins WHERE email = :email LIMIT 1');
+            $stmt->execute([':email' => $email]);
+        }
+        if ($stmt->fetch()) {
+            return true;
+        }
+    }
+
+    if (tableHasColumn($pdo, 'patrols', 'email')) {
+        if ($excludeType === 'bpso' && $excludeId) {
+            $stmt = $pdo->prepare('SELECT id FROM patrols WHERE email = :email AND id != :id LIMIT 1');
+            $stmt->execute([':email' => $email, ':id' => $excludeId]);
+        } else {
+            $stmt = $pdo->prepare('SELECT id FROM patrols WHERE email = :email LIMIT 1');
+            $stmt->execute([':email' => $email]);
+        }
+        if ($stmt->fetch()) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 function formatCreatedAt(?string $createdAt): ?string
@@ -233,18 +295,7 @@ if ($method === 'GET') {
             exit;
         }
 
-        $stmt = $pdo->prepare('SELECT id FROM admins WHERE email = :email');
-        $stmt->execute([':email' => $email]);
-        if ($stmt->fetch()) {
-            ob_clean();
-            http_response_code(400);
-            echo json_encode(['success' => false, 'error' => 'Email already exists']);
-            exit;
-        }
-
-        $stmt = $pdo->prepare('SELECT id FROM patrols WHERE email = :email');
-        $stmt->execute([':email' => $email]);
-        if ($stmt->fetch()) {
+        if (emailExistsOnAccountTables($pdo, $email)) {
             ob_clean();
             http_response_code(400);
             echo json_encode(['success' => false, 'error' => 'Email already exists']);
@@ -352,18 +403,7 @@ if ($method === 'GET') {
                     exit;
                 }
 
-                $stmt = $pdo->prepare('SELECT id FROM patrols WHERE email = :email AND id != :id');
-                $stmt->execute([':email' => $email, ':id' => $parsed['id']]);
-                if ($stmt->fetch()) {
-                    ob_clean();
-                    http_response_code(400);
-                    echo json_encode(['success' => false, 'error' => 'Email already exists']);
-                    exit;
-                }
-
-                $stmt = $pdo->prepare('SELECT id FROM admins WHERE email = :email');
-                $stmt->execute([':email' => $email]);
-                if ($stmt->fetch()) {
+                if (emailExistsOnAccountTables($pdo, $email, 'bpso', $parsed['id'])) {
                     ob_clean();
                     http_response_code(400);
                     echo json_encode(['success' => false, 'error' => 'Email already exists']);
@@ -415,18 +455,7 @@ if ($method === 'GET') {
                     exit;
                 }
 
-                $stmt = $pdo->prepare('SELECT id FROM admins WHERE email = :email AND id != :id');
-                $stmt->execute([':email' => $email, ':id' => $parsed['id']]);
-                if ($stmt->fetch()) {
-                    ob_clean();
-                    http_response_code(400);
-                    echo json_encode(['success' => false, 'error' => 'Email already exists']);
-                    exit;
-                }
-
-                $stmt = $pdo->prepare('SELECT id FROM patrols WHERE email = :email');
-                $stmt->execute([':email' => $email]);
-                if ($stmt->fetch()) {
+                if (emailExistsOnAccountTables($pdo, $email, 'admin', $parsed['id'])) {
                     ob_clean();
                     http_response_code(400);
                     echo json_encode(['success' => false, 'error' => 'Email already exists']);
