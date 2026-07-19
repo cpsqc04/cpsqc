@@ -28,6 +28,18 @@ function ensureUsersTable(PDO $pdo): void
         $columns[$row['Field']] = true;
     }
 
+    if (!isset($columns['email'])) {
+        $pdo->exec('ALTER TABLE admins ADD COLUMN email VARCHAR(255) DEFAULT NULL');
+    }
+
+    if (!isset($columns['full_name'])) {
+        $pdo->exec('ALTER TABLE admins ADD COLUMN full_name VARCHAR(255) DEFAULT NULL');
+    }
+
+    if (!isset($columns['created_at'])) {
+        $pdo->exec('ALTER TABLE admins ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP');
+    }
+
     if (!isset($columns['role'])) {
         $pdo->exec('ALTER TABLE admins ADD COLUMN role VARCHAR(50) DEFAULT "Admin"');
     }
