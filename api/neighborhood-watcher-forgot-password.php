@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../includes/neighborhood-watcher-member-auth.php';
+require_once __DIR__ . '/../includes/neighborhood-watcher-member-credentials.php';
 require_once __DIR__ . '/../db.php';
 require_once __DIR__ . '/neighborhood-watcher-members-schema.php';
 require_once __DIR__ . '/../includes/login_otp.php';
@@ -126,8 +127,8 @@ if ($action === 'reset') {
         exit;
     }
 
-    if (strlen($newPassword) < 6) {
-        echo json_encode(['success' => false, 'message' => 'Password must be at least 6 characters long.']);
+    if (!isValidNwMemberPassword($newPassword)) {
+        echo json_encode(['success' => false, 'message' => nwMemberPasswordRequirementMessage()]);
         exit;
     }
 

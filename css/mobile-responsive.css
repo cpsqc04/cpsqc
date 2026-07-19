@@ -252,6 +252,17 @@ table.data-table,
     .filter-group input {
         width: 100% !important;
     }
+
+    /* NW dashboard: card list on phones */
+    .report-cards {
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 0.85rem !important;
+    }
+
+    .table-container:has(+ .report-cards) {
+        display: none !important;
+    }
 }
 
 @media (max-width: 480px) {

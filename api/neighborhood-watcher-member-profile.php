@@ -7,6 +7,7 @@ require_once __DIR__ . '/../db.php';
 require_once __DIR__ . '/neighborhood-watcher-members-schema.php';
 require_once __DIR__ . '/../includes/contact_validation.php';
 require_once __DIR__ . '/../includes/neighborhood-watcher-member-auth.php';
+require_once __DIR__ . '/../includes/neighborhood-watcher-member-credentials.php';
 
 if (!isNwMemberLoggedIn()) {
     http_response_code(401);
@@ -142,9 +143,9 @@ if ($method === 'POST' && $action === 'change_password') {
         exit;
     }
 
-    if (strlen($newPassword) < 6) {
+    if (!isValidNwMemberPassword($newPassword)) {
         http_response_code(400);
-        echo json_encode(['success' => false, 'message' => 'Password must be at least 6 characters long.']);
+        echo json_encode(['success' => false, 'message' => nwMemberPasswordRequirementMessage()]);
         exit;
     }
 

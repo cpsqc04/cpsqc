@@ -93,4 +93,6 @@
             }
         });
     });
+
+    window.closeMobileSidebar = closeMobileSidebar;
 })();

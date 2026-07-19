@@ -63,7 +63,7 @@ function sendVolunteerApplicationStatusEmail(
                     <p><strong>Email Address:</strong> {$safeEmail}</p>
                     " . ($memberCode ? "<p><strong>Member Code:</strong> {$safeMemberCode}</p>" : '') . "
                     <p><strong>Temporary Password:</strong> <span class='temp-password'>{$safeTempPassword}</span></p>
-                    <p class='credentials-note'>Sign in using your registered email and temporary password. You will be asked to set a new 16-character alphanumeric password on first login.</p>
+                    <p class='credentials-note'>Sign in using your registered email and temporary password. On first login you will be asked to set a new password with uppercase, lowercase, and a number or special character (e.g. @, #, _).</p>
                 </div>
             ";
         }

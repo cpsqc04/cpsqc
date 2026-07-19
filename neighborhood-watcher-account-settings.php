@@ -65,6 +65,7 @@ $nwActiveNav = 'account';
         .form-group input:focus, .form-group textarea:focus { outline: none; border-color: var(--primary-color); box-shadow: 0 0 0 3px rgba(76, 138, 137, 0.1); }
         .form-group input[readonly] { background: #f8fafc; color: var(--text-secondary); cursor: not-allowed; }
         .form-group textarea { min-height: 100px; resize: vertical; }
+        .field-hint { margin: 0.4rem 0 0; color: var(--text-secondary); font-size: 0.82rem; line-height: 1.4; }
         .btn-submit { padding: 0.75rem 1.5rem; background: var(--primary-color); color: #fff; border: none; border-radius: 8px; font-size: 0.95rem; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 0.5rem; margin-top: 1.25rem; }
         .btn-submit:hover { background: #4ca8a6; }
         .alert { padding: 0.85rem 1rem; border-radius: 8px; margin-bottom: 1rem; font-size: 0.92rem; display: none; }
@@ -169,11 +170,12 @@ $nwActiveNav = 'account';
                             </div>
                             <div class="form-group">
                                 <label for="newPassword">New Password *</label>
-                                <input id="newPassword" type="password" minlength="6" required>
+                                <input id="newPassword" type="password" minlength="8" autocomplete="new-password" required>
+                                <p class="field-hint">At least 8 characters with uppercase, lowercase, and a number or special character (e.g. @, #, _).</p>
                             </div>
                             <div class="form-group">
                                 <label for="confirmPassword">Confirm New Password *</label>
-                                <input id="confirmPassword" type="password" minlength="6" required>
+                                <input id="confirmPassword" type="password" minlength="8" autocomplete="new-password" required>
                             </div>
                         </div>
                         <button type="submit" class="btn-submit"><i class="fas fa-lock"></i> Update Password</button>
@@ -315,7 +317,8 @@ $nwActiveNav = 'account';
 
         document.addEventListener('DOMContentLoaded', function() {
             const sidebar = document.getElementById('sidebar');
-            if (localStorage.getItem('nwSidebarCollapsed') === 'true') {
+            const isMobile = window.matchMedia('(max-width: 768px)').matches;
+            if (!isMobile && localStorage.getItem('nwSidebarCollapsed') === 'true') {
                 sidebar.classList.add('collapsed');
                 document.body.classList.add('sidebar-collapsed');
             }

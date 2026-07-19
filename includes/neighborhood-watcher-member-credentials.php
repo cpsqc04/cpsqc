@@ -23,9 +23,26 @@ function generateNwMemberTempPassword(): string
     return str_shuffle($password);
 }
 
+/**
+ * Password must be at least 8 characters and include uppercase, lowercase,
+ * and a number or special character (e.g. @, #, _).
+ */
 function isValidNwMemberPassword(string $password): bool
 {
-    return (bool) preg_match('/^(?=.*[A-Za-z])(?=.*\d)[A-Za-z0-9]{16}$/', $password);
+    if (strlen($password) < 8) {
+        return false;
+    }
+
+    $hasUpper = (bool) preg_match('/[A-Z]/', $password);
+    $hasLower = (bool) preg_match('/[a-z]/', $password);
+    $hasNumberOrSpecial = (bool) preg_match('/[0-9@#_$%^&*!?\-+=.]/', $password);
+
+    return $hasUpper && $hasLower && $hasNumberOrSpecial;
+}
+
+function nwMemberPasswordRequirementMessage(): string
+{
+    return 'Password must be at least 8 characters and include an uppercase letter, a lowercase letter, and a number or special character (e.g. @, #, _).';
 }
 
 function generateNwMemberCode(PDO $pdo, int $volunteerId): string

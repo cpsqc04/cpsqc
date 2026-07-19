@@ -287,7 +287,21 @@ $autoOpenLogin = !empty($autoOpenLogin);
             const confirmPassword = document.getElementById('confirmPassword').value;
             if (!newPassword || !confirmPassword) return showForgotMessage('forgotPasswordMessage3', 'Please fill in all fields.', false);
             if (newPassword !== confirmPassword) return showForgotMessage('forgotPasswordMessage3', 'Passwords do not match.', false);
-            if (newPassword.length < 6) return showForgotMessage('forgotPasswordMessage3', 'Password must be at least 6 characters long.', false);
+            const isNwForgot = String(FORGOT_API || '').indexOf('neighborhood-watcher') !== -1;
+            if (isNwForgot) {
+                const hasUpper = /[A-Z]/.test(newPassword);
+                const hasLower = /[a-z]/.test(newPassword);
+                const hasNumberOrSpecial = /[0-9@#_$%^&*!?\-+=.]/.test(newPassword);
+                if (newPassword.length < 8 || !hasUpper || !hasLower || !hasNumberOrSpecial) {
+                    return showForgotMessage(
+                        'forgotPasswordMessage3',
+                        'Password must be at least 8 characters and include an uppercase letter, a lowercase letter, and a number or special character (e.g. @, #, _).',
+                        false
+                    );
+                }
+            } else if (newPassword.length < 6) {
+                return showForgotMessage('forgotPasswordMessage3', 'Password must be at least 6 characters long.', false);
+            }
             try {
                 const response = await fetch(FORGOT_API + '?action=reset', {
                     method: 'POST',

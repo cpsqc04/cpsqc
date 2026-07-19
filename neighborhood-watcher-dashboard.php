@@ -93,11 +93,37 @@ $nwActiveNav = 'report';
         .empty-state { text-align: center; padding: 2.5rem 1rem; color: var(--text-secondary); }
         .empty-state i { font-size: 2rem; margin-bottom: 0.75rem; opacity: 0.4; display: block; }
         #photoPreview img { max-width: 220px; max-height: 160px; border-radius: 8px; margin-top: 0.5rem; border: 1px solid var(--border-color); }
+        .report-cards { display: none; flex-direction: column; gap: 0.85rem; }
+        .report-card { border: 1px solid var(--border-color); border-radius: 12px; padding: 1rem; background: #fff; box-shadow: 0 1px 4px rgba(15, 23, 42, 0.06); }
+        .report-card-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 0.75rem; margin-bottom: 0.75rem; }
+        .report-card-id { font-weight: 700; color: var(--tertiary-color); font-size: 0.95rem; word-break: break-word; }
+        .report-card-meta { display: grid; gap: 0.55rem; }
+        .report-card-row { display: grid; grid-template-columns: 6.5rem 1fr; gap: 0.5rem; font-size: 0.9rem; }
+        .report-card-label { color: var(--text-secondary); font-weight: 500; }
+        .report-card-value { color: var(--text-color); word-break: break-word; }
+        .btn-submit { width: auto; }
         @media (max-width: 768px) {
             .main-wrapper { margin-left: 0; }
             body.sidebar-collapsed .main-wrapper { margin-left: 0; }
-            .sidebar { transform: translateX(-100%); }
+            .sidebar { transform: translateX(-100%); width: min(320px, 88vw); }
             .sidebar.mobile-open { transform: translateX(0); }
+            .sidebar.collapsed { width: min(320px, 88vw); transform: translateX(-100%); }
+            .sidebar.collapsed.mobile-open { transform: translateX(0); }
+            .top-header { align-items: center; }
+            .user-info { width: 100%; margin-left: 0; justify-content: flex-start; }
+            .page-title { font-size: 1.25rem; }
+            .section-heading { font-size: 1.05rem; flex-wrap: wrap; }
+            .content-area { padding: 1rem; }
+            .page-content { padding: 1rem; border-radius: 10px; }
+            .btn-submit { width: 100%; justify-content: center; }
+            .table-container { display: none; }
+            .report-cards { display: flex; }
+            #photoPreview img { max-width: 100%; height: auto; max-height: none; }
+        }
+        @media (max-width: 480px) {
+            .page-title { font-size: 1.1rem; }
+            .report-card-row { grid-template-columns: 1fr; gap: 0.15rem; }
+            .datetime-display { width: 100%; justify-content: space-between; }
         }
     </style>
     <link rel="stylesheet" href="css/mobile-responsive.css">
@@ -309,8 +335,10 @@ $nwActiveNav = 'report';
                 }
 
                 let html = '<div class="table-container"><table><thead><tr><th>Report ID</th><th>Location</th><th>Assigned To</th><th>Status</th><th>BPSO Resolution</th><th>Submitted</th></tr></thead><tbody>';
+                let cardsHtml = '<div class="report-cards">';
                 reports.forEach(function(report) {
                     const date = report.created_at ? new Date(report.created_at).toLocaleString() : '-';
+                    const resolutionText = report.resolution_report || 'Pending — waiting for assigned personnel';
                     const resolutionHtml = report.resolution_report
                         ? '<td class="resolution-cell">' + escapeHtml(report.resolution_report) + '</td>'
                         : '<td class="resolution-cell"><span class="resolution-empty">Pending — waiting for assigned personnel</span></td>';
@@ -322,9 +350,22 @@ $nwActiveNav = 'report';
                         + resolutionHtml
                         + '<td>' + escapeHtml(date) + '</td>'
                         + '</tr>';
+                    cardsHtml += '<article class="report-card">'
+                        + '<div class="report-card-top">'
+                        + '<div class="report-card-id">' + escapeHtml(report.report_id) + '</div>'
+                        + '<span class="status-badge ' + statusClass(report.status) + '">' + escapeHtml(report.status) + '</span>'
+                        + '</div>'
+                        + '<div class="report-card-meta">'
+                        + '<div class="report-card-row"><span class="report-card-label">Location</span><span class="report-card-value">' + escapeHtml(report.location) + '</span></div>'
+                        + '<div class="report-card-row"><span class="report-card-label">Assigned To</span><span class="report-card-value">' + escapeHtml(report.assigned_to || '—') + '</span></div>'
+                        + '<div class="report-card-row"><span class="report-card-label">Resolution</span><span class="report-card-value">' + escapeHtml(resolutionText) + '</span></div>'
+                        + '<div class="report-card-row"><span class="report-card-label">Submitted</span><span class="report-card-value">' + escapeHtml(date) + '</span></div>'
+                        + '</div>'
+                        + '</article>';
                 });
                 html += '</tbody></table></div>';
-                container.innerHTML = html;
+                cardsHtml += '</div>';
+                container.innerHTML = html + cardsHtml;
             } catch (err) {
                 container.innerHTML = '<div class="empty-state"><i class="fas fa-wifi"></i>Network error while loading reports.</div>';
             }
@@ -369,7 +410,8 @@ $nwActiveNav = 'report';
 
         document.addEventListener('DOMContentLoaded', function() {
             const sidebar = document.getElementById('sidebar');
-            if (localStorage.getItem('nwSidebarCollapsed') === 'true') {
+            const isMobile = window.matchMedia('(max-width: 768px)').matches;
+            if (!isMobile && localStorage.getItem('nwSidebarCollapsed') === 'true') {
                 sidebar.classList.add('collapsed');
                 document.body.classList.add('sidebar-collapsed');
             }
@@ -385,6 +427,7 @@ $nwActiveNav = 'report';
                         window.closeMobileSidebar();
                     } else if (window.innerWidth <= 768) {
                         sidebar.classList.remove('mobile-open');
+                        document.body.classList.remove('sidebar-mobile-open');
                     }
                 });
             });

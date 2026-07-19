@@ -184,7 +184,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $error = 'Passwords do not match.';
                 $showSetPasswordModal = true;
             } elseif (!isValidNwMemberPassword($newPassword)) {
-                $error = 'Password must be exactly 16 characters and alphanumeric (letters and numbers only).';
+                $error = nwMemberPasswordRequirementMessage();
                 $showSetPasswordModal = true;
             } else {
                 try {
@@ -748,16 +748,16 @@ $autoOpenPasswordChangeOtp = !empty($showPasswordChangeOtpModal);
             <?php if ($error !== null && !empty($showSetPasswordModal)): ?>
                 <div class="alert alert-error"><?php echo htmlspecialchars($error); ?></div>
             <?php endif; ?>
-            <p class="register-hint">Create a new password to continue. It must be exactly 16 alphanumeric characters (letters and numbers only).</p>
+            <p class="register-hint">Create a new password to continue. It must be at least 8 characters and include an uppercase letter, a lowercase letter, and a number or special character (e.g. @, #, _).</p>
             <form method="POST" action="">
                 <input type="hidden" name="set_nw_password" value="1">
                 <div class="field">
                     <label for="new_password">New Password *</label>
-                    <input id="new_password" name="new_password" type="password" maxlength="16" minlength="16" pattern="(?=.*[A-Za-z])(?=.*\d)[A-Za-z0-9]{16}" required>
+                    <input id="new_password" name="new_password" type="password" minlength="8" autocomplete="new-password" required>
                 </div>
                 <div class="field">
                     <label for="confirm_password">Confirm Password *</label>
-                    <input id="confirm_password" name="confirm_password" type="password" maxlength="16" minlength="16" pattern="(?=.*[A-Za-z])(?=.*\d)[A-Za-z0-9]{16}" required>
+                    <input id="confirm_password" name="confirm_password" type="password" minlength="8" autocomplete="new-password" required>
                 </div>
                 <div class="button-group">
                     <button class="btn" type="submit" style="width:100%;">Save Password</button>
