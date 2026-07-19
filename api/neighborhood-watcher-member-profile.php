@@ -4,9 +4,9 @@ session_start();
 header('Content-Type: application/json');
 
 require_once __DIR__ . '/../db.php';
-require_once __DIR__ . '/nw_members_schema.php';
+require_once __DIR__ . '/neighborhood-watcher-members-schema.php';
 require_once __DIR__ . '/../includes/contact_validation.php';
-require_once __DIR__ . '/../includes/nw_member_auth.php';
+require_once __DIR__ . '/../includes/neighborhood-watcher-member-auth.php';
 
 if (!isNwMemberLoggedIn()) {
     http_response_code(401);

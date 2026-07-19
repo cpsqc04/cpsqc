@@ -1,7 +1,9 @@
 <?php
-require_once __DIR__ . '/includes/nw_member_auth.php';
+require_once __DIR__ . '/includes/neighborhood-watcher-member-auth.php';
 require_once __DIR__ . '/db.php';
-require_once __DIR__ . '/api/nw_members_schema.php';
+require_once __DIR__ . '/api/neighborhood-watcher-members-schema.php';
+require_once __DIR__ . '/includes/neighborhood-watcher-member-credentials.php';
+require_once __DIR__ . '/includes/volunteer_notifications.php';
 
 $autoloadPath = __DIR__ . DIRECTORY_SEPARATOR . 'vendor' . DIRECTORY_SEPARATOR . 'autoload.php';
 if (file_exists($autoloadPath)) {
@@ -11,26 +13,46 @@ require_once __DIR__ . '/includes/login_otp.php';
 
 nwMemberSessionStart();
 
-if (isNwMemberLoggedIn()) {
-    if (nwMemberMustChangePassword()) {
-        header('Location: nw-change-password.php');
-    } else {
-        header('Location: nw-dashboard.php');
-    }
-    exit;
-}
-
 $error = null;
 $otpPrompt = null;
 $showOtpForm = false;
+$showSetPasswordModal = false;
+$showPasswordChangeOtpModal = false;
+$passwordChangeOtpPrompt = null;
 $otpEmailMasked = null;
 $otpExpiresAtText = null;
 $otpResendCooldown = 0;
 
 if (isset($_GET['cancel_otp'])) {
     unset($_SESSION['pending_nw_member_login']);
-    header('Location: nw-login.php');
+    header('Location: neighborhood-watcher-login.php');
     exit;
+}
+
+if (isset($_GET['cancel_password_otp'])) {
+    unset($_SESSION['pending_nw_password_change_otp']);
+    header('Location: neighborhood-watcher-login.php');
+    exit;
+}
+
+// Fully authenticated members go to dashboard.
+if (
+    isNwMemberLoggedIn()
+    && !nwMemberMustChangePassword()
+    && empty($_SESSION['pending_nw_password_change_otp'])
+) {
+    header('Location: neighborhood-watcher-dashboard.php');
+    exit;
+}
+
+if (!empty($_SESSION['pending_nw_password_change_otp'])) {
+    $showPasswordChangeOtpModal = true;
+    $pendingPwOtp = $_SESSION['pending_nw_password_change_otp'];
+    $passwordChangeOtpPrompt = 'Enter the OTP sent to your email to confirm your password change.';
+    $otpEmailMasked = maskEmailAddress((string) ($pendingPwOtp['email'] ?? ''));
+    $otpExpiresAtText = date('g:i A', strtotime((string) ($pendingPwOtp['expires_at'] ?? 'now')));
+} elseif (isNwMemberLoggedIn() && nwMemberMustChangePassword()) {
+    $showSetPasswordModal = true;
 }
 
 if (isset($_SESSION['pending_nw_member_login'])) {
@@ -141,13 +163,106 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_SESSION['nw_member_must_change_password'] = !empty($pendingLogin['must_change_password']);
             unset($_SESSION['pending_nw_member_login']);
             if (!empty($pendingLogin['must_change_password'])) {
-                header('Location: nw-change-password.php');
+                $showSetPasswordModal = true;
+                $showOtpForm = false;
+                $otpPrompt = null;
             } else {
-                header('Location: nw-dashboard.php');
+                header('Location: neighborhood-watcher-dashboard.php');
+                exit;
             }
+        }
+    } elseif (isset($_POST['set_nw_password']) && $error === null) {
+        if (!isNwMemberLoggedIn() || !nwMemberMustChangePassword()) {
+            $error = 'Please sign in again to set your password.';
+        } else {
+            $newPassword = (string) ($_POST['new_password'] ?? '');
+            $confirmPassword = (string) ($_POST['confirm_password'] ?? '');
+            if ($newPassword === '' || $confirmPassword === '') {
+                $error = 'Please fill in all password fields.';
+                $showSetPasswordModal = true;
+            } elseif ($newPassword !== $confirmPassword) {
+                $error = 'Passwords do not match.';
+                $showSetPasswordModal = true;
+            } elseif (!isValidNwMemberPassword($newPassword)) {
+                $error = 'Password must be exactly 16 characters and alphanumeric (letters and numbers only).';
+                $showSetPasswordModal = true;
+            } else {
+                try {
+                    ensureNwMembersTable($pdo);
+                    $passwordHash = password_hash($newPassword, PASSWORD_DEFAULT);
+                    $update = $pdo->prepare('UPDATE nw_members SET password_hash = :password_hash, must_change_password = 0 WHERE id = :id AND status = :status');
+                    $update->execute([
+                        ':password_hash' => $passwordHash,
+                        ':id' => getNwMemberId(),
+                        ':status' => 'Active',
+                    ]);
+                    $_SESSION['nw_member_must_change_password'] = false;
+
+                    $otp = generateLoginOTP();
+                    $_SESSION['pending_nw_password_change_otp'] = [
+                        'otp' => $otp,
+                        'email' => getNwMemberEmail(),
+                        'member_name' => getNwMemberName(),
+                        'expires_at' => date('Y-m-d H:i:s', strtotime('+10 minutes')),
+                        'attempts' => 0,
+                    ];
+
+                    $mailResult = sendNwPasswordChangedOTPEmail(getNwMemberEmail(), getNwMemberName(), $otp);
+                    if (empty($mailResult['success'])) {
+                        $error = 'Password updated, but failed to send confirmation OTP. Please try again.';
+                        $showSetPasswordModal = true;
+                        unset($_SESSION['pending_nw_password_change_otp']);
+                        $_SESSION['nw_member_must_change_password'] = true;
+                        $pdo->prepare('UPDATE nw_members SET must_change_password = 1 WHERE id = :id')->execute([':id' => getNwMemberId()]);
+                    } else {
+                        $showPasswordChangeOtpModal = true;
+                        $passwordChangeOtpPrompt = 'Password updated. Enter the OTP sent to your email to confirm.';
+                        $otpEmailMasked = maskEmailAddress((string) getNwMemberEmail());
+                        $otpExpiresAtText = date('g:i A', strtotime('+10 minutes'));
+                    }
+                } catch (PDOException $e) {
+                    $error = 'System error. Please try again later.';
+                    $showSetPasswordModal = true;
+                }
+            }
+        }
+    } elseif (isset($_POST['verify_password_change_otp']) && $error === null) {
+        $pendingPw = $_SESSION['pending_nw_password_change_otp'] ?? null;
+        $enteredOtp = trim($_POST['password_change_otp'] ?? '');
+        if (!$pendingPw) {
+            $error = 'No pending password change verification found.';
+            $showSetPasswordModal = isNwMemberLoggedIn() && nwMemberMustChangePassword();
+        } elseif ($enteredOtp === '' || !preg_match('/^\d{6}$/', $enteredOtp)) {
+            $error = 'Please enter a valid 6-digit OTP.';
+            $showPasswordChangeOtpModal = true;
+            $passwordChangeOtpPrompt = 'Enter the OTP sent to your email to confirm your password change.';
+            $otpEmailMasked = maskEmailAddress((string) ($pendingPw['email'] ?? ''));
+        } elseif (strtotime((string) ($pendingPw['expires_at'] ?? '')) < time()) {
+            unset($_SESSION['pending_nw_password_change_otp']);
+            $error = 'OTP has expired. Please set your password again.';
+            $_SESSION['nw_member_must_change_password'] = true;
+            $showSetPasswordModal = true;
+        } elseif (!hash_equals((string) ($pendingPw['otp'] ?? ''), $enteredOtp)) {
+            $_SESSION['pending_nw_password_change_otp']['attempts'] = (int) ($pendingPw['attempts'] ?? 0) + 1;
+            $remaining = max(0, 5 - (int) $_SESSION['pending_nw_password_change_otp']['attempts']);
+            $error = $remaining === 0
+                ? 'Too many failed OTP attempts. Please set your password again.'
+                : "Invalid OTP. {$remaining} attempt(s) remaining.";
+            if ($remaining === 0) {
+                unset($_SESSION['pending_nw_password_change_otp']);
+                $_SESSION['nw_member_must_change_password'] = true;
+                $showSetPasswordModal = true;
+            } else {
+                $showPasswordChangeOtpModal = true;
+                $passwordChangeOtpPrompt = 'Enter the OTP sent to your email to confirm your password change.';
+                $otpEmailMasked = maskEmailAddress((string) ($pendingPw['email'] ?? ''));
+            }
+        } else {
+            unset($_SESSION['pending_nw_password_change_otp']);
+            header('Location: neighborhood-watcher-dashboard.php?password_changed=1');
             exit;
         }
-    } elseif (!isset($_POST['resend_login_otp']) && $error === null) {
+    } elseif (!isset($_POST['resend_login_otp']) && !isset($_POST['set_nw_password']) && !isset($_POST['verify_password_change_otp']) && $error === null) {
         $email = trim($_POST['email'] ?? '');
         $password = $_POST['password'] ?? '';
 
@@ -214,7 +329,9 @@ if ($showOtpForm && empty($otpPrompt) && isset($_SESSION['pending_nw_member_logi
     $otpResendCooldown = $otpView['otp_resend_cooldown'];
 }
 
-$autoOpenLogin = !empty($showOtpForm) || ($error !== null);
+$autoOpenLogin = !empty($showOtpForm) || ($error !== null && !$showSetPasswordModal && !$showPasswordChangeOtpModal);
+$autoOpenSetPassword = !empty($showSetPasswordModal);
+$autoOpenPasswordChangeOtp = !empty($showPasswordChangeOtpModal);
 ?>
 <!doctype html>
 <html lang="en">
@@ -225,6 +342,7 @@ $autoOpenLogin = !empty($showOtpForm) || ($error !== null);
     <link rel="icon" type="image/x-icon" href="images/favicon.ico">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="css/portal-landing.css">
+    <link rel="stylesheet" href="css/mobile-responsive.css">
 </head>
 <body>
     <div class="progress-bar" id="progressBar" aria-hidden="true"></div>
@@ -375,7 +493,7 @@ $autoOpenLogin = !empty($showOtpForm) || ($error !== null);
             <?php endif; ?>
             <?php if ($showOtpForm): ?>
                 <?php renderLoginOtpForm(
-                    'nw-login.php?cancel_otp=1',
+                    'neighborhood-watcher-login.php?cancel_otp=1',
                     $otpEmailMasked,
                     $otpExpiresAtText,
                     (int) $otpResendCooldown
@@ -405,6 +523,66 @@ $autoOpenLogin = !empty($showOtpForm) || ($error !== null);
         </div>
     </div>
 
+    <div class="modal-overlay" id="eligibilityModal" role="dialog" aria-modal="true" aria-labelledby="eligibility-title" style="z-index:2040;">
+        <div class="modal-panel wide">
+            <div class="modal-header">
+                <h2 id="eligibility-title">Eligibility Criteria</h2>
+                <button type="button" class="modal-close" onclick="closeEligibilityModal()" aria-label="Close">&times;</button>
+            </div>
+            <p class="register-hint">Please answer all items below. You may proceed only if you meet every requirement.</p>
+            <form id="eligibilityCriteriaForm" onsubmit="event.preventDefault();">
+                <ol class="eligibility-list">
+                    <li class="eligibility-item">
+                        <p class="eligibility-question">1. I am a Filipino Citizen. <em>Ako ay mamamayang Pilipino.</em></p>
+                        <div class="eligibility-choices" role="radiogroup" aria-label="Filipino Citizen">
+                            <label class="eligibility-choice"><input type="radio" name="eligibility_1" value="yes" required> Yes</label>
+                            <label class="eligibility-choice"><input type="radio" name="eligibility_1" value="no"> No</label>
+                        </div>
+                    </li>
+                    <li class="eligibility-item">
+                        <p class="eligibility-question">2. I am Barangay San Agustin Resident. <em>Residente ako ng Barangay San Agustin.</em></p>
+                        <div class="eligibility-choices" role="radiogroup" aria-label="Barangay San Agustin Resident">
+                            <label class="eligibility-choice"><input type="radio" name="eligibility_2" value="yes" required> Yes</label>
+                            <label class="eligibility-choice"><input type="radio" name="eligibility_2" value="no"> No</label>
+                        </div>
+                    </li>
+                    <li class="eligibility-item">
+                        <p class="eligibility-question">3. I have been a resident of Barangay San Agustin for at least six (6) months. <em>Ako ay naninirahan sa Barangay San Agustin nang hindi bababa sa anim (6) na buwan.</em></p>
+                        <div class="eligibility-choices" role="radiogroup" aria-label="Resident for at least six months">
+                            <label class="eligibility-choice"><input type="radio" name="eligibility_3" value="yes" required> Yes</label>
+                            <label class="eligibility-choice"><input type="radio" name="eligibility_3" value="no"> No</label>
+                        </div>
+                    </li>
+                    <li class="eligibility-item">
+                        <p class="eligibility-question">4. I am a registered voter in Barangay San Agustin. <em>Ako ay isang rehistradong botante sa Barangay San Agustin.</em></p>
+                        <div class="eligibility-choices" role="radiogroup" aria-label="Registered voter">
+                            <label class="eligibility-choice"><input type="radio" name="eligibility_4" value="yes" required> Yes</label>
+                            <label class="eligibility-choice"><input type="radio" name="eligibility_4" value="no"> No</label>
+                        </div>
+                    </li>
+                    <li class="eligibility-item">
+                        <p class="eligibility-question">5. I am between 18 and 60 years old. <em>Ang aking edad ay nasa pagitan ng 18 hanggang 60 taong gulang.</em></p>
+                        <div class="eligibility-choices" role="radiogroup" aria-label="Age between 18 and 60">
+                            <label class="eligibility-choice"><input type="radio" name="eligibility_5" value="yes" required> Yes</label>
+                            <label class="eligibility-choice"><input type="radio" name="eligibility_5" value="no"> No</label>
+                        </div>
+                    </li>
+                    <li class="eligibility-item">
+                        <p class="eligibility-question">6. I can read and write in Tagalog o English. <em>Ako ay nakakabasa at nakakasulat sa wikang Tagalog at Ingles.</em></p>
+                        <div class="eligibility-choices" role="radiogroup" aria-label="Can read and write Tagalog or English">
+                            <label class="eligibility-choice"><input type="radio" name="eligibility_6" value="yes" required> Yes</label>
+                            <label class="eligibility-choice"><input type="radio" name="eligibility_6" value="no"> No</label>
+                        </div>
+                    </li>
+                </ol>
+                <div class="button-group">
+                    <button type="button" class="btn btn-secondary" onclick="closeEligibilityModal()">Cancel</button>
+                    <button type="button" class="btn" id="eligibilityProceedBtn" disabled onclick="proceedToApplicationForm()">Proceed to Application Form</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <div class="modal-overlay" id="registerModal" role="dialog" aria-modal="true" aria-labelledby="register-title" style="z-index:2050;">
         <div class="modal-panel wide">
             <div class="modal-header">
@@ -424,6 +602,26 @@ $autoOpenLogin = !empty($showOtpForm) || ($error !== null);
                 <div class="field">
                     <label for="memberMiddleName">Middle Name <span style="font-weight:400;color:rgba(255,255,255,0.55);">(if applicable)</span></label>
                     <input id="memberMiddleName" name="middle_name" type="text">
+                </div>
+                <div class="field">
+                    <label for="memberGender">Gender *</label>
+                    <select id="memberGender" name="gender" required>
+                        <option value="">Select gender</option>
+                        <option value="Male">Male</option>
+                        <option value="Female">Female</option>
+                        <option value="Other">Other</option>
+                    </select>
+                </div>
+                <div class="field">
+                    <label for="memberMaritalStatus">Marital Status *</label>
+                    <select id="memberMaritalStatus" name="marital_status" required>
+                        <option value="">Select marital status</option>
+                        <option value="Single">Single</option>
+                        <option value="Married">Married</option>
+                        <option value="Separated">Separated</option>
+                        <option value="Widowed">Widowed</option>
+                        <option value="Common-law (live-in)">Common-law (live-in)</option>
+                    </select>
                 </div>
                 <div class="field">
                     <label for="memberBirthday">Birthday *</label>
@@ -447,8 +645,45 @@ $autoOpenLogin = !empty($showOtpForm) || ($error !== null);
                     <input id="memberEmail" name="email" type="email" required>
                 </div>
                 <div class="field">
-                    <label for="memberAddress">Home Address *</label>
-                    <input id="memberAddress" name="address" type="text" required>
+                    <label for="memberUnitStreet">Unit/House Number &amp; Street Name *</label>
+                    <input id="memberUnitStreet" name="unit_street" type="text" required placeholder="e.g., 123 Bonifacio St.">
+                </div>
+                <div class="field">
+                    <label for="memberSubdivision">Subdivision/Village/Building *</label>
+                    <select id="memberSubdivision" name="subdivision" required>
+                        <option value="">Select subdivision</option>
+                        <option value="T.S. Cruz Subdivision">T.S. Cruz Subdivision</option>
+                        <option value="Clemente Subdivision">Clemente Subdivision</option>
+                        <option value="Greenfields III Subdivision">Greenfields III Subdivision</option>
+                        <option value="Millieville Subdivision">Millieville Subdivision</option>
+                        <option value="Nova Homes Subdivision">Nova Homes Subdivision</option>
+                        <option value="St. Francis/Blueville Subdivision">St. Francis/Blueville Subdivision</option>
+                    </select>
+                </div>
+                <div class="field">
+                    <label for="memberBarangay">Barangay *</label>
+                    <select id="memberBarangay" name="barangay" required>
+                        <option value="">Select barangay</option>
+                        <option value="San Agustin" selected>San Agustin</option>
+                    </select>
+                </div>
+                <div class="field">
+                    <label for="memberCity">City/Municipality *</label>
+                    <select id="memberCity" name="city" required>
+                        <option value="">Select city/municipality</option>
+                        <option value="Quezon City" selected>Quezon City</option>
+                    </select>
+                </div>
+                <div class="field">
+                    <label for="memberPostalCode">Postal Code *</label>
+                    <input id="memberPostalCode" name="postal_code" type="text" required readonly>
+                </div>
+                <div class="field">
+                    <label for="memberCountry">Country *</label>
+                    <select id="memberCountry" name="country" required>
+                        <option value="">Select country</option>
+                        <option value="Philippines" selected>Philippines</option>
+                    </select>
                 </div>
                 <div class="field">
                     <label for="memberEmergencyName">Emergency Contact Full Name *</label>
@@ -461,14 +696,20 @@ $autoOpenLogin = !empty($showOtpForm) || ($error !== null);
                 <div class="field">
                     <label for="memberPhoto">Neighborhood Watch Member Photo *</label>
                     <input id="memberPhoto" name="photo" type="file" accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp" required onchange="previewMemberImage(this, 'memberPhotoPreview')">
-                    <p class="field-hint">JPG or PNG, 5 MB or below.</p>
+                    <p class="field-hint">JPG or PNG, 10 MB or below.</p>
                     <div id="memberPhotoPreview" class="file-preview"></div>
                 </div>
                 <div class="field">
                     <label for="memberPhotoId">Photo of Valid ID *</label>
                     <input id="memberPhotoId" name="photoId" type="file" accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp" required onchange="previewMemberImage(this, 'memberPhotoIdPreview')">
-                    <p class="field-hint">JPG or PNG, 5 MB or below.</p>
+                    <p class="field-hint">JPG or PNG, 10 MB or below.</p>
                     <div id="memberPhotoIdPreview" class="file-preview"></div>
+                </div>
+                <div class="field">
+                    <label for="memberBarangayClearance">Barangay Clearance *</label>
+                    <input id="memberBarangayClearance" name="barangayClearance" type="file" accept="image/jpeg,image/png,image/webp,application/pdf,.jpg,.jpeg,.png,.webp,.pdf" required onchange="previewBarangayClearance(this, 'memberBarangayClearancePreview')">
+                    <p class="field-hint">Photo (JPG/PNG) or PDF, 10 MB or below.</p>
+                    <div id="memberBarangayClearancePreview" class="file-preview"></div>
                 </div>
                 <div class="consent-box">
                     <input id="memberConsent" name="consent" type="checkbox" value="1" required>
@@ -499,10 +740,71 @@ $autoOpenLogin = !empty($showOtpForm) || ($error !== null);
         </div>
     </div>
 
+    <div class="modal-overlay<?php echo !empty($autoOpenSetPassword) ? ' open' : ''; ?>" id="setPasswordModal" role="dialog" aria-modal="true" aria-labelledby="set-password-title" style="z-index:3200;">
+        <div class="modal-panel">
+            <div class="modal-header">
+                <h2 id="set-password-title">Set Your Password</h2>
+            </div>
+            <?php if ($error !== null && !empty($showSetPasswordModal)): ?>
+                <div class="alert alert-error"><?php echo htmlspecialchars($error); ?></div>
+            <?php endif; ?>
+            <p class="register-hint">Create a new password to continue. It must be exactly 16 alphanumeric characters (letters and numbers only).</p>
+            <form method="POST" action="">
+                <input type="hidden" name="set_nw_password" value="1">
+                <div class="field">
+                    <label for="new_password">New Password *</label>
+                    <input id="new_password" name="new_password" type="password" maxlength="16" minlength="16" pattern="(?=.*[A-Za-z])(?=.*\d)[A-Za-z0-9]{16}" required>
+                </div>
+                <div class="field">
+                    <label for="confirm_password">Confirm Password *</label>
+                    <input id="confirm_password" name="confirm_password" type="password" maxlength="16" minlength="16" pattern="(?=.*[A-Za-z])(?=.*\d)[A-Za-z0-9]{16}" required>
+                </div>
+                <div class="button-group">
+                    <button class="btn" type="submit" style="width:100%;">Save Password</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="modal-overlay<?php echo !empty($autoOpenPasswordChangeOtp) ? ' open' : ''; ?>" id="passwordChangeOtpModal" role="dialog" aria-modal="true" aria-labelledby="password-otp-title" style="z-index:3300;">
+        <div class="modal-panel">
+            <div class="modal-header">
+                <h2 id="password-otp-title">Confirm Password Change</h2>
+            </div>
+            <?php if ($error !== null && !empty($showPasswordChangeOtpModal)): ?>
+                <div class="alert alert-error"><?php echo htmlspecialchars($error); ?></div>
+            <?php endif; ?>
+            <?php if (!empty($passwordChangeOtpPrompt)): ?>
+                <div class="alert alert-success"><?php echo htmlspecialchars($passwordChangeOtpPrompt); ?></div>
+            <?php endif; ?>
+            <p class="register-hint">OTP sent to <?php echo htmlspecialchars($otpEmailMasked ?: 'your email'); ?><?php echo $otpExpiresAtText ? ' (expires ' . htmlspecialchars($otpExpiresAtText) . ')' : ''; ?>.</p>
+            <form method="POST" action="">
+                <input type="hidden" name="verify_password_change_otp" value="1">
+                <div class="field">
+                    <label for="password_change_otp">6-digit OTP *</label>
+                    <input id="password_change_otp" name="password_change_otp" type="text" inputmode="numeric" maxlength="6" pattern="\d{6}" required>
+                </div>
+                <div class="button-group">
+                    <button class="btn" type="submit" style="width:100%;">Verify OTP</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <script src="js/form-contact-validation.js"></script>
-    <script src="js/nw-register-application.js"></script>
+    <script src="js/neighborhood-watcher-register-application.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            if (<?php echo !empty($autoOpenSetPassword) ? 'true' : 'false'; ?>) {
+                document.body.style.overflow = 'hidden';
+            }
+            if (<?php echo !empty($autoOpenPasswordChangeOtp) ? 'true' : 'false'; ?>) {
+                document.body.style.overflow = 'hidden';
+            }
+        });
+    </script>
 
 <?php
-$forgotApiEndpoint = 'api/nw-forgot-password.php';
-$portalHomePath = 'nw-login.php';
+$forgotApiEndpoint = 'api/neighborhood-watcher-forgot-password.php';
+$portalHomePath = 'neighborhood-watcher-login.php';
 require __DIR__ . '/includes/portal_landing_modals.php';

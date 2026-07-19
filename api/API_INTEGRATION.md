@@ -929,9 +929,9 @@ These endpoints require an **admin login session** (cookie-based). Do not share 
 | `GET/POST /api/patrols.php` | BPSO Personnel |
 | `GET/POST /api/patrol_schedules.php` | Patrol Schedule |
 | `GET /api/patrol_logs.php` | Patrol Logs |
-| `GET/POST /api/nw_incidents.php` | NW Incidents |
-| `GET/POST /api/nw_members.php` | NW Applications / members |
-| `GET/POST /api/volunteers.php` | Legacy alias for `nw_members.php` |
+| `GET/POST /api/neighborhood-watcher-incidents.php` | NW Incidents |
+| `GET/POST /api/neighborhood-watcher-members.php` | NW Applications / members |
+| `GET/POST /api/volunteers.php` | Legacy alias for `neighborhood-watcher-members.php` |
 | `GET/POST /api/users.php` | User Management |
 | `GET /api/dashboard.php` | Dashboard stats |
 | `GET /api/notifications.php` | Admin notifications |

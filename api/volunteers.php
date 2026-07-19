@@ -2,6 +2,6 @@
 
 /**
  * Backward-compatible entry point for Neighborhood Watch member applications.
- * The canonical API is api/nw_members.php (table: nw_members).
+ * The canonical API is api/neighborhood-watcher-members.php (table: nw_members).
  */
-require __DIR__ . '/nw_members.php';
+require __DIR__ . '/neighborhood-watcher-members.php';

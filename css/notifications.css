@@ -214,3 +214,33 @@
 .notification-empty p {
     margin: 0;
 }
+
+@media (max-width: 768px) {
+    .notification-dropdown {
+        position: fixed;
+        top: calc(3.5rem + env(safe-area-inset-top, 0px));
+        right: 0.75rem;
+        left: 0.75rem;
+        width: auto;
+        max-width: none;
+        max-height: min(70vh, 520px);
+    }
+
+    .notification-list {
+        max-height: min(55vh, 400px);
+    }
+
+    .notification-item {
+        padding: 0.85rem 1rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .notification-header {
+        padding: 1rem;
+    }
+
+    .notification-header h3 {
+        font-size: 1rem;
+    }
+}

@@ -1,5 +1,5 @@
 <?php
-require_once __DIR__ . '/includes/nw_member_auth.php';
+require_once __DIR__ . '/includes/neighborhood-watcher-member-auth.php';
 
 nwMemberSessionStart();
 
@@ -12,5 +12,5 @@ unset(
     $_SESSION['nw_member_must_change_password']
 );
 
-header('Location: nw-login.php');
+header('Location: neighborhood-watcher-login.php');
 exit;

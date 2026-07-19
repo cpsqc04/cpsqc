@@ -1,5 +1,5 @@
 <?php
-require_once __DIR__ . '/includes/nw_member_auth.php';
+require_once __DIR__ . '/includes/neighborhood-watcher-member-auth.php';
 
 requireNwMemberLogin();
 requireNwMemberPasswordChanged();
@@ -11,11 +11,12 @@ $nwActiveNav = 'account';
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Account Settings - Alertara</title>
     <link rel="icon" type="image/x-icon" href="images/favicon.ico">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="css/theme.css">
+    <link rel="stylesheet" href="css/admin-sidebar.css">
     <style>
         body { margin: 0; padding: 0; font-family: var(--font-family); background-color: var(--bg-color); display: flex; min-height: 100vh; }
         .sidebar { width: 320px; background: var(--tertiary-color); color: #fff; position: fixed; left: 0; top: 0; height: 100vh; overflow: hidden; box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1); z-index: 1000; transition: width 0.3s ease; display: flex; flex-direction: column; }
@@ -77,12 +78,13 @@ $nwActiveNav = 'account';
             .form-grid { grid-template-columns: 1fr; }
         }
     </style>
+    <link rel="stylesheet" href="css/mobile-responsive.css">
 </head>
 <body>
     <aside class="sidebar" id="sidebar">
         <div class="sidebar-header">
             <div class="logo-container">
-                <a href="nw-dashboard.php">
+                <a href="neighborhood-watcher-dashboard.php">
                     <img src="images/tara.png" alt="Alertara Logo">
                 </a>
                 <div class="user-name-display" id="sidebarMemberName"><?php echo $memberName; ?></div>
@@ -90,10 +92,10 @@ $nwActiveNav = 'account';
             </div>
         </div>
         <nav class="sidebar-nav">
-            <?php require __DIR__ . '/includes/nw_portal_sidebar_nav.php'; ?>
+            <?php require __DIR__ . '/includes/neighborhood-watcher-portal-sidebar-nav.php'; ?>
         </nav>
         <div class="sidebar-footer">
-            <a href="nw-logout.php" class="sidebar-logout-btn" data-tooltip="Logout">
+            <a href="neighborhood-watcher-logout.php" class="sidebar-logout-btn" data-tooltip="Logout">
                 <i class="fas fa-sign-out-alt"></i>
                 <span>Logout</span>
             </a>
@@ -234,7 +236,7 @@ $nwActiveNav = 'account';
 
         async function loadProfile() {
             try {
-                const response = await fetch('api/nw_member_profile.php');
+                const response = await fetch('api/neighborhood-watcher-member-profile.php');
                 const result = await response.json();
                 if (result.success && result.data) {
                     fillProfileForm(result.data);
@@ -261,7 +263,7 @@ $nwActiveNav = 'account';
             }
 
             try {
-                const response = await fetch('api/nw_member_profile.php', {
+                const response = await fetch('api/neighborhood-watcher-member-profile.php', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -289,7 +291,7 @@ $nwActiveNav = 'account';
         document.getElementById('passwordForm').addEventListener('submit', async function(e) {
             e.preventDefault();
             try {
-                const response = await fetch('api/nw_member_profile.php', {
+                const response = await fetch('api/neighborhood-watcher-member-profile.php', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -322,5 +324,6 @@ $nwActiveNav = 'account';
             loadProfile();
         });
     </script>
+    <script src="js/mobile-shell.js"></script>
 </body>
 </html>

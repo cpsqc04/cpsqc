@@ -1,7 +1,7 @@
 (function (global) {
     'use strict';
 
-    var MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+    var MAX_IMAGE_BYTES = 10 * 1024 * 1024;
     var ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
 
     function $(id) {
@@ -24,13 +24,21 @@
         }
     }
 
+    function isAllowedImageFile(file) {
+        if (!file) return false;
+        var type = String(file.type || '').toLowerCase();
+        if (ALLOWED_IMAGE_TYPES.indexOf(type) !== -1) return true;
+        if (type.indexOf('image/') === 0 && /\.(jpe?g|png|webp)$/i.test(file.name || '')) return true;
+        return /\.(jpe?g|png|webp)$/i.test(file.name || '');
+    }
+
     function validateImageFile(file, label) {
         if (!file) return (label || 'Photo') + ' is required.';
-        if (!ALLOWED_IMAGE_TYPES.includes(String(file.type || '').toLowerCase()) && !/\.(jpe?g|png|webp)$/i.test(file.name || '')) {
+        if (!isAllowedImageFile(file)) {
             return (label || 'Photo') + ' must be a JPG or PNG image.';
         }
         if (file.size > MAX_IMAGE_BYTES) {
-            return (label || 'Photo') + ' must be 5 MB or below.';
+            return (label || 'Photo') + ' must be 10 MB or below.';
         }
         return null;
     }

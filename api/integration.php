@@ -368,19 +368,19 @@ function getIntegrationCatalog(): array
                         'auth' => 'admin_session (create is public)',
                         'actions' => ['create', 'update', 'delete'],
                     ]),
-                    endpoint('/api/nw_members.php', [
+                    endpoint('/api/neighborhood-watcher-members.php', [
                         'name' => 'Neighborhood Watch Members / Applications',
                         'methods' => ['GET', 'POST'],
                         'auth' => 'admin_session',
                         'actions' => ['create', 'update', 'delete'],
                     ]),
                     endpoint('/api/volunteers.php', [
-                        'name' => 'NW Volunteer Applications (legacy alias → nw_members.php)',
+                        'name' => 'NW Volunteer Applications (legacy alias → neighborhood-watcher-members.php)',
                         'methods' => ['GET', 'POST'],
                         'auth' => 'admin_session',
                         'actions' => ['create', 'update', 'delete'],
                     ]),
-                    endpoint('/api/nw_incidents.php', [
+                    endpoint('/api/neighborhood-watcher-incidents.php', [
                         'name' => 'NW Incident Reports (admin review)',
                         'methods' => ['GET', 'POST'],
                         'auth' => 'admin_session',
@@ -457,7 +457,7 @@ function getIntegrationCatalog(): array
                         'auth' => 'bpso_session',
                         'actions' => ['submit_resolution'],
                     ]),
-                    endpoint('/api/bpso_nw_incidents.php', [
+                    endpoint('/api/bpso-neighborhood-watcher-incidents.php', [
                         'name' => 'Assigned NW Incidents',
                         'methods' => ['GET', 'POST'],
                         'auth' => 'bpso_session',
@@ -482,19 +482,19 @@ function getIntegrationCatalog(): array
             'nw_portal' => [
                 'description' => 'Require Neighborhood Watch member login session',
                 'endpoints' => [
-                    endpoint('/api/nw_incidents.php', [
+                    endpoint('/api/neighborhood-watcher-incidents.php', [
                         'name' => 'NW Incident Reports',
                         'methods' => ['GET', 'POST'],
                         'auth' => 'nw_session or admin_session',
                         'actions' => ['create'],
                     ]),
-                    endpoint('/api/nw_member_profile.php', [
+                    endpoint('/api/neighborhood-watcher-member-profile.php', [
                         'name' => 'NW Member Profile',
                         'methods' => ['GET', 'POST'],
                         'auth' => 'nw_session',
                         'actions' => ['update_profile', 'change_password'],
                     ]),
-                    endpoint('/api/nw-forgot-password.php', [
+                    endpoint('/api/neighborhood-watcher-forgot-password.php', [
                         'name' => 'NW Forgot Password',
                         'methods' => ['POST'],
                         'auth' => 'public',
@@ -511,14 +511,14 @@ function getIntegrationCatalog(): array
                         'auth' => 'public',
                         'actions' => ['create'],
                     ]),
-                    endpoint('/api/nw_members.php', [
+                    endpoint('/api/neighborhood-watcher-members.php', [
                         'name' => 'Neighborhood Watch Application',
                         'methods' => ['POST'],
                         'auth' => 'public',
                         'actions' => ['create'],
                     ]),
                     endpoint('/api/volunteers.php', [
-                        'name' => 'NW Volunteer Application (legacy alias → nw_members.php)',
+                        'name' => 'NW Volunteer Application (legacy alias → neighborhood-watcher-members.php)',
                         'methods' => ['POST'],
                         'auth' => 'public',
                         'actions' => ['create'],

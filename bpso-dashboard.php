@@ -9,11 +9,12 @@ $personnelName = htmlspecialchars(getBpsoPersonnelName());
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>BPSO Portal - Alertara</title>
     <link rel="icon" type="image/x-icon" href="images/favicon.ico">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="css/theme.css">
+    <link rel="stylesheet" href="css/admin-sidebar.css">
     <style>
         body { margin: 0; padding: 0; font-family: var(--font-family); background-color: var(--bg-color); display: flex; min-height: 100vh; }
         .sidebar { width: 320px; background: var(--tertiary-color); color: #fff; position: fixed; left: 0; top: 0; height: 100vh; overflow: hidden; box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1); z-index: 1000; transition: width 0.3s ease; display: flex; flex-direction: column; }
@@ -232,6 +233,7 @@ $personnelName = htmlspecialchars(getBpsoPersonnelName());
             .sidebar.mobile-open { transform: translateX(0); }
         }
     </style>
+    <link rel="stylesheet" href="css/mobile-responsive.css">
 </head>
 <body>
     <aside class="sidebar" id="sidebar">
@@ -1226,7 +1228,7 @@ $personnelName = htmlspecialchars(getBpsoPersonnelName());
         async function loadNwIncidents() {
             const tbody = document.getElementById('nwIncidentsTableBody');
             try {
-                const res = await fetch('api/bpso_nw_incidents.php');
+                const res = await fetch('api/bpso-neighborhood-watcher-incidents.php');
                 const result = await res.json();
                 if (!result.success) {
                     tbody.innerHTML = '<tr><td colspan="5" class="empty-state">Failed to load neighborhood watch incidents.</td></tr>';
@@ -1324,7 +1326,7 @@ $personnelName = htmlspecialchars(getBpsoPersonnelName());
             }
 
             try {
-                const res = await fetch('api/bpso_nw_incidents.php', {
+                const res = await fetch('api/bpso-neighborhood-watcher-incidents.php', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ action: 'submit_resolution', id, resolution_report: resolutionReport, status })
@@ -1377,5 +1379,6 @@ $personnelName = htmlspecialchars(getBpsoPersonnelName());
         });
     </script>
     <?php require __DIR__ . '/includes/bpso_notifications_script.php'; ?>
+    <script src="js/mobile-shell.js"></script>
 </body>
 </html>

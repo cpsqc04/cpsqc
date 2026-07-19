@@ -12,7 +12,7 @@ require_once __DIR__ . '/db.php';
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Patrol Schedule - Alertara</title>
     <link rel="icon" type="image/x-icon" href="images/favicon.ico">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -404,6 +404,7 @@ require_once __DIR__ . '/db.php';
         .risk-alerts-empty { padding: 1.25rem; text-align: center; color: var(--text-secondary); background: #f9fafb; border-radius: 8px; border: 1px dashed var(--border-color); }
         @media (max-width: 768px) { .sidebar { width: 320px; transform: translateX(-100%); transition: transform 0.3s ease; } .sidebar.mobile-open { transform: translateX(0); } .sidebar.collapsed { width: 80px; transform: translateX(0); } .main-wrapper { margin-left: 0; } body.sidebar-collapsed .main-wrapper { margin-left: 80px; } .modal-content { width: 95%; margin: 10% auto; padding: 1.5rem; } .search-container { flex-direction: column; } .btn-add { width: 100%; justify-content: center; } }
     </style>
+    <link rel="stylesheet" href="css/mobile-responsive.css">
 </head>
 <body>
     <aside class="sidebar" id="sidebar">
@@ -1047,6 +1048,7 @@ require_once __DIR__ . '/db.php';
         setInterval(updateDateTime, 1000);
     </script>
     <?php require __DIR__ . '/includes/admin_notifications_script.php'; ?>
+    <script src="js/mobile-shell.js"></script>
 </body>
 </html>
 

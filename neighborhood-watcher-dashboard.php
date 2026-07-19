@@ -1,5 +1,5 @@
 <?php
-require_once __DIR__ . '/includes/nw_member_auth.php';
+require_once __DIR__ . '/includes/neighborhood-watcher-member-auth.php';
 
 requireNwMemberLogin();
 requireNwMemberPasswordChanged();
@@ -7,17 +7,18 @@ requireNwMemberPasswordChanged();
 $memberName = htmlspecialchars(getNwMemberName());
 $memberEmail = htmlspecialchars(getNwMemberEmail());
 $passwordChanged = isset($_GET['password_changed']);
-$nwActiveNav = 'dashboard';
+$nwActiveNav = 'report';
 ?>
 <!doctype html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Neighborhood Watch Portal - Alertara</title>
     <link rel="icon" type="image/x-icon" href="images/favicon.ico">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="css/theme.css">
+    <link rel="stylesheet" href="css/admin-sidebar.css">
     <style>
         body { margin: 0; padding: 0; font-family: var(--font-family); background-color: var(--bg-color); display: flex; min-height: 100vh; }
         .sidebar { width: 320px; background: var(--tertiary-color); color: #fff; position: fixed; left: 0; top: 0; height: 100vh; overflow: hidden; box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1); z-index: 1000; transition: width 0.3s ease; display: flex; flex-direction: column; }
@@ -62,7 +63,8 @@ $nwActiveNav = 'dashboard';
         .content-area { padding: 2rem; flex: 1; background: #f5f5f5; }
         .page-content { background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 12px; padding: 2rem; box-shadow: 0 2px 8px var(--shadow); }
         .section-heading { margin: 0 0 1.5rem; color: var(--tertiary-color); font-size: 1.25rem; font-weight: 600; display: flex; align-items: center; gap: 0.5rem; }
-        .section-block { margin-bottom: 2.5rem; }
+        .section-block { margin-bottom: 2.5rem; display: none; }
+        .section-block.is-active { display: block; }
         .section-block:last-child { margin-bottom: 0; }
         .form-group { margin-bottom: 1.25rem; }
         .form-group label { display: block; margin-bottom: 0.5rem; color: var(--text-color); font-weight: 500; font-size: 0.95rem; }
@@ -98,12 +100,13 @@ $nwActiveNav = 'dashboard';
             .sidebar.mobile-open { transform: translateX(0); }
         }
     </style>
+    <link rel="stylesheet" href="css/mobile-responsive.css">
 </head>
 <body>
     <aside class="sidebar" id="sidebar">
         <div class="sidebar-header">
             <div class="logo-container">
-                <a href="nw-dashboard.php">
+                <a href="neighborhood-watcher-dashboard.php">
                     <img src="images/tara.png" alt="Alertara Logo">
                 </a>
                 <div class="user-name-display"><?php echo $memberName; ?></div>
@@ -111,10 +114,10 @@ $nwActiveNav = 'dashboard';
             </div>
         </div>
         <nav class="sidebar-nav">
-            <?php require __DIR__ . '/includes/nw_portal_sidebar_nav.php'; ?>
+            <?php require __DIR__ . '/includes/neighborhood-watcher-portal-sidebar-nav.php'; ?>
         </nav>
         <div class="sidebar-footer">
-            <a href="nw-logout.php" class="sidebar-logout-btn" data-tooltip="Logout">
+            <a href="neighborhood-watcher-logout.php" class="sidebar-logout-btn" data-tooltip="Logout">
                 <i class="fas fa-sign-out-alt"></i>
                 <span>Logout</span>
             </a>
@@ -145,7 +148,7 @@ $nwActiveNav = 'dashboard';
                     <div class="alert alert-success">Your password has been updated successfully.</div>
                 <?php endif; ?>
 
-                <section id="reportSection" class="section-block">
+                <section id="reportSection" class="section-block is-active">
                     <h2 class="section-heading"><i class="fas fa-exclamation-triangle"></i> Report Incident to BPSO</h2>
                     <div id="reportAlert" style="display:none;"></div>
                     <form id="reportForm">
@@ -197,9 +200,33 @@ $nwActiveNav = 'dashboard';
             }
         }
 
-        function scrollToSection(sectionId, button) {
-            const section = document.getElementById(sectionId);
-            if (section) section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        function showPortalSection(sectionId, updateHash) {
+            const reportSection = document.getElementById('reportSection');
+            const reportsSection = document.getElementById('reportsSection');
+            const targetId = sectionId === 'reportsSection' ? 'reportsSection' : 'reportSection';
+
+            if (reportSection) reportSection.classList.toggle('is-active', targetId === 'reportSection');
+            if (reportsSection) reportsSection.classList.toggle('is-active', targetId === 'reportsSection');
+
+            document.querySelectorAll('.nav-submodule[data-section]').forEach((link) => {
+                link.classList.toggle('active', link.getAttribute('data-section') === targetId);
+            });
+
+            if (updateHash !== false) {
+                const nextHash = targetId === 'reportsSection' ? '#reportsSection' : '#reportSection';
+                if (window.location.hash !== nextHash) {
+                    history.replaceState(null, '', nextHash);
+                }
+            }
+
+            if (targetId === 'reportsSection') {
+                loadReports();
+            }
+        }
+
+        function scrollToSection(sectionId) {
+            showPortalSection(sectionId, true);
+            window.scrollTo({ top: 0, behavior: 'smooth' });
         }
 
         function updateDateTime() {
@@ -268,7 +295,7 @@ $nwActiveNav = 'dashboard';
         async function loadReports() {
             const container = document.getElementById('reportsContainer');
             try {
-                const response = await fetch('api/nw_incidents.php');
+                const response = await fetch('api/neighborhood-watcher-incidents.php');
                 const result = await response.json();
                 if (!result.success) {
                     container.innerHTML = '<div class="empty-state"><i class="fas fa-exclamation-circle"></i>' + escapeHtml(result.message || 'Failed to load reports.') + '</div>';
@@ -314,7 +341,7 @@ $nwActiveNav = 'dashboard';
             }
 
             try {
-                const response = await fetch('api/nw_incidents.php', {
+                const response = await fetch('api/neighborhood-watcher-incidents.php', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -331,7 +358,7 @@ $nwActiveNav = 'dashboard';
                     photoDataUrl = null;
                     document.getElementById('photoPreview').innerHTML = '';
                     showReportAlert(result.message || 'Report submitted successfully.', false);
-                    loadReports();
+                    showPortalSection('reportsSection', true);
                 } else {
                     showReportAlert(result.message || 'Failed to submit report.', true);
                 }
@@ -348,12 +375,29 @@ $nwActiveNav = 'dashboard';
             }
             updateDateTime();
             setInterval(updateDateTime, 1000);
-            loadReports();
 
-            if (window.location.hash === '#reportsSection') {
-                scrollToSection('reportsSection');
-            }
+            document.querySelectorAll('.nav-submodule[data-section]').forEach((link) => {
+                link.addEventListener('click', function(event) {
+                    event.preventDefault();
+                    const sectionId = this.getAttribute('data-section');
+                    showPortalSection(sectionId, true);
+                    if (window.innerWidth <= 768 && typeof window.closeMobileSidebar === 'function') {
+                        window.closeMobileSidebar();
+                    } else if (window.innerWidth <= 768) {
+                        sidebar.classList.remove('mobile-open');
+                    }
+                });
+            });
+
+            window.addEventListener('hashchange', function() {
+                const hash = window.location.hash.replace('#', '');
+                showPortalSection(hash === 'reportsSection' ? 'reportsSection' : 'reportSection', false);
+            });
+
+            const initialHash = window.location.hash.replace('#', '');
+            showPortalSection(initialHash === 'reportsSection' ? 'reportsSection' : 'reportSection', false);
         });
     </script>
+    <script src="js/mobile-shell.js"></script>
 </body>
 </html>

@@ -8,7 +8,7 @@ if (!function_exists('getNeighborhoodWatchNavPage')) {
         }
 
         $base = basename($_SERVER['PHP_SELF'] ?? '');
-        if ($base === 'review-nw-incidents.php') {
+        if ($base === 'review-neighborhood-watcher-incidents.php') {
             return 'incidents';
         }
         if ($base === 'neighborhood-watch-member-list.php') {
@@ -33,7 +33,7 @@ $nwNavPage = getNeighborhoodWatchNavPage();
                         <span class="nav-submodule-icon"><i class="fas fa-user-check"></i></span>
                         <span class="nav-submodule-text">Member List</span>
                     </a>
-                    <a href="review-nw-incidents.php" class="nav-submodule <?php echo $nwNavPage === 'incidents' ? 'active' : ''; ?>" data-tooltip="Member Incident Reports">
+                    <a href="review-neighborhood-watcher-incidents.php" class="nav-submodule <?php echo $nwNavPage === 'incidents' ? 'active' : ''; ?>" data-tooltip="Member Incident Reports">
                         <span class="nav-submodule-icon"><i class="fas fa-exclamation-circle"></i></span>
                         <span class="nav-submodule-text">Member Incident Reports</span>
                     </a>

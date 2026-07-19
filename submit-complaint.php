@@ -13,7 +13,7 @@ require_once __DIR__ . '/db.php';
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Submit Complaint - Alertara</title>
     <link rel="icon" type="image/x-icon" href="images/favicon.ico">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -1107,6 +1107,7 @@ require_once __DIR__ . '/db.php';
             }
         }
     </style>
+    <link rel="stylesheet" href="css/mobile-responsive.css">
 </head>
 <body>
     <!-- Sidebar Navigation -->
@@ -1602,6 +1603,7 @@ require_once __DIR__ . '/db.php';
         setInterval(updateDateTime, 1000);
     </script>
     <?php require __DIR__ . '/includes/admin_notifications_script.php'; ?>
+    <script src="js/mobile-shell.js"></script>
 </body>
 </html>
 

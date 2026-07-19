@@ -15,7 +15,7 @@ $cctvNavActive = 'cctv-request';
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>CCTV Request - Alertara</title>
     <link rel="icon" type="image/x-icon" href="images/favicon.ico">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -268,6 +268,7 @@ $cctvNavActive = 'cctv-request';
             .date-filter input[type="date"] { flex: 1; }
         }
     </style>
+    <link rel="stylesheet" href="css/mobile-responsive.css">
 </head>
 <body>
     <aside class="sidebar" id="sidebar">
@@ -883,5 +884,6 @@ $cctvNavActive = 'cctv-request';
         }
     </script>
     <?php require __DIR__ . '/includes/admin_notifications_script.php'; ?>
+    <script src="js/mobile-shell.js"></script>
 </body>
 </html>

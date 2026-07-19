@@ -131,50 +131,65 @@ function renderLoginOtpForm(string $cancelUrl, ?string $emailMasked, ?string $ex
 function loadMailConfigFromEnv(): array
 {
     $config = [
-        'host' => $_ENV['MAIL_HOST'] ?? 'smtp.resend.com',
-        'port' => (int) ($_ENV['MAIL_PORT'] ?? 465),
-        'username' => $_ENV['MAIL_USERNAME'] ?? '',
-        'password' => $_ENV['MAIL_PASSWORD'] ?? '',
-        'from' => $_ENV['MAIL_FROM_ADDRESS'] ?? '',
-        'from_name' => $_ENV['MAIL_FROM_NAME'] ?? 'AlerTara QC',
-        'encryption' => $_ENV['MAIL_ENCRYPTION'] ?? 'ssl',
+        'host' => $_ENV['MAIL_HOST'] ?? getenv('MAIL_HOST') ?: 'smtp.resend.com',
+        'port' => (int) ($_ENV['MAIL_PORT'] ?? getenv('MAIL_PORT') ?: 465),
+        'username' => (string) ($_ENV['MAIL_USERNAME'] ?? getenv('MAIL_USERNAME') ?: ''),
+        'password' => (string) ($_ENV['MAIL_PASSWORD'] ?? getenv('MAIL_PASSWORD') ?: ''),
+        'from' => (string) ($_ENV['MAIL_FROM_ADDRESS'] ?? getenv('MAIL_FROM_ADDRESS') ?: ''),
+        'from_name' => (string) ($_ENV['MAIL_FROM_NAME'] ?? getenv('MAIL_FROM_NAME') ?: 'AlerTara QC'),
+        'encryption' => (string) ($_ENV['MAIL_ENCRYPTION'] ?? getenv('MAIL_ENCRYPTION') ?: 'ssl'),
     ];
 
-    if ($config['username'] === '' || $config['password'] === '') {
-        $envPath = dirname(__DIR__) . DIRECTORY_SEPARATOR . '.env';
-        if (file_exists($envPath)) {
-            $lines = file($envPath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-            foreach ($lines as $line) {
-                if (strpos(trim($line), '#') === 0) {
-                    continue;
-                }
-                if (strpos($line, '=') === false) {
-                    continue;
-                }
-                [$key, $value] = explode('=', $line, 2);
-                $key = trim($key);
-                $value = trim(trim($value), '"\'');
-                if ($key === 'MAIL_USERNAME' && $config['username'] === '') {
-                    $config['username'] = $value;
-                }
-                if ($key === 'MAIL_PASSWORD' && $config['password'] === '') {
-                    $config['password'] = $value;
-                }
-                if ($key === 'MAIL_HOST' && empty($_ENV['MAIL_HOST'])) {
-                    $config['host'] = $value;
-                }
-                if ($key === 'MAIL_PORT' && empty($_ENV['MAIL_PORT'])) {
-                    $config['port'] = (int) $value;
-                }
-                if ($key === 'MAIL_FROM_ADDRESS' && $config['from'] === '') {
-                    $config['from'] = $value;
-                }
-                if ($key === 'MAIL_FROM_NAME' && empty($_ENV['MAIL_FROM_NAME'])) {
-                    $config['from_name'] = $value;
-                }
-                if ($key === 'MAIL_ENCRYPTION' && empty($_ENV['MAIL_ENCRYPTION'])) {
-                    $config['encryption'] = $value;
-                }
+    // Always merge from .env so Apache/CLI both use the project mail settings.
+    $envPath = dirname(__DIR__) . DIRECTORY_SEPARATOR . '.env';
+    if (file_exists($envPath)) {
+        $lines = file($envPath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+        foreach ($lines as $line) {
+            $line = trim($line);
+            if ($line === '' || strpos($line, '#') === 0 || strpos($line, '=') === false) {
+                continue;
+            }
+            [$key, $value] = explode('=', $line, 2);
+            $key = trim($key);
+            $value = trim($value);
+            if ($value !== '' && ($value[0] === '"' || $value[0] === "'")) {
+                $value = trim($value, "\"'");
+            }
+
+            switch ($key) {
+                case 'MAIL_HOST':
+                    $config['host'] = $value !== '' ? $value : $config['host'];
+                    break;
+                case 'MAIL_PORT':
+                    if ($value !== '') {
+                        $config['port'] = (int) $value;
+                    }
+                    break;
+                case 'MAIL_USERNAME':
+                    if ($value !== '') {
+                        $config['username'] = $value;
+                    }
+                    break;
+                case 'MAIL_PASSWORD':
+                    if ($value !== '') {
+                        $config['password'] = $value;
+                    }
+                    break;
+                case 'MAIL_FROM_ADDRESS':
+                    if ($value !== '') {
+                        $config['from'] = $value;
+                    }
+                    break;
+                case 'MAIL_FROM_NAME':
+                    if ($value !== '') {
+                        $config['from_name'] = $value;
+                    }
+                    break;
+                case 'MAIL_ENCRYPTION':
+                    if ($value !== '') {
+                        $config['encryption'] = $value;
+                    }
+                    break;
             }
         }
     }
@@ -184,6 +199,78 @@ function loadMailConfigFromEnv(): array
     }
 
     return $config;
+}
+
+/**
+ * @return array{success:bool,error:?string}
+ */
+function sendSmtpHtmlMail(string $toEmail, string $subject, string $htmlBody): array
+{
+    $mailConfig = loadMailConfigFromEnv();
+
+    if ($mailConfig['username'] === '' || $mailConfig['password'] === '' || trim($toEmail) === '') {
+        $error = 'Email credentials or recipient email not set.';
+        error_log('SMTP mail failed: ' . $error);
+        return ['success' => false, 'error' => $error];
+    }
+
+    if (!class_exists('PHPMailer\\PHPMailer\\PHPMailer')) {
+        $autoload = dirname(__DIR__) . '/vendor/autoload.php';
+        if (file_exists($autoload)) {
+            require_once $autoload;
+        }
+    }
+
+    if (class_exists('PHPMailer\\PHPMailer\\PHPMailer')) {
+        $mail = null;
+        try {
+            $mail = new \PHPMailer\PHPMailer\PHPMailer(true);
+            $mail->isSMTP();
+            $mail->Host = $mailConfig['host'];
+            $mail->SMTPAuth = true;
+            $mail->Username = $mailConfig['username'];
+            $mail->Password = $mailConfig['password'];
+            if ($mailConfig['port'] === 587 || strtolower($mailConfig['encryption']) === 'tls') {
+                $mail->SMTPSecure = \PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_STARTTLS;
+            } else {
+                $mail->SMTPSecure = \PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_SMTPS;
+            }
+            $mail->Port = $mailConfig['port'];
+            $mail->CharSet = 'UTF-8';
+            $mail->Timeout = 30;
+            $mail->SMTPOptions = [
+                'ssl' => [
+                    'verify_peer' => false,
+                    'verify_peer_name' => false,
+                    'allow_self_signed' => true,
+                ],
+            ];
+
+            $mail->setFrom($mailConfig['from'], $mailConfig['from_name']);
+            $mail->addAddress($toEmail);
+            $mail->isHTML(true);
+            $mail->Subject = $subject;
+            $mail->Body = $htmlBody;
+            $mail->AltBody = trim(html_entity_decode(strip_tags(str_replace(['<br>', '<br/>', '<br />'], "\n", $htmlBody)), ENT_QUOTES, 'UTF-8'));
+            $mail->send();
+            error_log('SMTP mail sent successfully to ' . $toEmail . ' subject=' . $subject);
+            return ['success' => true, 'error' => null];
+        } catch (Throwable $e) {
+            $error = $mail && !empty($mail->ErrorInfo) ? $mail->ErrorInfo : $e->getMessage();
+            error_log('SMTP mail send failed: ' . $error);
+            return ['success' => false, 'error' => $error];
+        }
+    }
+
+    $headers = "MIME-Version: 1.0\r\nContent-Type: text/html; charset=UTF-8\r\nFrom: {$mailConfig['from_name']} <{$mailConfig['from']}>\r\n";
+    $ok = @mail($toEmail, $subject, $htmlBody, $headers);
+    if (!$ok) {
+        $error = 'PHP mail() failed. Configure SMTP/PHPMailer.';
+        error_log('SMTP mail failed: ' . $error);
+        return ['success' => false, 'error' => $error];
+    }
+
+    return ['success' => true, 'error' => null];
 }
 
 function sendLoginOTPEmail(string $email, string $username, string $otp, string $portal = 'admin'): bool

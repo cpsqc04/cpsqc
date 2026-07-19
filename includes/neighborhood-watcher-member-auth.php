@@ -19,7 +19,7 @@ function isNwMemberLoggedIn(): bool
 function requireNwMemberLogin(): void
 {
     if (!isNwMemberLoggedIn()) {
-        header('Location: nw-login.php');
+        header('Location: neighborhood-watcher-login.php');
         exit;
     }
 }
@@ -51,8 +51,8 @@ function nwMemberMustChangePassword(): bool
 function requireNwMemberPasswordChanged(): void
 {
     requireNwMemberLogin();
-    if (nwMemberMustChangePassword()) {
-        header('Location: nw-change-password.php');
+    if (nwMemberMustChangePassword() || !empty($_SESSION['pending_nw_password_change_otp'])) {
+        header('Location: neighborhood-watcher-login.php');
         exit;
     }
 }

@@ -146,7 +146,7 @@ cpsqc-main/
 ├── detect.py            # Optional CCTV detection (local)
 ├── login.php            # Admin login
 ├── bpso-dashboard.php   # BPSO portal
-├── nw-dashboard.php     # Neighborhood Watch portal
+├── neighborhood-watcher-dashboard.php     # Neighborhood Watch portal
 ├── patrol-schedule.php  # Patrol assignments + high-risk areas
 └── README.md
 ```

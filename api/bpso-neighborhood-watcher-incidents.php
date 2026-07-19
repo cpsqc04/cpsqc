@@ -3,7 +3,7 @@ session_start();
 header('Content-Type: application/json');
 
 require_once __DIR__ . '/../db.php';
-require_once __DIR__ . '/nw_incidents_schema.php';
+require_once __DIR__ . '/neighborhood-watcher-incidents-schema.php';
 require_once __DIR__ . '/../includes/bpso_auth.php';
 
 try {

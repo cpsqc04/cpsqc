@@ -12,7 +12,21 @@ function volunteerMediaPublicPath(string $filename): string
 
 function volunteerMediaIsDataUrl(?string $value): bool
 {
-    return is_string($value) && str_starts_with($value, 'data:image/');
+    return is_string($value) && (
+        str_starts_with($value, 'data:image/') ||
+        str_starts_with($value, 'data:application/pdf')
+    );
+}
+
+function volunteerMediaIsPdfPath(?string $value): bool
+{
+    if (!is_string($value) || $value === '') {
+        return false;
+    }
+    if (str_starts_with($value, 'data:application/pdf')) {
+        return true;
+    }
+    return (bool) preg_match('/\.pdf($|\?)/i', $value);
 }
 
 function volunteerMediaOptimizeBinary(string $binary): string
@@ -59,8 +73,36 @@ function volunteerMediaStore(?string $value, string $type, int $memberId): ?stri
         return $value;
     }
 
+    $dir = volunteerMediaDirectory();
+    if (!is_dir($dir) && !mkdir($dir, 0755, true) && !is_dir($dir)) {
+        throw new RuntimeException('Unable to create upload directory.');
+    }
+
+    $safeType = preg_replace('/[^a-z0-9_]+/i', '_', $type);
+
+    if (preg_match('#^data:application/pdf;base64,(.+)$#i', $value, $matches)) {
+        $binary = base64_decode($matches[1], true);
+        if ($binary === false) {
+            throw new RuntimeException('Invalid PDF data.');
+        }
+        if (strlen($binary) > 10 * 1024 * 1024) {
+            throw new RuntimeException('PDF file is too large. Please upload files 10 MB or below.');
+        }
+        // Basic PDF signature check
+        if (!str_starts_with($binary, '%PDF')) {
+            throw new RuntimeException('Invalid PDF format.');
+        }
+
+        $filename = sprintf('member_%d_%s.pdf', $memberId, $safeType);
+        $fullPath = $dir . DIRECTORY_SEPARATOR . $filename;
+        if (file_put_contents($fullPath, $binary) === false) {
+            throw new RuntimeException('Failed to save uploaded PDF.');
+        }
+        return volunteerMediaPublicPath($filename);
+    }
+
     if (!preg_match('#^data:image/(jpeg|jpg|png|gif|webp);base64,(.+)$#i', $value, $matches)) {
-        throw new RuntimeException('Invalid image format. Please upload JPG or PNG images.');
+        throw new RuntimeException('Invalid image format. Please upload JPG, PNG, or PDF files.');
     }
 
     $binary = base64_decode($matches[2], true);
@@ -68,18 +110,13 @@ function volunteerMediaStore(?string $value, string $type, int $memberId): ?stri
         throw new RuntimeException('Invalid image data.');
     }
 
-    if (strlen($binary) > 5 * 1024 * 1024) {
-        throw new RuntimeException('Image file is too large. Please upload images 5 MB or below.');
+    if (strlen($binary) > 10 * 1024 * 1024) {
+        throw new RuntimeException('Image file is too large. Please upload images 10 MB or below.');
     }
 
     $binary = volunteerMediaOptimizeBinary($binary);
 
-    $dir = volunteerMediaDirectory();
-    if (!is_dir($dir) && !mkdir($dir, 0755, true) && !is_dir($dir)) {
-        throw new RuntimeException('Unable to create upload directory.');
-    }
-
-    $filename = sprintf('member_%d_%s.jpg', $memberId, preg_replace('/[^a-z0-9_]+/i', '_', $type));
+    $filename = sprintf('member_%d_%s.jpg', $memberId, $safeType);
     $fullPath = $dir . DIRECTORY_SEPARATOR . $filename;
 
     if (file_put_contents($fullPath, $binary) === false) {

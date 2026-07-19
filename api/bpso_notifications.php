@@ -5,7 +5,7 @@ require_once __DIR__ . '/../includes/bpso_auth.php';
 require_once __DIR__ . '/../db.php';
 require_once __DIR__ . '/patrol_schedules_schema.php';
 require_once __DIR__ . '/complaints_schema.php';
-require_once __DIR__ . '/nw_incidents_schema.php';
+require_once __DIR__ . '/neighborhood-watcher-incidents-schema.php';
 require_once __DIR__ . '/notifications_schema.php';
 
 if (!function_exists('getTimeAgo')) {

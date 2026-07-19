@@ -169,7 +169,7 @@ function sendAccountLockEmail($email, $username, $lockedUntil) {
                     .warning-box { background: #fef2f2; border-left: 4px solid #ef4444; padding: 15px; margin: 20px 0; border-radius: 4px; }
                     .footer { background: #f5f5f5; padding: 15px 20px; text-align: center; color: #999; font-size: 11px; }
                 </style>
-            </head>
+</head>
             <body>
                 <div class='email-container'>
                     <div class='header'>
@@ -297,7 +297,7 @@ function sendLoginSuccessEmail($email, $username, $loginTime, $ipAddress) {
                     .btn { display: inline-block; padding: 12px 24px; background: #4c8a89; color: white; text-decoration: none; border-radius: 6px; margin-top: 10px; }
                     .footer { background: #f5f5f5; padding: 15px 20px; text-align: center; color: #999; font-size: 11px; }
                 </style>
-            </head>
+</head>
             <body>
                 <div class='email-container'>
                     <div class='header'>
@@ -741,7 +741,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
             }
             } else {
-                $error = 'Invalid email or password';
+                $error = 'This email is not registered. Please contact the administrator.';
             }
         }
     }
@@ -1704,6 +1704,7 @@ $autoOpenLogin = !empty($showOtpForm) || isset($error) || isset($_SESSION['regis
             .section-label { letter-spacing: 0.14em; }
         }
     </style>
+    <link rel="stylesheet" href="css/mobile-responsive.css">
 </head>
 <body>
     <div class="progress-bar" id="progressBar" aria-hidden="true"></div>
@@ -1788,7 +1789,7 @@ $autoOpenLogin = !empty($showOtpForm) || isset($error) || isset($_SESSION['regis
                             <li>Track neighborhood watch updates</li>
                             <li>Support early community awareness</li>
                         </ul>
-                        <a class="btn" href="nw-login.php">Visit</a>
+                        <a class="btn" href="neighborhood-watcher-login.php">Visit</a>
                     </article>
                     <article class="role-card reveal reveal-delay-2">
                         <div class="role-icon" aria-hidden="true"><i class="fas fa-route"></i></div>

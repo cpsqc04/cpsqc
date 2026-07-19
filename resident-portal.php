@@ -10,6 +10,7 @@ $autoOpenLogin = false;
     <link rel="icon" type="image/x-icon" href="images/favicon.ico">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="css/portal-landing.css">
+    <link rel="stylesheet" href="css/mobile-responsive.css">
 </head>
 <body>
     <div class="progress-bar" id="progressBar" aria-hidden="true"></div>
@@ -267,7 +268,7 @@ $autoOpenLogin = false;
                 <div class="field">
                     <label for="tipPhoto">Photo *</label>
                     <input id="tipPhoto" name="photo" type="file" accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp" required onchange="previewResidentImage(this, 'tipPhotoPreview')">
-                    <p class="field-hint">JPG or PNG, 5 MB or below.</p>
+                    <p class="field-hint">JPG or PNG, 10 MB or below.</p>
                     <div id="tipPhotoPreview" class="file-preview"></div>
                 </div>
                 <div class="field">

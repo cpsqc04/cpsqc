@@ -23,5 +23,5 @@ function getAppBaseUrl(): string
 
 function getNwMemberPortalUrl(): string
 {
-    return getAppBaseUrl() . '/nw-login.php';
+    return getAppBaseUrl() . '/neighborhood-watcher-login.php';
 }

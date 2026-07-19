@@ -375,6 +375,9 @@ $autoOpenLogin = !empty($autoOpenLogin);
             if (event.target === document.getElementById('registerModal') && typeof closeRegisterModal === 'function') {
                 closeRegisterModal();
             }
+            if (event.target === document.getElementById('eligibilityModal') && typeof closeEligibilityModal === 'function') {
+                closeEligibilityModal();
+            }
             if (event.target === document.getElementById('registrationSuccessModal') && typeof closeRegistrationSuccessModal === 'function') {
                 closeRegistrationSuccessModal();
             }
@@ -386,6 +389,7 @@ $autoOpenLogin = !empty($autoOpenLogin);
                 closeForgotPasswordModal();
                 closeSuccessModal();
                 if (typeof closeRegisterModal === 'function') closeRegisterModal();
+                if (typeof closeEligibilityModal === 'function') closeEligibilityModal();
                 if (typeof closeRegistrationSuccessModal === 'function') closeRegistrationSuccessModal();
             }
         });

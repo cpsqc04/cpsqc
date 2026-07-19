@@ -22,7 +22,7 @@ $nwSearchPlaceholder = $nwIsMemberList
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title><?php echo htmlspecialchars($nwPageTitle); ?> - Alertara</title>
     <link rel="icon" type="image/x-icon" href="images/favicon.ico">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -404,6 +404,68 @@ $nwSearchPlaceholder = $nwIsMemberList
         .btn-approve:hover { background: #047857; }
         .btn-reject { padding: 0.75rem 1.5rem; border: none; border-radius: 8px; font-size: 0.95rem; font-weight: 600; cursor: pointer; background: #dc3545; color: #fff; transition: all 0.2s ease; }
         .btn-reject:hover { background: #c82333; }
+        .btn-reject-cancel { padding: 0.75rem 1.5rem; border: 1px solid var(--border-color); border-radius: 8px; font-size: 0.95rem; font-weight: 600; cursor: pointer; background: #fff; color: var(--text-color); }
+        .btn-reject-cancel:hover { background: #f3f4f6; }
+        .reject-form-panel {
+            display: none;
+            width: 100%;
+            margin-top: 0.25rem;
+            padding: 1rem;
+            border: 1px solid #fecaca;
+            border-radius: 10px;
+            background: #fff5f5;
+        }
+        .reject-form-panel.active { display: block; }
+        .reject-form-panel label {
+            display: block;
+            font-weight: 600;
+            font-size: 0.9rem;
+            margin-bottom: 0.4rem;
+            color: var(--text-color);
+        }
+        .reject-form-panel select,
+        .reject-form-panel textarea {
+            width: 100%;
+            padding: 0.65rem 0.75rem;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            font: inherit;
+            margin-bottom: 0.9rem;
+            background: #fff;
+        }
+        .reject-form-panel textarea { min-height: 90px; resize: vertical; }
+        .reject-form-actions { display: flex; gap: 0.75rem; justify-content: flex-end; flex-wrap: wrap; }
+        .eligibility-review-list {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+            display: grid;
+            gap: 0.65rem;
+        }
+        .eligibility-review-item {
+            display: flex;
+            justify-content: space-between;
+            gap: 1rem;
+            align-items: flex-start;
+            padding: 0.65rem 0.75rem;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            background: #f8fafc;
+        }
+        .eligibility-review-item span:first-child {
+            color: var(--text-color);
+            font-size: 0.9rem;
+            line-height: 1.4;
+        }
+        .eligibility-answer {
+            flex-shrink: 0;
+            font-weight: 700;
+            font-size: 0.85rem;
+            padding: 0.2rem 0.55rem;
+            border-radius: 999px;
+        }
+        .eligibility-answer.yes { background: #d1e7dd; color: #0f5132; }
+        .eligibility-answer.no { background: #f8d7da; color: #842029; }
         .review-actions { display: flex; gap: 1rem; justify-content: flex-end; margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid var(--border-color); }
         .review-photo-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 1rem; }
         .review-photo-card { display: flex; flex-direction: column; gap: 0.5rem; }
@@ -417,6 +479,7 @@ $nwSearchPlaceholder = $nwIsMemberList
         .detail-row.inline .detail-label { min-width: 120px; }
         @media (max-width: 768px) { .sidebar { width: 320px; transform: translateX(-100%); transition: transform 0.3s ease; } .sidebar.mobile-open { transform: translateX(0); } .sidebar.collapsed { width: 80px; transform: translateX(0); } .main-wrapper { margin-left: 0; } body.sidebar-collapsed .main-wrapper { margin-left: 80px; } .toolbar { flex-direction: column; } .search-box { width: 100%; } .form-row { grid-template-columns: 1fr; } }
     </style>
+    <link rel="stylesheet" href="css/mobile-responsive.css">
 </head>
 <body>
     <aside class="sidebar" id="sidebar">
@@ -589,7 +652,10 @@ $nwSearchPlaceholder = $nwIsMemberList
                     <table id="membersTable">
                         <thead>
                             <tr>
-                                <th>Name</th>
+                                <th>First Name</th>
+                                <th>Last Name</th>
+                                <th>Gender</th>
+                                <th>Marital Status</th>
                                 <th>Contact</th>
                                 <th>Status</th>
                                 <th>Actions</th>
@@ -784,13 +850,37 @@ $nwSearchPlaceholder = $nwIsMemberList
             <div id="memberDetails" class="complaint-details">
                 <!-- Details will be populated by JavaScript -->
             </div>
-            <div id="reviewMemberActions" class="review-actions" style="display: none;">
-                <button type="button" class="btn-reject" onclick="reviewDecision('reject')">
-                    <i class="fas fa-times"></i> Reject
-                </button>
-                <button type="button" class="btn-approve" onclick="reviewDecision('approve')">
-                    <i class="fas fa-check"></i> Approve
-                </button>
+            <div id="reviewMemberActions" class="review-actions" style="display: none; flex-direction: column; align-items: stretch;">
+                <div id="rejectFormPanel" class="reject-form-panel">
+                    <label for="rejectionReason">Reason of Rejection *</label>
+                    <select id="rejectionReason">
+                        <option value="">Select a reason</option>
+                        <option value="Maximum of slots reached">Maximum of slots reached</option>
+                        <option value="Incomplete document requirements">Incomplete document requirements</option>
+                        <option value="Discrepancy in residency requirements">Discrepancy in residency requirements</option>
+                    </select>
+                    <label for="rejectionNotes">Notes</label>
+                    <textarea id="rejectionNotes" placeholder="Add optional notes for this rejection"></textarea>
+                    <div class="reject-form-actions">
+                        <button type="button" class="btn-reject-cancel" onclick="cancelRejectForm()">Cancel</button>
+                        <button type="button" class="btn-reject" onclick="confirmRejectApplication()">
+                            <i class="fas fa-times"></i> Confirm Reject
+                        </button>
+                    </div>
+                </div>
+                <div id="reviewDecisionButtons" style="display: flex; gap: 1rem; justify-content: flex-end; width: 100%; flex-wrap: wrap;">
+                    <button type="button" class="btn-reject" onclick="showRejectForm()">
+                        <i class="fas fa-times"></i> Reject
+                    </button>
+                    <button type="button" class="btn-approve" onclick="reviewDecision('approve')">
+                        <i class="fas fa-check"></i> Approve
+                    </button>
+                </div>
+                <div id="rejectedEmailActions" style="display: none; gap: 1rem; justify-content: flex-end; width: 100%;">
+                    <button type="button" class="btn-approve" style="background:#4c8a89;" onclick="resendRejectionEmail()">
+                        <i class="fas fa-envelope"></i> Resend Rejection Email
+                    </button>
+                </div>
             </div>
         </div>
     </div>
@@ -914,7 +1004,7 @@ $nwSearchPlaceholder = $nwIsMemberList
         // Load Members from database
         async function loadMembers() {
             try {
-                const response = await fetch('api/nw_members.php');
+                const response = await fetch('api/neighborhood-watcher-members.php');
                 const result = await response.json();
                 
                 if (!result.success) {
@@ -1090,7 +1180,7 @@ $nwSearchPlaceholder = $nwIsMemberList
                     emergency_contact_number: emergencyContact
                 };
                 
-                fetch('api/nw_members.php', {
+                fetch('api/neighborhood-watcher-members.php', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -1144,7 +1234,10 @@ $nwSearchPlaceholder = $nwIsMemberList
             const primaryActionLabel = NW_PAGE_MODE === 'members' ? 'View' : 'Review';
             
             row.innerHTML = `
-                <td>${member.name || ''}</td>
+                <td>${member.first_name || ''}</td>
+                <td>${member.last_name || ''}</td>
+                <td>${member.gender || '—'}</td>
+                <td>${member.marital_status || '—'}</td>
                 <td>${member.contact || ''}</td>
                 <td><span class="status-badge ${statusClass}">${member.status || 'Pending'}</span></td>
                 <td>
@@ -1158,13 +1251,102 @@ $nwSearchPlaceholder = $nwIsMemberList
             tbody.appendChild(row);
         }
         
-        function loadMemberActivities() {
-            try {
-                const raw = localStorage.getItem('memberActivities') || localStorage.getItem('volunteerActivities');
-                return raw ? JSON.parse(raw) : [];
-            } catch (e) {
-                console.error('Failed to load member activities', e);
-                return [];
+        function formatApplicantBirthday(value) {
+            if (!value) return '';
+            const raw = String(value).trim();
+            const isoMatch = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+            if (isoMatch) {
+                return `${isoMatch[2]}/${isoMatch[3]}/${isoMatch[1]}`;
+            }
+            return raw;
+        }
+
+        const ELIGIBILITY_CRITERIA_LABELS = {
+            eligibility_1: 'I am a Filipino Citizen.',
+            eligibility_2: 'I am Barangay San Agustin Resident.',
+            eligibility_3: 'I have been a resident of Barangay San Agustin for at least six (6) months.',
+            eligibility_4: 'I am a registered voter in Barangay San Agustin.',
+            eligibility_5: 'I am between 18 and 60 years old.',
+            eligibility_6: 'I can read and write in Tagalog o English.'
+        };
+
+        function parseEligibilityAnswers(raw) {
+            if (!raw) return null;
+            if (typeof raw === 'object' && !Array.isArray(raw)) return raw;
+            if (typeof raw === 'string') {
+                try {
+                    const parsed = JSON.parse(raw);
+                    return parsed && typeof parsed === 'object' ? parsed : null;
+                } catch (e) {
+                    return null;
+                }
+            }
+            return null;
+        }
+
+        function buildEligibilityReviewHtml(member) {
+            const answers = parseEligibilityAnswers(member.eligibility_answers);
+            if (!answers) {
+                return `
+                <div class="detail-row">
+                    <span class="detail-label">Eligibility Criteria:</span>
+                    <span class="detail-value" style="color: var(--text-secondary); font-style: italic;">No eligibility answers recorded</span>
+                </div>
+                `;
+            }
+
+            const items = Object.keys(ELIGIBILITY_CRITERIA_LABELS).map((key) => {
+                const answer = String(answers[key] || '').toLowerCase();
+                const answerLabel = answer === 'yes' ? 'Yes' : (answer === 'no' ? 'No' : '—');
+                const answerClass = answer === 'yes' ? 'yes' : (answer === 'no' ? 'no' : '');
+                return `
+                    <li class="eligibility-review-item">
+                        <span>${ELIGIBILITY_CRITERIA_LABELS[key]}</span>
+                        <span class="eligibility-answer ${answerClass}">${answerLabel}</span>
+                    </li>
+                `;
+            }).join('');
+
+            return `
+                <div class="detail-row">
+                    <span class="detail-label">Eligibility Criteria Answers:</span>
+                    <div class="detail-value">
+                        <ul class="eligibility-review-list">${items}</ul>
+                    </div>
+                </div>
+            `;
+        }
+
+        function resetRejectForm() {
+            const panel = document.getElementById('rejectFormPanel');
+            const buttons = document.getElementById('reviewDecisionButtons');
+            const rejectedActions = document.getElementById('rejectedEmailActions');
+            const reason = document.getElementById('rejectionReason');
+            const notes = document.getElementById('rejectionNotes');
+            if (panel) panel.classList.remove('active');
+            if (buttons) buttons.style.display = 'flex';
+            if (rejectedActions) rejectedActions.style.display = 'none';
+            if (reason) reason.value = '';
+            if (notes) notes.value = '';
+        }
+
+        function showRejectForm() {
+            const panel = document.getElementById('rejectFormPanel');
+            const buttons = document.getElementById('reviewDecisionButtons');
+            const rejectedActions = document.getElementById('rejectedEmailActions');
+            if (panel) panel.classList.add('active');
+            if (buttons) buttons.style.display = 'none';
+            if (rejectedActions) rejectedActions.style.display = 'none';
+        }
+
+        function cancelRejectForm() {
+            const member = currentReviewMemberId ? memberData[currentReviewMemberId] : null;
+            resetRejectForm();
+            if (member && member.status === 'Rejected') {
+                const rejectedActions = document.getElementById('rejectedEmailActions');
+                const buttons = document.getElementById('reviewDecisionButtons');
+                if (buttons) buttons.style.display = 'none';
+                if (rejectedActions) rejectedActions.style.display = 'flex';
             }
         }
 
@@ -1182,23 +1364,64 @@ $nwSearchPlaceholder = $nwIsMemberList
             const statusClass = getStatusBadgeClass(member.status);
             const modalTitle = NW_PAGE_MODE === 'members' ? 'Member Details' : 'Review Application';
             document.querySelector('#reviewMemberModal .modal-header h2').textContent = modalTitle;
-            const activities = loadMemberActivities().filter(a => String(a.memberId ?? a.volunteerId) === String(id));
+            const birthdayDisplay = formatApplicantBirthday(member.birthday);
+            resetRejectForm();
 
-            let detailsHTML = `
+            detailsContainer.innerHTML = `
                 <div class="detail-row inline">
-                    <span class="detail-label">Name:</span>
-                    <span class="detail-value"><strong>${member.name}</strong></span>
+                    <span class="detail-label">First Name:</span>
+                    <span class="detail-value"><strong>${member.first_name || ''}</strong></span>
                 </div>
+                <div class="detail-row inline">
+                    <span class="detail-label">Last Name:</span>
+                    <span class="detail-value"><strong>${member.last_name || ''}</strong></span>
+                </div>
+                ${member.middle_name ? `
+                <div class="detail-row inline">
+                    <span class="detail-label">Middle Name:</span>
+                    <span class="detail-value">${member.middle_name}</span>
+                </div>
+                ` : ''}
 
                 <div class="detail-row inline">
                     <span class="detail-label">Status:</span>
-                    <span class="status-badge ${statusClass}">${member.status}</span>
+                    <span class="status-badge ${statusClass}">${member.status || ''}</span>
                 </div>
 
+                ${member.gender ? `
+                <div class="detail-row">
+                    <span class="detail-label">Gender:</span>
+                    <span class="detail-value">${member.gender}</span>
+                </div>
+                ` : ''}
+
+                ${member.marital_status ? `
+                <div class="detail-row">
+                    <span class="detail-label">Marital Status:</span>
+                    <span class="detail-value">${member.marital_status}</span>
+                </div>
+                ` : ''}
+
+                ${birthdayDisplay ? `
+                <div class="detail-row">
+                    <span class="detail-label">Birthday:</span>
+                    <span class="detail-value">${birthdayDisplay}</span>
+                </div>
+                ` : ''}
+
+                ${member.id_number ? `
+                <div class="detail-row">
+                    <span class="detail-label">ID Number:</span>
+                    <span class="detail-value">${member.id_number}</span>
+                </div>
+                ` : ''}
+
+                ${member.contact ? `
                 <div class="detail-row">
                     <span class="detail-label">Contact Number:</span>
                     <span class="detail-value">${member.contact}</span>
                 </div>
+                ` : ''}
 
                 ${member.email ? `
                 <div class="detail-row">
@@ -1207,10 +1430,19 @@ $nwSearchPlaceholder = $nwIsMemberList
                 </div>
                 ` : ''}
 
-                ${member.address ? `
+                ${member.address || member.address_unit_street ? `
                 <div class="detail-row">
                     <span class="detail-label">Home Address:</span>
-                    <span class="detail-value">${member.address}</span>
+                    <span class="detail-value">
+                        ${member.address_unit_street || member.address_subdivision || member.address_barangay ? `
+                            ${member.address_unit_street ? `<div><strong>Unit/House & Street:</strong> ${member.address_unit_street}</div>` : ''}
+                            ${member.address_subdivision ? `<div><strong>Subdivision:</strong> ${member.address_subdivision}</div>` : ''}
+                            ${member.address_barangay ? `<div><strong>Barangay:</strong> ${member.address_barangay}</div>` : ''}
+                            ${member.address_city ? `<div><strong>City/Municipality:</strong> ${member.address_city}</div>` : ''}
+                            ${member.address_postal_code ? `<div><strong>Postal Code:</strong> ${member.address_postal_code}</div>` : ''}
+                            ${member.address_country ? `<div><strong>Country:</strong> ${member.address_country}</div>` : ''}
+                        ` : (member.address || '')}
+                    </span>
                 </div>
                 ` : ''}
 
@@ -1223,8 +1455,20 @@ $nwSearchPlaceholder = $nwIsMemberList
                 </div>
                 ` : ''}
 
+                ${buildEligibilityReviewHtml(member)}
+
+                ${member.status === 'Rejected' && (member.rejection_reason || member.notes) ? `
                 <div class="detail-row">
-                    <span class="detail-label">Uploaded Photos:</span>
+                    <span class="detail-label">Rejection Details:</span>
+                    <span class="detail-value">
+                        ${member.rejection_reason ? `<div><strong>Reason:</strong> ${member.rejection_reason}</div>` : ''}
+                        ${member.notes ? `<div style="margin-top:0.35rem;"><strong>Notes:</strong> ${member.notes}</div>` : ''}
+                    </span>
+                </div>
+                ` : ''}
+
+                <div class="detail-row">
+                    <span class="detail-label">Uploaded Photos / Documents:</span>
                     <div class="detail-value review-photo-grid">
                         ${member.photo_data ? `
                         <div class="review-photo-card">
@@ -1240,56 +1484,50 @@ $nwSearchPlaceholder = $nwIsMemberList
                         ` : `
                         <span style="color: var(--text-secondary); font-style: italic;">No photo ID uploaded</span>
                         `}
+                        ${member.barangay_clearance_data ? (
+                            /\.pdf($|\?)/i.test(String(member.barangay_clearance_data))
+                                ? `
+                        <div class="review-photo-card">
+                            <span style="font-size: 0.85rem; color: var(--text-secondary);">Barangay Clearance</span>
+                            <a href="${member.barangay_clearance_data}" target="_blank" rel="noopener noreferrer" style="display:inline-flex;align-items:center;gap:0.4rem;color:var(--primary-color);font-weight:600;">
+                                <i class="fas fa-file-pdf"></i> View PDF
+                            </a>
+                        </div>
+                                `
+                                : `
+                        <div class="review-photo-card">
+                            <span style="font-size: 0.85rem; color: var(--text-secondary);">Barangay Clearance</span>
+                            <img src="${member.barangay_clearance_data}" alt="Barangay Clearance" onclick="viewPhoto(this.src)">
+                        </div>
+                                `
+                        ) : `
+                        <span style="color: var(--text-secondary); font-style: italic;">No barangay clearance uploaded</span>
+                        `}
                     </div>
                 </div>
             `;
 
-            if (activities.length > 0) {
-                detailsHTML += `
-                    <div class="detail-row">
-                        <span class="detail-label">Assigned Tasks:</span>
-                        <div class="detail-value">
-                            <ul style="padding-left:1.1rem; margin:0;">
-                                ${activities.map(a => `
-                                    <li>
-                                        <strong>${a.eventTitle || ''}</strong> (${a.eventType || ''})
-                                        – ${a.eventDate || ''} ${a.callTime || ''}-${a.endTime || ''} @ ${a.venue || ''}
-                                        <br>Role: ${a.role || ''} • Check-in Status: ${a.checkInStatus || 'Pending'}
-                                    </li>
-                                `).join('')}
-                            </ul>
-                        </div>
-                    </div>
-                `;
-
-                const attended = activities.filter(a => (a.checkInStatus || '').toLowerCase() === 'checked-in');
-                if (attended.length > 0) {
-                    detailsHTML += `
-                        <div class="detail-row">
-                            <span class="detail-label">Events / Seminars Attended:</span>
-                            <div class="detail-value">
-                                <ul style="padding-left:1.1rem; margin:0;">
-                                    ${attended.map(a => `
-                                        <li>
-                                            ${a.eventDate || ''} – <strong>${a.eventTitle || ''}</strong> (${a.eventType || ''})
-                                            @ ${a.venue || ''}
-                                        </li>
-                                    `).join('')}
-                                </ul>
-                            </div>
-                        </div>
-                    `;
-                }
+            reviewActions.style.display = (member.status === 'Pending' || member.status === 'Rejected') ? 'flex' : 'none';
+            const decisionButtons = document.getElementById('reviewDecisionButtons');
+            const rejectedActions = document.getElementById('rejectedEmailActions');
+            if (member.status === 'Pending') {
+                if (decisionButtons) decisionButtons.style.display = 'flex';
+                if (rejectedActions) rejectedActions.style.display = 'none';
+            } else if (member.status === 'Rejected') {
+                if (decisionButtons) decisionButtons.style.display = 'none';
+                if (rejectedActions) rejectedActions.style.display = 'flex';
+                const reason = document.getElementById('rejectionReason');
+                const notes = document.getElementById('rejectionNotes');
+                if (reason && member.rejection_reason) reason.value = member.rejection_reason;
+                if (notes) notes.value = member.notes || '';
             }
-            
-            detailsContainer.innerHTML = detailsHTML;
-            reviewActions.style.display = member.status === 'Pending' ? 'flex' : 'none';
             modal.classList.add('active');
         }
 
         function closeReviewMemberModal() {
             document.getElementById('reviewMemberModal').classList.remove('active');
             currentReviewMemberId = null;
+            resetRejectForm();
         }
 
         function getStatusUpdateMessage(decision, result) {
@@ -1297,18 +1535,59 @@ $nwSearchPlaceholder = $nwIsMemberList
                 ? 'Application approved successfully.'
                 : 'Application rejected.';
 
-            if (result.email_sent === false) {
-                return baseMessage + ' However, the notification email could not be sent. Please verify the applicant email address and mail settings.';
+            if (result.email_sent === true) {
+                const to = result.email_to ? ` (${result.email_to})` : '';
+                return baseMessage + ` A notification email was sent to the applicant${to}.`;
             }
 
-            if (result.email_sent === true) {
-                return baseMessage + ' A notification email was sent to the applicant.';
+            if (result.email_sent === false) {
+                const detail = result.email_error ? ` Reason: ${result.email_error}` : '';
+                return baseMessage + ' However, the notification email could not be sent.' + detail + ' Please verify the applicant email address and mail settings.';
             }
 
             return baseMessage;
         }
 
-        function reviewDecision(decision) {
+        function confirmRejectApplication() {
+            const reason = (document.getElementById('rejectionReason') || {}).value || '';
+            const notes = (document.getElementById('rejectionNotes') || {}).value || '';
+            if (!reason) {
+                alert('Please select a reason of rejection.');
+                return;
+            }
+            reviewDecision('reject', reason, notes);
+        }
+
+        function resendRejectionEmail() {
+            const id = currentReviewMemberId;
+            const member = id ? memberData[id] : null;
+            if (!member) {
+                alert('Member not found!');
+                return;
+            }
+
+            let reason = member.rejection_reason || '';
+            const reasonInput = document.getElementById('rejectionReason');
+            if (reasonInput && reasonInput.value) {
+                reason = reasonInput.value;
+            }
+            if (!reason) {
+                alert('No rejection reason found. Please select a reason and confirm reject again.');
+                showRejectForm();
+                return;
+            }
+
+            const notesInput = document.getElementById('rejectionNotes');
+            const notes = notesInput ? notesInput.value : (member.notes || '');
+
+            if (!confirm('Resend the rejection email to ' + (member.email || 'the applicant') + '?')) {
+                return;
+            }
+
+            reviewDecision('reject', reason, notes, true);
+        }
+
+        function reviewDecision(decision, rejectionReason, rejectionNotes, resendRejectionEmailFlag) {
             const id = currentReviewMemberId;
             const member = id ? memberData[id] : null;
             if (!member) {
@@ -1317,29 +1596,50 @@ $nwSearchPlaceholder = $nwIsMemberList
             }
 
             const status = decision === 'approve' ? 'Active' : 'Rejected';
-            const confirmMessage = decision === 'approve'
-                ? 'Approve this neighborhood watch application?'
-                : 'Reject this neighborhood watch application?';
-
-            if (!confirm(confirmMessage)) {
+            if (decision === 'approve') {
+                if (!confirm('Approve this neighborhood watch application?')) {
+                    return;
+                }
+            } else if (!rejectionReason) {
+                alert('Please select a reason of rejection.');
+                showRejectForm();
+                return;
+            } else if (!resendRejectionEmailFlag && !confirm('Reject this neighborhood watch application and email the applicant?')) {
                 return;
             }
 
-            fetch('api/nw_members.php', {
+            const payload = {
+                action: 'update',
+                id: parseInt(id, 10),
+                name: member.name,
+                first_name: member.first_name || '',
+                middle_name: member.middle_name || '',
+                last_name: member.last_name || '',
+                gender: member.gender || '',
+                marital_status: member.marital_status || '',
+                contact: member.contact,
+                email: member.email || '',
+                address: member.address || '',
+                birthday: member.birthday || '',
+                id_number: member.id_number || '',
+                status: status,
+                photo_id: null,
+                emergency_contact_name: member.emergency_contact_name || '',
+                emergency_contact_number: member.emergency_contact_number || '',
+                notes: decision === 'reject' ? (rejectionNotes || '') : (member.notes || '')
+            };
+
+            if (decision === 'reject') {
+                payload.rejection_reason = rejectionReason;
+                if (resendRejectionEmailFlag || member.status === 'Rejected') {
+                    payload.resend_rejection_email = true;
+                }
+            }
+
+            fetch('api/neighborhood-watcher-members.php', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    action: 'update',
-                    id: parseInt(id, 10),
-                    name: member.name,
-                    contact: member.contact,
-                    email: member.email || '',
-                    address: member.address || '',
-                    status: status,
-                    photo_id: null,
-                    emergency_contact_name: member.emergency_contact_name || '',
-                    emergency_contact_number: member.emergency_contact_number || ''
-                })
+                body: JSON.stringify(payload)
             })
             .then(res => res.json())
             .then(result => {
@@ -1350,6 +1650,14 @@ $nwSearchPlaceholder = $nwIsMemberList
 
                 loadMembers();
                 closeReviewMemberModal();
+                if (resendRejectionEmailFlag) {
+                    if (result.email_sent === true) {
+                        alert('Rejection email resent to ' + (result.email_to || member.email || 'the applicant') + '.');
+                    } else {
+                        alert('Failed to resend rejection email.' + (result.email_error ? (' Reason: ' + result.email_error) : ''));
+                    }
+                    return;
+                }
                 alert(getStatusUpdateMessage(decision, result));
             })
             .catch(err => {
@@ -1481,7 +1789,7 @@ $nwSearchPlaceholder = $nwIsMemberList
                     emergency_contact_number: emergencyContact
                 };
 
-                fetch('api/nw_members.php', {
+                fetch('api/neighborhood-watcher-members.php', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -1514,7 +1822,7 @@ $nwSearchPlaceholder = $nwIsMemberList
         
         function deleteMember(id) {
             if (confirm('Are you sure you want to delete this member? This action cannot be undone.')) {
-                fetch('api/nw_members.php', {
+                fetch('api/neighborhood-watcher-members.php', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -1610,6 +1918,7 @@ $nwSearchPlaceholder = $nwIsMemberList
         setInterval(updateDateTime, 1000);
     </script>
     <?php require __DIR__ . '/includes/admin_notifications_script.php'; ?>
+    <script src="js/mobile-shell.js"></script>
 </body>
 </html>
 

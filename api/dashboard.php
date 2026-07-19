@@ -13,7 +13,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
 }
 
 require_once __DIR__ . '/../db.php';
-require_once __DIR__ . '/nw_members_schema.php';
+require_once __DIR__ . '/neighborhood-watcher-members-schema.php';
 require_once __DIR__ . '/patrol_logs_schema.php';
 
 try {
