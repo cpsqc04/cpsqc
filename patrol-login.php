@@ -306,7 +306,7 @@ $autoOpenLogin = !empty($showOtpForm) || ($error !== null);
         <section class="section contact-section" id="contact">
             <div class="section-inner">
                 <p class="section-label reveal">Contact us</p>
-                <h2 class="reveal reveal-delay-1">Let’s keep Barangay San Agustin safer together</h2>
+                <h2 class="reveal reveal-delay-1">We're here to help</h2>
                 <div class="contact-info reveal reveal-delay-1">
                     <p>Reach the AlerTara QC team in Barangay San Agustin for support or account assistance.</p>
                     <div>
@@ -314,12 +314,12 @@ $autoOpenLogin = !empty($showOtpForm) || ($error !== null);
                         contactcps@alertaraqc.gov.ph
                     </div>
                     <div>
-                        <strong>Location</strong>
+                        <strong>Address</strong>
                         Barangay San Agustin, Novaliches, Quezon City, Metro Manila Philippines
                     </div>
                     <div>
-                        <strong>Hours</strong>
-                        8:00 A.M. - 5:00 P.M.
+                        <strong>Operation Hours</strong>
+                        24/7
                     </div>
                     <div style="margin-top:1rem;">
                         <a class="btn btn-ghost" href="login.php">Explore the main page</a>

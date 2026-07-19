@@ -19,13 +19,18 @@ try {
     exit;
 }
 
-if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
+$method = $_SERVER['REQUEST_METHOD'];
+$input = json_decode(file_get_contents('php://input'), true) ?? [];
+$action = $input['action'] ?? '';
+
+// Public tip/create-style: allow complaint creation without admin session.
+$isPublicCreate = ($method === 'POST' && $action === 'create');
+if (!$isPublicCreate && (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true)) {
     http_response_code(401);
     echo json_encode(['success' => false, 'message' => 'Unauthorized']);
     exit;
 }
 
-$method = $_SERVER['REQUEST_METHOD'];
 $cols = complaintsSelectColumns();
 
 if ($method === 'GET') {
@@ -42,9 +47,6 @@ if ($method === 'GET') {
     }
     exit;
 }
-
-$input = json_decode(file_get_contents('php://input'), true) ?? [];
-$action = $input['action'] ?? '';
 
 if ($method === 'POST') {
     if ($action === 'create') {

@@ -68,8 +68,8 @@ function volunteerMediaStore(?string $value, string $type, int $memberId): ?stri
         throw new RuntimeException('Invalid image data.');
     }
 
-    if (strlen($binary) > 8 * 1024 * 1024) {
-        throw new RuntimeException('Image file is too large. Please upload images under 8 MB.');
+    if (strlen($binary) > 5 * 1024 * 1024) {
+        throw new RuntimeException('Image file is too large. Please upload images 5 MB or below.');
     }
 
     $binary = volunteerMediaOptimizeBinary($binary);

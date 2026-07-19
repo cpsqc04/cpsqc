@@ -1154,7 +1154,7 @@ $autoOpenLogin = !empty($showOtpForm) || isset($error) || isset($_SESSION['regis
         }
         .role-grid {
             display: grid;
-            grid-template-columns: repeat(3, 1fr);
+            grid-template-columns: repeat(4, 1fr);
             gap: 1.35rem;
             margin-top: 2rem;
         }
@@ -1567,6 +1567,10 @@ $autoOpenLogin = !empty($showOtpForm) || isset($error) || isset($_SESSION['regis
         .success-modal-content p { color: #575757; margin-bottom: 1.5rem; }
         .success-modal-actions .btn { min-width: 140px; color: #fff; }
 
+        @media (max-width: 1100px) {
+            .role-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+
             @media (max-width: 860px) {
             .nav-toggle { display: grid; place-items: center; }
             .site-nav {
@@ -1762,9 +1766,20 @@ $autoOpenLogin = !empty($showOtpForm) || isset($error) || isset($_SESSION['regis
             <div class="section-inner">
                 <p class="section-label reveal">Who uses this</p>
                 <h2 class="reveal reveal-delay-1">Choose your portal</h2>
-                <p class="sub reveal reveal-delay-2">Three access paths keep Barangay San Agustin community partners, patrol teams, and BPSO administrators in sync—with the right tools for each role.</p>
+                <p class="sub reveal reveal-delay-2">Four access paths keep Barangay San Agustin residents, community partners, patrol teams, and BPSO administrators in sync—with the right tools for each role.</p>
                 <div class="role-grid">
                     <article class="role-card reveal">
+                        <div class="role-icon" aria-hidden="true"><i class="fas fa-shield-halved"></i></div>
+                        <h3>BPSO Administrator</h3>
+                        <p>Barangay peace and security administrators who manage response coordination and community safety operations in Barangay San Agustin.</p>
+                        <ul class="role-list">
+                            <li>Oversee community policing and surveillance</li>
+                            <li>Review patrol and incident reports</li>
+                            <li>Coordinate public-safety response</li>
+                        </ul>
+                        <button type="button" class="btn" onclick="openLoginModal()">Visit</button>
+                    </article>
+                    <article class="role-card reveal reveal-delay-1">
                         <div class="role-icon" aria-hidden="true"><i class="fas fa-house-user"></i></div>
                         <h3>Neighborhood Watcher</h3>
                         <p>Approved community volunteers who observe local activity and help keep Barangay San Agustin informed.</p>
@@ -1775,7 +1790,7 @@ $autoOpenLogin = !empty($showOtpForm) || isset($error) || isset($_SESSION['regis
                         </ul>
                         <a class="btn" href="nw-login.php">Visit</a>
                     </article>
-                    <article class="role-card reveal reveal-delay-1">
+                    <article class="role-card reveal reveal-delay-2">
                         <div class="role-icon" aria-hidden="true"><i class="fas fa-route"></i></div>
                         <h3>Patrol</h3>
                         <p>Field patrol personnel who move through assigned areas in Barangay San Agustin and document on-ground activity.</p>
@@ -1786,16 +1801,16 @@ $autoOpenLogin = !empty($showOtpForm) || isset($error) || isset($_SESSION['regis
                         </ul>
                         <a class="btn" href="patrol-login.php">Visit</a>
                     </article>
-                    <article class="role-card reveal reveal-delay-2">
-                        <div class="role-icon" aria-hidden="true"><i class="fas fa-shield-halved"></i></div>
-                        <h3>BPSO Administrator</h3>
-                        <p>Barangay peace and security administrators who manage response coordination and community safety operations in Barangay San Agustin.</p>
+                    <article class="role-card reveal reveal-delay-3">
+                        <div class="role-icon" aria-hidden="true"><i class="fas fa-users"></i></div>
+                        <h3>Resident</h3>
+                        <p>Barangay San Agustin residents who can submit complaints and send anonymous tips to support community safety.</p>
                         <ul class="role-list">
-                            <li>Oversee community policing and surveillance</li>
-                            <li>Review patrol and incident reports</li>
-                            <li>Coordinate public-safety response</li>
+                            <li>Submit formal barangay complaints</li>
+                            <li>Send tips anonymously</li>
+                            <li>Support a safer barangay community</li>
                         </ul>
-                        <button type="button" class="btn" onclick="openLoginModal()">Visit</button>
+                        <a class="btn" href="resident-portal.php">Visit</a>
                     </article>
                 </div>
             </div>
@@ -1877,7 +1892,7 @@ $autoOpenLogin = !empty($showOtpForm) || isset($error) || isset($_SESSION['regis
         <section class="section contact-section" id="contact">
             <div class="section-inner">
                 <p class="section-label reveal">Contact us</p>
-                <h2 class="reveal reveal-delay-1">Let’s keep Barangay San Agustin safer together</h2>
+                <h2 class="reveal reveal-delay-1">We're here to help</h2>
                 <div class="contact-info reveal reveal-delay-1">
                     <p>Reach the AlerTara QC team in Barangay San Agustin for support, partnership inquiries, or account assistance.</p>
                     <div>
@@ -1885,12 +1900,12 @@ $autoOpenLogin = !empty($showOtpForm) || isset($error) || isset($_SESSION['regis
                         contactcps@alertaraqc.gov.ph
                     </div>
                     <div>
-                        <strong>Location</strong>
+                        <strong>Address</strong>
                         Barangay San Agustin, Novaliches, Quezon City, Metro Manila Philippines
                     </div>
                     <div>
-                        <strong>Hours</strong>
-                        8:00 A.M. - 5:00 P.M.
+                        <strong>Operation Hours</strong>
+                        24/7
                     </div>
                 </div>
             </div>

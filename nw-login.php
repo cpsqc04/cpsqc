@@ -244,6 +244,7 @@ $autoOpenLogin = !empty($showOtpForm) || ($error !== null);
         </ul>
         <div class="nav-actions">
             <a class="nav-back" href="login.php"><i class="fas fa-arrow-left"></i> Main page</a>
+            <button type="button" class="nav-back" onclick="openRegisterModal()">Register</button>
             <button type="button" class="nav-cta" onclick="openLoginModal()">Sign in</button>
         </div>
     </header>
@@ -263,6 +264,7 @@ $autoOpenLogin = !empty($showOtpForm) || ($error !== null);
                 <p class="lead">Secure access for approved neighborhood watch members in Barangay San Agustin to report incidents and support community awareness.</p>
                 <div class="hero-ctas">
                     <button type="button" class="btn" onclick="openLoginModal()">Sign in</button>
+                    <button type="button" class="btn btn-ghost" onclick="openRegisterModal()">Register</button>
                     <a class="btn btn-ghost" href="login.php">Back to main page</a>
                 </div>
             </div>
@@ -320,7 +322,7 @@ $autoOpenLogin = !empty($showOtpForm) || ($error !== null);
         <section class="section contact-section" id="contact">
             <div class="section-inner">
                 <p class="section-label reveal">Contact us</p>
-                <h2 class="reveal reveal-delay-1">Let’s keep Barangay San Agustin safer together</h2>
+                <h2 class="reveal reveal-delay-1">We're here to help</h2>
                 <div class="contact-info reveal reveal-delay-1">
                     <p>Reach the AlerTara QC team in Barangay San Agustin for support or account assistance.</p>
                     <div>
@@ -328,12 +330,12 @@ $autoOpenLogin = !empty($showOtpForm) || ($error !== null);
                         contactcps@alertaraqc.gov.ph
                     </div>
                     <div>
-                        <strong>Location</strong>
+                        <strong>Address</strong>
                         Barangay San Agustin, Novaliches, Quezon City, Metro Manila Philippines
                     </div>
                     <div>
-                        <strong>Hours</strong>
-                        8:00 A.M. - 5:00 P.M.
+                        <strong>Operation Hours</strong>
+                        24/7
                     </div>
                     <div style="margin-top:1rem;">
                         <a class="btn btn-ghost" href="login.php">Explore the main page</a>
@@ -348,6 +350,7 @@ $autoOpenLogin = !empty($showOtpForm) || ($error !== null);
             <div class="footer-brand">Aler<span>Tara</span> QC</div>
             <div class="footer-links">
                 <button type="button" onclick="openLoginModal()">Sign in</button>
+                <button type="button" onclick="openRegisterModal()">Register</button>
                 <a href="login.php">Main page</a>
                 <button type="button" onclick="openLegalModal('privacy')">Privacy Policy</button>
                 <button type="button" onclick="openLegalModal('terms')">Terms of Service</button>
@@ -393,10 +396,111 @@ $autoOpenLogin = !empty($showOtpForm) || ($error !== null);
                     <div class="button-group">
                         <button class="btn" type="submit" style="width:100%; border-radius:12px;">Sign in</button>
                     </div>
+                    <p style="margin:1rem 0 0; text-align:center; color:rgba(255,255,255,0.72); font-size:0.92rem;">
+                        New member?
+                        <a href="#" style="color:var(--teal-bright);" onclick="event.preventDefault(); closeLoginModal(); openRegisterModal();">Register</a>
+                    </p>
                 </form>
             <?php endif; ?>
         </div>
     </div>
+
+    <div class="modal-overlay" id="registerModal" role="dialog" aria-modal="true" aria-labelledby="register-title" style="z-index:2050;">
+        <div class="modal-panel wide">
+            <div class="modal-header">
+                <h2 id="register-title">Neighborhood Watch Application</h2>
+                <button type="button" class="modal-close" onclick="closeRegisterModal()" aria-label="Close">&times;</button>
+            </div>
+            <p class="register-hint">Submit your application for review. Once approved, proceed to the barangay hall for further instructions before signing in.</p>
+            <form id="memberApplicationForm" onsubmit="submitMemberApplication(event)" autocomplete="off">
+                <div class="field">
+                    <label for="memberLastName">Last Name *</label>
+                    <input id="memberLastName" name="last_name" type="text" required>
+                </div>
+                <div class="field">
+                    <label for="memberFirstName">First Name *</label>
+                    <input id="memberFirstName" name="first_name" type="text" required>
+                </div>
+                <div class="field">
+                    <label for="memberMiddleName">Middle Name <span style="font-weight:400;color:rgba(255,255,255,0.55);">(if applicable)</span></label>
+                    <input id="memberMiddleName" name="middle_name" type="text">
+                </div>
+                <div class="field">
+                    <label for="memberBirthday">Birthday *</label>
+                    <div class="birthday-input-wrap">
+                        <input id="memberBirthday" name="birthday" type="text" inputmode="numeric" maxlength="10" autocomplete="bday" required>
+                        <input id="memberBirthdayPicker" class="birthday-native-picker" type="date" tabindex="-1" aria-hidden="true" title="Open calendar">
+                        <span class="birthday-calendar-icon" aria-hidden="true"><i class="fas fa-calendar-alt"></i></span>
+                    </div>
+                    <p id="memberBirthdayError" class="field-error" hidden>must be 18 years old and above</p>
+                </div>
+                <div class="field">
+                    <label for="memberIdNumber">ID Number *</label>
+                    <input id="memberIdNumber" name="id_number" type="text" required>
+                </div>
+                <div class="field">
+                    <label for="memberContact">Contact Number *</label>
+                    <input id="memberContact" name="contact" type="tel" class="contact-number-input" placeholder="" required>
+                </div>
+                <div class="field">
+                    <label for="memberEmail">Email Address *</label>
+                    <input id="memberEmail" name="email" type="email" required>
+                </div>
+                <div class="field">
+                    <label for="memberAddress">Home Address *</label>
+                    <input id="memberAddress" name="address" type="text" required>
+                </div>
+                <div class="field">
+                    <label for="memberEmergencyName">Emergency Contact Full Name *</label>
+                    <input id="memberEmergencyName" name="emergencyName" type="text" required>
+                </div>
+                <div class="field">
+                    <label for="memberEmergencyContact">Emergency Contact Number *</label>
+                    <input id="memberEmergencyContact" name="emergencyContact" type="tel" class="contact-number-input" placeholder="" required>
+                </div>
+                <div class="field">
+                    <label for="memberPhoto">Neighborhood Watch Member Photo *</label>
+                    <input id="memberPhoto" name="photo" type="file" accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp" required onchange="previewMemberImage(this, 'memberPhotoPreview')">
+                    <p class="field-hint">JPG or PNG, 5 MB or below.</p>
+                    <div id="memberPhotoPreview" class="file-preview"></div>
+                </div>
+                <div class="field">
+                    <label for="memberPhotoId">Photo of Valid ID *</label>
+                    <input id="memberPhotoId" name="photoId" type="file" accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp" required onchange="previewMemberImage(this, 'memberPhotoIdPreview')">
+                    <p class="field-hint">JPG or PNG, 5 MB or below.</p>
+                    <div id="memberPhotoIdPreview" class="file-preview"></div>
+                </div>
+                <div class="consent-box">
+                    <input id="memberConsent" name="consent" type="checkbox" value="1" required>
+                    <label for="memberConsent">
+                        I have read and agree to the
+                        <a href="#" onclick="openLegalModal('terms', event);">Terms of Service</a>
+                        and
+                        <a href="#" onclick="openLegalModal('privacy', event);">Privacy Policy</a>,
+                        and I consent to the collection and processing of my personal data for this Neighborhood Watch membership application.
+                    </label>
+                </div>
+                <div class="button-group">
+                    <button type="button" class="btn btn-secondary" onclick="closeRegisterModal()">Cancel</button>
+                    <button type="submit" class="btn" id="registerSubmitBtn" disabled>Submit Application</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="registrationSuccessModal" role="dialog" aria-modal="true" style="z-index:3100;">
+        <div class="modal-panel" style="text-align:center; background: linear-gradient(145deg, #10b981, #059669);">
+            <div style="width:72px;height:72px;margin:0 auto 1rem;background:rgba(255,255,255,0.2);border-radius:50%;display:grid;place-items:center;">
+                <i class="fas fa-check-circle" style="font-size:2.2rem;color:#fff;"></i>
+            </div>
+            <h2 style="margin:0 0 0.75rem;color:#fff;font-family:var(--font-display);">Application Submitted!</h2>
+            <p style="margin:0 0 1.5rem;color:rgba(255,255,255,0.95);">Your neighborhood watch membership application has been submitted and is pending admin review. Please proceed to the barangay hall for further instructions once approved.</p>
+            <button type="button" class="btn btn-ghost" onclick="closeRegistrationSuccessModal()" style="width:100%;">OK</button>
+        </div>
+    </div>
+
+    <script src="js/form-contact-validation.js"></script>
+    <script src="js/nw-register-application.js"></script>
 
 <?php
 $forgotApiEndpoint = 'api/nw-forgot-password.php';

@@ -4,7 +4,7 @@ $forgotApiEndpoint = $forgotApiEndpoint ?? 'api/forgot-password.php';
 $portalHomePath = $portalHomePath ?? 'login.php';
 $autoOpenLogin = !empty($autoOpenLogin);
 ?>
-    <div class="modal-overlay" id="legalModal" role="dialog" aria-modal="true">
+    <div class="modal-overlay" id="legalModal" role="dialog" aria-modal="true" style="z-index:2200;">
         <div class="modal-panel wide">
             <div class="modal-header">
                 <h2 id="legalTitle">Policy</h2>
@@ -145,12 +145,18 @@ $autoOpenLogin = !empty($autoOpenLogin);
             }
         }
 
-        function openLegalModal(key) {
+        function openLegalModal(key, event) {
+            if (event) {
+                event.preventDefault();
+                event.stopPropagation();
+            }
             const item = legalContent[key];
             if (!item) return;
+            const modal = document.getElementById('legalModal');
             document.getElementById('legalTitle').textContent = item.title;
             document.getElementById('legalBody').innerHTML = item.html;
-            document.getElementById('legalModal').classList.add('open');
+            modal.style.zIndex = '2200';
+            modal.classList.add('open');
             document.body.style.overflow = 'hidden';
         }
         function closeLegalModal() {
@@ -366,6 +372,12 @@ $autoOpenLogin = !empty($autoOpenLogin);
             if (event.target === document.getElementById('legalModal')) closeLegalModal();
             if (event.target === document.getElementById('forgotPasswordModal')) closeForgotPasswordModal();
             if (event.target === document.getElementById('successModal')) closeSuccessModal();
+            if (event.target === document.getElementById('registerModal') && typeof closeRegisterModal === 'function') {
+                closeRegisterModal();
+            }
+            if (event.target === document.getElementById('registrationSuccessModal') && typeof closeRegistrationSuccessModal === 'function') {
+                closeRegistrationSuccessModal();
+            }
         });
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') {
@@ -373,6 +385,8 @@ $autoOpenLogin = !empty($autoOpenLogin);
                 closeLegalModal();
                 closeForgotPasswordModal();
                 closeSuccessModal();
+                if (typeof closeRegisterModal === 'function') closeRegisterModal();
+                if (typeof closeRegistrationSuccessModal === 'function') closeRegistrationSuccessModal();
             }
         });
     </script>

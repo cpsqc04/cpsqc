@@ -72,7 +72,7 @@ AlertaraQC supports BPSO patrol scheduling and monitoring, neighborhood watch co
    composer install
    ```
 5. Open in the browser:
-   - Public entry: `http://localhost/cpsqc-main/public-entry.php`
+   - Resident portal: `http://localhost/cpsqc-main/resident-portal.php`
    - Admin login: `http://localhost/cpsqc-main/login.php`
    - API catalog: `http://localhost/cpsqc-main/api/integration.php`
 

@@ -43,7 +43,7 @@ if ($method === 'GET' || ($method === 'POST' && ($action === 'update' || $action
 if ($method === 'GET') {
     // Return all neighborhood watch members
     try {
-        $stmt = $pdo->query('SELECT id, name, contact, email, address, category, skills, availability, status, notes, photo_data, photo_id_data, certifications_data, certifications_description, emergency_contact_name, emergency_contact_number, created_at FROM nw_members ORDER BY id DESC');
+        $stmt = $pdo->query('SELECT id, name, contact, email, address, birthday, id_number, category, skills, availability, status, notes, photo_data, photo_id_data, certifications_data, certifications_description, emergency_contact_name, emergency_contact_number, created_at FROM nw_members ORDER BY id DESC');
         $nw_members = $stmt->fetchAll();
 
         echo json_encode([
@@ -63,6 +63,8 @@ if ($method === 'POST') {
         $contact = trim($input['contact'] ?? '');
         $email = trim($input['email'] ?? '');
         $address = trim($input['address'] ?? '');
+        $birthday = trim($input['birthday'] ?? '');
+        $idNumber = trim($input['id_number'] ?? '');
         $category = trim($input['category'] ?? '');
         $skills = trim($input['skills'] ?? '');
         $availability = trim($input['availability'] ?? '') ?: 'Flexible';
@@ -79,6 +81,32 @@ if ($method === 'POST') {
             http_response_code(400);
             echo json_encode(['success' => false, 'message' => 'Missing required fields.']);
             exit;
+        }
+
+        if ($birthday !== '') {
+            $birthdayTs = strtotime(str_replace('/', '-', $birthday));
+            if (preg_match('/^(\d{2})\/(\d{2})\/(\d{4})$/', $birthday, $parts)) {
+                $birthdayTs = strtotime(sprintf('%04d-%02d-%02d', (int) $parts[3], (int) $parts[1], (int) $parts[2]));
+            } elseif (preg_match('/^\d{4}-\d{2}-\d{2}$/', $birthday)) {
+                $birthdayTs = strtotime($birthday);
+            }
+            if ($birthdayTs === false) {
+                http_response_code(400);
+                echo json_encode(['success' => false, 'message' => 'Invalid birthday. Use MM/DD/YYYY.']);
+                exit;
+            }
+            $birthday = date('Y-m-d', $birthdayTs);
+            $age = (new DateTimeImmutable($birthday))->diff(new DateTimeImmutable('today'))->y;
+            if ($age < 18) {
+                http_response_code(400);
+                echo json_encode(['success' => false, 'message' => 'must be 18 years old and above']);
+                exit;
+            }
+        } else {
+            $birthday = null;
+        }
+        if ($idNumber === '') {
+            $idNumber = null;
         }
 
         $contact = normalizeContactDigits($contact);
@@ -132,13 +160,15 @@ if ($method === 'POST') {
             $pdo->beginTransaction();
 
             if ($hasVolunteerCode && $volunteerCode) {
-                $stmt = $pdo->prepare('INSERT INTO nw_members (volunteer_code, name, contact, email, address, category, skills, availability, status, notes, photo_data, photo_id_data, certifications_data, certifications_description, emergency_contact_name, emergency_contact_number) VALUES (:code, :name, :contact, :email, :address, :category, :skills, :availability, :status, :notes, :photo, :photo_id, :certifications, :certifications_desc, :emergency_name, :emergency_contact)');
+                $stmt = $pdo->prepare('INSERT INTO nw_members (volunteer_code, name, contact, email, address, birthday, id_number, category, skills, availability, status, notes, photo_data, photo_id_data, certifications_data, certifications_description, emergency_contact_name, emergency_contact_number) VALUES (:code, :name, :contact, :email, :address, :birthday, :id_number, :category, :skills, :availability, :status, :notes, :photo, :photo_id, :certifications, :certifications_desc, :emergency_name, :emergency_contact)');
                 $stmt->execute([
                     ':code' => $volunteerCode,
                     ':name' => $name,
                     ':contact' => $contact,
                     ':email' => $email,
                     ':address' => $address,
+                    ':birthday' => $birthday,
+                    ':id_number' => $idNumber,
                     ':category' => $category,
                     ':skills' => $skills,
                     ':availability' => $availability,
@@ -152,12 +182,14 @@ if ($method === 'POST') {
                     ':emergency_contact' => $emergencyContact,
                 ]);
             } else {
-                $stmt = $pdo->prepare('INSERT INTO nw_members (name, contact, email, address, category, skills, availability, status, notes, photo_data, photo_id_data, certifications_data, certifications_description, emergency_contact_name, emergency_contact_number) VALUES (:name, :contact, :email, :address, :category, :skills, :availability, :status, :notes, :photo, :photo_id, :certifications, :certifications_desc, :emergency_name, :emergency_contact)');
+                $stmt = $pdo->prepare('INSERT INTO nw_members (name, contact, email, address, birthday, id_number, category, skills, availability, status, notes, photo_data, photo_id_data, certifications_data, certifications_description, emergency_contact_name, emergency_contact_number) VALUES (:name, :contact, :email, :address, :birthday, :id_number, :category, :skills, :availability, :status, :notes, :photo, :photo_id, :certifications, :certifications_desc, :emergency_name, :emergency_contact)');
                 $stmt->execute([
                     ':name' => $name,
                     ':contact' => $contact,
                     ':email' => $email,
                     ':address' => $address,
+                    ':birthday' => $birthday,
+                    ':id_number' => $idNumber,
                     ':category' => $category,
                     ':skills' => $skills,
                     ':availability' => $availability,
@@ -198,6 +230,8 @@ if ($method === 'POST') {
                     'contact' => $contact,
                     'email' => $email,
                     'address' => $address,
+                    'birthday' => $birthday,
+                    'id_number' => $idNumber,
                     'category' => $category,
                     'skills' => $skills,
                     'availability' => $availability,
@@ -227,6 +261,8 @@ if ($method === 'POST') {
         $contact = trim($input['contact'] ?? '');
         $email = trim($input['email'] ?? '');
         $address = trim($input['address'] ?? '');
+        $birthday = trim($input['birthday'] ?? '');
+        $idNumber = trim($input['id_number'] ?? '');
         $category = trim($input['category'] ?? '');
         $skills = trim($input['skills'] ?? '');
         $availability = trim($input['availability'] ?? '') ?: 'Flexible';
@@ -243,6 +279,21 @@ if ($method === 'POST') {
             http_response_code(400);
             echo json_encode(['success' => false, 'message' => 'Missing required fields.']);
             exit;
+        }
+
+        if ($birthday !== '') {
+            $birthdayTs = strtotime($birthday);
+            if ($birthdayTs === false) {
+                http_response_code(400);
+                echo json_encode(['success' => false, 'message' => 'Invalid birthday.']);
+                exit;
+            }
+            $birthday = date('Y-m-d', $birthdayTs);
+        } else {
+            $birthday = null;
+        }
+        if ($idNumber === '') {
+            $idNumber = null;
         }
 
         $contact = normalizeContactDigits($contact);
@@ -300,12 +351,14 @@ if ($method === 'POST') {
                 $photoIdToSave = $photoId;
             }
 
-            $stmt = $pdo->prepare('UPDATE nw_members SET name = :name, contact = :contact, email = :email, address = :address, category = :category, skills = :skills, availability = :availability, status = :status, notes = :notes, photo_data = :photo, photo_id_data = :photo_id, certifications_data = :certifications, certifications_description = :certifications_desc, emergency_contact_name = :emergency_name, emergency_contact_number = :emergency_contact WHERE id = :id');
+            $stmt = $pdo->prepare('UPDATE nw_members SET name = :name, contact = :contact, email = :email, address = :address, birthday = :birthday, id_number = :id_number, category = :category, skills = :skills, availability = :availability, status = :status, notes = :notes, photo_data = :photo, photo_id_data = :photo_id, certifications_data = :certifications, certifications_description = :certifications_desc, emergency_contact_name = :emergency_name, emergency_contact_number = :emergency_contact WHERE id = :id');
             $stmt->execute([
                 ':name' => $name,
                 ':contact' => $contact,
                 ':email' => $email,
                 ':address' => $address,
+                ':birthday' => $birthday,
+                ':id_number' => $idNumber,
                 ':category' => $category,
                 ':skills' => $skills,
                 ':availability' => $availability,
@@ -349,6 +402,8 @@ if ($method === 'POST') {
                     'contact' => $contact,
                     'email' => $email,
                     'address' => $address,
+                    'birthday' => $birthday,
+                    'id_number' => $idNumber,
                     'category' => $category,
                     'skills' => $skills,
                     'availability' => $availability,
