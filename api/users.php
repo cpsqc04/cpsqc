@@ -503,6 +503,12 @@ if ($method === 'GET') {
                 $sql = 'UPDATE admins SET ' . implode(', ', $updateFields) . ' WHERE id = :id';
                 $stmt = $pdo->prepare($sql);
                 $stmt->execute($params);
+
+                if (!empty($_SESSION['user_id']) && (int) $_SESSION['user_id'] === (int) $parsed['id']) {
+                    $_SESSION['username'] = $username;
+                    $_SESSION['full_name'] = $fullName;
+                    $_SESSION['user_role'] = 'Admin';
+                }
             }
 
             $user = fetchManagedUser($pdo, ($parsed['type'] === 'bpso' ? 'bpso-' : 'admin-') . $parsed['id']);

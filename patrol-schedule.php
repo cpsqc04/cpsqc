@@ -413,6 +413,9 @@ require_once __DIR__ . '/db.php';
                 <a href="index.php" style="display: block; cursor: pointer;">
                     <img src="images/tara.png" alt="Alertara Logo" style="display: block;">
                 </a>
+                <div class="user-name-display">
+                    <?php echo htmlspecialchars(getAdminDisplayName()); ?>
+                </div>
             </div>
         </div>
         <nav class="sidebar-nav">

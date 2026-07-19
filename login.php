@@ -562,7 +562,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         } else {
             $_SESSION['admin_logged_in'] = true;
-            $_SESSION['username'] = $pendingLogin['display_name'] ?: $pendingLogin['username'];
+            $_SESSION['username'] = $pendingLogin['username'] ?? ($pendingLogin['display_name'] ?? 'Admin');
+            $_SESSION['full_name'] = $pendingLogin['display_name'] ?: ($pendingLogin['username'] ?? 'Admin');
             $_SESSION['user_role'] = $pendingLogin['role'] ?? 'Admin';
             $_SESSION['user_id'] = $pendingLogin['user_id'];
 

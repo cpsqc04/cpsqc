@@ -154,7 +154,7 @@ define('NW_PAGE_MODE', 'incidents');
         <div class="sidebar-header">
             <div class="logo-container">
                 <a href="index.php"><img src="images/tara.png" alt="Alertara Logo"></a>
-                <div class="user-name-display"><?php echo htmlspecialchars($_SESSION['username'] ?? 'Admin'); ?></div>
+                <div class="user-name-display"><?php echo htmlspecialchars(getAdminDisplayName()); ?></div>
             </div>
         </div>
         <nav class="sidebar-nav">
