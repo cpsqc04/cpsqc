@@ -19,6 +19,9 @@ function ensureNwIncidentReportsTable(PDO $pdo): void
         assigned_at TIMESTAMP NULL DEFAULT NULL,
         resolved_at TIMESTAMP NULL DEFAULT NULL,
         admin_notes TEXT NULL,
+        terms_accepted TINYINT(1) NOT NULL DEFAULT 0,
+        terms_accepted_at TIMESTAMP NULL DEFAULT NULL,
+        terms_version VARCHAR(50) NULL DEFAULT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         UNIQUE KEY uniq_report_id (report_id),
@@ -39,6 +42,9 @@ function ensureNwIncidentReportsTable(PDO $pdo): void
         'resolution_report' => 'ALTER TABLE nw_incident_reports ADD COLUMN resolution_report TEXT NULL AFTER assigned_patrol_id',
         'assigned_at' => 'ALTER TABLE nw_incident_reports ADD COLUMN assigned_at TIMESTAMP NULL DEFAULT NULL AFTER resolution_report',
         'resolved_at' => 'ALTER TABLE nw_incident_reports ADD COLUMN resolved_at TIMESTAMP NULL DEFAULT NULL AFTER assigned_at',
+        'terms_accepted' => 'ALTER TABLE nw_incident_reports ADD COLUMN terms_accepted TINYINT(1) NOT NULL DEFAULT 0 AFTER admin_notes',
+        'terms_accepted_at' => 'ALTER TABLE nw_incident_reports ADD COLUMN terms_accepted_at TIMESTAMP NULL DEFAULT NULL AFTER terms_accepted',
+        'terms_version' => 'ALTER TABLE nw_incident_reports ADD COLUMN terms_version VARCHAR(50) NULL DEFAULT NULL AFTER terms_accepted_at',
     ];
 
     foreach ($additions as $column => $sql) {
@@ -62,7 +68,7 @@ function ensureNwIncidentReportsTable(PDO $pdo): void
 
 function nwIncidentSelectColumns(): string
 {
-    return 'id, report_id, volunteer_id, member_name, member_contact, member_email, location, description, photo_data, status, assigned_to, assigned_patrol_id, resolution_report, assigned_at, resolved_at, admin_notes, created_at, updated_at';
+    return 'id, report_id, volunteer_id, member_name, member_contact, member_email, location, description, photo_data, status, assigned_to, assigned_patrol_id, resolution_report, assigned_at, resolved_at, admin_notes, terms_accepted, terms_accepted_at, terms_version, created_at, updated_at';
 }
 
 function generateNwIncidentReportId(PDO $pdo): string

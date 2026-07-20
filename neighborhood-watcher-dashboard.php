@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/includes/neighborhood-watcher-member-auth.php';
+require_once __DIR__ . '/includes/neighborhood-watcher-incident-terms.php';
 
 requireNwMemberLogin();
 requireNwMemberPasswordChanged();
@@ -93,6 +94,20 @@ $nwActiveNav = 'report';
         .empty-state { text-align: center; padding: 2.5rem 1rem; color: var(--text-secondary); }
         .empty-state i { font-size: 2rem; margin-bottom: 0.75rem; opacity: 0.4; display: block; }
         #photoPreview img { max-width: 220px; max-height: 160px; border-radius: 8px; margin-top: 0.5rem; border: 1px solid var(--border-color); }
+        .report-notice { padding: 0.85rem 1rem; border-radius: 8px; margin-bottom: 1.25rem; background: #eff6ff; color: #1e40af; border: 1px solid #bfdbfe; font-size: 0.92rem; line-height: 1.5; }
+        .terms-group { display: flex; align-items: flex-start; gap: 0.75rem; padding: 1rem; border: 1px solid var(--border-color); border-radius: 8px; background: #fafafa; }
+        .terms-group input[type="checkbox"] { margin-top: 0.2rem; width: auto; flex-shrink: 0; }
+        .terms-group label { margin: 0; font-weight: 400; line-height: 1.55; cursor: pointer; }
+        .terms-modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 3000; align-items: center; justify-content: center; padding: 1rem; }
+        .terms-modal.active { display: flex; }
+        .terms-modal-content { background: #fff; width: 100%; max-width: 640px; max-height: 85vh; overflow-y: auto; border-radius: 12px; padding: 1.5rem; box-shadow: 0 10px 40px rgba(0,0,0,0.2); }
+        .terms-modal-content h2 { margin: 0 0 1rem; color: var(--tertiary-color); }
+        .terms-modal-content h3 { margin: 1.25rem 0 0.5rem; color: var(--tertiary-color); font-size: 1rem; }
+        .terms-modal-content p { margin: 0 0 0.75rem; line-height: 1.6; color: var(--text-color); }
+        .terms-modal-actions { display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 1.25rem; flex-wrap: wrap; }
+        .btn-cancel-terms { padding: 0.65rem 1.25rem; background: #6c757d; color: #fff; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; }
+        .btn-confirm-terms { padding: 0.65rem 1.25rem; background: var(--primary-color); color: #fff; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; }
+        .btn-confirm-terms:disabled { opacity: 0.55; cursor: not-allowed; }
         .report-cards { display: none; flex-direction: column; gap: 0.85rem; }
         .report-card { border: 1px solid var(--border-color); border-radius: 12px; padding: 1rem; background: #fff; box-shadow: 0 1px 4px rgba(15, 23, 42, 0.06); }
         .report-card-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 0.75rem; margin-bottom: 0.75rem; }
@@ -176,6 +191,7 @@ $nwActiveNav = 'report';
 
                 <section id="reportSection" class="section-block is-active">
                     <h2 class="section-heading"><i class="fas fa-exclamation-triangle"></i> Report Incident to BPSO</h2>
+                    <div class="report-notice">This form is for genuine community safety incidents. Reports must be truthful and made in good faith.</div>
                     <div id="reportAlert" style="display:none;"></div>
                     <form id="reportForm">
                         <div class="form-group">
@@ -205,8 +221,26 @@ $nwActiveNav = 'report';
         </main>
     </div>
 
+    <div id="termsModal" class="terms-modal" onclick="if (event.target === this) closeTermsModal()">
+        <div class="terms-modal-content">
+            <h2>Incident Report Terms and Conditions</h2>
+            <p style="margin:0 0 1rem;color:var(--text-secondary);line-height:1.55;">Please review and accept the terms below before your report is submitted.</p>
+            <?php echo getNwIncidentTermsHtml(); ?>
+            <div class="terms-group" style="margin-top:1rem;">
+                <input type="checkbox" id="termsAccepted" onchange="updateTermsConfirmButton()">
+                <label for="termsAccepted"><?php echo htmlspecialchars(getNwIncidentTermsSummary()); ?></label>
+            </div>
+            <div class="terms-modal-actions">
+                <button type="button" class="btn-cancel-terms" onclick="closeTermsModal()">Cancel</button>
+                <button type="button" class="btn-confirm-terms" id="confirmTermsBtn" disabled onclick="confirmTermsAndSubmit()">I Agree and Submit</button>
+            </div>
+        </div>
+    </div>
+
     <script>
+        const NW_INCIDENT_TERMS_VERSION = <?php echo json_encode(getNwIncidentTermsVersion()); ?>;
         let photoDataUrl = null;
+        let pendingReportPayload = null;
 
         function toggleSidebar() {
             const sidebar = document.getElementById('sidebar');
@@ -288,6 +322,21 @@ $nwActiveNav = 'report';
             el.style.display = 'block';
         }
 
+        function updateTermsConfirmButton() {
+            document.getElementById('confirmTermsBtn').disabled = !document.getElementById('termsAccepted').checked;
+        }
+
+        function openTermsModal() {
+            document.getElementById('termsAccepted').checked = false;
+            updateTermsConfirmButton();
+            document.getElementById('termsModal').classList.add('active');
+        }
+
+        function closeTermsModal() {
+            document.getElementById('termsModal').classList.remove('active');
+            pendingReportPayload = null;
+        }
+
         function previewPhoto(input) {
             const preview = document.getElementById('photoPreview');
             photoDataUrl = null;
@@ -316,6 +365,47 @@ $nwActiveNav = 'report';
                 img.src = e.target.result;
             };
             reader.readAsDataURL(file);
+        }
+
+        async function confirmTermsAndSubmit() {
+            if (!pendingReportPayload || !document.getElementById('termsAccepted').checked) {
+                return;
+            }
+
+            const confirmBtn = document.getElementById('confirmTermsBtn');
+            confirmBtn.disabled = true;
+
+            try {
+                const response = await fetch('api/neighborhood-watcher-incidents.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        action: 'create',
+                        ...pendingReportPayload,
+                        terms_accepted: true,
+                        terms_version: NW_INCIDENT_TERMS_VERSION
+                    })
+                });
+                const result = await response.json();
+
+                if (result.success) {
+                    closeTermsModal();
+                    document.getElementById('reportForm').reset();
+                    photoDataUrl = null;
+                    document.getElementById('photoPreview').innerHTML = '';
+                    showReportAlert(result.message || 'Report submitted successfully.', false);
+                    showPortalSection('reportsSection', true);
+                    return;
+                }
+
+                closeTermsModal();
+                showReportAlert(result.message || 'Failed to submit report.', true);
+            } catch (err) {
+                closeTermsModal();
+                showReportAlert('Network error. Please try again.', true);
+            } finally {
+                confirmBtn.disabled = !document.getElementById('termsAccepted').checked;
+            }
         }
 
         async function loadReports() {
@@ -371,7 +461,7 @@ $nwActiveNav = 'report';
             }
         }
 
-        document.getElementById('reportForm').addEventListener('submit', async function(e) {
+        document.getElementById('reportForm').addEventListener('submit', function(e) {
             e.preventDefault();
             const location = document.getElementById('incidentLocation').value.trim();
             const description = document.getElementById('incidentDescription').value.trim();
@@ -381,31 +471,14 @@ $nwActiveNav = 'report';
                 return;
             }
 
-            try {
-                const response = await fetch('api/neighborhood-watcher-incidents.php', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        action: 'create',
-                        location: location,
-                        description: description,
-                        photo: photoDataUrl
-                    })
-                });
-                const result = await response.json();
+            pendingReportPayload = {
+                location: location,
+                description: description,
+                photo: photoDataUrl
+            };
 
-                if (result.success) {
-                    document.getElementById('reportForm').reset();
-                    photoDataUrl = null;
-                    document.getElementById('photoPreview').innerHTML = '';
-                    showReportAlert(result.message || 'Report submitted successfully.', false);
-                    showPortalSection('reportsSection', true);
-                } else {
-                    showReportAlert(result.message || 'Failed to submit report.', true);
-                }
-            } catch (err) {
-                showReportAlert('Network error. Please try again.', true);
-            }
+            document.getElementById('reportAlert').style.display = 'none';
+            openTermsModal();
         });
 
         document.addEventListener('DOMContentLoaded', function() {

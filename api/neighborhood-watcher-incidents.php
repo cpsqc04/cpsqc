@@ -9,6 +9,7 @@ require_once __DIR__ . '/neighborhood-watcher-members-schema.php';
 require_once __DIR__ . '/bpso_attendance_schema.php';
 require_once __DIR__ . '/notifications_schema.php';
 require_once __DIR__ . '/../includes/neighborhood-watcher-member-auth.php';
+require_once __DIR__ . '/../includes/neighborhood-watcher-incident-terms.php';
 
 try {
     ensureNwMembersTable($pdo);
@@ -61,10 +62,24 @@ if ($method === 'POST') {
         $location = trim($input['location'] ?? '');
         $description = trim($input['description'] ?? '');
         $photoData = $input['photo'] ?? null;
+        $termsAccepted = !empty($input['terms_accepted']);
+        $termsVersion = trim($input['terms_version'] ?? '');
 
         if ($location === '' || $description === '') {
             http_response_code(400);
             echo json_encode(['success' => false, 'message' => 'Location and description are required.']);
+            exit;
+        }
+
+        if (!$termsAccepted) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'message' => 'You must agree to the incident report terms before submitting.']);
+            exit;
+        }
+
+        if ($termsVersion !== getNwIncidentTermsVersion()) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'message' => 'The terms and conditions have been updated. Please review and accept them again.']);
             exit;
         }
 
@@ -81,7 +96,7 @@ if ($method === 'POST') {
 
             $reportId = generateNwIncidentReportId($pdo);
 
-            $stmt = $pdo->prepare('INSERT INTO nw_incident_reports (report_id, volunteer_id, member_name, member_contact, member_email, location, description, photo_data, status) VALUES (:report_id, :volunteer_id, :member_name, :member_contact, :member_email, :location, :description, :photo_data, :status)');
+            $stmt = $pdo->prepare('INSERT INTO nw_incident_reports (report_id, volunteer_id, member_name, member_contact, member_email, location, description, photo_data, status, terms_accepted, terms_accepted_at, terms_version) VALUES (:report_id, :volunteer_id, :member_name, :member_contact, :member_email, :location, :description, :photo_data, :status, :terms_accepted, :terms_accepted_at, :terms_version)');
             $stmt->execute([
                 ':report_id' => $reportId,
                 ':volunteer_id' => getNwMemberId(),
@@ -92,6 +107,9 @@ if ($method === 'POST') {
                 ':description' => $description,
                 ':photo_data' => $photoData ?: null,
                 ':status' => 'Under Review',
+                ':terms_accepted' => 1,
+                ':terms_accepted_at' => date('Y-m-d H:i:s'),
+                ':terms_version' => getNwIncidentTermsVersion(),
             ]);
 
             $id = (int) $pdo->lastInsertId();
