@@ -547,11 +547,7 @@ require_once __DIR__ . '/db.php';
             <div class="page-content">
                 <div class="search-container">
                     <div class="search-box">
-<<<<<<< HEAD
                         <input type="text" id="searchInput" placeholder="Search BPSO personnel by name, personnel ID, or duty shift..." onkeyup="filterPatrolOfficers()">
-=======
-                        <input type="text" id="searchInput" placeholder="Search BPSO personnel by name, personnel ID, or schedule..." onkeyup="filterPatrolOfficers()">
->>>>>>> bd0e9e2fcfed13fcdf64eabe653cdae9394a7d69
                     </div>
                     <button class="btn-add" onclick="openAddOfficerModal()">
                         <i class="fas fa-plus"></i> Add Patrol
@@ -564,11 +560,7 @@ require_once __DIR__ . '/db.php';
                                 <th>BPSO Personnel ID</th>
                                 <th>Personnel Name</th>
                                 <th>Contact Number</th>
-<<<<<<< HEAD
                                 <th>Duty Shift</th>
-=======
-                                <th>Schedule</th>
->>>>>>> bd0e9e2fcfed13fcdf64eabe653cdae9394a7d69
                                 <th>Status</th>
                                 <th>Actions</th>
                             </tr>
@@ -616,17 +608,12 @@ require_once __DIR__ . '/db.php';
                     <input type="password" id="officerConfirmPassword" name="confirmPassword" required minlength="8" autocomplete="new-password">
                 </div>
                 <div class="form-group">
-<<<<<<< HEAD
                     <label for="officerDutyShift">Duty Shift *</label>
                     <select id="officerDutyShift" name="duty_shift" required>
                         <option value="">Select duty shift</option>
                         <option value="Day Shift">Day Shift (8:00 AM – 8:00 PM)</option>
                         <option value="Night Shift">Night Shift (8:00 PM – 8:00 AM)</option>
                     </select>
-=======
-                    <label for="officerSchedule">Schedule *</label>
-                    <input type="text" id="officerSchedule" name="schedule" placeholder="e.g., Mon-Fri, 08:00-16:00" required>
->>>>>>> bd0e9e2fcfed13fcdf64eabe653cdae9394a7d69
                 </div>
                 <div class="form-group">
                     <label for="officerStatus">Status *</label>
@@ -695,16 +682,11 @@ require_once __DIR__ . '/db.php';
                     <input type="password" id="editOfficerConfirmPassword" name="confirmPassword" minlength="8" autocomplete="new-password">
                 </div>
                 <div class="form-group">
-<<<<<<< HEAD
                     <label for="editOfficerDutyShift">Duty Shift *</label>
                     <select id="editOfficerDutyShift" name="duty_shift" required>
                         <option value="Day Shift">Day Shift (8:00 AM – 8:00 PM)</option>
                         <option value="Night Shift">Night Shift (8:00 PM – 8:00 AM)</option>
                     </select>
-=======
-                    <label for="editOfficerSchedule">Schedule *</label>
-                    <input type="text" id="editOfficerSchedule" name="schedule" placeholder="e.g., Mon-Fri, 08:00-16:00" required>
->>>>>>> bd0e9e2fcfed13fcdf64eabe653cdae9394a7d69
                 </div>
                 <div class="form-group">
                     <label for="editOfficerStatus">Status *</label>
@@ -829,11 +811,7 @@ require_once __DIR__ . '/db.php';
                 <td>${officer.bpso_personnel_id || ''}</td>
                 <td>${officer.personnel_name || ''}</td>
                 <td>${officer.contact_number || ''}</td>
-<<<<<<< HEAD
                 <td>${officer.duty_shift || officer.schedule || ''}</td>
-=======
-                <td>${officer.schedule || ''}</td>
->>>>>>> bd0e9e2fcfed13fcdf64eabe653cdae9394a7d69
                 <td><span class="status-badge ${statusClass}">${officer.status || 'Available'}</span></td>
                 <td>
                     <div class="action-buttons">
@@ -881,11 +859,7 @@ require_once __DIR__ . '/db.php';
                     <p><strong>Personnel Name:</strong> ${officer.personnel_name || ''}</p>
                     <p><strong>Contact Number:</strong> ${officer.contact_number || ''}</p>
                     <p><strong>Email Address:</strong> ${officer.email || ''}</p>
-<<<<<<< HEAD
                     <p><strong>Duty Shift:</strong> ${officer.duty_shift || officer.schedule || ''}</p>
-=======
-                    <p><strong>Schedule:</strong> ${officer.schedule || ''}</p>
->>>>>>> bd0e9e2fcfed13fcdf64eabe653cdae9394a7d69
                     <p><strong>Status:</strong> ${officer.status || 'Available'}</p>
                 </div>
             `;
@@ -909,11 +883,7 @@ require_once __DIR__ . '/db.php';
             document.getElementById('editOfficerEmail').value = officer.email || '';
             document.getElementById('editOfficerPassword').value = '';
             document.getElementById('editOfficerConfirmPassword').value = '';
-<<<<<<< HEAD
             document.getElementById('editOfficerDutyShift').value = officer.duty_shift || officer.schedule || 'Day Shift';
-=======
-            document.getElementById('editOfficerSchedule').value = officer.schedule || '';
->>>>>>> bd0e9e2fcfed13fcdf64eabe653cdae9394a7d69
             document.getElementById('editOfficerStatus').value = officer.status || 'Available';
             
             document.getElementById('editOfficerModal').style.display = 'block';
@@ -976,19 +946,11 @@ require_once __DIR__ . '/db.php';
                 contact_number: formData.get('contact').trim(),
                 email: formData.get('email').trim(),
                 password: password,
-<<<<<<< HEAD
                 duty_shift: formData.get('duty_shift'),
                 status: formData.get('status')
             };
             
             if (!apiData.personnel_name || !apiData.contact_number || !apiData.email || !password || !confirmPassword || !apiData.duty_shift) {
-=======
-                schedule: formData.get('schedule').trim(),
-                status: formData.get('status')
-            };
-            
-            if (!apiData.personnel_name || !apiData.contact_number || !apiData.email || !password || !confirmPassword || !apiData.schedule) {
->>>>>>> bd0e9e2fcfed13fcdf64eabe653cdae9394a7d69
                 alert('Please fill in all required fields.');
                 return;
             }
@@ -1070,19 +1032,11 @@ require_once __DIR__ . '/db.php';
                 personnel_name: formData.get('name').trim(),
                 contact_number: formData.get('contact').trim(),
                 email: formData.get('email').trim(),
-<<<<<<< HEAD
                 duty_shift: formData.get('duty_shift'),
                 status: formData.get('status')
             };
             
             if (!apiData.bpso_personnel_id || !apiData.personnel_name || !apiData.contact_number || !apiData.email || !apiData.duty_shift || !apiData.status) {
-=======
-                schedule: formData.get('schedule').trim(),
-                status: formData.get('status')
-            };
-            
-            if (!apiData.bpso_personnel_id || !apiData.personnel_name || !apiData.contact_number || !apiData.email || !apiData.schedule || !apiData.status) {
->>>>>>> bd0e9e2fcfed13fcdf64eabe653cdae9394a7d69
                 alert('Please fill in all required fields.');
                 return;
             }

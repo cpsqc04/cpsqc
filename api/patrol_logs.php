@@ -5,10 +5,7 @@ header('Content-Type: application/json');
 require_once __DIR__ . '/../db.php';
 require_once __DIR__ . '/patrol_logs_schema.php';
 require_once __DIR__ . '/../includes/bpso_auth.php';
-<<<<<<< HEAD
 require_once __DIR__ . '/../includes/patrol_shifts.php';
-=======
->>>>>>> bd0e9e2fcfed13fcdf64eabe653cdae9394a7d69
 
 try {
     ensurePatrolLogsTable($pdo);
@@ -109,7 +106,6 @@ if ($method === 'POST' && $action === 'submit_report') {
                 ]);
             }
 
-<<<<<<< HEAD
             $scheduleUpdate = $pdo->prepare(
                 'UPDATE patrol_schedules
                  SET status = :status,
@@ -136,11 +132,6 @@ if ($method === 'POST' && $action === 'submit_report') {
                 ':status' => $status === 'Completed' ? 'Completed' : 'In Progress',
                 ':patrol_end' => $patrolEnd !== '' ? $patrolEnd : null,
                 ':duration_minutes' => $durationMinutes,
-=======
-            $scheduleUpdate = $pdo->prepare('UPDATE patrol_schedules SET status = :status WHERE id = :id AND patrol_id = :patrol_id');
-            $scheduleUpdate->execute([
-                ':status' => $status === 'Completed' ? 'Completed' : 'In Progress',
->>>>>>> bd0e9e2fcfed13fcdf64eabe653cdae9394a7d69
                 ':id' => $scheduleId,
                 ':patrol_id' => $patrolId,
             ]);

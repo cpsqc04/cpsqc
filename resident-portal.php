@@ -9,11 +9,7 @@ $autoOpenLogin = false;
     <title>Resident Portal - AlerTara QC</title>
     <link rel="icon" type="image/x-icon" href="images/favicon.ico">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-<<<<<<< HEAD
     <link rel="stylesheet" href="css/portal-landing.css?v=20260721b">
-=======
-    <link rel="stylesheet" href="css/portal-landing.css">
->>>>>>> bd0e9e2fcfed13fcdf64eabe653cdae9394a7d69
     <link rel="stylesheet" href="css/mobile-responsive.css">
 </head>
 <body>

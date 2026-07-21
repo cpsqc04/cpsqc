@@ -28,20 +28,12 @@ $personnelName = htmlspecialchars(getBpsoPersonnelName());
         .sidebar.collapsed .nav-module-header .arrow { opacity: 0; width: 0; overflow: hidden; margin: 0; display: none; }
         .sidebar.collapsed .nav-submodules { display: none !important; max-height: 0 !important; }
         .sidebar.collapsed .nav-module.active .nav-submodules { display: none !important; }
-<<<<<<< HEAD
-=======
-        .nav-submodule { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
->>>>>>> bd0e9e2fcfed13fcdf64eabe653cdae9394a7d69
         .sidebar.collapsed .nav-submodule { padding: 0.75rem; justify-content: center; min-height: 44px; margin: 0.25rem 0.5rem; border-radius: 8px; }
         .sidebar.collapsed .nav-submodule-dashboard { padding: 0.75rem; justify-content: center; }
         .sidebar.collapsed .nav-submodule:hover { padding-left: 0.75rem; }
         .sidebar.collapsed .nav-submodule-text { opacity: 0; width: 0; overflow: hidden; display: none; }
         .sidebar.collapsed .nav-badge { display: none !important; }
-<<<<<<< HEAD
         .sidebar.collapsed .nav-submodule.active { border-left: none; border-top: 3px solid var(--primary-color); box-shadow: none; }
-=======
-        .sidebar.collapsed .nav-submodule.active { border-left: none; border-top: 3px solid var(--primary-color); }
->>>>>>> bd0e9e2fcfed13fcdf64eabe653cdae9394a7d69
         .sidebar.collapsed .nav-module-header::after { content: attr(data-tooltip); position: absolute; left: 100%; top: 50%; transform: translateY(-50%); background: rgba(0,0,0,0.9); color: #fff; padding: 0.5rem 0.75rem; border-radius: 6px; font-size: 0.85rem; white-space: nowrap; opacity: 0; pointer-events: none; margin-left: 0.75rem; z-index: 2000; box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
         .sidebar.collapsed .nav-module-header:hover::after { opacity: 1; }
         .sidebar.collapsed .sidebar-logout-btn { justify-content: center; padding: 0.875rem; }
@@ -62,7 +54,6 @@ $personnelName = htmlspecialchars(getBpsoPersonnelName());
         .sidebar-nav::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.22); border-radius: 999px; }
         .sidebar-nav::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.35); }
         .nav-module { margin-bottom: 0.125rem; }
-<<<<<<< HEAD
         .nav-module-header,
         .nav-submodule,
         .nav-submodule-dashboard {
@@ -167,26 +158,6 @@ $personnelName = htmlspecialchars(getBpsoPersonnelName());
             font-weight: 600;
         }
         .nav-submodule-dashboard.active .nav-submodule-icon i { color: #fff; }
-=======
-        .nav-module-header { display: flex; align-items: center; justify-content: space-between; padding: 0.875rem 1.5rem; color: rgba(255, 255, 255, 0.9); cursor: pointer; font-weight: 500; font-size: 0.9rem; gap: 0.75rem; line-height: 1.4; }
-        .nav-module-header:hover { background: rgba(255, 255, 255, 0.08); color: #fff; }
-        .nav-module.active .nav-module-header { background: rgba(255, 255, 255, 0.1); color: #fff; }
-        .nav-module-icon { width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-        .nav-module-header-text { flex: 1; }
-        .sidebar.collapsed .nav-module-header-text { opacity: 0; width: 0; overflow: hidden; }
-        .nav-module-header .arrow { font-size: 0.7rem; color: rgba(255, 255, 255, 0.6); transition: transform 0.3s ease; }
-        .nav-module.active .nav-module-header .arrow { transform: rotate(90deg); }
-        .nav-submodules { max-height: 0; overflow: hidden; transition: max-height 0.3s ease; background: rgba(0, 0, 0, 0.15); }
-        .nav-module.active .nav-submodules { max-height: 280px; }
-        .nav-submodule { padding: 0.65rem 1rem 0.65rem 3rem; color: rgba(255, 255, 255, 0.75); text-decoration: none; display: flex; align-items: center; gap: 0.65rem; transition: all 0.2s ease; font-size: 0.82rem; cursor: pointer; border: none; background: none; width: 100%; text-align: left; font-family: inherit; position: relative; box-sizing: border-box; }
-        .nav-submodule:hover { background: rgba(255, 255, 255, 0.08); color: #fff; padding-left: 3.35rem; }
-        .nav-submodule.active { background: rgba(76, 138, 137, 0.35); color: #fff; border-left: 3px solid var(--primary-color); font-weight: 600; }
-        .nav-submodule.active .nav-submodule-icon i { color: #fff; }
-        .nav-submodule-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-        .nav-badge { display: none; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px; background: #ef4444; color: #fff; font-size: 0.7rem; font-weight: 700; align-items: center; justify-content: center; line-height: 20px; text-align: center; flex-shrink: 0; }
-        .nav-submodule.active .nav-badge { background: #fff; color: #ef4444; }
-        .nav-submodule-dashboard { padding-left: 1.25rem; font-weight: 500; }
->>>>>>> bd0e9e2fcfed13fcdf64eabe653cdae9394a7d69
         .sidebar.collapsed .nav-submodule::after { content: attr(data-tooltip); position: absolute; left: 100%; top: 50%; transform: translateY(-50%); background: rgba(0,0,0,0.9); color: #fff; padding: 0.5rem 0.75rem; border-radius: 6px; font-size: 0.85rem; white-space: nowrap; opacity: 0; pointer-events: none; margin-left: 0.75rem; z-index: 2000; }
         .sidebar.collapsed .nav-submodule:hover::after { opacity: 1; }
         .personnel-status-chip { display: inline-flex; align-items: center; gap: 0.35rem; margin-top: 0.25rem; padding: 0.28rem 0.65rem; border-radius: 999px; font-size: 0.75rem; font-weight: 600; background: rgba(255,255,255,0.12); color: rgba(255,255,255,0.9); }
@@ -242,10 +213,6 @@ $personnelName = htmlspecialchars(getBpsoPersonnelName());
         @media (max-width: 900px) {
             .form-grid-split { grid-template-columns: 1fr; }
         }
-<<<<<<< HEAD
-=======
-        .nav-submodule-icon { width: 22px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
->>>>>>> bd0e9e2fcfed13fcdf64eabe653cdae9394a7d69
         .nav-submodule-icon i { color: rgba(255, 255, 255, 0.75); transition: color 0.2s ease; }
         .sidebar-footer { margin-top: auto; padding: 1rem; border-top: 1px solid rgba(255, 255, 255, 0.1); position: relative; flex-shrink: 0; }
         .sidebar-logout-btn { display: flex; align-items: center; gap: 0.75rem; padding: 0.875rem 1.5rem; background: rgba(239, 68, 68, 0.1); color: rgba(255, 255, 255, 0.9); text-decoration: none; border-radius: 8px; font-size: 1rem; font-weight: 500; border: 1px solid rgba(239, 68, 68, 0.2); width: 100%; box-sizing: border-box; }
@@ -483,27 +450,17 @@ $personnelName = htmlspecialchars(getBpsoPersonnelName());
                             <thead>
                                 <tr>
                                     <th>Date</th>
-<<<<<<< HEAD
                                     <th>Shift</th>
                                     <th>Patrol Zone</th>
                                     <th>Start</th>
                                     <th>End</th>
                                     <th>Duration</th>
-=======
-                                    <th>Time</th>
-                                    <th>Route</th>
-                                    <th>Location</th>
->>>>>>> bd0e9e2fcfed13fcdf64eabe653cdae9394a7d69
                                     <th>Status</th>
                                     <th>Actions</th>
                                 </tr>
                             </thead>
                             <tbody id="scheduleTableBody">
-<<<<<<< HEAD
                                 <tr><td colspan="8" class="empty-state">Loading schedule...</td></tr>
-=======
-                                <tr><td colspan="6" class="empty-state">Loading schedule...</td></tr>
->>>>>>> bd0e9e2fcfed13fcdf64eabe653cdae9394a7d69
                             </tbody>
                         </table>
                     </div>
@@ -758,7 +715,6 @@ $personnelName = htmlspecialchars(getBpsoPersonnelName());
             renderScheduleTable();
         }
 
-<<<<<<< HEAD
         function getTodayDateString() {
             return new Date().toISOString().split('T')[0];
         }
@@ -771,8 +727,6 @@ $personnelName = htmlspecialchars(getBpsoPersonnelName());
             return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
         }
 
-=======
->>>>>>> bd0e9e2fcfed13fcdf64eabe653cdae9394a7d69
         function getFilteredSchedules() {
             const today = getTodayDateString();
             if (scheduleFilter === 'today') {
@@ -793,7 +747,6 @@ $personnelName = htmlspecialchars(getBpsoPersonnelName());
             const rows = getFilteredSchedules();
 
             if (rows.length === 0) {
-<<<<<<< HEAD
                 tbody.innerHTML = '<tr><td colspan="8" class="empty-state"><i class="fas fa-calendar-times"></i>No patrol assignments in this view.</td></tr>';
             } else {
                 tbody.innerHTML = rows.map(row => {
@@ -802,12 +755,6 @@ $personnelName = htmlspecialchars(getBpsoPersonnelName());
                     const startDisplay = row.patrol_start_display || (row.patrol_start || row.schedule_time ? formatScheduleTime(row.patrol_start || row.schedule_time) : (row.status === 'Scheduled' ? 'Pending' : '—'));
                     const endDisplay = row.patrol_end_display || (row.patrol_end ? formatScheduleTime(row.patrol_end) : (row.status === 'In Progress' ? 'In progress' : (row.status === 'Scheduled' ? 'Pending' : '—')));
                     const durationLabel = row.duration_label || (row.status === 'In Progress' ? 'In progress' : '—');
-=======
-                tbody.innerHTML = '<tr><td colspan="6" class="empty-state"><i class="fas fa-calendar-times"></i>No patrol assignments in this view.</td></tr>';
-            } else {
-                tbody.innerHTML = rows.map(row => {
-                    scheduleData[row.id] = row;
->>>>>>> bd0e9e2fcfed13fcdf64eabe653cdae9394a7d69
                     const canReport = row.status === 'Scheduled' || row.status === 'In Progress';
                     const actions = canReport
                         ? `<button type="button" class="btn-report" onclick="openReportForSchedule(${row.id})">Submit Report</button>`
@@ -817,7 +764,6 @@ $personnelName = htmlspecialchars(getBpsoPersonnelName());
                         : '';
                     return `<tr>
                         <td>${escapeHtml(row.schedule_date)}</td>
-<<<<<<< HEAD
                         <td>${escapeHtml(row.shift || '—')}</td>
                         <td>${escapeHtml(zone)}</td>
                         <td>${escapeHtml(startDisplay)}</td>
@@ -825,13 +771,6 @@ $personnelName = htmlspecialchars(getBpsoPersonnelName());
                         <td>${escapeHtml(durationLabel)}</td>
                         <td><span class="status-badge ${statusClass(row.status)}">${escapeHtml(row.status)}</span></td>
                         <td>${startBtn}${actions}</td>
-=======
-                        <td>${escapeHtml(row.schedule_time)}</td>
-                        <td>${escapeHtml(row.route)}</td>
-                        <td>${escapeHtml(row.location || '—')}</td>
-                        <td><span class="status-badge ${statusClass(row.status)}">${escapeHtml(row.status)}</span></td>
-                        <td>${actions}${startBtn}</td>
->>>>>>> bd0e9e2fcfed13fcdf64eabe653cdae9394a7d69
                     </tr>`;
                 }).join('');
             }
@@ -1013,11 +952,7 @@ $personnelName = htmlspecialchars(getBpsoPersonnelName());
                 const result = await res.json();
 
                 if (!result.success) {
-<<<<<<< HEAD
                     tbody.innerHTML = '<tr><td colspan="8" class="empty-state">Failed to load schedule.</td></tr>';
-=======
-                    tbody.innerHTML = '<tr><td colspan="6" class="empty-state">Failed to load schedule.</td></tr>';
->>>>>>> bd0e9e2fcfed13fcdf64eabe653cdae9394a7d69
                     portalSchedules = [];
                     updateNavBadges();
                     return;
@@ -1027,11 +962,7 @@ $personnelName = htmlspecialchars(getBpsoPersonnelName());
                 portalSchedules = result.data || [];
 
                 if (portalSchedules.length === 0) {
-<<<<<<< HEAD
                     tbody.innerHTML = '<tr><td colspan="8" class="empty-state"><i class="fas fa-calendar-times"></i>No patrol assignments yet.</td></tr>';
-=======
-                    tbody.innerHTML = '<tr><td colspan="6" class="empty-state"><i class="fas fa-calendar-times"></i>No patrol assignments yet.</td></tr>';
->>>>>>> bd0e9e2fcfed13fcdf64eabe653cdae9394a7d69
                     select.innerHTML = '<option value="">No assignments available</option>';
                     updateNavBadges();
                     return;
@@ -1040,11 +971,7 @@ $personnelName = htmlspecialchars(getBpsoPersonnelName());
                 renderScheduleTable();
                 updateNavBadges();
             } catch (e) {
-<<<<<<< HEAD
                 tbody.innerHTML = '<tr><td colspan="8" class="empty-state">Error loading schedule.</td></tr>';
-=======
-                tbody.innerHTML = '<tr><td colspan="6" class="empty-state">Error loading schedule.</td></tr>';
->>>>>>> bd0e9e2fcfed13fcdf64eabe653cdae9394a7d69
                 portalSchedules = [];
                 updateNavBadges();
             }
@@ -1133,11 +1060,7 @@ $personnelName = htmlspecialchars(getBpsoPersonnelName());
                 const res = await fetch('api/patrol_schedules.php', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-<<<<<<< HEAD
                     body: JSON.stringify({ action: 'start_patrol', schedule_id: scheduleId, status: 'In Progress' })
-=======
-                    body: JSON.stringify({ action: 'update_status', schedule_id: scheduleId, status: 'In Progress' })
->>>>>>> bd0e9e2fcfed13fcdf64eabe653cdae9394a7d69
                 });
                 const result = await res.json();
                 if (result.success) {

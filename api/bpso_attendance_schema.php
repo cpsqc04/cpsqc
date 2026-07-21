@@ -59,7 +59,6 @@ function bpsoAttendanceSelectColumns(string $prefix = ''): string
     return "{$p}id, {$p}patrol_id, {$p}personnel_name, {$p}bpso_personnel_id, {$p}attendance_date, {$p}time_in, {$p}time_out, {$p}notes, {$p}created_at";
 }
 
-<<<<<<< HEAD
 require_once __DIR__ . '/../includes/patrol_shifts.php';
 
 function enrichAttendanceRow(array $row, ?PDO $pdo = null): array
@@ -80,12 +79,6 @@ function enrichAttendanceRow(array $row, ?PDO $pdo = null): array
         $row['duty'] = '—';
     }
 
-=======
-function enrichAttendanceRow(array $row): array
-{
-    $row['is_at_hall'] = empty($row['time_out']);
-    $row['status_label'] = empty($row['time_out']) ? 'At Hall' : 'Timed Out';
->>>>>>> bd0e9e2fcfed13fcdf64eabe653cdae9394a7d69
     return $row;
 }
 

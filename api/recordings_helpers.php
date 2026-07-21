@@ -13,7 +13,6 @@ function recordingsDirectory(): string
     return dirname(__DIR__) . DIRECTORY_SEPARATOR . RECORDINGS_DIR_NAME;
 }
 
-<<<<<<< HEAD
 function ensureRecordingsDirectory(): bool
 {
     $dir = recordingsDirectory();
@@ -24,8 +23,6 @@ function ensureRecordingsDirectory(): bool
     return @mkdir($dir, 0755, true) || is_dir($dir);
 }
 
-=======
->>>>>>> bd0e9e2fcfed13fcdf64eabe653cdae9394a7d69
 function isValidRecordingFilename(string $filename): bool
 {
     return (bool) preg_match('/^recording_\d{8}_\d{6}\.mp4$/', $filename);
@@ -166,10 +163,7 @@ function formatRecordingSegment(array $parsed, string $filepath): array
 
 function scanRecordingSegments(?string $dateFilter = null, bool $includeEmpty = false): array
 {
-<<<<<<< HEAD
     ensureRecordingsDirectory();
-=======
->>>>>>> bd0e9e2fcfed13fcdf64eabe653cdae9394a7d69
     $dir = recordingsDirectory();
     if (!is_dir($dir)) {
         return [];
@@ -257,10 +251,7 @@ function findRecordingSegmentsForWindow(string $date, string $startTime, string 
 
 function cleanupExpiredRecordings(int $retentionDays = RECORDING_RETENTION_DAYS): int
 {
-<<<<<<< HEAD
     ensureRecordingsDirectory();
-=======
->>>>>>> bd0e9e2fcfed13fcdf64eabe653cdae9394a7d69
     $dir = recordingsDirectory();
     if (!is_dir($dir)) {
         return 0;

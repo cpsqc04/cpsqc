@@ -544,7 +544,6 @@ function getIntegrationCatalog(): array
                     endpoint('/api/current_frame.php', ['name' => 'Live Camera Frame', 'methods' => ['GET', 'HEAD'], 'auth' => 'admin_session']),
                     endpoint('/api/get_detections.php', ['name' => 'AI Detections', 'methods' => ['GET'], 'auth' => 'admin_session']),
                     endpoint('/api/get_frame_info.php', ['name' => 'Frame Metadata', 'methods' => ['GET'], 'auth' => 'admin_session']),
-                    endpoint('/api/cameras_public.php', ['name' => 'Public Cameras List', 'methods' => ['GET'], 'auth' => 'public']),
                 ],
             ],
             'utility' => [

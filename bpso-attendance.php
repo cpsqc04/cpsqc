@@ -141,11 +141,8 @@ require_once __DIR__ . '/db.php';
         .date-filter label { font-size: 0.9rem; font-weight: 500; color: var(--text-color); white-space: nowrap; }
         .date-filter input[type="date"] { padding: 0.75rem 1rem; border: 1px solid var(--border-color); border-radius: 8px; font-size: 0.95rem; font-family: var(--font-family); }
         .date-filter input[type="date"]:focus { outline: none; border-color: var(--primary-color); box-shadow: 0 0 0 3px rgba(76, 138, 137, 0.1); }
-<<<<<<< HEAD
         .btn-export { padding: 0.75rem 1.25rem; background: var(--primary-color); color: #fff; border: none; border-radius: 8px; font-size: 0.95rem; font-weight: 600; cursor: pointer; white-space: nowrap; display: inline-flex; align-items: center; gap: 0.5rem; }
         .btn-export:hover { background: #4ca8a6; }
-=======
->>>>>>> bd0e9e2fcfed13fcdf64eabe653cdae9394a7d69
         .table-container { overflow-x: auto; border-radius: 8px; border: 1px solid var(--border-color); }
         table { width: 100%; border-collapse: collapse; background: var(--card-bg); }
         thead { background: var(--tertiary-color); color: #fff; }
@@ -337,12 +334,9 @@ require_once __DIR__ . '/db.php';
                             <label for="historyDate">Date:</label>
                             <input type="date" id="historyDate" onchange="loadAttendanceLog()">
                         </div>
-<<<<<<< HEAD
                         <button type="button" class="btn-export" onclick="exportAttendanceLog()">
                             <i class="fas fa-file-export"></i> Export
                         </button>
-=======
->>>>>>> bd0e9e2fcfed13fcdf64eabe653cdae9394a7d69
                     </div>
                     <div class="table-container">
                         <table>
@@ -350,22 +344,15 @@ require_once __DIR__ . '/db.php';
                                 <tr>
                                     <th>Personnel ID</th>
                                     <th>Name</th>
-<<<<<<< HEAD
                                     <th>Duty</th>
                                     <th>Patrol Duration</th>
-=======
->>>>>>> bd0e9e2fcfed13fcdf64eabe653cdae9394a7d69
                                     <th>Time In</th>
                                     <th>Time Out</th>
                                     <th>Status</th>
                                 </tr>
                             </thead>
                             <tbody id="logTableBody">
-<<<<<<< HEAD
                                 <tr><td colspan="7" style="text-align:center;padding:2rem;color:#666;">Loading...</td></tr>
-=======
-                                <tr><td colspan="5" style="text-align:center;padding:2rem;color:#666;">Loading...</td></tr>
->>>>>>> bd0e9e2fcfed13fcdf64eabe653cdae9394a7d69
                             </tbody>
                         </table>
                     </div>
@@ -451,22 +438,14 @@ require_once __DIR__ . '/db.php';
                 const result = await response.json();
 
                 if (!result.success) {
-<<<<<<< HEAD
                     tableBody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:2rem;color:#666;">Failed to load attendance log.</td></tr>';
-=======
-                    tableBody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:2rem;color:#666;">Failed to load attendance log.</td></tr>';
->>>>>>> bd0e9e2fcfed13fcdf64eabe653cdae9394a7d69
                     return;
                 }
 
                 logData = result.data || [];
 
                 if (logData.length === 0) {
-<<<<<<< HEAD
                     tableBody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:2rem;color:#666;">No attendance records for this date.</td></tr>';
-=======
-                    tableBody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:2rem;color:#666;">No attendance records for this date.</td></tr>';
->>>>>>> bd0e9e2fcfed13fcdf64eabe653cdae9394a7d69
                     return;
                 }
 
@@ -474,11 +453,8 @@ require_once __DIR__ . '/db.php';
                     <tr>
                         <td>${escapeHtml(row.bpso_personnel_id || '—')}</td>
                         <td>${escapeHtml(row.personnel_name)}</td>
-<<<<<<< HEAD
                         <td>${escapeHtml(row.duty || '—')}</td>
                         <td>${escapeHtml(row.patrol_duration_label || '—')}</td>
-=======
->>>>>>> bd0e9e2fcfed13fcdf64eabe653cdae9394a7d69
                         <td>${formatDateTime(row.time_in)}</td>
                         <td>${formatDateTime(row.time_out)}</td>
                         <td><span class="status-badge ${statusClass(row.status_label)}">${escapeHtml(row.status_label)}</span></td>
@@ -488,7 +464,6 @@ require_once __DIR__ . '/db.php';
                 filterTable('logTableBody', 'logSearch');
             } catch (e) {
                 console.error('Error loading attendance log:', e);
-<<<<<<< HEAD
                 tableBody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:2rem;color:#666;">Error loading attendance log.</td></tr>';
             }
         }
@@ -499,12 +474,6 @@ require_once __DIR__ . '/db.php';
             window.location.href = 'api/bpso_attendance.php?view=export&date=' + encodeURIComponent(selectedDate);
         }
 
-=======
-                tableBody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:2rem;color:#666;">Error loading attendance log.</td></tr>';
-            }
-        }
-
->>>>>>> bd0e9e2fcfed13fcdf64eabe653cdae9394a7d69
         function toggleSidebar() {
             const sidebar = document.getElementById('sidebar');
             const isCollapsed = sidebar.classList.contains('collapsed');

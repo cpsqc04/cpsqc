@@ -374,11 +374,7 @@
         }
         .services-grid {
             display: grid;
-<<<<<<< HEAD
             grid-template-columns: repeat(2, minmax(0, 1fr));
-=======
-            grid-template-columns: repeat(2, 1fr);
->>>>>>> bd0e9e2fcfed13fcdf64eabe653cdae9394a7d69
             gap: 1.35rem;
             margin-top: 2rem;
         }
@@ -709,10 +705,6 @@
             font-size: 0.9rem;
         }
         .eligibility-list {
-<<<<<<< HEAD
-=======
-            list-style: none;
->>>>>>> bd0e9e2fcfed13fcdf64eabe653cdae9394a7d69
             margin: 0 0 1.25rem;
             padding: 0;
             display: grid;
@@ -730,12 +722,9 @@
             font-size: 0.95rem;
             line-height: 1.45;
         }
-<<<<<<< HEAD
         .eligibility-question::before {
             content: none;
         }
-=======
->>>>>>> bd0e9e2fcfed13fcdf64eabe653cdae9394a7d69
         .eligibility-question em {
             display: block;
             margin-top: 0.35rem;
@@ -789,7 +778,6 @@
         .birthday-input-wrap {
             position: relative;
             display: grid;
-<<<<<<< HEAD
             grid-template-columns: minmax(0, 1fr);
         }
         .birthday-input-wrap > * {
@@ -801,11 +789,6 @@
             box-sizing: border-box;
             position: relative;
             z-index: 1;
-=======
-        }
-        .birthday-input-wrap #memberBirthday {
-            padding-right: 3rem;
->>>>>>> bd0e9e2fcfed13fcdf64eabe653cdae9394a7d69
         }
         .birthday-calendar-icon {
             position: absolute;
@@ -815,10 +798,7 @@
             color: rgba(255,255,255,0.7);
             pointer-events: none;
             font-size: 1rem;
-<<<<<<< HEAD
             z-index: 2;
-=======
->>>>>>> bd0e9e2fcfed13fcdf64eabe653cdae9394a7d69
         }
         .birthday-native-picker {
             position: absolute;
@@ -834,10 +814,7 @@
             cursor: pointer;
             background: transparent;
             color-scheme: light;
-<<<<<<< HEAD
             z-index: 3;
-=======
->>>>>>> bd0e9e2fcfed13fcdf64eabe653cdae9394a7d69
         }
         .birthday-native-picker::-webkit-calendar-picker-indicator {
             position: absolute;
@@ -1157,12 +1134,6 @@
             .nav-back {
                 font-size: 0.78rem;
             }
-<<<<<<< HEAD
-=======
-            .services-grid {
-                grid-template-columns: 1fr;
-            }
->>>>>>> bd0e9e2fcfed13fcdf64eabe653cdae9394a7d69
             .nav-links {
                 order: 4;
                 position: static;
@@ -1218,10 +1189,6 @@
             .section .sub,
             .about-copy { max-width: none; }
             .role-grid { grid-template-columns: 1fr; }
-<<<<<<< HEAD
-=======
-            .services-grid { grid-template-columns: 1fr; }
->>>>>>> bd0e9e2fcfed13fcdf64eabe653cdae9394a7d69
             .form-row { grid-template-columns: 1fr; }
             .role-card { padding: 1.35rem 1.2rem; }
             .mvv-block { scroll-margin-top: 5rem; }
@@ -1323,7 +1290,6 @@
     font-family: var(--font-display);
     color: #fff;
     margin-bottom: 0.25rem;
-<<<<<<< HEAD
 }
 
 .services-grid {
@@ -1337,6 +1303,4 @@
     .services-grid {
         grid-template-columns: 1fr;
     }
-=======
->>>>>>> bd0e9e2fcfed13fcdf64eabe653cdae9394a7d69
 }

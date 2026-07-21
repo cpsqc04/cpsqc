@@ -153,7 +153,6 @@ PHONE_MODEL_CANDIDATES = ('phone_yolov8.pt', 'yolov8s.pt', 'yolov8m.pt', 'yolov8
 PHONE_COCO_CLASS_ID = 67
 GROUP_MIN_PEOPLE = 2   # Nearby people counted as a group
 CROWD_MIN_PEOPLE = 4   # Larger clusters counted as a crowd
-<<<<<<< HEAD
 BAG_CONFIDENCE_THRESHOLD = 0.25  # Backpacks/suitcases are often partially occluded
 BAG_YOLO_SCAN_CONF = 0.12  # Low conf for dedicated bag scan passes
 ENABLE_BAG_SECONDARY_SCAN = True
@@ -161,10 +160,6 @@ BAG_COCO_CLASS_IDS = [24, 26, 28]  # backpack, handbag, suitcase
 SUSPICIOUS_CATEGORIES = frozenset({'crowd', 'group', 'backpack', 'suitcase'})
 MAX_PERSON_DETECTIONS = 25  # Keep enough people for crowd counting
 MAX_OTHER_DETECTIONS = 15
-=======
-MAX_PERSON_DETECTIONS = 25  # Keep enough people for crowd counting
-MAX_OTHER_DETECTIONS = 10
->>>>>>> bd0e9e2fcfed13fcdf64eabe653cdae9394a7d69
 MAX_RECONNECT_ATTEMPTS = 10
 RECONNECT_DELAY = 3  # seconds
 FRAME_READ_TIMEOUT = 5  # seconds
@@ -181,11 +176,7 @@ PRIORITIZE_FRAME_SAVING = True  # Save frame BEFORE detection to minimize latenc
 # Class mapping for YOLO
 # COCO dataset classes: 0=person, 2=car, 3=motorcycle, 5=bus, 7=truck (vehicles)
 # 14=bird, 15=cat, 16=dog, 17=horse, 18=sheep, 19=cow, 20=elephant, 21=bear, 22=zebra, 23=giraffe (animals)
-<<<<<<< HEAD
 # 58=potted plant, 67=cell phone, 24=backpack, 26=handbag, 28=suitcase
-=======
-# 58=potted plant, 67=cell phone, 24=backpack, 28=suitcase
->>>>>>> bd0e9e2fcfed13fcdf64eabe653cdae9394a7d69
 CLASS_NAMES = {
     0: "person",
     2: "vehicle",  # car
@@ -203,10 +194,7 @@ CLASS_NAMES = {
     22: "animal",  # zebra
     23: "animal",  # giraffe
     24: "backpack",  # backpack
-<<<<<<< HEAD
     26: "backpack",  # handbag (treated as backpack for suspicious-activity monitoring)
-=======
->>>>>>> bd0e9e2fcfed13fcdf64eabe653cdae9394a7d69
     28: "suitcase",  # suitcase / luggage
     58: "plant",   # potted plant
     67: "phone",   # cell phone / smartphone
@@ -220,11 +208,7 @@ TARGET_CLASSES = ["person", "vehicle", "animal", "plant", "phone", "backpack", "
 WEAPON_CLASSES = ["knife", "gun", "pistol", "rifle", "weapon"]
 
 # YOLO class IDs we care about (speeds inference and keeps plant/phone/bag enabled)
-<<<<<<< HEAD
 YOLO_TARGET_CLASS_IDS = [0, 2, 3, 5, 7, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 26, 28, 58, 67]
-=======
-YOLO_TARGET_CLASS_IDS = [0, 2, 3, 5, 7, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 28, 58, 67]
->>>>>>> bd0e9e2fcfed13fcdf64eabe653cdae9394a7d69
 
 
 def get_rtsp_bases(rtsp_url):
@@ -743,7 +727,6 @@ def enhance_phone_detections(frame, model, detections):
 
     return detections
 
-<<<<<<< HEAD
 def map_bag_class_to_category(class_name):
     class_lower = str(class_name or '').lower()
     if any(b in class_lower for b in ['suitcase', 'luggage']):
@@ -887,8 +870,6 @@ def enhance_bag_detections(frame, model, detections):
 
     return detections
 
-=======
->>>>>>> bd0e9e2fcfed13fcdf64eabe653cdae9394a7d69
 def confidence_threshold_for_category(category):
     """Use lower thresholds for small / lower-confidence COCO classes."""
     if category == "plant":
@@ -896,11 +877,7 @@ def confidence_threshold_for_category(category):
     if category == "phone":
         return PHONE_CONFIDENCE_THRESHOLD
     if category in ("backpack", "suitcase"):
-<<<<<<< HEAD
         return BAG_CONFIDENCE_THRESHOLD
-=======
-        return 0.30
->>>>>>> bd0e9e2fcfed13fcdf64eabe653cdae9394a7d69
     return CONFIDENCE_THRESHOLD
 
 def map_class_to_category(class_id, class_name):
@@ -927,11 +904,7 @@ def map_class_to_category(class_id, class_name):
         return "phone"
 
     # Check for luggage / bags
-<<<<<<< HEAD
     if "backpack" in class_lower or "handbag" in class_lower:
-=======
-    if "backpack" in class_lower:
->>>>>>> bd0e9e2fcfed13fcdf64eabe653cdae9394a7d69
         return "backpack"
     if any(b in class_lower for b in ["suitcase", "luggage"]):
         return "suitcase"
@@ -1593,7 +1566,6 @@ def phone_near_person(phone_bbox, person_bbox):
         return True
     return bbox_iou(phone_bbox, person_bbox) >= 0.05
 
-<<<<<<< HEAD
 def object_near_person(object_bbox, person_bbox):
     return phone_near_person(object_bbox, person_bbox)
 
@@ -1639,11 +1611,6 @@ def enrich_detections_for_display(detections):
     """Normalize person fields for the Detected Objects card UI."""
     phones = [d for d in detections if d.get('category') == 'phone' and d.get('bbox')]
     bags = [d for d in detections if d.get('category') in ('backpack', 'suitcase') and d.get('bbox')]
-=======
-def enrich_detections_for_display(detections):
-    """Normalize person fields for the Detected Objects card UI."""
-    phones = [d for d in detections if d.get('category') == 'phone' and d.get('bbox')]
->>>>>>> bd0e9e2fcfed13fcdf64eabe653cdae9394a7d69
 
     for det in detections:
         category = det.get('category')
@@ -1678,20 +1645,16 @@ def enrich_detections_for_display(detections):
                     if phone_near_person(phone['bbox'], person_bbox):
                         items.append('cell phone')
                         break
-<<<<<<< HEAD
                 for bag in bags:
                     if object_near_person(bag['bbox'], person_bbox):
                         label = 'backpack' if bag.get('category') == 'backpack' else 'suitcase'
                         items.append(label)
-=======
->>>>>>> bd0e9e2fcfed13fcdf64eabe653cdae9394a7d69
             det['items_detected'] = ', '.join(dict.fromkeys(items)) if items else 'None'
             continue
 
         if category in ('group', 'crowd'):
             count = det.get('people_count') or det.get('group_size') or 0
             det['items_detected'] = f'{count} people'
-<<<<<<< HEAD
             if det.get('suspicious_reason'):
                 det['activity'] = 'Suspicious'
             continue
@@ -1700,8 +1663,6 @@ def enrich_detections_for_display(detections):
             det['items_detected'] = det.get('class') or category
             if det.get('suspicious_reason'):
                 det['activity'] = 'Suspicious'
-=======
->>>>>>> bd0e9e2fcfed13fcdf64eabe653cdae9394a7d69
             continue
 
         det['items_detected'] = det.get('class') or category or 'None'
@@ -2157,11 +2118,8 @@ def draw_detections_on_frame(frame, detections):
         if category in ("group", "crowd"):
             people_count = detection.get('people_count', detection.get('group_size', 0))
             label = f"{category}: {people_count} people"
-<<<<<<< HEAD
         elif detection.get('suspicious'):
             label = f"! {category}: {class_name} {conf:.2f}"
-=======
->>>>>>> bd0e9e2fcfed13fcdf64eabe653cdae9394a7d69
         else:
             label = f"{category}: {class_name} {conf:.2f}"
         font_scale = 0.7 if category in ("plant", "phone", "backpack", "suitcase", "group", "crowd") else 0.55
@@ -2213,12 +2171,9 @@ def save_detections(detections):
             "people_count": sum(1 for d in detections if d.get('category') == 'person'),
             "group_count": sum(1 for d in detections if d.get('category') == 'group'),
             "crowd_count": sum(1 for d in detections if d.get('category') == 'crowd'),
-<<<<<<< HEAD
             "backpack_count": sum(1 for d in detections if d.get('category') == 'backpack'),
             "suitcase_count": sum(1 for d in detections if d.get('category') == 'suitcase'),
             "suspicious_count": sum(1 for d in detections if d.get('suspicious')),
-=======
->>>>>>> bd0e9e2fcfed13fcdf64eabe653cdae9394a7d69
             "status": "active"
         }
         
@@ -3578,11 +3533,7 @@ def main():
                             results = model(
                                 frame,
                                 verbose=False,
-<<<<<<< HEAD
                                 conf=min(CONFIDENCE_THRESHOLD, PLANT_CONFIDENCE_THRESHOLD, PHONE_CONFIDENCE_THRESHOLD, BAG_CONFIDENCE_THRESHOLD),
-=======
-                                conf=min(CONFIDENCE_THRESHOLD, PLANT_CONFIDENCE_THRESHOLD, PHONE_CONFIDENCE_THRESHOLD),
->>>>>>> bd0e9e2fcfed13fcdf64eabe653cdae9394a7d69
                                 classes=YOLO_TARGET_CLASS_IDS,
                                 imgsz=640,
                             )
@@ -3590,13 +3541,9 @@ def main():
                             results = model(frame)
                         detections = process_detections(results, frame)
                         detections = enhance_phone_detections(frame, model, detections)
-<<<<<<< HEAD
                         detections = enhance_bag_detections(frame, model, detections)
                         detections = analyze_crowds_and_groups(frame, detections)
                         detections = mark_suspicious_detections(detections)
-=======
-                        detections = analyze_crowds_and_groups(frame, detections)
->>>>>>> bd0e9e2fcfed13fcdf64eabe653cdae9394a7d69
                         detections = enrich_detections_for_display(detections)
                         last_overlay_detections = detections
                         # Always refresh detections.json so the UI stays in sync
