@@ -129,7 +129,11 @@ RECORDING_FPS = 30  # FPS for recorded video (30 FPS is standard for CCTV)
 RECORDING_CHUNK_DURATION = 3600  # Record in 1-hour chunks (seconds)
 RECORDING_CODEC = 'mp4v'  # Use 'mp4v' for .mp4, 'XVID' for .avi
 RECORDING_EXTENSION = '.mp4'  # File extension for recordings
+<<<<<<< HEAD
 RECORDING_RETENTION_DAYS = 30  # Auto-delete recordings older than 30 days
+=======
+MAX_RECORDINGS_TO_KEEP = 168  # Keep 7 days of 1-hour recordings (168 hours)
+>>>>>>> bd0e9e2fcfed13fcdf64eabe653cdae9394a7d69
 CONFIDENCE_THRESHOLD = 0.5
 MAX_RECONNECT_ATTEMPTS = 10
 RECONNECT_DELAY = 3  # seconds
@@ -1512,6 +1516,7 @@ def rotate_video_writer(writer_info, width, height, fps=RECORDING_FPS):
     # Start new recording
     return init_video_writer(width, height, fps)
 
+<<<<<<< HEAD
 def get_recording_file_age_seconds(filepath):
     """Return age of a recording file in seconds (from filename timestamp or mtime)."""
     name = os.path.basename(filepath)
@@ -1567,6 +1572,33 @@ def cleanup_old_recordings(retention_days=RECORDING_RETENTION_DAYS):
 
         if removed:
             print(f"✓ Retention cleanup complete ({removed} file(s) removed, keep {retention_days} days)")
+=======
+def cleanup_old_recordings(max_keep=MAX_RECORDINGS_TO_KEEP):
+    """Remove old recording files, keeping only the most recent ones"""
+    if not os.path.exists(RECORDINGS_DIR):
+        return
+    
+    try:
+        # Get all recording files
+        recordings = []
+        for filename in os.listdir(RECORDINGS_DIR):
+            if filename.startswith("recording_") and filename.endswith(RECORDING_EXTENSION):
+                filepath = os.path.join(RECORDINGS_DIR, filename)
+                if os.path.isfile(filepath):
+                    recordings.append((filepath, os.path.getmtime(filepath)))
+        
+        # Sort by modification time (newest first)
+        recordings.sort(key=lambda x: x[1], reverse=True)
+        
+        # Remove old files beyond max_keep
+        if len(recordings) > max_keep:
+            for filepath, _ in recordings[max_keep:]:
+                try:
+                    os.remove(filepath)
+                    print(f"✓ Removed old recording: {os.path.basename(filepath)}")
+                except Exception as e:
+                    print(f"✗ Error removing old recording {filepath}: {e}")
+>>>>>>> bd0e9e2fcfed13fcdf64eabe653cdae9394a7d69
     except Exception as e:
         print(f"✗ Error during recording cleanup: {e}")
 
@@ -2096,8 +2128,11 @@ def main():
         try:
             os.makedirs(RECORDINGS_DIR, exist_ok=True)
             print(f"✓ Recordings directory ready: {RECORDINGS_DIR}")
+<<<<<<< HEAD
             cleanup_old_recordings()
             print(f"✓ Retention policy: auto-delete after {RECORDING_RETENTION_DAYS} days")
+=======
+>>>>>>> bd0e9e2fcfed13fcdf64eabe653cdae9394a7d69
         except Exception as e:
             print(f"Warning: Could not create recordings directory: {e}")
             print("Recording will be disabled")

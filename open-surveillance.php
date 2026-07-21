@@ -217,6 +217,7 @@ $cctvNavActive = 'open-surveillance';
         .detection-card .tag.person { background: #0ea5e9; }
         .detection-card .tag.vehicle { background: #ea580c; }
         .detection-card .tag.animal { background: #ca8a04; }
+<<<<<<< HEAD
         .detection-card .tag.suspicious-flag {
             background: #dc2626;
             margin-left: 0.35rem;
@@ -237,6 +238,8 @@ $cctvNavActive = 'open-surveillance';
             font-weight: 600;
         }
         .suspicious-banner.show { display: block; }
+=======
+>>>>>>> bd0e9e2fcfed13fcdf64eabe653cdae9394a7d69
         .detection-card-body {
             display: grid;
             grid-template-columns: 92px 1fr;
@@ -494,7 +497,10 @@ $cctvNavActive = 'open-surveillance';
 
                     <div class="surveillance-layout">
                         <div class="detection-panel">
+<<<<<<< HEAD
                             <p id="suspiciousBanner" class="suspicious-banner"></p>
+=======
+>>>>>>> bd0e9e2fcfed13fcdf64eabe653cdae9394a7d69
                             <h3><i class="fas fa-list"></i> Detected Objects</h3>
                             <div class="detection-cards" id="detectionList">
                                 <p class="detection-empty">No objects detected yet.</p>
@@ -734,11 +740,16 @@ $cctvNavActive = 'open-surveillance';
             }
 
             if (cat === 'group' || cat === 'crowd') {
+<<<<<<< HEAD
                 const rows = [
+=======
+                return [
+>>>>>>> bd0e9e2fcfed13fcdf64eabe653cdae9394a7d69
                     ['People Count', String(item.people_count || item.group_size || '—')],
                     ['Confidence', confidence],
                     ['Detected', detectedAt]
                 ];
+<<<<<<< HEAD
                 if (item.suspicious_reason) {
                     rows.unshift(['Activity', item.activity || 'Suspicious']);
                     rows.splice(1, 0, ['Reason', item.suspicious_reason]);
@@ -758,6 +769,8 @@ $cctvNavActive = 'open-surveillance';
                     rows.splice(1, 0, ['Reason', item.suspicious_reason]);
                 }
                 return rows;
+=======
+>>>>>>> bd0e9e2fcfed13fcdf64eabe653cdae9394a7d69
             }
 
             return [
@@ -784,10 +797,16 @@ $cctvNavActive = 'open-surveillance';
             `).join('');
 
             return `
+<<<<<<< HEAD
                 <article class="detection-card${item.suspicious ? ' suspicious' : ''}">
                     <div class="detection-card-header">
                         <span class="tag ${tagClass}">${escapeHtml(categoryLabel(cat))}</span>
                         ${item.suspicious ? '<span class="tag suspicious-flag">Suspicious</span>' : ''}
+=======
+                <article class="detection-card">
+                    <div class="detection-card-header">
+                        <span class="tag ${tagClass}">${escapeHtml(categoryLabel(cat))}</span>
+>>>>>>> bd0e9e2fcfed13fcdf64eabe653cdae9394a7d69
                     </div>
                     <div class="detection-card-body">
                         ${thumb}
@@ -804,6 +823,7 @@ $cctvNavActive = 'open-surveillance';
                 const detections = data.detections || [];
 
                 const list = document.getElementById('detectionList');
+<<<<<<< HEAD
                 const banner = document.getElementById('suspiciousBanner');
                 if (!detections.length) {
                     list.innerHTML = '<p class="detection-empty">No objects detected yet.</p>';
@@ -825,6 +845,13 @@ $cctvNavActive = 'open-surveillance';
                     }
                 }
 
+=======
+                if (!detections.length) {
+                    list.innerHTML = '<p class="detection-empty">No objects detected yet.</p>';
+                    return;
+                }
+
+>>>>>>> bd0e9e2fcfed13fcdf64eabe653cdae9394a7d69
                 const priority = { person: 0, crowd: 1, group: 2, phone: 3, backpack: 4, suitcase: 5, weapon: 6, vehicle: 7, animal: 8, plant: 9 };
                 const sorted = detections.slice().sort((a, b) => {
                     const pa = priority[a.category] ?? 99;

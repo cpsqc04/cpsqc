@@ -583,7 +583,11 @@ require_once __DIR__ . '/db.php';
                 </div>
                 <div class="search-container">
                     <div class="search-box">
+<<<<<<< HEAD
                         <input type="text" id="searchInput" placeholder="Search by personnel, patrol zone, shift, status, or date..." onkeyup="filterPatrols()">
+=======
+                        <input type="text" id="searchInput" placeholder="Search by personnel, route, or status..." onkeyup="filterPatrols()">
+>>>>>>> bd0e9e2fcfed13fcdf64eabe653cdae9394a7d69
                     </div>
                     <button type="button" class="btn-add" onclick="openAssignPatrolModal()" style="white-space: nowrap;">
                         <i class="fas fa-plus"></i> Assign Patrol
@@ -594,18 +598,28 @@ require_once __DIR__ . '/db.php';
                         <thead>
                             <tr>
                                 <th>BPSO Personnel</th>
+<<<<<<< HEAD
                                 <th>Shift</th>
                                 <th>Patrol Zone</th>
                                 <th>Date</th>
                                 <th>Patrol Start</th>
                                 <th>Patrol End</th>
                                 <th>Duration</th>
+=======
+                                <th>Route</th>
+                                <th>Date</th>
+                                <th>Time</th>
+>>>>>>> bd0e9e2fcfed13fcdf64eabe653cdae9394a7d69
                                 <th>Status</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody id="patrolsTableBody">
+<<<<<<< HEAD
                             <tr><td colspan="9" style="text-align:center;padding:2rem;color:#666;">Loading patrol schedules...</td></tr>
+=======
+                            <tr><td colspan="6" style="text-align:center;padding:2rem;color:#666;">Loading patrol schedules...</td></tr>
+>>>>>>> bd0e9e2fcfed13fcdf64eabe653cdae9394a7d69
                         </tbody>
                     </table>
                 </div>
@@ -633,6 +647,7 @@ require_once __DIR__ . '/db.php';
                     <input type="date" id="patrolDate" name="date" required>
                 </div>
                 <div class="form-group">
+<<<<<<< HEAD
                     <label for="patrolShift">Shift *</label>
                     <select id="patrolShift" name="shift" required>
                         <option value="">Select shift</option>
@@ -647,6 +662,14 @@ require_once __DIR__ . '/db.php';
                 <div class="form-group">
                     <label for="patrolRoute">Route / Streets</label>
                     <input type="text" id="patrolRoute" name="route" placeholder="Optional route details">
+=======
+                    <label for="patrolTime">Time *</label>
+                    <input type="time" id="patrolTime" name="time" required>
+                </div>
+                <div class="form-group">
+                    <label for="patrolRoute">Route *</label>
+                    <input type="text" id="patrolRoute" name="route" required placeholder="e.g. San Agustin Street to Quezon Avenue">
+>>>>>>> bd0e9e2fcfed13fcdf64eabe653cdae9394a7d69
                 </div>
                 <div class="form-group">
                     <label for="patrolNotes">Notes</label>
@@ -725,6 +748,7 @@ require_once __DIR__ . '/db.php';
             const rows = table.getElementsByTagName('tr');
             for (let i = 0; i < rows.length; i++) {
                 const row = rows[i];
+<<<<<<< HEAD
                 const searchText = row.getAttribute('data-search') || row.textContent || row.innerText;
                 row.style.display = searchText.toLowerCase().indexOf(filter) > -1 ? '' : 'none';
             }
@@ -737,6 +761,16 @@ require_once __DIR__ . '/db.php';
             if (Number.isNaN(date.getTime())) return value;
             return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
         }
+=======
+                const text = row.textContent || row.innerText;
+                if (text.toLowerCase().indexOf(filter) > -1) {
+                    row.style.display = '';
+                } else {
+                    row.style.display = 'none';
+                }
+            }
+        }
+>>>>>>> bd0e9e2fcfed13fcdf64eabe653cdae9394a7d69
         // Patrol schedule data from database
         let patrolData = {};
         let riskAlertData = {};
@@ -848,7 +882,11 @@ require_once __DIR__ . '/db.php';
                 const result = await response.json();
 
                 if (!result.success) {
+<<<<<<< HEAD
                     tableBody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:2rem;color:#666;">Failed to load patrol schedules.</td></tr>';
+=======
+                    tableBody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:2rem;color:#666;">Failed to load patrol schedules.</td></tr>';
+>>>>>>> bd0e9e2fcfed13fcdf64eabe653cdae9394a7d69
                     return;
                 }
 
@@ -856,12 +894,17 @@ require_once __DIR__ . '/db.php';
                 const rows = result.data || [];
 
                 if (rows.length === 0) {
+<<<<<<< HEAD
                     tableBody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:2rem;color:#666;">No patrol assignments yet. Click "Assign Patrol" to create one.</td></tr>';
+=======
+                    tableBody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:2rem;color:#666;">No patrol assignments yet. Click "Assign Patrol" to create one.</td></tr>';
+>>>>>>> bd0e9e2fcfed13fcdf64eabe653cdae9394a7d69
                     return;
                 }
 
                 tableBody.innerHTML = rows.map(row => {
                     patrolData[row.id] = row;
+<<<<<<< HEAD
                     const zone = row.patrol_zone || row.location || row.route || '—';
                     const startDisplay = row.patrol_start_display || formatScheduleTime(row.patrol_start || row.schedule_time) || (row.status === 'Scheduled' ? 'Pending' : '—');
                     const endDisplay = row.patrol_end_display || formatScheduleTime(row.patrol_end) || (row.status === 'Scheduled' ? 'Pending' : (row.status === 'In Progress' ? 'In progress' : '—'));
@@ -875,6 +918,13 @@ require_once __DIR__ . '/db.php';
                         <td>${escapeHtml(startDisplay)}</td>
                         <td>${escapeHtml(endDisplay)}</td>
                         <td>${escapeHtml(durationLabel)}</td>
+=======
+                    return `<tr data-schedule-id="${row.id}">
+                        <td>${escapeHtml(row.personnel_name)}</td>
+                        <td>${escapeHtml(row.route)}</td>
+                        <td>${escapeHtml(row.schedule_date)}</td>
+                        <td>${escapeHtml(row.schedule_time)}</td>
+>>>>>>> bd0e9e2fcfed13fcdf64eabe653cdae9394a7d69
                         <td><span class="status-badge ${statusClass(row.status)}">${escapeHtml(row.status)}</span></td>
                         <td>
                             <div class="action-buttons">
@@ -885,7 +935,11 @@ require_once __DIR__ . '/db.php';
                 }).join('');
             } catch (e) {
                 console.error('Error loading patrol schedules:', e);
+<<<<<<< HEAD
                 tableBody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:2rem;color:#666;">Error loading patrol schedules.</td></tr>';
+=======
+                tableBody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:2rem;color:#666;">Error loading patrol schedules.</td></tr>';
+>>>>>>> bd0e9e2fcfed13fcdf64eabe653cdae9394a7d69
             }
         }
 
@@ -902,12 +956,18 @@ require_once __DIR__ . '/db.php';
             const today = new Date().toISOString().split('T')[0];
             document.getElementById('patrolDate').value = today;
             document.getElementById('patrolRoute').value = '';
+<<<<<<< HEAD
             document.getElementById('patrolZone').value = '';
             document.getElementById('patrolShift').value = '';
             document.getElementById('patrolNotes').value = '';
 
             if (prefill) {
                 document.getElementById('patrolZone').value = prefill.route || '';
+=======
+            document.getElementById('patrolNotes').value = '';
+
+            if (prefill) {
+>>>>>>> bd0e9e2fcfed13fcdf64eabe653cdae9394a7d69
                 document.getElementById('patrolRoute').value = prefill.route || '';
                 document.getElementById('patrolNotes').value = prefill.notes || '';
             }
@@ -963,6 +1023,7 @@ require_once __DIR__ . '/db.php';
             const schedule = patrolData[id];
             if (!schedule) return;
             
+<<<<<<< HEAD
             const zone = schedule.patrol_zone || schedule.location || schedule.route || '—';
             const content = `
                 <div style="line-height: 1.8;">
@@ -973,6 +1034,14 @@ require_once __DIR__ . '/db.php';
                     <p><strong>Patrol Start:</strong> ${escapeHtml(schedule.patrol_start_display || formatScheduleTime(schedule.patrol_start || schedule.schedule_time) || 'Pending')}</p>
                     <p><strong>Patrol End:</strong> ${escapeHtml(schedule.patrol_end_display || formatScheduleTime(schedule.patrol_end) || '—')}</p>
                     <p><strong>Duration:</strong> ${escapeHtml(schedule.duration_label || '—')}</p>
+=======
+            const content = `
+                <div style="line-height: 1.8;">
+                    <p><strong>BPSO Personnel:</strong> ${escapeHtml(schedule.personnel_name)}</p>
+                    <p><strong>Route:</strong> ${escapeHtml(schedule.route)}</p>
+                    <p><strong>Date:</strong> ${escapeHtml(schedule.schedule_date)}</p>
+                    <p><strong>Time:</strong> ${escapeHtml(schedule.schedule_time)}</p>
+>>>>>>> bd0e9e2fcfed13fcdf64eabe653cdae9394a7d69
                     <p><strong>Status:</strong> <span class="status-badge ${statusClass(schedule.status)}">${escapeHtml(schedule.status)}</span></p>
                     <p><strong>Notes:</strong> ${escapeHtml(schedule.notes || '—')}</p>
                 </div>
@@ -1005,10 +1074,16 @@ require_once __DIR__ . '/db.php';
                 action: 'create',
                 patrol_id: patrolId,
                 schedule_date: formData.get('date'),
+<<<<<<< HEAD
                 shift: formData.get('shift'),
                 patrol_zone: formData.get('patrol_zone'),
                 route: formData.get('route') || formData.get('patrol_zone'),
                 location: formData.get('patrol_zone'),
+=======
+                schedule_time: formData.get('time'),
+                route: formData.get('route'),
+                location: '',
+>>>>>>> bd0e9e2fcfed13fcdf64eabe653cdae9394a7d69
                 notes: formData.get('notes') || ''
             };
 

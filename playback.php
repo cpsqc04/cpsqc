@@ -475,6 +475,7 @@ $cctvNavActive = 'playback';
             const start = params.get('start');
             const end = params.get('end');
             const requestId = params.get('request_id');
+<<<<<<< HEAD
             const dateInput = document.getElementById('playbackDate');
 
             if (date) {
@@ -482,6 +483,10 @@ $cctvNavActive = 'playback';
             } else {
                 dateInput.value = new Date().toISOString().slice(0, 10);
             }
+=======
+
+            if (date) document.getElementById('playbackDate').value = date;
+>>>>>>> bd0e9e2fcfed13fcdf64eabe653cdae9394a7d69
             if (start) document.getElementById('playbackStart').value = start.length === 5 ? start : start.slice(0, 5);
             if (end) document.getElementById('playbackEnd').value = end.length === 5 ? end : end.slice(0, 5);
 
@@ -541,7 +546,11 @@ $cctvNavActive = 'playback';
         async function loadSegments() {
             const date = document.getElementById('playbackDate').value;
             const url = 'api/recordings.php?action=list' + (date ? '&date=' + encodeURIComponent(date) : '');
+<<<<<<< HEAD
             await fetchAndRenderSegments(url, false, false);
+=======
+            await fetchAndRenderSegments(url, false);
+>>>>>>> bd0e9e2fcfed13fcdf64eabe653cdae9394a7d69
             if (window.__autoSearch) {
                 window.__autoSearch = false;
                 searchRecordings();
@@ -564,10 +573,17 @@ $cctvNavActive = 'playback';
             if (start) url += '&start=' + encodeURIComponent(start);
             if (end) url += '&end=' + encodeURIComponent(end);
 
+<<<<<<< HEAD
             await fetchAndRenderSegments(url, true, true);
         }
 
         async function fetchAndRenderSegments(url, autoPlayFirst, showEmptyError) {
+=======
+            await fetchAndRenderSegments(url, true);
+        }
+
+        async function fetchAndRenderSegments(url, autoPlayFirst) {
+>>>>>>> bd0e9e2fcfed13fcdf64eabe653cdae9394a7d69
             const tbody = document.getElementById('segmentsTableBody');
             tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-secondary);">Searching...</td></tr>';
 
@@ -578,8 +594,13 @@ $cctvNavActive = 'playback';
 
                 renderSegments(result.data || [], autoPlayFirst);
 
+<<<<<<< HEAD
                 if (showEmptyError && (!result.data || !result.data.length)) {
                     showPlaybackError('No recordings found for the selected date and time. Make sure the detection script is running during that period.');
+=======
+                if (!result.data || !result.data.length) {
+                    showPlaybackError('No recordings found for the selected date and time. Make sure the detection script was running during that period.');
+>>>>>>> bd0e9e2fcfed13fcdf64eabe653cdae9394a7d69
                 }
             } catch (e) {
                 tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#b91c1c;">Failed to load recordings.</td></tr>';

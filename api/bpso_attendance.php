@@ -28,6 +28,7 @@ if ($method === 'GET') {
     $view = trim($_GET['view'] ?? 'today');
     $date = trim($_GET['date'] ?? date('Y-m-d'));
 
+<<<<<<< HEAD
     if ($view === 'export') {
         if (!isAdminLoggedIn()) {
             http_response_code(401);
@@ -78,6 +79,8 @@ if ($method === 'GET') {
         exit;
     }
 
+=======
+>>>>>>> bd0e9e2fcfed13fcdf64eabe653cdae9394a7d69
     try {
         if ($view === 'my_status' && isBpsoLoggedIn()) {
             $stmt = $pdo->prepare(
@@ -94,12 +97,17 @@ if ($method === 'GET') {
                 'success' => true,
                 'data' => [
                     'is_at_hall' => (bool) $open,
+<<<<<<< HEAD
                     'open_session' => $open ? enrichAttendanceRow($open, $pdo) : null,
+=======
+                    'open_session' => $open ? enrichAttendanceRow($open) : null,
+>>>>>>> bd0e9e2fcfed13fcdf64eabe653cdae9394a7d69
                 ],
             ]);
             exit;
         }
 
+<<<<<<< HEAD
         $sql = 'SELECT ' . bpsoAttendanceSelectColumns('a') . ', p.duty_shift
                 FROM bpso_attendance a
                 LEFT JOIN patrols p ON p.id = a.patrol_id
@@ -108,10 +116,18 @@ if ($method === 'GET') {
 
         if (isBpsoLoggedIn()) {
             $sql .= ' AND a.patrol_id = :patrol_id';
+=======
+        $sql = 'SELECT ' . bpsoAttendanceSelectColumns() . ' FROM bpso_attendance WHERE 1=1';
+        $params = [];
+
+        if (isBpsoLoggedIn()) {
+            $sql .= ' AND patrol_id = :patrol_id';
+>>>>>>> bd0e9e2fcfed13fcdf64eabe653cdae9394a7d69
             $params[':patrol_id'] = getBpsoPatrolId();
         }
 
         if ($view === 'at_hall') {
+<<<<<<< HEAD
             $sql .= ' AND a.attendance_date = :attendance_date AND a.time_out IS NULL';
             $params[':attendance_date'] = date('Y-m-d');
         } elseif ($view === 'today') {
@@ -120,18 +136,36 @@ if ($method === 'GET') {
         } elseif ($view === 'history') {
             if ($date !== '') {
                 $sql .= ' AND a.attendance_date = :attendance_date';
+=======
+            $sql .= ' AND attendance_date = :attendance_date AND time_out IS NULL';
+            $params[':attendance_date'] = date('Y-m-d');
+        } elseif ($view === 'today') {
+            $sql .= ' AND attendance_date = :attendance_date';
+            $params[':attendance_date'] = $date;
+        } elseif ($view === 'history') {
+            if ($date !== '') {
+                $sql .= ' AND attendance_date = :attendance_date';
+>>>>>>> bd0e9e2fcfed13fcdf64eabe653cdae9394a7d69
                 $params[':attendance_date'] = $date;
             }
         }
 
+<<<<<<< HEAD
         $sql .= ' ORDER BY a.time_in DESC';
+=======
+        $sql .= ' ORDER BY time_in DESC';
+>>>>>>> bd0e9e2fcfed13fcdf64eabe653cdae9394a7d69
 
         $stmt = $pdo->prepare($sql);
         $stmt->execute($params);
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
         foreach ($rows as $index => $row) {
+<<<<<<< HEAD
             $rows[$index] = enrichAttendanceRow($row, $pdo);
+=======
+            $rows[$index] = enrichAttendanceRow($row);
+>>>>>>> bd0e9e2fcfed13fcdf64eabe653cdae9394a7d69
         }
 
         echo json_encode(['success' => true, 'data' => $rows]);

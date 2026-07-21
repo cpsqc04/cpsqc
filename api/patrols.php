@@ -6,7 +6,10 @@ header('Content-Type: application/json');
 require_once __DIR__ . '/../db.php';
 require_once __DIR__ . '/patrol_logs_schema.php';
 require_once __DIR__ . '/../includes/contact_validation.php';
+<<<<<<< HEAD
 require_once __DIR__ . '/../includes/patrol_shifts.php';
+=======
+>>>>>>> bd0e9e2fcfed13fcdf64eabe653cdae9394a7d69
 
 /**
  * Generate the next BPSO personnel ID in PER-XX format.
@@ -82,9 +85,12 @@ function ensurePatrolsTable(PDO $pdo): void
     if (!isset($columns['schedule'])) {
         $pdo->exec('ALTER TABLE patrols ADD COLUMN schedule VARCHAR(255) NOT NULL DEFAULT "" AFTER contact_number');
     }
+<<<<<<< HEAD
     if (!isset($columns['duty_shift'])) {
         $pdo->exec('ALTER TABLE patrols ADD COLUMN duty_shift VARCHAR(50) NOT NULL DEFAULT "" AFTER schedule');
     }
+=======
+>>>>>>> bd0e9e2fcfed13fcdf64eabe653cdae9394a7d69
     if (!isset($columns['status'])) {
         $pdo->exec('ALTER TABLE patrols ADD COLUMN status VARCHAR(50) NOT NULL DEFAULT "Available" AFTER schedule');
     }
@@ -100,7 +106,10 @@ function ensurePatrolsTable(PDO $pdo): void
 
     try {
         $pdo->exec("UPDATE patrols SET bpso_personnel_id = CONCAT('BPSO-', id) WHERE bpso_personnel_id = '' OR bpso_personnel_id IS NULL");
+<<<<<<< HEAD
         $pdo->exec("UPDATE patrols SET duty_shift = schedule WHERE (duty_shift = '' OR duty_shift IS NULL) AND schedule IN ('Day Shift', 'Night Shift')");
+=======
+>>>>>>> bd0e9e2fcfed13fcdf64eabe653cdae9394a7d69
     } catch (PDOException $e) {
         // Ignore if update fails
     }
@@ -135,7 +144,11 @@ if ($method === 'GET') {
             exit;
         }
 
+<<<<<<< HEAD
         $stmt = $pdo->query('SELECT id, bpso_personnel_id, personnel_name, contact_number, email, schedule, duty_shift, status, created_at FROM patrols ORDER BY id DESC');
+=======
+        $stmt = $pdo->query('SELECT id, bpso_personnel_id, personnel_name, contact_number, email, schedule, status, created_at FROM patrols ORDER BY id DESC');
+>>>>>>> bd0e9e2fcfed13fcdf64eabe653cdae9394a7d69
         $patrols = $stmt->fetchAll();
 
         echo json_encode([
@@ -159,12 +172,20 @@ if ($method === 'POST') {
         $email = trim($input['email'] ?? '');
         $password = $input['password'] ?? '';
         $schedule = trim($input['schedule'] ?? '');
+<<<<<<< HEAD
         $dutyShift = trim($input['duty_shift'] ?? $schedule);
         $status = trim($input['status'] ?? 'Available');
 
         if ($personnelName === '' || $contactNumber === '' || $email === '' || $password === '' || !isValidPatrolShift($dutyShift)) {
             http_response_code(400);
             echo json_encode(['success' => false, 'message' => 'Missing required fields. Select a duty shift (Day Shift or Night Shift).']);
+=======
+        $status = trim($input['status'] ?? 'Available');
+
+        if ($personnelName === '' || $contactNumber === '' || $email === '' || $password === '' || $schedule === '') {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'message' => 'Missing required fields.']);
+>>>>>>> bd0e9e2fcfed13fcdf64eabe653cdae9394a7d69
             exit;
         }
 
@@ -200,7 +221,11 @@ if ($method === 'POST') {
             }
 
             $personnelId = generateNextBpsoPersonnelId($pdo);
+<<<<<<< HEAD
             $stmt = $pdo->prepare('INSERT INTO patrols (bpso_personnel_id, personnel_name, contact_number, email, password_hash, schedule, duty_shift, status) VALUES (:bpso_personnel_id, :personnel_name, :contact_number, :email, :password_hash, :schedule, :duty_shift, :status)');
+=======
+            $stmt = $pdo->prepare('INSERT INTO patrols (bpso_personnel_id, personnel_name, contact_number, email, password_hash, schedule, status) VALUES (:bpso_personnel_id, :personnel_name, :contact_number, :email, :password_hash, :schedule, :status)');
+>>>>>>> bd0e9e2fcfed13fcdf64eabe653cdae9394a7d69
 
             $inserted = false;
             for ($attempt = 0; $attempt < 5; $attempt++) {
@@ -211,8 +236,12 @@ if ($method === 'POST') {
                         ':contact_number' => $contactNumber,
                         ':email' => $email,
                         ':password_hash' => $passwordHash,
+<<<<<<< HEAD
                         ':schedule' => $dutyShift,
                         ':duty_shift' => $dutyShift,
+=======
+                        ':schedule' => $schedule,
+>>>>>>> bd0e9e2fcfed13fcdf64eabe653cdae9394a7d69
                         ':status' => $status,
                     ]);
                     $inserted = true;
@@ -242,8 +271,12 @@ if ($method === 'POST') {
                     'personnel_name' => $personnelName,
                     'contact_number' => $contactNumber,
                     'email' => $email,
+<<<<<<< HEAD
                     'schedule' => $dutyShift,
                     'duty_shift' => $dutyShift,
+=======
+                    'schedule' => $schedule,
+>>>>>>> bd0e9e2fcfed13fcdf64eabe653cdae9394a7d69
                     'status' => $status,
                 ],
             ]);
@@ -266,12 +299,20 @@ if ($method === 'POST') {
         $email = trim($input['email'] ?? '');
         $password = $input['password'] ?? '';
         $schedule = trim($input['schedule'] ?? '');
+<<<<<<< HEAD
         $dutyShift = trim($input['duty_shift'] ?? $schedule);
         $status = trim($input['status'] ?? '');
 
         if ($id <= 0 || $personnelId === '' || $personnelName === '' || $contactNumber === '' || $email === '' || !isValidPatrolShift($dutyShift) || $status === '') {
             http_response_code(400);
             echo json_encode(['success' => false, 'message' => 'Missing required fields. Select a duty shift (Day Shift or Night Shift).']);
+=======
+        $status = trim($input['status'] ?? '');
+
+        if ($id <= 0 || $personnelId === '' || $personnelName === '' || $contactNumber === '' || $email === '' || $schedule === '' || $status === '') {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'message' => 'Missing required fields.']);
+>>>>>>> bd0e9e2fcfed13fcdf64eabe653cdae9394a7d69
             exit;
         }
 
@@ -328,27 +369,43 @@ if ($method === 'POST') {
 
             if ($password !== '') {
                 $passwordHash = password_hash($password, PASSWORD_DEFAULT);
+<<<<<<< HEAD
                 $stmt = $pdo->prepare('UPDATE patrols SET bpso_personnel_id = :bpso_personnel_id, personnel_name = :personnel_name, contact_number = :contact_number, email = :email, password_hash = :password_hash, schedule = :schedule, duty_shift = :duty_shift, status = :status WHERE id = :id');
+=======
+                $stmt = $pdo->prepare('UPDATE patrols SET bpso_personnel_id = :bpso_personnel_id, personnel_name = :personnel_name, contact_number = :contact_number, email = :email, password_hash = :password_hash, schedule = :schedule, status = :status WHERE id = :id');
+>>>>>>> bd0e9e2fcfed13fcdf64eabe653cdae9394a7d69
                 $stmt->execute([
                     ':bpso_personnel_id' => $personnelId,
                     ':personnel_name' => $personnelName,
                     ':contact_number' => $contactNumber,
                     ':email' => $email,
                     ':password_hash' => $passwordHash,
+<<<<<<< HEAD
                     ':schedule' => $dutyShift,
                     ':duty_shift' => $dutyShift,
+=======
+                    ':schedule' => $schedule,
+>>>>>>> bd0e9e2fcfed13fcdf64eabe653cdae9394a7d69
                     ':status' => $status,
                     ':id' => $id,
                 ]);
             } else {
+<<<<<<< HEAD
                 $stmt = $pdo->prepare('UPDATE patrols SET bpso_personnel_id = :bpso_personnel_id, personnel_name = :personnel_name, contact_number = :contact_number, email = :email, schedule = :schedule, duty_shift = :duty_shift, status = :status WHERE id = :id');
+=======
+                $stmt = $pdo->prepare('UPDATE patrols SET bpso_personnel_id = :bpso_personnel_id, personnel_name = :personnel_name, contact_number = :contact_number, email = :email, schedule = :schedule, status = :status WHERE id = :id');
+>>>>>>> bd0e9e2fcfed13fcdf64eabe653cdae9394a7d69
                 $stmt->execute([
                     ':bpso_personnel_id' => $personnelId,
                     ':personnel_name' => $personnelName,
                     ':contact_number' => $contactNumber,
                     ':email' => $email,
+<<<<<<< HEAD
                     ':schedule' => $dutyShift,
                     ':duty_shift' => $dutyShift,
+=======
+                    ':schedule' => $schedule,
+>>>>>>> bd0e9e2fcfed13fcdf64eabe653cdae9394a7d69
                     ':status' => $status,
                     ':id' => $id,
                 ]);
@@ -362,8 +419,12 @@ if ($method === 'POST') {
                     'personnel_name' => $personnelName,
                     'contact_number' => $contactNumber,
                     'email' => $email,
+<<<<<<< HEAD
                     'schedule' => $dutyShift,
                     'duty_shift' => $dutyShift,
+=======
+                    'schedule' => $schedule,
+>>>>>>> bd0e9e2fcfed13fcdf64eabe653cdae9394a7d69
                     'status' => $status,
                 ],
             ]);

@@ -341,7 +341,11 @@ $autoOpenPasswordChangeOtp = !empty($showPasswordChangeOtpModal);
     <title>Neighborhood Watch Login - AlerTara QC</title>
     <link rel="icon" type="image/x-icon" href="images/favicon.ico">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<<<<<<< HEAD
     <link rel="stylesheet" href="css/portal-landing.css?v=20260721">
+=======
+    <link rel="stylesheet" href="css/portal-landing.css">
+>>>>>>> bd0e9e2fcfed13fcdf64eabe653cdae9394a7d69
     <link rel="stylesheet" href="css/mobile-responsive.css">
 </head>
 <body>
@@ -531,50 +535,85 @@ $autoOpenPasswordChangeOtp = !empty($showPasswordChangeOtpModal);
             </div>
             <p class="register-hint">Please answer all items below. You may proceed only if you meet every requirement.</p>
             <form id="eligibilityCriteriaForm" onsubmit="event.preventDefault();">
+<<<<<<< HEAD
                 <div class="eligibility-list">
                     <div class="eligibility-item">
+=======
+                <ol class="eligibility-list">
+                    <li class="eligibility-item">
+>>>>>>> bd0e9e2fcfed13fcdf64eabe653cdae9394a7d69
                         <p class="eligibility-question">1. I am a Filipino Citizen. <em>Ako ay mamamayang Pilipino.</em></p>
                         <div class="eligibility-choices" role="radiogroup" aria-label="Filipino Citizen">
                             <label class="eligibility-choice"><input type="radio" name="eligibility_1" value="yes" required> Yes</label>
                             <label class="eligibility-choice"><input type="radio" name="eligibility_1" value="no"> No</label>
                         </div>
+<<<<<<< HEAD
                     </div>
                     <div class="eligibility-item">
+=======
+                    </li>
+                    <li class="eligibility-item">
+>>>>>>> bd0e9e2fcfed13fcdf64eabe653cdae9394a7d69
                         <p class="eligibility-question">2. I am Barangay San Agustin Resident. <em>Residente ako ng Barangay San Agustin.</em></p>
                         <div class="eligibility-choices" role="radiogroup" aria-label="Barangay San Agustin Resident">
                             <label class="eligibility-choice"><input type="radio" name="eligibility_2" value="yes" required> Yes</label>
                             <label class="eligibility-choice"><input type="radio" name="eligibility_2" value="no"> No</label>
                         </div>
+<<<<<<< HEAD
                     </div>
                     <div class="eligibility-item">
+=======
+                    </li>
+                    <li class="eligibility-item">
+>>>>>>> bd0e9e2fcfed13fcdf64eabe653cdae9394a7d69
                         <p class="eligibility-question">3. I have been a resident of Barangay San Agustin for at least six (6) months. <em>Ako ay naninirahan sa Barangay San Agustin nang hindi bababa sa anim (6) na buwan.</em></p>
                         <div class="eligibility-choices" role="radiogroup" aria-label="Resident for at least six months">
                             <label class="eligibility-choice"><input type="radio" name="eligibility_3" value="yes" required> Yes</label>
                             <label class="eligibility-choice"><input type="radio" name="eligibility_3" value="no"> No</label>
                         </div>
+<<<<<<< HEAD
                     </div>
                     <div class="eligibility-item">
+=======
+                    </li>
+                    <li class="eligibility-item">
+>>>>>>> bd0e9e2fcfed13fcdf64eabe653cdae9394a7d69
                         <p class="eligibility-question">4. I am a registered voter in Barangay San Agustin. <em>Ako ay isang rehistradong botante sa Barangay San Agustin.</em></p>
                         <div class="eligibility-choices" role="radiogroup" aria-label="Registered voter">
                             <label class="eligibility-choice"><input type="radio" name="eligibility_4" value="yes" required> Yes</label>
                             <label class="eligibility-choice"><input type="radio" name="eligibility_4" value="no"> No</label>
                         </div>
+<<<<<<< HEAD
                     </div>
                     <div class="eligibility-item">
+=======
+                    </li>
+                    <li class="eligibility-item">
+>>>>>>> bd0e9e2fcfed13fcdf64eabe653cdae9394a7d69
                         <p class="eligibility-question">5. I am between 18 and 60 years old. <em>Ang aking edad ay nasa pagitan ng 18 hanggang 60 taong gulang.</em></p>
                         <div class="eligibility-choices" role="radiogroup" aria-label="Age between 18 and 60">
                             <label class="eligibility-choice"><input type="radio" name="eligibility_5" value="yes" required> Yes</label>
                             <label class="eligibility-choice"><input type="radio" name="eligibility_5" value="no"> No</label>
                         </div>
+<<<<<<< HEAD
                     </div>
                     <div class="eligibility-item">
+=======
+                    </li>
+                    <li class="eligibility-item">
+>>>>>>> bd0e9e2fcfed13fcdf64eabe653cdae9394a7d69
                         <p class="eligibility-question">6. I can read and write in Tagalog o English. <em>Ako ay nakakabasa at nakakasulat sa wikang Tagalog at Ingles.</em></p>
                         <div class="eligibility-choices" role="radiogroup" aria-label="Can read and write Tagalog or English">
                             <label class="eligibility-choice"><input type="radio" name="eligibility_6" value="yes" required> Yes</label>
                             <label class="eligibility-choice"><input type="radio" name="eligibility_6" value="no"> No</label>
                         </div>
+<<<<<<< HEAD
                     </div>
                 </div>
+=======
+                    </li>
+                </ol>
+>>>>>>> bd0e9e2fcfed13fcdf64eabe653cdae9394a7d69
                 <div class="button-group">
                     <button type="button" class="btn btn-secondary" onclick="closeEligibilityModal()">Cancel</button>
                     <button type="button" class="btn" id="eligibilityProceedBtn" disabled onclick="proceedToApplicationForm()">Proceed to Application Form</button>
