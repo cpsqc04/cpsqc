@@ -1,0 +1,18 @@
+[
+    {
+        "id": "1",
+        "cameraId": "CAM-001",
+        "name": "Main Entrance Camera",
+        "location": "Susano Road, Barangay San Agustin, Quezon City",
+        "ipAddress": "192.168.1.9",
+        "port": "554",
+        "username": "admin",
+        "password": "Surveillance@04",
+        "streamType": "sub",
+        "rtspUrl": "rtsp://admin:Surveillance%4004@192.168.1.9:554/Preview_01_sub",
+        "status": "Online",
+        "description": "Main entrance surveillance camera",
+        "createdAt": "2026-01-02 19:57:35",
+        "updatedAt": "2026-07-14 14:51:01"
+    }
+]
