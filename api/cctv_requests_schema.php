@@ -1,5 +1,7 @@
 <?php
 
+require_once __DIR__ . '/../includes/schema_helpers.php';
+
 function ensureCctvRequestsTable(PDO $pdo): void
 {
     $columns = [];
@@ -50,8 +52,8 @@ function ensureCctvRequestsTable(PDO $pdo): void
             fulfillment_notes TEXT DEFAULT NULL,
             reviewed_by VARCHAR(255) DEFAULT NULL,
             fulfilled_at DATETIME DEFAULT NULL,
-            forwarded_to_group1_at DATETIME DEFAULT NULL,
-            group1_evidence_reference_id VARCHAR(100) DEFAULT NULL,
+            forwarded_to_incident_reporting_at DATETIME DEFAULT NULL,
+            incident_reporting_evidence_reference_id VARCHAR(100) DEFAULT NULL,
             forwarded_recording_files TEXT DEFAULT NULL,
             submitted_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -60,6 +62,26 @@ function ensureCctvRequestsTable(PDO $pdo): void
             INDEX idx_submitted_at (submitted_at)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
         return;
+    }
+
+    renameTableColumnIfNeeded(
+        $pdo,
+        'cctv_requests',
+        'forwarded_to_group1_at',
+        'forwarded_to_incident_reporting_at',
+        'DATETIME DEFAULT NULL'
+    );
+    renameTableColumnIfNeeded(
+        $pdo,
+        'cctv_requests',
+        'group1_evidence_reference_id',
+        'incident_reporting_evidence_reference_id',
+        'VARCHAR(100) DEFAULT NULL'
+    );
+
+    $columns = [];
+    foreach ($pdo->query('SHOW COLUMNS FROM cctv_requests') as $row) {
+        $columns[$row['Field']] = true;
     }
 
     $additions = [
@@ -95,9 +117,9 @@ function ensureCctvRequestsTable(PDO $pdo): void
         'fulfillment_notes' => 'ALTER TABLE cctv_requests ADD COLUMN fulfillment_notes TEXT DEFAULT NULL AFTER actual_footage_end',
         'reviewed_by' => 'ALTER TABLE cctv_requests ADD COLUMN reviewed_by VARCHAR(255) DEFAULT NULL AFTER fulfillment_notes',
         'fulfilled_at' => 'ALTER TABLE cctv_requests ADD COLUMN fulfilled_at DATETIME DEFAULT NULL AFTER reviewed_by',
-        'forwarded_to_group1_at' => 'ALTER TABLE cctv_requests ADD COLUMN forwarded_to_group1_at DATETIME DEFAULT NULL AFTER fulfilled_at',
-        'group1_evidence_reference_id' => 'ALTER TABLE cctv_requests ADD COLUMN group1_evidence_reference_id VARCHAR(100) DEFAULT NULL AFTER forwarded_to_group1_at',
-        'forwarded_recording_files' => 'ALTER TABLE cctv_requests ADD COLUMN forwarded_recording_files TEXT DEFAULT NULL AFTER group1_evidence_reference_id',
+        'forwarded_to_incident_reporting_at' => 'ALTER TABLE cctv_requests ADD COLUMN forwarded_to_incident_reporting_at DATETIME DEFAULT NULL AFTER fulfilled_at',
+        'incident_reporting_evidence_reference_id' => 'ALTER TABLE cctv_requests ADD COLUMN incident_reporting_evidence_reference_id VARCHAR(100) DEFAULT NULL AFTER forwarded_to_incident_reporting_at',
+        'forwarded_recording_files' => 'ALTER TABLE cctv_requests ADD COLUMN forwarded_recording_files TEXT DEFAULT NULL AFTER incident_reporting_evidence_reference_id',
         'submitted_at' => 'ALTER TABLE cctv_requests ADD COLUMN submitted_at DATETIME DEFAULT CURRENT_TIMESTAMP AFTER forwarded_recording_files',
         'updated_at' => 'ALTER TABLE cctv_requests ADD COLUMN updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP AFTER submitted_at',
     ];
@@ -122,7 +144,7 @@ function cctvRequestsSelectColumns(string $prefix = ''): string
         'footage_start_time', 'footage_end_time', 'incident_type', 'incident_description',
         'delivery_method', 'status', 'review_notes', 'rejection_reason', 'approved_camera_id',
         'actual_footage_start', 'actual_footage_end', 'fulfillment_notes', 'reviewed_by',
-        'fulfilled_at', 'forwarded_to_group1_at', 'group1_evidence_reference_id',
+        'fulfilled_at', 'forwarded_to_incident_reporting_at', 'incident_reporting_evidence_reference_id',
         'forwarded_recording_files', 'submitted_at', 'updated_at',
     ])) . ', ' . $p . 'supporting_document';
 }
@@ -187,30 +209,88 @@ function canCreateCctvRequest(bool $isAdmin): bool
 
 function normalizeCctvRequestInput(array $input): array
 {
+    // Friendly aliases matching partner/module field labels
+    $agency = trim($input['requesting_agency'] ?? $input['agency'] ?? '');
+    $contactNumber = trim($input['contact_number'] ?? $input['contact'] ?? '');
+    $email = trim($input['contact_email'] ?? $input['email'] ?? '');
+    $caseReference = trim($input['case_reference'] ?? $input['case_ref'] ?? '');
+    $purpose = trim($input['purpose'] ?? '');
+    $purposeDetails = trim($input['purpose_details'] ?? $input['purpose_detail'] ?? '');
+    if ($purposeDetails === '' && $purpose !== '') {
+        $purposeDetails = $purpose;
+    }
+    $legalBasis = trim($input['legal_basis'] ?? $input['legal_basis_text'] ?? '');
+    $incidentLocation = trim($input['incident_location'] ?? $input['location'] ?? '');
+    $cameraId = trim($input['camera_id'] ?? $input['camera'] ?? '');
+    $locationDescription = trim($input['location_description'] ?? '');
+    $incidentDescription = trim($input['incident_description'] ?? $input['description'] ?? '');
+    $deliveryMethod = trim($input['delivery_method'] ?? 'secure_download');
+    $supportingDocument = trim($input['supporting_document'] ?? $input['supporting_documents'] ?? $input['document'] ?? '');
+    $reviewNotes = trim($input['review_notes'] ?? '');
+    $contactPerson = trim($input['contact_person'] ?? $input['contact_name'] ?? '');
+    if ($contactPerson === '' && $agency !== '') {
+        $contactPerson = $agency;
+    }
+
+    $incidentDate = trim($input['incident_date'] ?? $input['date'] ?? '');
+    $footageStart = trim($input['footage_start_time'] ?? $input['start_time'] ?? '');
+    $footageEnd = trim($input['footage_end_time'] ?? $input['end_time'] ?? '');
+
+    // Footage Window object or string support
+    if (isset($input['footage_window']) && is_array($input['footage_window'])) {
+        $window = $input['footage_window'];
+        if ($incidentDate === '') {
+            $incidentDate = trim($window['date'] ?? $window['incident_date'] ?? '');
+        }
+        if ($footageStart === '') {
+            $footageStart = trim($window['start'] ?? $window['start_time'] ?? $window['footage_start_time'] ?? '');
+        }
+        if ($footageEnd === '') {
+            $footageEnd = trim($window['end'] ?? $window['end_time'] ?? $window['footage_end_time'] ?? '');
+        }
+    } elseif (isset($input['footage_window']) && is_string($input['footage_window'])) {
+        $raw = trim($input['footage_window']);
+        // e.g. "2026-07-09 18:00-19:30" or "2026-07-09 18:00 – 19:30"
+        if (preg_match('/^(\d{4}-\d{2}-\d{2})\s+(\d{1,2}:\d{2})\s*[-–]\s*(\d{1,2}:\d{2})/', $raw, $m)) {
+            if ($incidentDate === '') {
+                $incidentDate = $m[1];
+            }
+            if ($footageStart === '') {
+                $footageStart = $m[2];
+            }
+            if ($footageEnd === '') {
+                $footageEnd = $m[3];
+            }
+        }
+    }
+
+    $sourceReferenceId = trim($input['source_reference_id'] ?? $input['partner_request_id'] ?? $input['request_id'] ?? '');
+
     return [
         'source' => trim($input['source'] ?? 'web_form'),
-        'source_reference_id' => trim($input['source_reference_id'] ?? ''),
-        'requesting_agency' => trim($input['requesting_agency'] ?? ''),
-        'contact_person' => trim($input['contact_person'] ?? ''),
+        'source_reference_id' => $sourceReferenceId,
+        'requesting_agency' => $agency,
+        'contact_person' => $contactPerson,
         'contact_position' => trim($input['contact_position'] ?? ''),
-        'contact_number' => trim($input['contact_number'] ?? ''),
-        'contact_email' => trim($input['contact_email'] ?? ''),
+        'contact_number' => $contactNumber,
+        'contact_email' => $email,
         'office_unit' => trim($input['office_unit'] ?? ''),
-        'case_reference' => trim($input['case_reference'] ?? ''),
+        'case_reference' => $caseReference,
         'related_complaint_id' => trim($input['related_complaint_id'] ?? ''),
-        'purpose' => trim($input['purpose'] ?? ''),
-        'purpose_details' => trim($input['purpose_details'] ?? ''),
-        'legal_basis' => trim($input['legal_basis'] ?? ''),
-        'incident_location' => trim($input['incident_location'] ?? ''),
-        'camera_id' => trim($input['camera_id'] ?? ''),
-        'location_description' => trim($input['location_description'] ?? ''),
-        'incident_date' => trim($input['incident_date'] ?? ''),
-        'footage_start_time' => trim($input['footage_start_time'] ?? ''),
-        'footage_end_time' => trim($input['footage_end_time'] ?? ''),
+        'purpose' => $purpose,
+        'purpose_details' => $purposeDetails,
+        'legal_basis' => $legalBasis,
+        'incident_location' => $incidentLocation,
+        'camera_id' => $cameraId,
+        'location_description' => $locationDescription,
+        'incident_date' => $incidentDate,
+        'footage_start_time' => $footageStart,
+        'footage_end_time' => $footageEnd,
         'incident_type' => trim($input['incident_type'] ?? ''),
-        'incident_description' => trim($input['incident_description'] ?? ''),
-        'delivery_method' => trim($input['delivery_method'] ?? 'secure_download'),
-        'supporting_document' => trim($input['supporting_document'] ?? ''),
+        'incident_description' => $incidentDescription,
+        'delivery_method' => $deliveryMethod !== '' ? $deliveryMethod : 'secure_download',
+        'supporting_document' => $supportingDocument,
+        'review_notes' => $reviewNotes,
     ];
 }
 

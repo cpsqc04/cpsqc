@@ -1,29 +1,15 @@
 <?php
 
 /**
- * Forward CCTV evidence packages to Group 1 Incident Logging and Classification.
+ * Forward CCTV evidence packages to Incident Reporting.
  *
- * Configure in .env:
- *   CCTV_EVIDENCE_API_URL=   (optional; falls back to BLOTTER_API_URL)
- *   BLOTTER_API_URL=
- *   BLOTTER_API_KEY=
- *   BLOTTER_API_TIMEOUT=30
- *
- * Outbound payload (JSON):
- *   {
- *     "source": "alertaraqc",
- *     "record_type": "cctv_evidence",
- *     "source_request_id": "CCTV-REQ-2026-001",
- *     "request": { ... request metadata ... },
- *     "footage": { "segment_count", "total_size_bytes", "segments": [ ... ] },
- *     "metadata": { "internal_id", "forwarded_by", "forwarded_at" }
- *   }
- *
- * Expected response:
- *   { "success": true, "evidence_reference_id": "EVD-2026-000001", "message": "..." }
+ * Configure in .env (preferred + legacy):
+ *   CCTV_EVIDENCE_API_URL=   (optional; falls back to INCIDENT_REPORTING_API_URL / BLOTTER_API_URL)
+ *   INCIDENT_REPORTING_API_KEY= (legacy: BLOTTER_API_KEY)
  */
 
 require_once __DIR__ . '/../api/recordings_helpers.php';
+require_once __DIR__ . '/api_key_auth.php';
 
 function alertaraBaseUrl(): string
 {
@@ -42,15 +28,12 @@ function alertaraBaseUrl(): string
 
 function getCctvEvidenceApiConfig(): array
 {
-    $url = trim($_ENV['CCTV_EVIDENCE_API_URL'] ?? '');
-    if ($url === '') {
-        $url = trim($_ENV['BLOTTER_API_URL'] ?? '');
-    }
+    $cfg = getIncidentReportingApiConfig();
 
     return [
-        'url' => $url,
-        'api_key' => trim($_ENV['BLOTTER_API_KEY'] ?? ''),
-        'timeout' => max(5, (int) ($_ENV['BLOTTER_API_TIMEOUT'] ?? 30)),
+        'url' => $cfg['cctv_evidence_url'],
+        'api_key' => $cfg['api_key'],
+        'timeout' => $cfg['timeout'],
     ];
 }
 
@@ -176,7 +159,7 @@ function buildCctvEvidencePayload(array $request, array $segments): array
     ];
 }
 
-function forwardCctvEvidenceToGroup1(array $request): array
+function forwardCctvEvidenceToIncidentReporting(array $request): array
 {
     if (!function_exists('curl_init')) {
         return ['success' => false, 'message' => 'cURL extension is required to forward CCTV evidence.'];
@@ -186,7 +169,7 @@ function forwardCctvEvidenceToGroup1(array $request): array
     if ($config['url'] === '') {
         return [
             'success' => false,
-            'message' => 'CCTV Evidence API is not configured. Set CCTV_EVIDENCE_API_URL or BLOTTER_API_URL in .env.',
+            'message' => 'CCTV Evidence API is not configured. Set CCTV_EVIDENCE_API_URL or INCIDENT_REPORTING_API_URL in .env.',
         ];
     }
 
@@ -265,9 +248,15 @@ function forwardCctvEvidenceToGroup1(array $request): array
 
     return [
         'success' => true,
-        'message' => trim($decoded['message'] ?? 'CCTV evidence forwarded to Group 1.'),
+        'message' => trim($decoded['message'] ?? 'CCTV evidence forwarded to Incident Reporting.'),
         'evidence_reference_id' => $referenceId,
         'segments' => $segments,
         'http_code' => $httpCode,
     ];
+}
+
+/** @deprecated Use forwardCctvEvidenceToIncidentReporting() */
+function forwardCctvEvidenceToGroup1(array $request): array
+{
+    return forwardCctvEvidenceToIncidentReporting($request);
 }

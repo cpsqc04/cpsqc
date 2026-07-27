@@ -98,15 +98,18 @@ try {
         $notifications = [];
         $unreadCount = 0;
         
-        // Build query based on user role
-        // Admins see: all notifications (user_id IS NULL) + their own notifications (user_id = userId)
-        // Users see: only their own notifications (user_id = userId)
+        // Admins see system/admin notifications only — never patrol, watcher, or bulletin audience alerts
+        // that were created for portal recipients.
         if ($isAdmin) {
             try {
+                $adminScope = "(user_id IS NULL OR user_id = :user_id)
+                      AND (patrol_id IS NULL OR patrol_id = 0)
+                      AND (nw_member_id IS NULL OR nw_member_id = 0)
+                      AND type <> 'bulletin_announcement'";
                 $stmt = $pdo->prepare("
                     SELECT id, type, title, message, link, is_read, created_at 
                     FROM notifications 
-                    WHERE user_id IS NULL OR user_id = :user_id 
+                    WHERE {$adminScope}
                     ORDER BY created_at DESC 
                     LIMIT 20
                 ");
@@ -115,7 +118,8 @@ try {
                 $unreadStmt = $pdo->prepare("
                     SELECT COUNT(*) as count 
                     FROM notifications 
-                    WHERE (user_id IS NULL OR user_id = :user_id) AND is_read = 0
+                    WHERE {$adminScope}
+                      AND is_read = 0
                 ");
                 $unreadStmt->execute([':user_id' => $userId]);
             } catch (PDOException $e) {
@@ -227,7 +231,7 @@ try {
         } else {
             // Mark all as read - based on user role
             if ($isAdmin) {
-                $stmt = $pdo->prepare("UPDATE notifications SET is_read = 1 WHERE (user_id IS NULL OR user_id = :user_id) AND is_read = 0");
+                $stmt = $pdo->prepare("UPDATE notifications SET is_read = 1 WHERE (user_id IS NULL OR user_id = :user_id) AND (patrol_id IS NULL OR patrol_id = 0) AND (nw_member_id IS NULL OR nw_member_id = 0) AND type <> 'bulletin_announcement' AND is_read = 0");
                 $stmt->execute([':user_id' => $userId]);
             } else {
                 $stmt = $pdo->prepare("UPDATE notifications SET is_read = 1 WHERE user_id = :user_id AND is_read = 0");
@@ -482,6 +486,55 @@ try {
             // patrol_logs table doesn't exist, skip
         }
         
+        // Sync missed patrol reports (shift ended with no submitted report)
+        try {
+            require_once __DIR__ . '/patrol_schedules_schema.php';
+            require_once __DIR__ . '/../includes/patrol_shifts.php';
+            ensurePatrolSchedulesTable($pdo);
+            ensurePatrolLogsTable($pdo);
+
+            $stmt = $pdo->query("
+                SELECT id, personnel_name, route, patrol_zone, schedule_date, shift, status
+                FROM patrol_schedules
+                WHERE schedule_date >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
+                ORDER BY schedule_date DESC, id DESC
+            ");
+            while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+                $scheduleDate = (string) ($row['schedule_date'] ?? '');
+                $shift = (string) ($row['shift'] ?? '');
+                if ($scheduleDate === '' || !hasPatrolShiftEnded($scheduleDate, $shift)) {
+                    continue;
+                }
+
+                $reportCheck = $pdo->prepare("
+                    SELECT COUNT(*) FROM patrol_logs
+                    WHERE schedule_id = :schedule_id
+                      AND status <> 'Scheduled'
+                ");
+                $reportCheck->execute([':schedule_id' => (int) $row['id']]);
+                if ((int) $reportCheck->fetchColumn() > 0) {
+                    continue;
+                }
+
+                $personnelName = trim((string) ($row['personnel_name'] ?? ''));
+                if ($personnelName === '') {
+                    $personnelName = 'Unknown patrol';
+                }
+
+                if (createAdminNotification(
+                    $pdo,
+                    'missed_patrol_report',
+                    'Missed Patrol Report',
+                    $personnelName,
+                    'missed-report:' . $row['id']
+                )) {
+                    $synced++;
+                }
+            }
+        } catch (PDOException $e) {
+            // skip if schedules/logs unavailable
+        }
+
         // Note: Login/logout notifications are created directly in login.php and logout.php
         // This sync function only handles other activities
         

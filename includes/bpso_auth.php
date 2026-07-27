@@ -36,6 +36,12 @@ function getBpsoPersonnelName(): string
     return (string)($_SESSION['bpso_personnel_name'] ?? '');
 }
 
+function getBpsoPersonnelCode(): string
+{
+    bpsoSessionStart();
+    return (string)($_SESSION['bpso_personnel_code'] ?? '');
+}
+
 function isAdminLoggedIn(): bool
 {
     bpsoSessionStart();

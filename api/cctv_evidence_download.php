@@ -1,10 +1,10 @@
 <?php
 
 /**
- * Partner download endpoint for CCTV evidence files forwarded to Group 1.
+ * Partner download endpoint for CCTV evidence files forwarded to Incident Reporting.
  *
  * GET ?request_id=CCTV-REQ-2026-001&file=recording_YYYYMMDD_HHMMSS.mp4
- * Headers or query: X-API-Key / Authorization: Bearer / api_key={BLOTTER_API_KEY}
+ * Headers or query: X-API-Key / Authorization: Bearer / api_key={INCIDENT_REPORTING_API_KEY}
  */
 
 require_once __DIR__ . '/../db.php';
@@ -19,7 +19,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'GET') {
     exit;
 }
 
-requirePartnerApiKey('BLOTTER_API_KEY', 'CCTV Evidence Download', true);
+requirePartnerApiKey(partnerEnvKeyCandidates('incident-reporting'), 'CCTV Evidence Download', true);
 
 $requestId = trim($_GET['request_id'] ?? '');
 $filename = basename(trim($_GET['file'] ?? ''));
@@ -41,7 +41,7 @@ if (!isValidRecordingFilename($filename)) {
 try {
     ensureCctvRequestsTable($pdo);
 
-    $stmt = $pdo->prepare('SELECT request_id, forwarded_to_group1_at, forwarded_recording_files FROM cctv_requests WHERE request_id = :request_id LIMIT 1');
+    $stmt = $pdo->prepare('SELECT request_id, forwarded_to_incident_reporting_at, forwarded_recording_files FROM cctv_requests WHERE request_id = :request_id LIMIT 1');
     $stmt->execute([':request_id' => $requestId]);
     $request = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -52,7 +52,7 @@ try {
         exit;
     }
 
-    if (empty($request['forwarded_to_group1_at'])) {
+    if (empty($request['forwarded_to_incident_reporting_at'])) {
         http_response_code(403);
         header('Content-Type: application/json');
         echo json_encode(['success' => false, 'message' => 'CCTV evidence has not been forwarded for this request.']);

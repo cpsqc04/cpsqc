@@ -27,6 +27,8 @@ if ($method === 'GET') {
 
     $view = trim($_GET['view'] ?? 'today');
     $date = trim($_GET['date'] ?? date('Y-m-d'));
+    $dateFrom = trim($_GET['date_from'] ?? '');
+    $dateTo = trim($_GET['date_to'] ?? '');
 
     if ($view === 'export') {
         if (!isAdminLoggedIn()) {
@@ -53,16 +55,28 @@ if ($method === 'GET') {
 
             $out = fopen('php://output', 'w');
             fprintf($out, chr(0xEF) . chr(0xBB) . chr(0xBF));
-            fputcsv($out, ['Personnel ID', 'Name', 'Duty', 'Patrol Duration', 'Time In', 'Time Out', 'Status', 'Date']);
+            fputcsv($out, ['Personnel ID', 'Name', 'Duty', 'Duration', 'Overtime', 'Clock On Date', 'Clock On Time', 'Clock Out', 'Status', 'Date']);
 
             foreach ($rows as $row) {
                 $enriched = enrichAttendanceRow($row, $pdo);
+                $timeIn = (string) ($enriched['time_in'] ?? '');
+                $clockOnDate = '';
+                $clockOnTime = '';
+                if ($timeIn !== '' && preg_match('/(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2}(?::\d{2})?)/', $timeIn, $m)) {
+                    $clockOnDate = $m[1];
+                    $clockOnTime = $m[2];
+                } elseif ($timeIn !== '') {
+                    $clockOnDate = $timeIn;
+                }
+
                 fputcsv($out, [
                     $enriched['bpso_personnel_id'] ?? '',
                     $enriched['personnel_name'] ?? '',
                     $enriched['duty'] ?? '',
                     $enriched['patrol_duration_label'] ?? '',
-                    $enriched['time_in'] ?? '',
+                    $enriched['overtime_label'] ?? '',
+                    $clockOnDate,
+                    $clockOnTime,
                     $enriched['time_out'] ?? '',
                     $enriched['status_label'] ?? '',
                     $enriched['attendance_date'] ?? '',
@@ -80,21 +94,37 @@ if ($method === 'GET') {
 
     try {
         if ($view === 'my_status' && isBpsoLoggedIn()) {
+            $patrolId = getBpsoPatrolId();
             $stmt = $pdo->prepare(
                 'SELECT ' . bpsoAttendanceSelectColumns() . ' FROM bpso_attendance
-                 WHERE patrol_id = :patrol_id AND attendance_date = :attendance_date AND time_out IS NULL
+                 WHERE patrol_id = :patrol_id AND time_out IS NULL
                  ORDER BY time_in DESC LIMIT 1'
             );
-            $stmt->execute([
-                ':patrol_id' => getBpsoPatrolId(),
-                ':attendance_date' => date('Y-m-d'),
-            ]);
+            $stmt->execute([':patrol_id' => $patrolId]);
             $open = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            $today = date('Y-m-d');
+            $activitySql = 'SELECT ' . bpsoAttendanceSelectColumns() . ' FROM bpso_attendance
+                WHERE patrol_id = :patrol_id
+                  AND (attendance_date = :today OR time_out IS NULL)
+                ORDER BY time_in DESC';
+            $activityStmt = $pdo->prepare($activitySql);
+            $activityStmt->execute([
+                ':patrol_id' => $patrolId,
+                ':today' => $today,
+            ]);
+            $sessions = $activityStmt->fetchAll(PDO::FETCH_ASSOC);
+            foreach ($sessions as $index => $row) {
+                $sessions[$index] = enrichAttendanceRow($row, $pdo);
+            }
+
             echo json_encode([
                 'success' => true,
                 'data' => [
                     'is_at_hall' => (bool) $open,
+                    'is_clocked_on' => (bool) $open,
                     'open_session' => $open ? enrichAttendanceRow($open, $pdo) : null,
+                    'sessions' => $sessions,
                 ],
             ]);
             exit;
@@ -109,6 +139,12 @@ if ($method === 'GET') {
         if (isBpsoLoggedIn()) {
             $sql .= ' AND a.patrol_id = :patrol_id';
             $params[':patrol_id'] = getBpsoPatrolId();
+        } elseif (isAdminLoggedIn()) {
+            $filterPatrolId = (int) ($_GET['patrol_id'] ?? 0);
+            if ($filterPatrolId > 0) {
+                $sql .= ' AND a.patrol_id = :filter_patrol_id';
+                $params[':filter_patrol_id'] = $filterPatrolId;
+            }
         }
 
         if ($view === 'at_hall') {
@@ -118,9 +154,37 @@ if ($method === 'GET') {
             $sql .= ' AND a.attendance_date = :attendance_date';
             $params[':attendance_date'] = $date;
         } elseif ($view === 'history') {
-            if ($date !== '') {
+            if ($dateFrom !== '' && $dateTo !== '') {
+                try {
+                    $fromDt = new DateTime($dateFrom);
+                    $toDt = new DateTime($dateTo);
+                } catch (Exception $e) {
+                    http_response_code(400);
+                    echo json_encode(['success' => false, 'message' => 'Invalid date range.']);
+                    exit;
+                }
+
+                if ($fromDt > $toDt) {
+                    http_response_code(400);
+                    echo json_encode(['success' => false, 'message' => 'Date From cannot be later than Date To.']);
+                    exit;
+                }
+
+                $daySpan = (int) $fromDt->diff($toDt)->days + 1;
+                if ($daySpan > 10) {
+                    http_response_code(400);
+                    echo json_encode(['success' => false, 'message' => 'Date range is limited to 10 days.']);
+                    exit;
+                }
+
+                $sql .= ' AND a.attendance_date BETWEEN :date_from AND :date_to';
+                $params[':date_from'] = $fromDt->format('Y-m-d');
+                $params[':date_to'] = $toDt->format('Y-m-d');
+            } elseif ($date !== '') {
                 $sql .= ' AND a.attendance_date = :attendance_date';
                 $params[':attendance_date'] = $date;
+            } else {
+                $sql .= ' AND a.attendance_date >= DATE_SUB(CURDATE(), INTERVAL 9 DAY)';
             }
         }
 
@@ -155,15 +219,12 @@ if ($method === 'POST') {
 
         try {
             $openStmt = $pdo->prepare(
-                'SELECT id FROM bpso_attendance WHERE patrol_id = :patrol_id AND attendance_date = :attendance_date AND time_out IS NULL LIMIT 1'
+                'SELECT id FROM bpso_attendance WHERE patrol_id = :patrol_id AND time_out IS NULL LIMIT 1'
             );
-            $openStmt->execute([
-                ':patrol_id' => $patrolId,
-                ':attendance_date' => date('Y-m-d'),
-            ]);
+            $openStmt->execute([':patrol_id' => $patrolId]);
             if ($openStmt->fetch(PDO::FETCH_ASSOC)) {
                 http_response_code(400);
-                echo json_encode(['success' => false, 'message' => 'You are already timed in at the barangay hall.']);
+                echo json_encode(['success' => false, 'message' => 'You are already clocked on. Please clock out first.']);
                 exit;
             }
 
@@ -190,18 +251,28 @@ if ($method === 'POST') {
                 ':notes' => $notes !== '' ? $notes : null,
             ]);
 
+            require_once __DIR__ . '/notifications_schema.php';
+            notifyAdminActorActivity(
+                $pdo,
+                'patrol',
+                (string) $personnel['personnel_name'],
+                'clocked on.',
+                'bpso-attendance.php'
+            );
+
             echo json_encode([
                 'success' => true,
-                'message' => 'Timed in at barangay hall.',
+                'message' => 'Clocked on successfully.',
                 'data' => [
                     'id' => (int) $pdo->lastInsertId(),
                     'time_in' => $timestamp,
                     'is_at_hall' => true,
+                    'is_clocked_on' => true,
                 ],
             ]);
         } catch (PDOException $e) {
             http_response_code(500);
-            echo json_encode(['success' => false, 'message' => 'Failed to time in: ' . $e->getMessage()]);
+            echo json_encode(['success' => false, 'message' => 'Failed to clock on: ' . $e->getMessage()]);
         }
         exit;
     }
@@ -217,16 +288,13 @@ if ($method === 'POST') {
 
         try {
             $openStmt = $pdo->prepare(
-                'SELECT id, time_in FROM bpso_attendance WHERE patrol_id = :patrol_id AND attendance_date = :attendance_date AND time_out IS NULL ORDER BY time_in DESC LIMIT 1'
+                'SELECT id, time_in FROM bpso_attendance WHERE patrol_id = :patrol_id AND time_out IS NULL ORDER BY time_in DESC LIMIT 1'
             );
-            $openStmt->execute([
-                ':patrol_id' => $patrolId,
-                ':attendance_date' => date('Y-m-d'),
-            ]);
+            $openStmt->execute([':patrol_id' => $patrolId]);
             $open = $openStmt->fetch(PDO::FETCH_ASSOC);
             if (!$open) {
                 http_response_code(400);
-                echo json_encode(['success' => false, 'message' => 'No active hall attendance session found. Please time in first.']);
+                echo json_encode(['success' => false, 'message' => 'No active clock-on session found. Please clock on first.']);
                 exit;
             }
 
@@ -238,19 +306,34 @@ if ($method === 'POST') {
                 ':patrol_id' => $patrolId,
             ]);
 
+            $nameStmt = $pdo->prepare('SELECT personnel_name FROM patrols WHERE id = :id LIMIT 1');
+            $nameStmt->execute([':id' => $patrolId]);
+            $nameRow = $nameStmt->fetch(PDO::FETCH_ASSOC);
+            require_once __DIR__ . '/notifications_schema.php';
+            notifyAdminActorActivity(
+                $pdo,
+                'patrol',
+                (string) ($nameRow['personnel_name'] ?? getBpsoPersonnelName()),
+                'clocked out.',
+                'bpso-attendance.php'
+            );
+
             echo json_encode([
                 'success' => true,
-                'message' => 'Timed out from barangay hall.',
+                'message' => 'Clocked out successfully.',
                 'data' => [
                     'id' => (int) $open['id'],
                     'time_in' => $open['time_in'],
                     'time_out' => $timestamp,
                     'is_at_hall' => false,
+                    'is_clocked_on' => false,
+                    'duration_label' => formatHallDurationLabel($open['time_in'], $timestamp),
+                    'overtime_label' => formatOvertimeLabel($open['time_in'], $timestamp),
                 ],
             ]);
         } catch (PDOException $e) {
             http_response_code(500);
-            echo json_encode(['success' => false, 'message' => 'Failed to time out: ' . $e->getMessage()]);
+            echo json_encode(['success' => false, 'message' => 'Failed to clock out: ' . $e->getMessage()]);
         }
         exit;
     }

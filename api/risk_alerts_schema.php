@@ -18,7 +18,7 @@ function ensureRiskAlertsTable(PDO $pdo): void
         $pdo->exec("CREATE TABLE risk_alerts (
             id INT AUTO_INCREMENT PRIMARY KEY,
             alert_id VARCHAR(100) NOT NULL UNIQUE,
-            source_group VARCHAR(50) NOT NULL DEFAULT 'group_5',
+            source_group VARCHAR(50) NOT NULL DEFAULT 'crime_analytics',
             source_reference_id VARCHAR(100) DEFAULT NULL,
             rule_name VARCHAR(255) NOT NULL,
             rule_type VARCHAR(50) NOT NULL DEFAULT 'Hotspot',
@@ -45,7 +45,7 @@ function ensureRiskAlertsTable(PDO $pdo): void
     }
 
     $additions = [
-        'source_group' => "ALTER TABLE risk_alerts ADD COLUMN source_group VARCHAR(50) NOT NULL DEFAULT 'group_5' AFTER alert_id",
+        'source_group' => "ALTER TABLE risk_alerts ADD COLUMN source_group VARCHAR(50) NOT NULL DEFAULT 'crime_analytics' AFTER alert_id",
         'source_reference_id' => 'ALTER TABLE risk_alerts ADD COLUMN source_reference_id VARCHAR(100) DEFAULT NULL AFTER source_group',
         'rule_name' => 'ALTER TABLE risk_alerts ADD COLUMN rule_name VARCHAR(255) NOT NULL DEFAULT "" AFTER source_reference_id',
         'rule_type' => "ALTER TABLE risk_alerts ADD COLUMN rule_type VARCHAR(50) NOT NULL DEFAULT 'Hotspot' AFTER rule_name",
@@ -70,45 +70,50 @@ function ensureRiskAlertsTable(PDO $pdo): void
             $pdo->exec($sql);
         }
     }
+
+    // Normalize legacy Crime Analytics source labels.
+    try {
+        $pdo->exec("UPDATE risk_alerts SET source_group = 'crime_analytics'
+            WHERE LOWER(source_group) IN ('group_5', 'group5', 'group 5')");
+    } catch (PDOException $e) {
+        // ignore if table/column not ready
+    }
 }
 
+function validateCrimeAnalyticsAlertApiKey(bool $allowQueryString = false): bool
+{
+    require_once __DIR__ . '/../includes/api_key_auth.php';
+    return validatePartnerApiKey(partnerEnvKeyCandidates('crime-analytics'), $allowQueryString);
+}
+
+/** @deprecated Use validateCrimeAnalyticsAlertApiKey() */
 function validateGroup5AlertApiKey(bool $allowQueryString = false): bool
 {
-    $expectedKey = trim($_ENV['GROUP5_API_KEY'] ?? '');
-    if ($expectedKey === '') {
-        return false;
-    }
-
-    $providedKey = '';
-    $authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? '';
-    if (preg_match('/Bearer\s+(\S+)/i', $authHeader, $matches)) {
-        $providedKey = $matches[1];
-    }
-    if ($providedKey === '') {
-        $providedKey = trim($_SERVER['HTTP_X_API_KEY'] ?? '');
-    }
-    if ($providedKey === '' && $allowQueryString && ($_SERVER['REQUEST_METHOD'] ?? '') === 'GET') {
-        $providedKey = trim($_GET['api_key'] ?? '');
-    }
-
-    return $providedKey !== '' && hash_equals($expectedKey, $providedKey);
+    return validateCrimeAnalyticsAlertApiKey($allowQueryString);
 }
 
-function requireConfiguredGroup5AlertApiKey(): bool
+function requireConfiguredCrimeAnalyticsAlertApiKey(): bool
 {
-    $expectedKey = trim($_ENV['GROUP5_API_KEY'] ?? '');
+    require_once __DIR__ . '/../includes/api_key_auth.php';
+    $expectedKey = envFirst(...partnerEnvKeyCandidates('crime-analytics'));
     if ($expectedKey === '') {
         return false;
     }
 
-    return validateGroup5AlertApiKey();
+    return validateCrimeAnalyticsAlertApiKey();
+}
+
+/** @deprecated Use requireConfiguredCrimeAnalyticsAlertApiKey() */
+function requireConfiguredGroup5AlertApiKey(): bool
+{
+    return requireConfiguredCrimeAnalyticsAlertApiKey();
 }
 
 function normalizeRiskAlertInput(array $input): array
 {
-    $sourceGroup = strtolower(trim($input['source_group'] ?? $input['source'] ?? 'group_5'));
-    if ($sourceGroup === 'group 5' || $sourceGroup === 'group5') {
-        $sourceGroup = 'group_5';
+    $sourceGroup = strtolower(trim($input['source_group'] ?? $input['source'] ?? 'crime_analytics'));
+    if (in_array($sourceGroup, ['group 5', 'group5', 'group_5', 'crime-analytics', 'crime analytics'], true)) {
+        $sourceGroup = 'crime_analytics';
     }
 
     $severity = strtoupper(trim($input['severity'] ?? 'MEDIUM'));

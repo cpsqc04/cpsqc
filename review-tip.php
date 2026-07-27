@@ -409,11 +409,7 @@ require_once __DIR__ . '/db.php';
             </div>
         </div>
         <nav class="sidebar-nav">
-            <!-- Dashboard Link -->
-            <a href="index.php" class="nav-module-header" data-tooltip="Dashboard" style="text-decoration: none; display: flex; align-items: center; justify-content: space-between; padding: 0.875rem 1.5rem; color: rgba(255, 255, 255, 0.9); cursor: pointer; transition: background-color 0.2s ease; font-weight: 500; user-select: none; gap: 0.75rem; <?php echo basename($_SERVER['PHP_SELF']) == 'index.php' ? 'background: rgba(76, 138, 137, 0.25); border-left: 3px solid #4c8a89;' : ''; ?>">
-                <span class="nav-module-icon"><i class="fas fa-home"></i></span>
-                <span class="nav-module-header-text">Dashboard</span>
-            </a>
+            <?php require __DIR__ . '/includes/admin_nav_dashboard.php'; ?>
             
             <!-- User Management Module (Admin Only) -->
             <?php if (isAdminUser()): ?>
@@ -634,12 +630,12 @@ require_once __DIR__ . '/db.php';
                 <label style="display: block; margin-bottom: 0.75rem; color: var(--text-color); font-weight: 500; font-size: 0.95rem;">Select Actions:</label>
                 <div style="display: flex; flex-direction: column; gap: 0.75rem; margin-top: 0.5rem;">
                     <label style="display: flex; align-items: flex-start; gap: 0.75rem; cursor: pointer; padding: 0.5rem; border-radius: 6px; transition: background 0.2s ease;">
-                        <input type="checkbox" id="sendToGroup1" value="group1" style="margin-top: 0.25rem; flex-shrink: 0; width: 18px; height: 18px; cursor: pointer;">
-                        <span style="flex: 1; line-height: 1.5;">Send to Incident Logging and Classification</span>
+                        <input type="checkbox" id="sendToIncidentReporting" value="incident_reporting" style="margin-top: 0.25rem; flex-shrink: 0; width: 18px; height: 18px; cursor: pointer;">
+                        <span style="flex: 1; line-height: 1.5;">Send to Incident Reporting</span>
                     </label>
                     <label style="display: flex; align-items: flex-start; gap: 0.75rem; cursor: pointer; padding: 0.5rem; border-radius: 6px; transition: background 0.2s ease;">
-                        <input type="checkbox" id="sendToGroup3" value="group3" style="margin-top: 0.25rem; flex-shrink: 0; width: 18px; height: 18px; cursor: pointer;">
-                        <span style="flex: 1; line-height: 1.5;">Send to Inter-agency Coordination Portal (Police Backup)</span>
+                        <input type="checkbox" id="sendToEmergencyResponse" value="emergency_response" style="margin-top: 0.25rem; flex-shrink: 0; width: 18px; height: 18px; cursor: pointer;">
+                        <span style="flex: 1; line-height: 1.5;">Send to Emergency Response (Police Backup)</span>
                     </label>
                     <label style="display: flex; align-items: flex-start; gap: 0.75rem; cursor: pointer; padding: 0.5rem; border-radius: 6px; transition: background 0.2s ease;">
                         <input type="checkbox" id="exportWord" value="export" style="margin-top: 0.25rem; flex-shrink: 0; width: 18px; height: 18px; cursor: pointer;">
@@ -1011,10 +1007,10 @@ require_once __DIR__ . '/db.php';
             const tip = tipData[currentTipId];
             if (!tip) return;
 
-            const sendToGroup1 = document.getElementById('sendToGroup1').checked;
-            const sendToGroup3 = document.getElementById('sendToGroup3').checked;
+            const sendToIncidentReporting = document.getElementById('sendToIncidentReporting').checked;
+            const sendToEmergencyResponse = document.getElementById('sendToEmergencyResponse').checked;
 
-            if (!sendToGroup1 && !sendToGroup3) {
+            if (!sendToIncidentReporting && !sendToEmergencyResponse) {
                 preview.style.display = 'none';
                 preview.innerHTML = '';
                 return;
@@ -1022,7 +1018,7 @@ require_once __DIR__ . '/db.php';
 
             let html = '<p style="margin: 0 0 0.5rem; font-weight: 600; color: var(--tertiary-color);">Will be included in forward:</p>';
             html += '<p style="margin-bottom: 0.35rem;"><strong>Status:</strong> ' + (tip.status || 'Under Review') + '</p>';
-            if (sendToGroup1) {
+            if (sendToIncidentReporting) {
                 html += '<p style="margin-bottom: 0;"><strong>Outcome:</strong> ' + (tip.outcome || 'No Outcome Yet') + '</p>';
             }
 
@@ -1076,24 +1072,24 @@ require_once __DIR__ . '/db.php';
             }
             
             // Reset checkboxes
-            document.getElementById('sendToGroup1').checked = false;
-            document.getElementById('sendToGroup3').checked = false;
+            document.getElementById('sendToIncidentReporting').checked = false;
+            document.getElementById('sendToEmergencyResponse').checked = false;
             document.getElementById('exportWord').checked = false;
 
-            const group1Input = document.getElementById('sendToGroup1');
-            const group3Input = document.getElementById('sendToGroup3');
-            group1Input.disabled = Boolean(tip.forwarded_at);
-            group3Input.disabled = Boolean(tip.backup_requested_at);
-            group1Input.onchange = updateActionReviewPreview;
-            group3Input.onchange = updateActionReviewPreview;
+            const incidentReportingInput = document.getElementById('sendToIncidentReporting');
+            const emergencyResponseInput = document.getElementById('sendToEmergencyResponse');
+            incidentReportingInput.disabled = Boolean(tip.forwarded_at);
+            emergencyResponseInput.disabled = Boolean(tip.backup_requested_at);
+            incidentReportingInput.onchange = updateActionReviewPreview;
+            emergencyResponseInput.onchange = updateActionReviewPreview;
             updateActionReviewPreview();
 
             let statusHtml = '';
             if (tip.forwarded_at) {
-                statusHtml += `<p style="margin-bottom:0.5rem;color:#0f5132;"><strong>Group 1:</strong> Sent ${new Date(tip.forwarded_at).toLocaleString()}${tip.blotter_reference_id ? ' — Ref: ' + tip.blotter_reference_id : ''}</p>`;
+                statusHtml += `<p style="margin-bottom:0.5rem;color:#0f5132;"><strong>Incident Reporting:</strong> Sent ${new Date(tip.forwarded_at).toLocaleString()}${tip.blotter_reference_id ? ' — Ref: ' + tip.blotter_reference_id : ''}</p>`;
             }
             if (tip.backup_requested_at) {
-                statusHtml += `<p style="margin-bottom:0.5rem;color:#0f5132;"><strong>Group 3:</strong> Backup requested ${new Date(tip.backup_requested_at).toLocaleString()}${tip.group3_reference_id ? ' — Ref: ' + tip.group3_reference_id : ''}</p>`;
+                statusHtml += `<p style="margin-bottom:0.5rem;color:#0f5132;"><strong>Emergency Response:</strong> Backup requested ${new Date(tip.backup_requested_at).toLocaleString()}${tip.emergency_response_reference_id ? ' — Ref: ' + tip.emergency_response_reference_id : ''}</p>`;
             }
             if (statusHtml) {
                 document.getElementById('actionTipContent').innerHTML += `<div style="margin-top:1rem;padding-top:0.75rem;border-top:1px solid var(--border-color);">${statusHtml}</div>`;
@@ -1115,21 +1111,21 @@ require_once __DIR__ . '/db.php';
             if (!currentTipId) return;
             
             const tip = tipData[currentTipId];
-            const sendToGroup1 = document.getElementById('sendToGroup1').checked;
-            const sendToGroup3 = document.getElementById('sendToGroup3').checked;
+            const sendToIncidentReporting = document.getElementById('sendToIncidentReporting').checked;
+            const sendToEmergencyResponse = document.getElementById('sendToEmergencyResponse').checked;
             const exportWord = document.getElementById('exportWord').checked;
             
-            if (!sendToGroup1 && !sendToGroup3 && !exportWord) {
+            if (!sendToIncidentReporting && !sendToEmergencyResponse && !exportWord) {
                 alert('Please select at least one action.');
                 return;
             }
 
-            if (sendToGroup1 && tip.forwarded_at) {
-                alert('This tip was already sent to Incident Logging and Classification.');
+            if (sendToIncidentReporting && tip.forwarded_at) {
+                alert('This tip was already sent to Incident Reporting.');
                 return;
             }
 
-            if (sendToGroup3 && tip.backup_requested_at) {
+            if (sendToEmergencyResponse && tip.backup_requested_at) {
                 alert('Police backup was already requested for this tip.');
                 return;
             }
@@ -1142,21 +1138,21 @@ require_once __DIR__ . '/db.php';
             let actionsCompleted = 0;
             let totalActions = 0;
             const results = {
-                group1: null,
-                group3: null,
+                incidentReporting: null,
+                emergencyResponse: null,
                 export: null
             };
             
-            if (sendToGroup1) {
+            if (sendToIncidentReporting) {
                 totalActions++;
-                fetch('api/send_to_group1.php', {
+                fetch('api/send_to_incident_reporting.php', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload)
                 })
                 .then(response => response.json())
                 .then(data => {
-                    results.group1 = data;
+                    results.incidentReporting = data;
                     if (data.success) {
                         tip.forwarded_at = data.data?.forwarded_at || new Date().toISOString();
                         tip.blotter_reference_id = data.data?.blotter_reference_id || '';
@@ -1165,31 +1161,31 @@ require_once __DIR__ . '/db.php';
                     checkAllActionsComplete();
                 })
                 .catch(error => {
-                    results.group1 = { success: false, message: error.message };
+                    results.incidentReporting = { success: false, message: error.message };
                     actionsCompleted++;
                     checkAllActionsComplete();
                 });
             }
             
-            if (sendToGroup3) {
+            if (sendToEmergencyResponse) {
                 totalActions++;
-                fetch('api/send_to_group3.php', {
+                fetch('api/send_to_emergency_response.php', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload)
                 })
                 .then(response => response.json())
                 .then(data => {
-                    results.group3 = data;
+                    results.emergencyResponse = data;
                     if (data.success) {
                         tip.backup_requested_at = data.data?.backup_requested_at || new Date().toISOString();
-                        tip.group3_reference_id = data.data?.group3_reference_id || '';
+                        tip.emergency_response_reference_id = data.data?.emergency_response_reference_id || '';
                     }
                     actionsCompleted++;
                     checkAllActionsComplete();
                 })
                 .catch(error => {
-                    results.group3 = { success: false, message: error.message };
+                    results.emergencyResponse = { success: false, message: error.message };
                     actionsCompleted++;
                     checkAllActionsComplete();
                 });
@@ -1216,29 +1212,29 @@ require_once __DIR__ . '/db.php';
                 let message = 'Actions completed:\n';
                 let hasError = false;
 
-                if (sendToGroup1) {
-                    if (results.group1?.success) {
-                        message += '- Sent to Incident Logging and Classification';
-                        if (results.group1.data?.blotter_reference_id) {
-                            message += ' (Ref: ' + results.group1.data.blotter_reference_id + ')';
+                if (sendToIncidentReporting) {
+                    if (results.incidentReporting?.success) {
+                        message += '- Sent to Incident Reporting';
+                        if (results.incidentReporting.data?.blotter_reference_id) {
+                            message += ' (Ref: ' + results.incidentReporting.data.blotter_reference_id + ')';
                         }
                         message += '\n';
                     } else {
                         hasError = true;
-                        message += '- Incident Logging failed: ' + (results.group1?.message || 'Unknown error') + '\n';
+                        message += '- Incident Reporting failed: ' + (results.incidentReporting?.message || 'Unknown error') + '\n';
                     }
                 }
 
-                if (sendToGroup3) {
-                    if (results.group3?.success) {
+                if (sendToEmergencyResponse) {
+                    if (results.emergencyResponse?.success) {
                         message += '- Sent to Inter-agency Coordination Portal (Police Backup)';
-                        if (results.group3.data?.group3_reference_id) {
-                            message += ' (Ref: ' + results.group3.data.group3_reference_id + ')';
+                        if (results.emergencyResponse.data?.emergency_response_reference_id) {
+                            message += ' (Ref: ' + results.emergencyResponse.data.emergency_response_reference_id + ')';
                         }
                         message += '\n';
                     } else {
                         hasError = true;
-                        message += '- Police backup request failed: ' + (results.group3?.message || 'Unknown error') + '\n';
+                        message += '- Police backup request failed: ' + (results.emergencyResponse?.message || 'Unknown error') + '\n';
                     }
                 }
 
@@ -1252,7 +1248,7 @@ require_once __DIR__ . '/db.php';
                 }
 
                 alert(message.trim());
-                if (!hasError || (sendToGroup1 && results.group1?.success) || (sendToGroup3 && results.group3?.success)) {
+                if (!hasError || (sendToIncidentReporting && results.incidentReporting?.success) || (sendToEmergencyResponse && results.emergencyResponse?.success)) {
                     closeActionModal();
                 }
             }

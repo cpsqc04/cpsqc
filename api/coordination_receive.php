@@ -1,11 +1,11 @@
 <?php
 
 /**
- * Reference inbound API for Group 3 — Inter-agency Coordination Portal (police backup).
- * Group 3 hosts an equivalent endpoint; AlertaraQC forwards backup requests here when configured.
+ * Reference inbound API for Emergency Response (police backup).
+ * Emergency Response hosts an equivalent endpoint; AlertaraQC forwards backup requests here when configured.
  *
- * POST JSON: see includes/group3_forward.php buildGroup3BackupPayload()
- * Headers: X-API-Key or Authorization: Bearer {GROUP3_API_KEY}
+ * POST JSON: see includes/emergency_response_forward.php buildEmergencyResponseBackupPayload()
+ * Headers: X-API-Key or Authorization: Bearer {EMERGENCY_RESPONSE_API_KEY}
  *
  * Response:
  *   { "success": true, "coordination_reference_id": "COORD-2026-000001", "message": "Backup request received." }
@@ -22,7 +22,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 require_once __DIR__ . '/../db.php';
 require_once __DIR__ . '/../includes/api_key_auth.php';
 
-requirePartnerApiKey('GROUP3_API_KEY', 'Inter-agency Coordination');
+requirePartnerApiKey(partnerEnvKeyCandidates('emergency-response'), 'Emergency Response');
 
 $input = json_decode(file_get_contents('php://input'), true);
 if (!is_array($input)) {

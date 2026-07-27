@@ -45,3 +45,7 @@ detections.json
 openh264*.dll
 openh264*.dll.bz2
 
+
+# User-uploaded media / documents
+uploads/
+

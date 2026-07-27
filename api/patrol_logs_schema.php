@@ -30,6 +30,7 @@ function ensurePatrolLogsTable(PDO $pdo): void
             incidents TEXT DEFAULT NULL,
             details TEXT DEFAULT NULL,
             location TEXT DEFAULT NULL,
+            documentation_photo LONGTEXT DEFAULT NULL,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             INDEX idx_patrol_id (patrol_id),
             INDEX idx_schedule_id (schedule_id)
@@ -72,6 +73,9 @@ function ensurePatrolLogsTable(PDO $pdo): void
     }
     if (!isset($columns['location'])) {
         $pdo->exec('ALTER TABLE patrol_logs ADD COLUMN location TEXT DEFAULT NULL AFTER details');
+    }
+    if (!isset($columns['documentation_photo'])) {
+        $pdo->exec('ALTER TABLE patrol_logs ADD COLUMN documentation_photo LONGTEXT DEFAULT NULL AFTER location');
     }
     if (!isset($columns['created_at'])) {
         $pdo->exec('ALTER TABLE patrol_logs ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP');

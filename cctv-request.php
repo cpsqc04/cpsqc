@@ -16,7 +16,7 @@ $cctvNavActive = 'cctv-request';
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>CCTV Request - Alertara</title>
+    <title>Footage Request - Alertara</title>
     <link rel="icon" type="image/x-icon" href="images/favicon.ico">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="css/theme.css">
@@ -152,6 +152,47 @@ $cctvNavActive = 'cctv-request';
         td { padding: 1rem; border-bottom: 1px solid var(--border-color); color: var(--text-color); }
         tbody tr:hover { background: #f9f9f9; }
         tbody tr:last-child td { border-bottom: none; }
+        .request-list { display: flex; flex-direction: column; gap: 0.75rem; }
+        .request-list-item {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 0.75rem 1.25rem;
+            align-items: center;
+            width: 100%;
+            text-align: left;
+            padding: 1rem 1.25rem;
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            background: #fff;
+            cursor: pointer;
+            font: inherit;
+            color: inherit;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+        }
+        .request-list-item:hover {
+            border-color: var(--primary-color);
+            box-shadow: 0 2px 10px rgba(76, 138, 137, 0.12);
+            background: #f8fbfb;
+        }
+        .request-list-item.is-active {
+            border-color: var(--primary-color);
+            box-shadow: inset 3px 0 0 var(--primary-color);
+            background: #f0f9f8;
+        }
+        .request-list-main { min-width: 0; }
+        .request-list-id { font-weight: 700; color: var(--tertiary-color); font-size: 1rem; margin: 0 0 0.35rem; }
+        .request-list-meta { color: var(--text-secondary); font-size: 0.9rem; line-height: 1.45; }
+        .request-list-meta strong { color: var(--text-color); font-weight: 600; }
+        .request-list-side { display: flex; flex-direction: column; align-items: flex-end; gap: 0.45rem; }
+        .request-list-date { font-size: 0.82rem; color: var(--text-secondary); white-space: nowrap; }
+        .request-list-empty {
+            padding: 2.5rem 1rem;
+            text-align: center;
+            color: var(--text-secondary);
+            border: 1px dashed var(--border-color);
+            border-radius: 10px;
+            background: #fafafa;
+        }
         .status-badge { padding: 0.25rem 0.75rem; border-radius: 12px; font-size: 0.85rem; font-weight: 500; display: inline-block; }
         .status-pending { background: #fff3cd; color: #856404; }
         .status-under-review { background: #cff4fc; color: #055160; }
@@ -160,9 +201,89 @@ $cctvNavActive = 'cctv-request';
         .status-rejected { background: #f8d7da; color: #842029; }
         .status-cancelled { background: #e9ecef; color: #6c757d; }
         .action-buttons { display: flex; gap: 0.5rem; flex-wrap: wrap; }
-        .btn-view, .btn-manage, .btn-link { padding: 0.5rem 1rem; border: none; border-radius: 6px; font-size: 0.85rem; cursor: pointer; color: #fff; background: var(--primary-color); text-decoration: none; display: inline-flex; align-items: center; }
+        .btn-view, .btn-manage, .btn-link, .btn-approve, .btn-reject, .btn-search-footage { padding: 0.5rem 1rem; border: none; border-radius: 6px; font-size: 0.85rem; cursor: pointer; color: #fff; background: var(--primary-color); text-decoration: none; display: inline-flex; align-items: center; gap: 0.4rem; font-weight: 600; }
         .btn-manage { background: #ff9800; }
         .btn-link { background: #6366f1; }
+        .btn-approve { background: #059669; }
+        .btn-reject { background: #dc2626; }
+        .btn-search-footage { background: var(--tertiary-color); }
+        .detail-actions {
+            display: flex;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+            margin-top: 1.5rem;
+            padding-top: 1.25rem;
+            border-top: 1px solid var(--border-color);
+        }
+        .reject-panel, .select-footage-panel {
+            margin-top: 1.25rem;
+            padding: 1.1rem 1.15rem;
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            background: #f8fafb;
+            display: none;
+        }
+        .reject-panel.show, .select-footage-panel.show { display: block; }
+        .select-footage-panel h3, .reject-panel h3 {
+            margin: 0 0 0.85rem;
+            font-size: 1rem;
+            color: var(--tertiary-color);
+        }
+        .footage-filters {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.75rem;
+            align-items: flex-end;
+            margin-bottom: 1rem;
+        }
+        .footage-filters .form-group { margin: 0; min-width: 160px; flex: 1; }
+        .footage-results { display: flex; flex-direction: column; gap: 0.65rem; max-height: 320px; overflow-y: auto; }
+        .footage-item {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 0.75rem;
+            align-items: center;
+            padding: 0.85rem 1rem;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            background: #fff;
+            cursor: pointer;
+            text-align: left;
+            font: inherit;
+            color: inherit;
+        }
+        .footage-item:hover { border-color: var(--primary-color); }
+        .footage-item.selected {
+            border-color: var(--primary-color);
+            box-shadow: inset 3px 0 0 var(--primary-color);
+            background: #f0f9f8;
+        }
+        .footage-item-title { font-weight: 600; color: var(--tertiary-color); margin: 0 0 0.25rem; }
+        .footage-item-meta { font-size: 0.85rem; color: var(--text-secondary); line-height: 1.4; }
+        .camera-match-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin: 0 0 0.85rem;
+        }
+        .camera-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            padding: 0.35rem 0.7rem;
+            border-radius: 999px;
+            background: #eef2ff;
+            color: #3730a3;
+            font-size: 0.8rem;
+            font-weight: 600;
+            border: 1px solid transparent;
+            cursor: pointer;
+        }
+        .camera-chip.selected {
+            background: #d1fae5;
+            color: #065f46;
+            border-color: #059669;
+        }
         .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 2000; align-items: center; justify-content: center; }
         .modal.active { display: flex; }
         .modal-content { background: var(--card-bg); border-radius: 12px; padding: 2rem; width: 90%; max-width: 760px; max-height: 90vh; overflow-y: auto; }
@@ -197,7 +318,7 @@ $cctvNavActive = 'cctv-request';
             gap: 0.65rem;
             flex-wrap: wrap;
         }
-        .group1-status {
+        .incident-reporting-status {
             margin: 0.85rem 0 0;
             padding: 0.7rem 0.85rem;
             border-radius: 8px;
@@ -224,7 +345,7 @@ $cctvNavActive = 'cctv-request';
             cursor: pointer;
             font-weight: 600;
         }
-        .btn-group1 {
+        .btn-incident-reporting {
             background: #fff;
             color: #0f5132;
             border: 1px solid #0f5132;
@@ -233,8 +354,8 @@ $cctvNavActive = 'cctv-request';
             cursor: pointer;
             font-size: 0.9rem;
         }
-        .btn-group1:hover:not(:disabled) { background: #0f5132; color: #fff; }
-        .btn-group1:disabled { opacity: 0.55; cursor: not-allowed; }
+        .btn-incident-reporting:hover:not(:disabled) { background: #0f5132; color: #fff; }
+        .btn-incident-reporting:disabled { opacity: 0.55; cursor: not-allowed; }
         .btn-link {
             background: #fff;
             color: var(--primary-color);
@@ -283,10 +404,7 @@ $cctvNavActive = 'cctv-request';
             </div>
         </div>
         <nav class="sidebar-nav">
-            <a href="index.php" class="nav-module-header" data-tooltip="Dashboard" style="text-decoration: none; display: flex; align-items: center; justify-content: space-between; padding: 0.875rem 1.5rem; color: rgba(255, 255, 255, 0.9); cursor: pointer; transition: background-color 0.2s ease; font-weight: 500; user-select: none; gap: 0.75rem; <?php echo basename($_SERVER['PHP_SELF']) == 'index.php' ? 'background: rgba(76, 138, 137, 0.25); border-left: 3px solid #4c8a89;' : ''; ?>">
-                <span class="nav-module-icon"><i class="fas fa-home"></i></span>
-                <span class="nav-module-header-text">Dashboard</span>
-            </a>
+            <?php require __DIR__ . '/includes/admin_nav_dashboard.php'; ?>
 
             <?php if (isAdminUser()): ?>
             <div class="nav-module <?php echo (basename($_SERVER['PHP_SELF']) == 'users.php' || basename($_SERVER['PHP_SELF']) == 'login-history.php') ? 'active' : ''; ?>">
@@ -401,7 +519,7 @@ $cctvNavActive = 'cctv-request';
                 <button class="content-burger-btn" onclick="toggleSidebar()" aria-label="Toggle sidebar">
                     <span></span>
                 </button>
-                <h1 class="page-title">CCTV Request</h1>
+                <h1 class="page-title">Footage Request</h1>
             </div>
             <div class="user-info">
                 <div class="datetime-display">
@@ -441,24 +559,8 @@ $cctvNavActive = 'cctv-request';
                             <input type="date" id="dateFilter" onchange="filterRequests()">
                         </div>
                     </div>
-                    <div class="table-container">
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>Request ID</th>
-                                    <th>Agency</th>
-                                    <th>Contact</th>
-                                    <th>Location / Camera</th>
-                                    <th>Footage Window</th>
-                                    <th>Status</th>
-                                    <th>Submitted</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody id="requestsTableBody">
-                                <tr><td colspan="8" style="text-align:center;color:var(--text-secondary);">Loading requests...</td></tr>
-                            </tbody>
-                        </table>
+                    <div id="requestsList" class="request-list">
+                        <div class="request-list-empty">Loading requests...</div>
                     </div>
                 </div>
             </div>
@@ -468,71 +570,47 @@ $cctvNavActive = 'cctv-request';
     <div id="viewModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h2>CCTV Request Details</h2>
+                <h2>Footage Request Details</h2>
                 <button class="close-modal" onclick="closeViewModal()">&times;</button>
             </div>
             <div id="viewDetails"></div>
-        </div>
-    </div>
-
-    <div id="manageModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2>Manage CCTV Request</h2>
-                <button class="close-modal" onclick="closeManageModal()">&times;</button>
+            <div class="detail-actions" id="detailActions"></div>
+            <div id="rejectPanel" class="reject-panel">
+                <h3>Reject Request</h3>
+                <div class="form-group">
+                    <label for="rejectReason">Rejection Reason *</label>
+                    <textarea id="rejectReason" rows="3" placeholder="Explain why this request is being rejected..."></textarea>
+                </div>
+                <div class="form-actions" style="border-top:none;padding-top:0;margin-top:0;">
+                    <button type="button" class="btn-cancel" onclick="hideRejectPanel()">Cancel</button>
+                    <button type="button" class="btn-reject" onclick="confirmReject()">Confirm Reject</button>
+                </div>
             </div>
-            <p id="manageRequestRef" style="margin:0 0 1rem;font-weight:600;color:var(--tertiary-color);"></p>
-            <form id="manageForm" onsubmit="saveManage(event)">
-                <input type="hidden" id="manageId">
-                <div class="form-group">
-                    <label for="manageStatus">Status *</label>
-                    <select id="manageStatus" required>
-                        <option value="Pending">Pending</option>
-                        <option value="Under Review">Under Review</option>
-                        <option value="Approved">Approved</option>
-                        <option value="Fulfilled">Fulfilled</option>
-                        <option value="Rejected">Rejected</option>
-                        <option value="Cancelled">Cancelled</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label for="manageApprovedCamera">Approved Camera</label>
-                    <select id="manageApprovedCamera"><option value="">Select camera</option></select>
-                </div>
-                <div class="form-group">
-                    <label for="manageActualStart">Actual Footage Start</label>
-                    <input type="time" id="manageActualStart">
-                </div>
-                <div class="form-group">
-                    <label for="manageActualEnd">Actual Footage End</label>
-                    <input type="time" id="manageActualEnd">
-                </div>
-                <div class="form-group">
-                    <label for="manageReviewNotes">Review Notes (internal)</label>
-                    <textarea id="manageReviewNotes" rows="3"></textarea>
-                </div>
-                <div class="form-group">
-                    <label for="manageRejectionReason">Rejection Reason (shown to requester)</label>
-                    <textarea id="manageRejectionReason" rows="2"></textarea>
-                </div>
-                <div class="form-group">
-                    <label for="manageFulfillmentNotes">Fulfillment Notes</label>
-                    <textarea id="manageFulfillmentNotes" rows="2" placeholder="Delivery details, file reference, etc."></textarea>
-                </div>
-                <div class="evidence-panel">
-                    <h3>Evidence delivery</h3>
-                    <p>Review matching footage, then send the package to Group 1 for case evidence.</p>
-                    <div class="evidence-actions">
-                        <a id="openPlaybackLink" href="playback.php" class="btn-link" target="_blank">Open Playback</a>
-                        <button type="button" id="sendToGroup1Btn" class="btn-group1" onclick="sendFootageToGroup1()">Send to Group 1</button>
+            <div id="selectFootagePanel" class="select-footage-panel">
+                <h3>Select Footage</h3>
+                <p style="margin:0 0 0.85rem;font-size:0.9rem;color:var(--text-secondary);">Search recordings by date and location to match this request.</p>
+                <div class="footage-filters">
+                    <div class="form-group">
+                        <label for="footageDate">Date</label>
+                        <input type="date" id="footageDate">
                     </div>
-                    <div id="group1EvidenceStatus" class="group1-status"></div>
+                    <div class="form-group">
+                        <label for="footageLocation">Location</label>
+                        <input type="text" id="footageLocation" placeholder="Search camera location...">
+                    </div>
+                    <button type="button" class="btn-search-footage" onclick="searchFootage()"><i class="fas fa-search"></i> Search</button>
+                </div>
+                <div id="cameraMatches" class="camera-match-list"></div>
+                <div id="footageResults" class="footage-results">
+                    <div class="request-list-empty">Enter a date and search for recordings.</div>
                 </div>
                 <div class="form-actions">
-                    <button type="button" class="btn-cancel" onclick="closeManageModal()">Cancel</button>
-                    <button type="submit" class="btn-save">Save Changes</button>
+                    <button type="button" class="btn-cancel" onclick="hideSelectFootagePanel()">Cancel</button>
+                    <button type="button" class="btn-approve" id="confirmFootageBtn" onclick="confirmSelectedFootage()" disabled>Confirm Selected Footage</button>
+                    <button type="button" class="btn-incident-reporting" id="sendToIncidentReportingBtn" onclick="sendFootageToIncidentReporting()">Send to Incident Reporting</button>
                 </div>
-            </form>
+                <div id="incidentReportingEvidenceStatus" class="incident-reporting-status"></div>
+            </div>
         </div>
     </div>
 
@@ -553,6 +631,19 @@ $cctvNavActive = 'cctv-request';
         let requestData = {};
         let allRequests = [];
         let cameras = [];
+        let activeRequestId = null;
+        let selectedFootageFilename = null;
+        let selectedCameraId = null;
+        let footageSegments = {};
+
+        function escapeHtml(value) {
+            return String(value == null ? '' : value)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
 
         function statusClass(status) {
             return String(status || '').toLowerCase().replace(/\s+/g, '-');
@@ -577,19 +668,25 @@ $cctvNavActive = 'cctv-request';
             return date.toLocaleString('en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
         }
 
+        function purposeLabel(item) {
+            const purpose = String(item.purpose || '').trim();
+            const details = String(item.purpose_details || '').trim();
+            if (purpose && details && purpose !== details) return purpose + ' — ' + details;
+            return details || purpose || '—';
+        }
+
+        function cameraLabel(cameraId) {
+            if (!cameraId) return '—';
+            const camera = cameras.find(c => String(c.cameraId) === String(cameraId));
+            if (!camera) return cameraId;
+            return camera.cameraId + (camera.name ? ' — ' + camera.name : '');
+        }
+
         async function loadCameras() {
             try {
                 const res = await fetch('api/cameras.php');
                 const result = await res.json();
                 cameras = result.success ? (result.cameras || []) : [];
-                const select = document.getElementById('manageApprovedCamera');
-                select.innerHTML = '<option value="">Select camera</option>';
-                cameras.forEach(camera => {
-                    const option = document.createElement('option');
-                    option.value = camera.cameraId;
-                    option.textContent = `${camera.cameraId} - ${camera.name}`;
-                    select.appendChild(option);
-                });
             } catch (e) {
                 console.error('Failed to load cameras', e);
             }
@@ -610,20 +707,21 @@ $cctvNavActive = 'cctv-request';
                 }
             } catch (e) {
                 console.error(e);
-                document.getElementById('requestsTableBody').innerHTML = '<tr><td colspan="8" style="text-align:center;color:#b91c1c;">Failed to load CCTV requests.</td></tr>';
+                document.getElementById('requestsList').innerHTML = '<div class="request-list-empty" style="color:#b91c1c;">Failed to load footage requests.</div>';
             }
         }
 
         function filterRequests() {
             const query = document.getElementById('searchInput').value.trim().toLowerCase();
             const dateFilter = document.getElementById('dateFilter').value;
-            const tbody = document.getElementById('requestsTableBody');
-            tbody.innerHTML = '';
+            const list = document.getElementById('requestsList');
+            list.innerHTML = '';
 
             const filtered = allRequests.filter(item => {
                 const haystack = [
                     item.request_id, item.requesting_agency, item.contact_person,
-                    item.contact_number, item.incident_location, item.camera_id, item.status
+                    item.contact_number, item.contact_email, item.incident_location,
+                    item.camera_id, item.status, item.case_reference
                 ].join(' ').toLowerCase();
                 const matchesQuery = query === '' || haystack.includes(query);
                 const matchesDate = dateFilter === '' || String(item.incident_date || '').startsWith(dateFilter) || String(item.submitted_at || '').startsWith(dateFilter);
@@ -631,63 +729,321 @@ $cctvNavActive = 'cctv-request';
             });
 
             if (!filtered.length) {
-                tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--text-secondary);">No CCTV requests found.</td></tr>';
+                list.innerHTML = '<div class="request-list-empty">No footage requests found.</div>';
                 return;
             }
 
             filtered.forEach(item => {
-                const row = document.createElement('tr');
-                const locationLabel = item.camera_id ? item.camera_id : (item.location_description || item.incident_location);
-                row.innerHTML = `
-                    <td>${item.request_id}</td>
-                    <td>${item.requesting_agency}</td>
-                    <td>${item.contact_person}<br><small>${item.contact_number}</small></td>
-                    <td>${locationLabel}</td>
-                    <td>${formatDate(item.incident_date)}<br><small>${formatTime(item.footage_start_time)} - ${formatTime(item.footage_end_time)}</small></td>
-                    <td><span class="status-badge status-${statusClass(item.status)}">${item.status}</span></td>
-                    <td>${formatDate(item.submitted_at)}</td>
-                    <td>
-                        <div class="action-buttons">
-                            <button class="btn-view" onclick="viewRequest('${item.request_id}')">View</button>
-                            <button class="btn-manage" onclick="manageRequest('${item.request_id}')">Manage</button>
+                const button = document.createElement('button');
+                button.type = 'button';
+                button.className = 'request-list-item' + (activeRequestId === item.request_id ? ' is-active' : '');
+                button.onclick = () => viewRequest(item.request_id);
+                const locationLabel = item.camera_id || item.location_description || item.incident_location || '—';
+                button.innerHTML = `
+                    <div class="request-list-main">
+                        <div class="request-list-id">${escapeHtml(item.request_id)}</div>
+                        <div class="request-list-meta">
+                            <strong>${escapeHtml(item.requesting_agency || '—')}</strong><br>
+                            ${escapeHtml(locationLabel)} · ${escapeHtml(formatDate(item.incident_date))} ${escapeHtml(formatTime(item.footage_start_time))}–${escapeHtml(formatTime(item.footage_end_time))}
                         </div>
-                    </td>
+                    </div>
+                    <div class="request-list-side">
+                        <span class="status-badge status-${statusClass(item.status)}">${escapeHtml(item.status || 'Pending')}</span>
+                        <span class="request-list-date">${escapeHtml(formatDate(item.submitted_at))}</span>
+                    </div>
                 `;
-                tbody.appendChild(row);
+                list.appendChild(button);
             });
+        }
+
+        function detailRow(label, valueHtml) {
+            return `<div class="detail-row"><span class="detail-label">${escapeHtml(label)}</span><span>${valueHtml}</span></div>`;
         }
 
         function viewRequest(requestId) {
             const item = requestData[requestId];
             if (!item) return;
+            activeRequestId = requestId;
+            selectedFootageFilename = null;
+            selectedCameraId = item.approved_camera_id || item.camera_id || null;
+            hideRejectPanel();
+            hideSelectFootagePanel();
+            filterRequests();
+
             const docButton = item.has_supporting_document
-                ? `<button class="btn-view" onclick="viewDocument(${item.id})">View Document</button>`
+                ? `<button class="btn-view" type="button" onclick="viewDocument(${item.id})">View Document</button>`
                 : 'None';
-            document.getElementById('viewDetails').innerHTML = `
-                <div class="detail-row"><span class="detail-label">Request ID</span><span>${item.request_id}</span></div>
-                <div class="detail-row"><span class="detail-label">Agency</span><span>${item.requesting_agency}</span></div>
-                <div class="detail-row"><span class="detail-label">Contact</span><span>${item.contact_person} (${item.contact_number})</span></div>
-                <div class="detail-row"><span class="detail-label">Email</span><span>${item.contact_email || '—'}</span></div>
-                <div class="detail-row"><span class="detail-label">Case Reference</span><span>${item.case_reference || '—'}</span></div>
-                <div class="detail-row"><span class="detail-label">Purpose</span><span>${item.purpose_details}</span></div>
-                <div class="detail-row"><span class="detail-label">Legal Basis</span><span>${item.legal_basis}</span></div>
-                <div class="detail-row"><span class="detail-label">Incident Location</span><span>${item.incident_location}</span></div>
-                <div class="detail-row"><span class="detail-label">Camera</span><span>${item.camera_id || '—'}</span></div>
-                <div class="detail-row"><span class="detail-label">Footage Window</span><span>${formatDate(item.incident_date)} ${formatTime(item.footage_start_time)} - ${formatTime(item.footage_end_time)}</span></div>
-                <div class="detail-row"><span class="detail-label">Incident Description</span><span>${item.incident_description}</span></div>
-                <div class="detail-row"><span class="detail-label">Delivery Method</span><span>${item.delivery_method}</span></div>
-                <div class="detail-row"><span class="detail-label">Supporting Document</span><span>${docButton}</span></div>
-                <div class="detail-row"><span class="detail-label">Status</span><span>${item.status}</span></div>
-                <div class="detail-row"><span class="detail-label">Review Notes</span><span>${item.review_notes || '—'}</span></div>
-                <div class="detail-row"><span class="detail-label">Rejection Reason</span><span>${item.rejection_reason || '—'}</span></div>
-                <div class="detail-row"><span class="detail-label">Fulfillment Notes</span><span>${item.fulfillment_notes || '—'}</span></div>
-                <div class="detail-row"><span class="detail-label">Group 1 Evidence</span><span>${item.forwarded_to_group1_at ? `Sent ${formatDateTime(item.forwarded_to_group1_at)}${item.group1_evidence_reference_id ? ' — Ref: ' + item.group1_evidence_reference_id : ''}` : '—'}</span></div>
+
+            document.getElementById('viewDetails').innerHTML = [
+                detailRow('Request ID', escapeHtml(item.request_id)),
+                detailRow('Agency', escapeHtml(item.requesting_agency || '—')),
+                detailRow('Contact Number', escapeHtml(item.contact_number || '—')),
+                detailRow('Email', escapeHtml(item.contact_email || '—')),
+                detailRow('Case Reference', escapeHtml(item.case_reference || '—')),
+                detailRow('Purpose', escapeHtml(purposeLabel(item))),
+                detailRow('Legal Basis', escapeHtml(item.legal_basis || '—')),
+                detailRow('Incident Location', escapeHtml(item.incident_location || '—')),
+                detailRow('Camera', escapeHtml(cameraLabel(item.camera_id))),
+                detailRow('Footage Window', escapeHtml(`${formatDate(item.incident_date)} ${formatTime(item.footage_start_time)} - ${formatTime(item.footage_end_time)}`)),
+                detailRow('Incident Description', escapeHtml(item.incident_description || '—')),
+                detailRow('Delivery Method', escapeHtml(item.delivery_method || '—')),
+                detailRow('Supporting Document', docButton),
+                detailRow('Review Notes', escapeHtml(item.review_notes || '—')),
+                detailRow('Date Submitted', escapeHtml(formatDateTime(item.submitted_at))),
+                detailRow('Status', `<span class="status-badge status-${statusClass(item.status)}">${escapeHtml(item.status || 'Pending')}</span>`)
+            ].join('');
+
+            const blocked = ['Rejected', 'Cancelled', 'Fulfilled'].includes(item.status);
+            const actions = document.getElementById('detailActions');
+            const rejectDisabled = item.status === 'Rejected' || item.status === 'Cancelled' || item.status === 'Fulfilled';
+            actions.innerHTML = `
+                <button type="button" class="btn-approve" ${blocked ? 'disabled style="opacity:0.55;cursor:not-allowed;"' : ''} onclick="startApprove()"><i class="fas fa-check"></i> Approve</button>
+                <button type="button" class="btn-reject" ${rejectDisabled ? 'disabled style="opacity:0.55;cursor:not-allowed;"' : ''} onclick="startReject()"><i class="fas fa-times"></i> Reject</button>
             `;
+
+            document.getElementById('footageDate').value = item.incident_date || '';
+            document.getElementById('footageLocation').value = item.incident_location || item.location_description || '';
+            updateIncidentReportingButtons(item);
             document.getElementById('viewModal').classList.add('active');
+        }
+
+        function updateIncidentReportingButtons(item) {
+            const incidentReportingBtn = document.getElementById('sendToIncidentReportingBtn');
+            const incidentReportingStatus = document.getElementById('incidentReportingEvidenceStatus');
+            const blocked = ['Rejected', 'Cancelled'].includes(item.status);
+            incidentReportingBtn.disabled = Boolean(item.forwarded_to_incident_reporting_at) || blocked;
+            incidentReportingBtn.textContent = item.forwarded_to_incident_reporting_at ? 'Already sent' : 'Send to Incident Reporting';
+            if (item.forwarded_to_incident_reporting_at) {
+                incidentReportingStatus.style.display = 'block';
+                incidentReportingStatus.innerHTML = `<strong>Incident Reporting:</strong> Sent ${escapeHtml(formatDateTime(item.forwarded_to_incident_reporting_at))}${item.incident_reporting_evidence_reference_id ? ' — Ref: ' + escapeHtml(item.incident_reporting_evidence_reference_id) : ''}`;
+            } else {
+                incidentReportingStatus.style.display = 'none';
+                incidentReportingStatus.textContent = '';
+            }
         }
 
         function closeViewModal() {
             document.getElementById('viewModal').classList.remove('active');
+            activeRequestId = null;
+            hideRejectPanel();
+            hideSelectFootagePanel();
+            filterRequests();
+        }
+
+        function startReject() {
+            hideSelectFootagePanel();
+            document.getElementById('rejectPanel').classList.add('show');
+            document.getElementById('rejectReason').value = '';
+            document.getElementById('rejectReason').focus();
+        }
+
+        function hideRejectPanel() {
+            document.getElementById('rejectPanel').classList.remove('show');
+        }
+
+        async function confirmReject() {
+            const item = requestData[activeRequestId];
+            if (!item) return;
+            const reason = document.getElementById('rejectReason').value.trim();
+            if (!reason) {
+                alert('Please provide a rejection reason.');
+                return;
+            }
+            try {
+                const result = await updateRequestStatus(item.id, {
+                    status: 'Rejected',
+                    rejection_reason: reason,
+                    review_notes: item.review_notes || ''
+                });
+                if (!result.success) throw new Error(result.message || 'Reject failed');
+                alert('Footage request rejected.');
+                closeViewModal();
+                await loadRequests();
+            } catch (err) {
+                alert(err.message || 'Failed to reject request.');
+            }
+        }
+
+        async function startApprove() {
+            const item = requestData[activeRequestId];
+            if (!item) return;
+            hideRejectPanel();
+            document.getElementById('selectFootagePanel').classList.add('show');
+            document.getElementById('footageDate').value = item.incident_date || '';
+            document.getElementById('footageLocation').value = item.incident_location || item.location_description || '';
+            selectedFootageFilename = null;
+            document.getElementById('confirmFootageBtn').disabled = true;
+            updateIncidentReportingButtons(item);
+            await searchFootage();
+            try {
+                if (!['Approved', 'Fulfilled'].includes(item.status)) {
+                    const result = await updateRequestStatus(item.id, {
+                        status: 'Approved',
+                        approved_camera_id: item.approved_camera_id || item.camera_id || '',
+                        actual_footage_start: item.actual_footage_start || item.footage_start_time || '',
+                        actual_footage_end: item.actual_footage_end || item.footage_end_time || '',
+                        review_notes: item.review_notes || '',
+                        rejection_reason: '',
+                        fulfillment_notes: item.fulfillment_notes || ''
+                    });
+                    if (result.success) {
+                        item.status = 'Approved';
+                        requestData[item.request_id] = item;
+                        filterRequests();
+                        const statusRow = document.querySelector('#viewDetails .detail-row:last-child span:last-child');
+                        if (statusRow) {
+                            statusRow.innerHTML = `<span class="status-badge status-approved">Approved</span>`;
+                        }
+                    }
+                }
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        function hideSelectFootagePanel() {
+            document.getElementById('selectFootagePanel').classList.remove('show');
+            selectedFootageFilename = null;
+            document.getElementById('confirmFootageBtn').disabled = true;
+        }
+
+        function matchingCameras(locationQuery) {
+            const q = String(locationQuery || '').trim().toLowerCase();
+            if (!q) return cameras.slice();
+            return cameras.filter(camera => {
+                const haystack = [camera.cameraId, camera.name, camera.location, camera.description].join(' ').toLowerCase();
+                return haystack.includes(q);
+            });
+        }
+
+        function renderCameraMatches(matches) {
+            const wrap = document.getElementById('cameraMatches');
+            if (!matches.length) {
+                wrap.innerHTML = '<span style="font-size:0.85rem;color:var(--text-secondary);">No cameras matched the location filter. Showing all recordings for the date.</span>';
+                return;
+            }
+            wrap.innerHTML = matches.map(camera => {
+                const selected = String(selectedCameraId || '') === String(camera.cameraId);
+                return `<button type="button" class="camera-chip${selected ? ' selected' : ''}" onclick="selectCamera('${escapeHtml(camera.cameraId)}')">
+                    <i class="fas fa-video"></i> ${escapeHtml(camera.cameraId)} — ${escapeHtml(camera.location || camera.name || '')}
+                </button>`;
+            }).join('');
+        }
+
+        function selectCamera(cameraId) {
+            selectedCameraId = cameraId;
+            const locationInput = document.getElementById('footageLocation');
+            const camera = cameras.find(c => String(c.cameraId) === String(cameraId));
+            if (camera && camera.location && !locationInput.value.trim()) {
+                locationInput.value = camera.location;
+            }
+            renderCameraMatches(matchingCameras(locationInput.value));
+        }
+
+        async function searchFootage() {
+            const date = document.getElementById('footageDate').value;
+            const location = document.getElementById('footageLocation').value.trim();
+            const results = document.getElementById('footageResults');
+            const cameraMatches = matchingCameras(location);
+            renderCameraMatches(cameraMatches);
+
+            if (!date) {
+                results.innerHTML = '<div class="request-list-empty">Select a date to search recordings.</div>';
+                return;
+            }
+
+            results.innerHTML = '<div class="request-list-empty">Searching recordings...</div>';
+            try {
+                const item = requestData[activeRequestId];
+                let url = 'api/recordings.php?action=find&date=' + encodeURIComponent(date);
+                const start = item && item.footage_start_time ? String(item.footage_start_time).slice(0, 5) : '';
+                const end = item && item.footage_end_time ? String(item.footage_end_time).slice(0, 5) : '';
+                if (start) url += '&start=' + encodeURIComponent(start);
+                if (end) url += '&end=' + encodeURIComponent(end);
+
+                let res = await fetch(url);
+                let result = await res.json();
+                if (!result.success) throw new Error(result.message || 'Failed to search recordings');
+
+                let segments = result.data || [];
+                if (!segments.length) {
+                    res = await fetch('api/recordings.php?action=list&date=' + encodeURIComponent(date));
+                    result = await res.json();
+                    if (!result.success) throw new Error(result.message || 'Failed to load recordings');
+                    segments = result.data || [];
+                }
+
+                footageSegments = {};
+                if (!segments.length) {
+                    results.innerHTML = '<div class="request-list-empty">No recordings found for that date.</div>';
+                    return;
+                }
+
+                results.innerHTML = segments.map(segment => {
+                    footageSegments[segment.filename] = segment;
+                    const selected = selectedFootageFilename === segment.filename;
+                    return `<button type="button" class="footage-item${selected ? ' selected' : ''}" data-filename="${escapeHtml(segment.filename)}" onclick="selectFootage(this.dataset.filename)">
+                        <div>
+                            <div class="footage-item-title">${escapeHtml(segment.filename)}</div>
+                            <div class="footage-item-meta">${escapeHtml(segment.label || (segment.start_at + ' – ' + segment.end_at))} · ${escapeHtml(segment.size_label || '')}</div>
+                        </div>
+                        <span class="status-badge status-${segment.playable ? 'approved' : 'under-review'}">${escapeHtml(segment.status || 'ready')}</span>
+                    </button>`;
+                }).join('');
+            } catch (err) {
+                results.innerHTML = `<div class="request-list-empty" style="color:#b91c1c;">${escapeHtml(err.message || 'Failed to search recordings.')}</div>`;
+            }
+        }
+
+        function selectFootage(filename) {
+            selectedFootageFilename = filename;
+            document.getElementById('confirmFootageBtn').disabled = !filename;
+            document.querySelectorAll('.footage-item').forEach(el => {
+                el.classList.toggle('selected', el.dataset.filename === filename);
+            });
+        }
+
+        async function updateRequestStatus(id, payload) {
+            const res = await fetch('api/cctv_requests.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(Object.assign({ action: 'manage', id }, payload))
+            });
+            return res.json();
+        }
+
+        async function confirmSelectedFootage() {
+            const item = requestData[activeRequestId];
+            if (!item || !selectedFootageFilename) return;
+            const segment = footageSegments[selectedFootageFilename];
+            if (!segment) {
+                alert('Selected recording was not found. Search again.');
+                return;
+            }
+
+            const cameraId = selectedCameraId || item.approved_camera_id || item.camera_id || '';
+            const noteLine = 'Selected footage: ' + selectedFootageFilename
+                + (cameraId ? ' (camera ' + cameraId + ')' : '')
+                + ' · ' + (segment.start_at || '') + ' – ' + (segment.end_at || '');
+            const fulfillmentNotes = [item.fulfillment_notes || '', noteLine].filter(Boolean).join('\n');
+
+            try {
+                const result = await updateRequestStatus(item.id, {
+                    status: 'Approved',
+                    approved_camera_id: cameraId,
+                    actual_footage_start: (segment.start_time || '').slice(0, 8),
+                    actual_footage_end: (segment.end_time || '').slice(0, 8),
+                    review_notes: item.review_notes || '',
+                    rejection_reason: '',
+                    fulfillment_notes: fulfillmentNotes
+                });
+                if (!result.success) throw new Error(result.message || 'Failed to save selected footage');
+                alert('Footage selected and request approved.');
+                closeViewModal();
+                await loadRequests();
+            } catch (err) {
+                alert(err.message || 'Failed to confirm footage.');
+            }
         }
 
         async function viewDocument(id) {
@@ -705,131 +1061,46 @@ $cctvNavActive = 'cctv-request';
             }
         }
 
-        function manageRequest(requestId) {
-            const item = requestData[requestId];
+        function sendFootageToIncidentReporting() {
+            const item = requestData[activeRequestId];
             if (!item) return;
-            document.getElementById('manageId').value = item.id;
-            document.getElementById('manageRequestRef').textContent = 'Request ID: ' + item.request_id;
-            document.getElementById('manageStatus').value = item.status;
-            document.getElementById('manageApprovedCamera').value = item.approved_camera_id || item.camera_id || '';
-            document.getElementById('manageActualStart').value = item.actual_footage_start ? String(item.actual_footage_start).slice(0, 5) : (item.footage_start_time ? String(item.footage_start_time).slice(0, 5) : '');
-            document.getElementById('manageActualEnd').value = item.actual_footage_end ? String(item.actual_footage_end).slice(0, 5) : (item.footage_end_time ? String(item.footage_end_time).slice(0, 5) : '');
-            document.getElementById('manageReviewNotes').value = item.review_notes || '';
-            document.getElementById('manageRejectionReason').value = item.rejection_reason || '';
-            document.getElementById('manageFulfillmentNotes').value = item.fulfillment_notes || '';
-            const group1Btn = document.getElementById('sendToGroup1Btn');
-            const group1Status = document.getElementById('group1EvidenceStatus');
-            const blocked = ['Rejected', 'Cancelled'].includes(item.status);
-            group1Btn.disabled = Boolean(item.forwarded_to_group1_at) || blocked;
-            group1Btn.textContent = item.forwarded_to_group1_at ? 'Already sent' : 'Send to Group 1';
-            if (item.forwarded_to_group1_at) {
-                group1Status.style.display = 'block';
-                group1Status.innerHTML = `<strong>Group 1:</strong> Sent ${formatDateTime(item.forwarded_to_group1_at)}${item.group1_evidence_reference_id ? ' — Ref: ' + item.group1_evidence_reference_id : ''}`;
-            } else {
-                group1Status.style.display = 'none';
-                group1Status.textContent = '';
-            }
-            const cam = item.approved_camera_id || item.camera_id || '';
-            const date = item.incident_date || '';
-            const start = item.actual_footage_start ? String(item.actual_footage_start).slice(0, 5) : (item.footage_start_time ? String(item.footage_start_time).slice(0, 5) : '');
-            const end = item.actual_footage_end ? String(item.actual_footage_end).slice(0, 5) : (item.footage_end_time ? String(item.footage_end_time).slice(0, 5) : '');
-            const playbackParams = new URLSearchParams();
-            if (cam) playbackParams.set('camera', cam);
-            if (date) playbackParams.set('date', date);
-            if (start) playbackParams.set('start', start);
-            if (end) playbackParams.set('end', end);
-            playbackParams.set('request_id', item.request_id);
-            document.getElementById('openPlaybackLink').href = 'playback.php?' + playbackParams.toString();
-            document.getElementById('manageModal').classList.add('active');
-        }
-
-        function closeManageModal() {
-            document.getElementById('manageModal').classList.remove('active');
-        }
-
-        function sendFootageToGroup1() {
-            const id = parseInt(document.getElementById('manageId').value, 10);
-            const item = allRequests.find(row => row.id === id);
-            if (!item) return;
-            if (item.forwarded_to_group1_at) {
-                alert('This CCTV request was already sent to Group 1.');
+            if (item.forwarded_to_incident_reporting_at) {
+                alert('This footage request was already sent to Incident Reporting.');
                 return;
             }
-            if (!confirm('Send matching CCTV recordings to Group 1 for evidence?\n\nThis will mark the request as Fulfilled.')) {
+            if (!confirm('Send matching CCTV recordings to Incident Reporting for evidence?\n\nThis will mark the request as Fulfilled.')) {
                 return;
             }
-            const btn = document.getElementById('sendToGroup1Btn');
+            const btn = document.getElementById('sendToIncidentReportingBtn');
             btn.disabled = true;
             btn.textContent = 'Sending...';
-            fetch('api/send_cctv_to_group1.php', {
+            fetch('api/send_cctv_to_incident_reporting.php', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ id })
+                body: JSON.stringify({ id: item.id })
             })
             .then(res => res.json().then(data => ({ ok: res.ok, data })))
             .then(({ ok, data }) => {
                 if (!ok || !data.success) {
-                    throw new Error(data.message || 'Failed to send footage to Group 1.');
+                    throw new Error(data.message || 'Failed to send footage to Incident Reporting.');
                 }
-                item.forwarded_to_group1_at = data.data?.forwarded_to_group1_at || new Date().toISOString();
-                item.group1_evidence_reference_id = data.data?.group1_evidence_reference_id || '';
-                item.forwarded_recording_files = JSON.stringify(data.data?.forwarded_recording_files || []);
+                item.forwarded_to_incident_reporting_at = data.data?.forwarded_to_incident_reporting_at || new Date().toISOString();
+                item.incident_reporting_evidence_reference_id = data.data?.incident_reporting_evidence_reference_id || '';
                 item.status = data.data?.status || 'Fulfilled';
-                item.fulfillment_notes = (item.fulfillment_notes ? item.fulfillment_notes + '\n' : '')
-                    + 'Sent to Group 1 for evidence'
-                    + (item.group1_evidence_reference_id ? ' — Ref: ' + item.group1_evidence_reference_id : '')
-                    + ' (' + (data.data?.segment_count || 0) + ' recording segment' + ((data.data?.segment_count || 0) === 1 ? '' : 's') + ').';
                 requestData[item.request_id] = item;
-                document.getElementById('manageStatus').value = item.status;
-                document.getElementById('manageFulfillmentNotes').value = item.fulfillment_notes;
-                manageRequest(item.request_id);
+                updateIncidentReportingButtons(item);
                 loadRequests();
-                alert(data.message || 'CCTV footage sent to Group 1.');
+                alert(data.message || 'Footage sent to Incident Reporting.');
             })
             .catch(err => {
                 btn.disabled = false;
-                btn.textContent = 'Send to Group 1';
-                alert(err.message || 'Failed to send footage to Group 1.');
+                btn.textContent = 'Send to Incident Reporting';
+                alert(err.message || 'Failed to send footage to Incident Reporting.');
             });
-        }
-
-        function saveManage(event) {
-            event.preventDefault();
-            const id = parseInt(document.getElementById('manageId').value, 10);
-            const status = document.getElementById('manageStatus').value;
-            const rejectionReason = document.getElementById('manageRejectionReason').value.trim();
-            if (status === 'Rejected' && rejectionReason === '') {
-                alert('Please provide a rejection reason.');
-                return;
-            }
-            fetch('api/cctv_requests.php', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    action: 'manage',
-                    id,
-                    status,
-                    approved_camera_id: document.getElementById('manageApprovedCamera').value,
-                    actual_footage_start: document.getElementById('manageActualStart').value,
-                    actual_footage_end: document.getElementById('manageActualEnd').value,
-                    review_notes: document.getElementById('manageReviewNotes').value.trim(),
-                    rejection_reason: rejectionReason,
-                    fulfillment_notes: document.getElementById('manageFulfillmentNotes').value.trim()
-                })
-            })
-            .then(res => res.json())
-            .then(result => {
-                if (!result.success) throw new Error(result.message || 'Update failed');
-                closeManageModal();
-                loadRequests();
-                alert('CCTV request updated successfully.');
-            })
-            .catch(err => alert(err.message || 'Failed to update request.'));
         }
 
         window.onclick = function(event) {
             if (event.target === document.getElementById('viewModal')) closeViewModal();
-            if (event.target === document.getElementById('manageModal')) closeManageModal();
         };
 
         function toggleSidebar() {

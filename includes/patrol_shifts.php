@@ -144,3 +144,81 @@ function formatHallDurationLabel(?string $timeIn, ?string $timeOut): string
 
     return formatPatrolDurationLabel($minutes);
 }
+
+/**
+ * Manila "now" for shift deadline checks.
+ */
+function manilaNow(): DateTime
+{
+    return new DateTime('now', new DateTimeZone('Asia/Manila'));
+}
+
+/**
+ * Start datetime of a patrol duty shift for the given schedule date.
+ */
+function getPatrolShiftStartDateTime(string $scheduleDate, string $shift): ?DateTime
+{
+    $shift = trim($shift);
+    $tz = new DateTimeZone('Asia/Manila');
+
+    if ($shift === PATROL_SHIFT_DAY) {
+        return new DateTime($scheduleDate . ' ' . normalizePatrolTime(PATROL_SHIFT_DAY_START), $tz);
+    }
+
+    if ($shift === PATROL_SHIFT_NIGHT) {
+        return new DateTime($scheduleDate . ' ' . normalizePatrolTime(PATROL_SHIFT_NIGHT_START), $tz);
+    }
+
+    return null;
+}
+
+/**
+ * Whether the assigned shift window has started.
+ */
+function hasPatrolShiftStarted(string $scheduleDate, string $shift, ?DateTime $now = null): bool
+{
+    $start = getPatrolShiftStartDateTime($scheduleDate, $shift);
+    if (!$start) {
+        return false;
+    }
+
+    $now = $now ?? manilaNow();
+
+    return $now >= $start;
+}
+
+/**
+ * End datetime of a patrol duty shift for the given schedule date.
+ */
+function getPatrolShiftEndDateTime(string $scheduleDate, string $shift): ?DateTime
+{
+    $shift = trim($shift);
+    $tz = new DateTimeZone('Asia/Manila');
+
+    if ($shift === PATROL_SHIFT_DAY) {
+        return new DateTime($scheduleDate . ' ' . normalizePatrolTime(PATROL_SHIFT_DAY_END), $tz);
+    }
+
+    if ($shift === PATROL_SHIFT_NIGHT) {
+        $end = new DateTime($scheduleDate . ' ' . normalizePatrolTime(PATROL_SHIFT_NIGHT_END), $tz);
+        $end->modify('+1 day');
+        return $end;
+    }
+
+    return null;
+}
+
+/**
+ * Whether the assigned shift window has fully ended.
+ */
+function hasPatrolShiftEnded(string $scheduleDate, string $shift, ?DateTime $now = null): bool
+{
+    $end = getPatrolShiftEndDateTime($scheduleDate, $shift);
+    if (!$end) {
+        return false;
+    }
+
+    $now = $now ?? manilaNow();
+
+    return $now >= $end;
+}

@@ -136,7 +136,15 @@ require_once __DIR__ . '/db.php';
         .search-box { flex: 1; min-width: 200px; position: relative; }
         .search-box input { width: 100%; padding: 0.75rem 1rem 0.75rem 2.5rem; border: 1px solid var(--border-color); border-radius: 8px; font-size: 0.95rem; transition: all 0.2s ease; box-sizing: border-box; }
         .search-box input:focus { outline: none; border-color: var(--primary-color); box-shadow: 0 0 0 3px rgba(76, 138, 137, 0.1); }
-        .search-box::before { content: "🔍"; position: absolute; left: 0.75rem; top: 50%; transform: translateY(-50%); font-size: 1rem; }
+        .search-box > i {
+            position: absolute;
+            left: 0.85rem;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #94a3b8;
+            font-size: 0.9rem;
+            pointer-events: none;
+        }
         .date-filter { display: flex; align-items: center; gap: 0.5rem; flex-shrink: 0; }
         .date-filter label { font-size: 0.9rem; font-weight: 500; color: var(--text-color); white-space: nowrap; }
         .date-filter input[type="date"] { padding: 0.75rem 1rem; border: 1px solid var(--border-color); border-radius: 8px; font-size: 0.95rem; font-family: var(--font-family); }
@@ -151,8 +159,27 @@ require_once __DIR__ . '/db.php';
         tbody tr:hover { background: #f9f9f9; }
         tbody tr:last-child td { border-bottom: none; }
         .status-badge { padding: 0.25rem 0.75rem; border-radius: 12px; font-size: 0.85rem; font-weight: 500; display: inline-block; }
-        .status-at-hall { background: #d1e7dd; color: #0f5132; }
-        .status-timed-out { background: #e9ecef; color: #6c757d; }
+        .status-at-hall, .status-clocked-on { background: #d1e7dd; color: #0f5132; }
+        .status-timed-out, .status-clocked-out { background: #e9ecef; color: #6c757d; }
+        .btn-view-timesheet { padding: 0.45rem 0.85rem; background: var(--primary-color); color: #fff; border: none; border-radius: 6px; font-size: 0.82rem; font-weight: 600; cursor: pointer; }
+        .btn-view-timesheet:hover { background: #4ca8a6; }
+        .timesheet-filters { display: flex; gap: 0.75rem; margin-bottom: 1rem; align-items: flex-end; flex-wrap: wrap; }
+        .timesheet-filters .filter-field { display: flex; flex-direction: column; gap: 0.35rem; min-width: 160px; }
+        .timesheet-filters label { font-size: 0.85rem; font-weight: 500; color: var(--text-secondary); }
+        .timesheet-filters select,
+        .timesheet-filters input[type="date"] { padding: 0.65rem 0.85rem; border: 1px solid var(--border-color); border-radius: 8px; font-size: 0.9rem; font-family: inherit; }
+        .timesheet-filters .filter-hint { width: 100%; margin: 0; color: var(--text-secondary); font-size: 0.8rem; }
+        .btn-apply-filter { padding: 0.65rem 1rem; background: var(--primary-color); color: #fff; border: none; border-radius: 8px; font-size: 0.9rem; font-weight: 600; cursor: pointer; }
+        .btn-apply-filter:hover { background: #4ca8a6; }
+        .personnel-timesheet-header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin-bottom: 0.75rem; }
+        .personnel-timesheet-meta { color: var(--text-secondary); font-size: 0.9rem; }
+        .modal { display: none; position: fixed; z-index: 2000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); overflow: auto; }
+        .modal.active { display: block; }
+        .modal-content { background: var(--card-bg); margin: 4% auto; padding: 1.5rem; border-radius: 12px; width: 92%; max-width: 980px; box-shadow: 0 4px 20px rgba(0,0,0,0.3); }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; padding-bottom: 0.75rem; border-bottom: 2px solid var(--border-color); }
+        .modal-header h2 { margin: 0; color: var(--tertiary-color); font-size: 1.25rem; }
+        .close-modal { background: none; border: none; font-size: 1.75rem; cursor: pointer; color: #aaa; line-height: 1; }
+        .close-modal:hover { color: #333; }
         @media (max-width: 768px) {
             .sidebar { width: 320px; transform: translateX(-100%); transition: transform 0.3s ease; }
             .sidebar.mobile-open { transform: translateX(0); }
@@ -176,10 +203,7 @@ require_once __DIR__ . '/db.php';
             </div>
         </div>
         <nav class="sidebar-nav">
-            <a href="index.php" class="nav-module-header" data-tooltip="Dashboard" style="text-decoration: none; display: flex; align-items: center; justify-content: space-between; padding: 0.875rem 1.5rem; color: rgba(255, 255, 255, 0.9); cursor: pointer; transition: background-color 0.2s ease; font-weight: 500; user-select: none; gap: 0.75rem; <?php echo basename($_SERVER['PHP_SELF']) == 'index.php' ? 'background: rgba(76, 138, 137, 0.25); border-left: 3px solid #4c8a89;' : ''; ?>">
-                <span class="nav-module-icon"><i class="fas fa-home"></i></span>
-                <span class="nav-module-header-text">Dashboard</span>
-            </a>
+            <?php require __DIR__ . '/includes/admin_nav_dashboard.php'; ?>
 
             <?php if (isAdminUser()): ?>
             <div class="nav-module <?php echo (basename($_SERVER['PHP_SELF']) == 'users.php' || basename($_SERVER['PHP_SELF']) == 'login-history.php') ? 'active' : ''; ?>">
@@ -328,6 +352,7 @@ require_once __DIR__ . '/db.php';
                     <h2 class="section-title"><i class="fas fa-clipboard-list"></i> Today's Attendance Log</h2>
                     <div class="search-container">
                         <div class="search-box">
+                            <i class="fas fa-search" aria-hidden="true"></i>
                             <input type="text" id="logSearch" placeholder="Search by personnel ID or name..." onkeyup="filterTable('logTableBody', 'logSearch')">
                         </div>
                         <div class="date-filter">
@@ -345,14 +370,17 @@ require_once __DIR__ . '/db.php';
                                     <th>Personnel ID</th>
                                     <th>Name</th>
                                     <th>Duty</th>
-                                    <th>Patrol Duration</th>
-                                    <th>Time In</th>
-                                    <th>Time Out</th>
+                                    <th>Clock On Date</th>
+                                    <th>Clock On Time</th>
+                                    <th>Clock Out</th>
+                                    <th>Duration</th>
+                                    <th>Overtime</th>
                                     <th>Status</th>
+                                    <th>Actions</th>
                                 </tr>
                             </thead>
                             <tbody id="logTableBody">
-                                <tr><td colspan="7" style="text-align:center;padding:2rem;color:#666;">Loading...</td></tr>
+                                <tr><td colspan="10" style="text-align:center;padding:2rem;color:#666;">Loading...</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -397,22 +425,86 @@ require_once __DIR__ . '/db.php';
         }
 
         function formatDateTime(value) {
-            if (!value) return '—';
-            const normalized = String(value).replace(' ', 'T');
-            const date = new Date(normalized);
+            if (!value) return '';
+            const match = String(value).match(/(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})(?::(\d{2}))?/);
+            if (!match) return escapeHtml(value);
+            const iso = `${match[1]}-${match[2]}-${match[3]}T${match[4]}:${match[5]}:${match[6] || '00'}+08:00`;
+            const date = new Date(iso);
             if (Number.isNaN(date.getTime())) return escapeHtml(value);
             return date.toLocaleString('en-US', {
+                timeZone: 'Asia/Manila',
                 month: 'short',
                 day: 'numeric',
                 year: 'numeric',
                 hour: '2-digit',
                 minute: '2-digit',
+                second: '2-digit',
                 hour12: true
             });
         }
 
+        function formatDateOnly(value) {
+            if (!value) return '';
+            const match = String(value).match(/(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})(?::(\d{2}))?/);
+            if (!match) return escapeHtml(value);
+            const iso = `${match[1]}-${match[2]}-${match[3]}T${match[4]}:${match[5]}:${match[6] || '00'}+08:00`;
+            const date = new Date(iso);
+            if (Number.isNaN(date.getTime())) return escapeHtml(value);
+            return date.toLocaleDateString('en-US', {
+                timeZone: 'Asia/Manila',
+                month: 'short',
+                day: 'numeric',
+                year: 'numeric'
+            });
+        }
+
+        function formatTimeOnly(value) {
+            if (!value) return '';
+            const match = String(value).match(/(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})(?::(\d{2}))?/);
+            if (!match) return escapeHtml(value);
+            const iso = `${match[1]}-${match[2]}-${match[3]}T${match[4]}:${match[5]}:${match[6] || '00'}+08:00`;
+            const date = new Date(iso);
+            if (Number.isNaN(date.getTime())) return escapeHtml(value);
+            return date.toLocaleTimeString('en-US', {
+                timeZone: 'Asia/Manila',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+                hour12: true
+            });
+        }
+
+        function parseManilaDate(value) {
+            if (!value) return null;
+            const match = String(value).match(/(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})(?::(\d{2}))?/);
+            if (!match) return null;
+            const date = new Date(`${match[1]}-${match[2]}-${match[3]}T${match[4]}:${match[5]}:${match[6] || '00'}+08:00`);
+            return Number.isNaN(date.getTime()) ? null : date;
+        }
+
+        function formatOvertimeClock(overtimeMinutes) {
+            const total = Math.max(0, Math.floor(overtimeMinutes || 0));
+            const hours = Math.floor(total / 60);
+            const mins = total % 60;
+            return String(hours).padStart(2, '0') + ':' + String(mins).padStart(2, '0');
+        }
+
+        function computeLiveOvertimeLabel(row) {
+            const start = parseManilaDate(row.time_in);
+            if (!start) return '00:00';
+            const end = row.time_out ? parseManilaDate(row.time_out) : new Date();
+            if (!end) return '00:00';
+            const totalMinutes = Math.max(0, Math.floor((end.getTime() - start.getTime()) / 60000));
+            const overtimeMinutes = Math.max(0, totalMinutes - (8 * 60));
+            if (overtimeMinutes <= 0) return '00:00';
+            const label = formatOvertimeClock(overtimeMinutes);
+            return row.time_out ? label : (label + ' (running)');
+        }
+
         function statusClass(label) {
-            return label === 'At Hall' ? 'status-at-hall' : 'status-timed-out';
+            const normalized = String(label || '').toLowerCase();
+            if (normalized.includes('clocked on') || normalized === 'at hall') return 'status-clocked-on';
+            return 'status-clocked-out';
         }
 
         function filterTable(bodyId, inputId) {
@@ -438,39 +530,45 @@ require_once __DIR__ . '/db.php';
                 const result = await response.json();
 
                 if (!result.success) {
-                    tableBody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:2rem;color:#666;">Failed to load attendance log.</td></tr>';
+                    tableBody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:2rem;color:#666;">Failed to load attendance log.</td></tr>';
                     return;
                 }
 
                 logData = result.data || [];
 
                 if (logData.length === 0) {
-                    tableBody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:2rem;color:#666;">No attendance records for this date.</td></tr>';
+                    tableBody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:2rem;color:#666;">No attendance records for this date.</td></tr>';
                     return;
                 }
 
-                tableBody.innerHTML = logData.map(row => `
+                tableBody.innerHTML = logData.map((row, index) => `
                     <tr>
-                        <td>${escapeHtml(row.bpso_personnel_id || '—')}</td>
+                        <td>${escapeHtml(row.bpso_personnel_id || '-')}</td>
                         <td>${escapeHtml(row.personnel_name)}</td>
-                        <td>${escapeHtml(row.duty || '—')}</td>
-                        <td>${escapeHtml(row.patrol_duration_label || '—')}</td>
-                        <td>${formatDateTime(row.time_in)}</td>
+                        <td>${escapeHtml(row.duty || '-')}</td>
+                        <td>${formatDateOnly(row.time_in)}</td>
+                        <td>${formatTimeOnly(row.time_in)}</td>
                         <td>${formatDateTime(row.time_out)}</td>
+                        <td>${escapeHtml(row.patrol_duration_label || '-')}</td>
+                        <td class="overtime-cell" data-index="${index}">${escapeHtml(computeLiveOvertimeLabel(row))}</td>
                         <td><span class="status-badge ${statusClass(row.status_label)}">${escapeHtml(row.status_label)}</span></td>
+                        <td>
+                            <a class="btn-view-timesheet" href="patrol-timesheet.php?patrol_id=${Number(row.patrol_id) || 0}" style="text-decoration:none;display:inline-block;">
+                                View Timesheet
+                            </a>
+                        </td>
                     </tr>
                 `).join('');
 
                 filterTable('logTableBody', 'logSearch');
             } catch (e) {
                 console.error('Error loading attendance log:', e);
-                tableBody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:2rem;color:#666;">Error loading attendance log.</td></tr>';
+                tableBody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:2rem;color:#666;">Error loading attendance log.</td></tr>';
             }
         }
 
         function exportAttendanceLog() {
-            const dateInput = document.getElementById('historyDate');
-            const selectedDate = dateInput.value || todayString();
+            const selectedDate = document.getElementById('historyDate').value || todayString();
             window.location.href = 'api/bpso_attendance.php?view=export&date=' + encodeURIComponent(selectedDate);
         }
 
@@ -526,6 +624,11 @@ require_once __DIR__ . '/db.php';
             const timeEl = document.getElementById('currentTime');
             if (dateEl) dateEl.textContent = dateStr;
             if (timeEl) timeEl.textContent = timeStr;
+
+            document.querySelectorAll('.overtime-cell').forEach(cell => {
+                const row = logData[Number(cell.dataset.index)] || {};
+                cell.textContent = computeLiveOvertimeLabel(row);
+            });
         }
 
         updateDateTime();

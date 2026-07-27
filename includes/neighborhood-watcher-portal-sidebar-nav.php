@@ -1,12 +1,16 @@
 <?php
 /**
  * Neighborhood Watch member portal sidebar navigation.
- * Expects: $nwActiveNav = 'report' | 'reports' | 'account'
+ * Expects: $nwActiveNav = 'bulletin' | 'report' | 'reports' | 'account'
  */
 if (!isset($nwActiveNav)) {
-    $nwActiveNav = 'report';
+    $nwActiveNav = 'bulletin';
 }
 ?>
+            <a href="neighborhood-watcher-dashboard.php#bulletinSection" class="nav-submodule <?php echo $nwActiveNav === 'bulletin' ? 'active' : ''; ?>" data-tooltip="Digital Bulletin" data-section="bulletinSection">
+                <span class="nav-submodule-icon"><i class="fas fa-bullhorn"></i></span>
+                <span class="nav-submodule-text">Digital Bulletin</span>
+            </a>
             <a href="neighborhood-watcher-dashboard.php#reportSection" class="nav-submodule <?php echo $nwActiveNav === 'report' ? 'active' : ''; ?>" data-tooltip="Report Incident" data-section="reportSection">
                 <span class="nav-submodule-icon"><i class="fas fa-exclamation-triangle"></i></span>
                 <span class="nav-submodule-text">Report Incident</span>

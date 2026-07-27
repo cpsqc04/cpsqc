@@ -86,6 +86,12 @@
             } else if (notif.type === 'logout') {
                 iconClass = 'logout';
                 icon = 'fa-sign-out-alt';
+            } else if (notif.type === 'missed_patrol_report') {
+                iconClass = 'patrol_request';
+                icon = 'fa-exclamation-triangle';
+            } else if (notif.type === 'portal_activity' || notif.type === 'nw_incident') {
+                iconClass = 'volunteer';
+                icon = 'fa-user-check';
             } else {
                 iconClass = 'event';
                 icon = 'fa-bullhorn';

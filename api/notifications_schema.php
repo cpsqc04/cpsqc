@@ -9,6 +9,7 @@ function ensureNotificationsTable(PDO $pdo): void
         id INT AUTO_INCREMENT PRIMARY KEY,
         user_id INT DEFAULT NULL,
         patrol_id INT DEFAULT NULL,
+        nw_member_id INT DEFAULT NULL,
         type VARCHAR(50) NOT NULL,
         title VARCHAR(255) NOT NULL DEFAULT '',
         message TEXT NOT NULL,
@@ -17,6 +18,7 @@ function ensureNotificationsTable(PDO $pdo): void
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         INDEX idx_user_id (user_id),
         INDEX idx_patrol_id (patrol_id),
+        INDEX idx_nw_member_id (nw_member_id),
         INDEX idx_is_read (is_read),
         INDEX idx_created_at (created_at)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
@@ -34,6 +36,14 @@ function ensureNotificationsTable(PDO $pdo): void
     if (!isset($columns['patrol_id'])) {
         $pdo->exec('ALTER TABLE notifications ADD COLUMN patrol_id INT DEFAULT NULL AFTER user_id');
         $pdo->exec('ALTER TABLE notifications ADD INDEX idx_patrol_id (patrol_id)');
+    }
+    if (!isset($columns['nw_member_id'])) {
+        try {
+            $pdo->exec('ALTER TABLE notifications ADD COLUMN nw_member_id INT DEFAULT NULL AFTER patrol_id');
+            $pdo->exec('ALTER TABLE notifications ADD INDEX idx_nw_member_id (nw_member_id)');
+        } catch (PDOException $e) {
+            // Column may already exist without being detected.
+        }
     }
     if (!isset($columns['title'])) {
         $pdo->exec("ALTER TABLE notifications ADD COLUMN title VARCHAR(255) NOT NULL DEFAULT '' AFTER type");
@@ -110,4 +120,146 @@ function createPatrolNotification(PDO $pdo, int $patrolId, string $type, string 
     $stmt->execute($params);
 
     return true;
+}
+
+function createNwMemberNotification(PDO $pdo, int $nwMemberId, string $type, string $title, string $message, ?string $link = null, ?string $createdAt = null): bool
+{
+    ensureNotificationsTable($pdo);
+
+    if ($link !== null && $link !== '') {
+        $checkStmt = $pdo->prepare('SELECT id FROM notifications WHERE nw_member_id = :nw_member_id AND type = :type AND link = :link LIMIT 1');
+        $checkStmt->execute([':nw_member_id' => $nwMemberId, ':type' => $type, ':link' => $link]);
+        if ($checkStmt->fetch()) {
+            return false;
+        }
+    }
+
+    $sql = 'INSERT INTO notifications (nw_member_id, type, title, message, link, created_at) VALUES (:nw_member_id, :type, :title, :message, :link, ' . ($createdAt ? ':created_at' : 'NOW()') . ')';
+    $stmt = $pdo->prepare($sql);
+    $params = [
+        ':nw_member_id' => $nwMemberId,
+        ':type' => $type,
+        ':title' => $title,
+        ':message' => $message,
+        ':link' => $link,
+    ];
+    if ($createdAt) {
+        $params[':created_at'] = $createdAt;
+    }
+    $stmt->execute($params);
+
+    return true;
+}
+
+/**
+ * Notify admin of a named patrol or watcher portal activity.
+ */
+function notifyAdminActorActivity(
+    PDO $pdo,
+    string $actorRole,
+    string $actorName,
+    string $activity,
+    ?string $link = null
+): bool {
+    ensureNotificationsTable($pdo);
+
+    $actorRole = strtolower(trim($actorRole));
+    $actorName = trim($actorName);
+    $activity = trim($activity);
+    if ($actorName === '' || $activity === '') {
+        return false;
+    }
+
+    $roleLabel = $actorRole === 'watcher' || $actorRole === 'neighborhood_watch'
+        ? 'Neighborhood Watch'
+        : 'Patrol';
+
+    $title = $roleLabel . ' Activity';
+    $message = $actorName . ' ' . ltrim($activity);
+
+    $uniqueLink = $link;
+    if ($uniqueLink === null || trim($uniqueLink) === '') {
+        $uniqueLink = 'portal-activity:' . $actorRole . ':' . time() . ':' . bin2hex(random_bytes(4));
+    } else {
+        $uniqueLink .= (str_contains($uniqueLink, '?') ? '&' : '?') . 'activity=' . rawurlencode(time() . '_' . bin2hex(random_bytes(3)));
+    }
+
+    return createAdminNotification($pdo, 'portal_activity', $title, $message, $uniqueLink);
+}
+
+/**
+ * Notify Patrol and/or Neighborhood Watch members about a bulletin announcement.
+ */
+function notifyBulletinAudiences(PDO $pdo, array $post): void
+{
+    ensureNotificationsTable($pdo);
+
+    $audience = strtolower(trim((string) ($post['target_audience'] ?? 'all')));
+    $status = strtolower(trim((string) ($post['status'] ?? 'active')));
+    if ($status !== 'active') {
+        return;
+    }
+
+    $publishAt = $post['publish_at'] ?? null;
+    if ($publishAt !== null && $publishAt !== '' && strtotime((string) $publishAt) > time()) {
+        return;
+    }
+
+    $postId = (int) ($post['id'] ?? 0);
+    if ($postId <= 0) {
+        return;
+    }
+
+    $title = trim((string) ($post['title'] ?? 'New Announcement'));
+    $body = trim((string) ($post['body'] ?? ''));
+    $snippet = $body !== ''
+        ? (strlen($body) > 160 ? substr($body, 0, 157) . '...' : $body)
+        : 'A new announcement was posted on the Digital Bulletin.';
+    $notifTitle = 'New Announcement';
+    $linkPatrol = 'tab:bulletin:' . $postId;
+    $linkWatcher = 'section:bulletinSection:' . $postId;
+
+    $notifyPatrol = in_array($audience, ['all', 'patrol'], true);
+    $notifyWatcher = in_array($audience, ['all', 'watcher'], true);
+
+    if ($notifyPatrol) {
+        try {
+            $patrolStmt = $pdo->query("SELECT id FROM patrols");
+            $patrolIds = $patrolStmt ? $patrolStmt->fetchAll(PDO::FETCH_COLUMN) : [];
+            foreach ($patrolIds as $patrolId) {
+                createPatrolNotification(
+                    $pdo,
+                    (int) $patrolId,
+                    'bulletin_announcement',
+                    $notifTitle,
+                    $title . ' — ' . $snippet,
+                    $linkPatrol
+                );
+            }
+        } catch (PDOException $e) {
+            error_log('Bulletin patrol notify failed: ' . $e->getMessage());
+        }
+    }
+
+    if ($notifyWatcher) {
+        try {
+            require_once __DIR__ . '/neighborhood-watcher-members-schema.php';
+            ensureNwMembersTable($pdo);
+            $table = nwMembersTableName();
+            $nwStmt = $pdo->query("SELECT id FROM {$table} WHERE status = 'Active'");
+            $nwIds = $nwStmt ? $nwStmt->fetchAll(PDO::FETCH_COLUMN) : [];
+            foreach ($nwIds as $nwId) {
+                createNwMemberNotification(
+                    $pdo,
+                    (int) $nwId,
+                    'bulletin_announcement',
+                    $notifTitle,
+                    $title . ' — ' . $snippet,
+                    $linkWatcher
+                );
+            }
+        } catch (PDOException $e) {
+            error_log('Bulletin watcher notify failed: ' . $e->getMessage());
+        }
+    }
 }

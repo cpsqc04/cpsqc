@@ -5,6 +5,7 @@ header('Content-Type: application/json');
 
 require_once __DIR__ . '/../db.php';
 require_once __DIR__ . '/patrol_logs_schema.php';
+require_once __DIR__ . '/notifications_schema.php';
 require_once __DIR__ . '/../includes/contact_validation.php';
 require_once __DIR__ . '/../includes/patrol_shifts.php';
 
@@ -234,6 +235,15 @@ if ($method === 'POST') {
 
             $id = (int)$pdo->lastInsertId();
 
+            createPatrolNotification(
+                $pdo,
+                $id,
+                'duty_schedule',
+                'Duty Schedule Set',
+                'Your duty schedule has been set to ' . $dutyShift . '.',
+                'duty:' . $id . ':' . time()
+            );
+
             echo json_encode([
                 'success' => true,
                 'data' => [
@@ -298,7 +308,7 @@ if ($method === 'POST') {
         }
 
         try {
-            $checkStmt = $pdo->prepare('SELECT bpso_personnel_id FROM patrols WHERE id = :id');
+            $checkStmt = $pdo->prepare('SELECT bpso_personnel_id, duty_shift, schedule FROM patrols WHERE id = :id');
             $checkStmt->execute([':id' => $id]);
             $current = $checkStmt->fetch();
 
@@ -326,6 +336,8 @@ if ($method === 'POST') {
                 exit;
             }
 
+            $previousDutyShift = trim((string) ($current['duty_shift'] ?? $current['schedule'] ?? ''));
+
             if ($password !== '') {
                 $passwordHash = password_hash($password, PASSWORD_DEFAULT);
                 $stmt = $pdo->prepare('UPDATE patrols SET bpso_personnel_id = :bpso_personnel_id, personnel_name = :personnel_name, contact_number = :contact_number, email = :email, password_hash = :password_hash, schedule = :schedule, duty_shift = :duty_shift, status = :status WHERE id = :id');
@@ -352,6 +364,17 @@ if ($method === 'POST') {
                     ':status' => $status,
                     ':id' => $id,
                 ]);
+            }
+
+            if ($previousDutyShift !== $dutyShift) {
+                createPatrolNotification(
+                    $pdo,
+                    $id,
+                    'duty_schedule',
+                    'Duty Schedule Updated',
+                    'Your duty schedule has been set to ' . $dutyShift . '.',
+                    'duty:' . $id . ':' . time()
+                );
             }
 
             echo json_encode([

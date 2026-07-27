@@ -1,6 +1,6 @@
 # Tip Partner API Integration
 
-> **See also:** [`API_INTEGRATION.md`](./API_INTEGRATION.md) for the complete partner API guide including Patrol Request (Group 6/8), CCTV Request, Tips, Digital Blotter, and Group 3 coordination.
+> **See also:** [`API_INTEGRATION.md`](./API_INTEGRATION.md) for the complete partner API guide including Patrol Request (Group 6/8), CCTV Request, Tips, Digital Blotter, and Emergency Response coordination.
 
 AlertaraQC forwards BPSO-reviewed community tips to partner systems via HTTP JSON APIs.
 
@@ -10,32 +10,32 @@ Configured in `.env`:
 
 | Variable | Group | Purpose |
 |----------|-------|---------|
-| `TIP_BLOTTER_API_URL` | Group 1 | Tip incident logging endpoint (falls back to `BLOTTER_API_URL`) |
-| `BLOTTER_API_KEY` | Group 1 | Shared API key |
-| `GROUP3_API_URL` | Group 3 | Police backup / coordination endpoint |
-| `GROUP3_API_KEY` | Group 3 | Shared API key |
+| `INCIDENT_REPORTING_TIP_API_URL` | Incident Reporting | Tip incident logging endpoint (falls back to `INCIDENT_REPORTING_API_URL`) |
+| `INCIDENT_REPORTING_API_KEY` | Incident Reporting | Shared API key |
+| `EMERGENCY_RESPONSE_API_URL` | Emergency Response | Police backup / coordination endpoint |
+| `EMERGENCY_RESPONSE_API_KEY` | Emergency Response | Shared API key |
 
 Admin triggers from **Review Tip → Action → Execute Actions**.
 
 ### Local testing
 
 ```env
-BLOTTER_API_KEY=test-group1-key
-TIP_BLOTTER_API_URL=http://localhost/cpsqc-main/api/tip_incident_receive.php
+INCIDENT_REPORTING_API_KEY=test-incident-reporting-key
+INCIDENT_REPORTING_TIP_API_URL=http://localhost/cpsqc-main/api/tip_incident_receive.php
 
-GROUP3_API_KEY=test-group3-key
-GROUP3_API_URL=http://localhost/cpsqc-main/api/coordination_receive.php
+EMERGENCY_RESPONSE_API_KEY=test-emergency-response-key
+EMERGENCY_RESPONSE_API_URL=http://localhost/cpsqc-main/api/coordination_receive.php
 ```
 
 ---
 
-## Group 1 — Incident Logging and Classification
+## Incident Reporting
 
 **Reference receive endpoint:** `POST /api/tip_incident_receive.php`
 
 **Headers:**
 - `Content-Type: application/json`
-- `X-API-Key: {BLOTTER_API_KEY}` or `Authorization: Bearer {BLOTTER_API_KEY}`
+- `X-API-Key: {INCIDENT_REPORTING_API_KEY}` or `Authorization: Bearer {INCIDENT_REPORTING_API_KEY}`
 
 **Request body:**
 
@@ -75,13 +75,13 @@ GROUP3_API_URL=http://localhost/cpsqc-main/api/coordination_receive.php
 
 ---
 
-## Group 3 — Inter-agency Coordination Portal (Police Backup)
+## Emergency Response (Police Backup)
 
 **Reference receive endpoint:** `POST /api/coordination_receive.php`
 
 **Headers:**
 - `Content-Type: application/json`
-- `X-API-Key: {GROUP3_API_KEY}` or `Authorization: Bearer {GROUP3_API_KEY}`
+- `X-API-Key: {EMERGENCY_RESPONSE_API_KEY}` or `Authorization: Bearer {EMERGENCY_RESPONSE_API_KEY}`
 
 **Request body:**
 
@@ -129,13 +129,13 @@ GROUP3_API_URL=http://localhost/cpsqc-main/api/coordination_receive.php
 
 | Endpoint | Method | Body |
 |----------|--------|------|
-| `/api/send_to_group1.php` | POST | `{ "id": 1 }` or `{ "tip_id": "TIP-2026-002" }` |
-| `/api/send_to_group3.php` | POST | `{ "id": 1, "police_backup_reason": "..." }` |
+| `/api/send_to_incident_reporting.php` | POST | `{ "id": 1 }` or `{ "tip_id": "TIP-2026-002" }` |
+| `/api/send_to_emergency_response.php` | POST | `{ "id": 1, "police_backup_reason": "..." }` |
 
 Requires admin session. Returns reference IDs and updates the `tips` table.
 
 ---
 
-## Related complaint API (Group 1)
+## Related complaint API (Incident Reporting)
 
 Complaints use a separate payload via `includes/blotter_forward.php` and reference endpoint `POST /api/blotter_receive.php`.

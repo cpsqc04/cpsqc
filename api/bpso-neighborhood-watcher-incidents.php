@@ -92,6 +92,19 @@ if ($method === 'POST' && $action === 'submit_resolution') {
             ]);
         }
 
+        require_once __DIR__ . '/notifications_schema.php';
+        $personnelName = getBpsoPersonnelName();
+        $reportLabel = (string) ($report['report_id'] ?? ('#' . $reportDbId));
+        notifyAdminActorActivity(
+            $pdo,
+            'patrol',
+            $personnelName !== '' ? $personnelName : 'Patrol personnel',
+            $status === 'Resolved'
+                ? 'resolved Neighborhood Watch incident ' . $reportLabel . '.'
+                : 'updated progress on Neighborhood Watch incident ' . $reportLabel . '.',
+            'review-neighborhood-watcher-incidents.php?id=' . urlencode($reportLabel)
+        );
+
         echo json_encode(['success' => true, 'message' => $status === 'Resolved' ? 'Incident report marked as resolved.' : 'Progress report saved.']);
     } catch (PDOException $e) {
         http_response_code(500);

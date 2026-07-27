@@ -1,11 +1,12 @@
 # AlertaraQC — Partner API Integration Guide
 
 > **Live API catalog (JSON):** open [`/api/integration.php`](./integration.php) in your browser — check **Pretty-print** for readable formatting  
+> **Five-module cheat sheet:** [`/api/PARTNER_MODULES.md`](./PARTNER_MODULES.md)  
 > Example: `http://localhost/cpsqc-main/api/integration.php`
 
 This document describes all HTTP JSON APIs used for integration between **AlertaraQC** (BPSO / Barangay San Agustin) and partner groups.
 
-Use this guide when implementing send or receive endpoints in Group 1, Group 3, Group 6, Group 8, or other partner systems.
+Use this guide when implementing send or receive endpoints in Incident Reporting, Emergency Response, Group 6, Group 8, or other partner systems.
 
 ---
 
@@ -67,13 +68,15 @@ All endpoints below are relative to this base URL (e.g. `/api/patrol_requests_re
 ├─────────────────────────────────────────────────────────────────────────┤
 │  INBOUND (partners → AlertaraQC)                                        │
 │    POST /api/patrol_requests_receive.php   ← Group 6, Group 8           │
-│    POST /api/cctv_requests_receive.php     ← CCTV / partner agencies    │
-│    POST /api/awareness_events_receive.php  ← Group 6 (events & reports) │
+│    POST /api/cctv_requests_receive.php     ← Footage Request            │
+│    POST /api/awareness_events_receive.php  ← Event List & Event Report  │
+│    POST /api/complaints_status_receive.php ← Track Complaint status     │
+│    POST /api/crime_analytics_alerts_receive.php     ← Crime Analytics alerts     │
 ├─────────────────────────────────────────────────────────────────────────┤
 │  OUTBOUND (AlertaraQC → partners)                                       │
-│    POST {BLOTTER_API_URL}                  → Group 1 Digital Blotter    │
-│    POST {TIP_BLOTTER_API_URL}              → Group 1 Tip Incident Log   │
-│    POST {GROUP3_API_URL}                   → Group 3 Police Backup      │
+│    POST {INCIDENT_REPORTING_API_URL}       → Track Complaint (Incident Reporting) │
+│    POST {INCIDENT_REPORTING_TIP_API_URL}   → Review Tip (Incident Reporting) │
+│    POST {EMERGENCY_RESPONSE_API_URL}       → Emergency Response Backup  │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -88,13 +91,14 @@ Reference receive endpoints (for local testing) are included in this repo under 
 | `PATROL_REQUEST_API_KEY` | Group 6 & 8 → patrol request inbound |
 | `AWARENESS_EVENTS_API_KEY` | Group 6 → awareness events & post-event reports |
 | `CCTV_REQUEST_API_KEY` | Partner → CCTV request inbound |
-| `BLOTTER_API_KEY` | Shared key for Group 1 tip + complaint APIs |
-| `BLOTTER_API_URL` | AlertaraQC → Group 1 complaint (Digital Blotter) |
-| `TIP_BLOTTER_API_URL` | AlertaraQC → Group 1 tip incident (falls back to `BLOTTER_API_URL`) |
-| `GROUP3_API_KEY` | Group 3 coordination / police backup |
-| `GROUP3_API_URL` | AlertaraQC → Group 3 coordination portal |
-| `BLOTTER_API_TIMEOUT` | Outbound timeout seconds (default 30) |
-| `GROUP3_API_TIMEOUT` | Outbound timeout seconds (default 30) |
+| `CRIME_ANALYTICS_API_KEY` | Crime Analytics → high-risk alerts (legacy: `GROUP5_API_KEY`) |
+| `INCIDENT_REPORTING_API_KEY` | Shared key for Incident Reporting tip + complaint APIs (legacy: `BLOTTER_API_KEY`) |
+| `INCIDENT_REPORTING_API_URL` | AlertaraQC → Incident Reporting complaint (legacy: `BLOTTER_API_URL`) |
+| `INCIDENT_REPORTING_TIP_API_URL` | AlertaraQC → Incident Reporting tip (legacy: `TIP_BLOTTER_API_URL`) |
+| `EMERGENCY_RESPONSE_API_KEY` | Emergency Response police backup (legacy: `GROUP3_API_KEY`) |
+| `EMERGENCY_RESPONSE_API_URL` | AlertaraQC → Emergency Response (legacy: `GROUP3_API_URL`) |
+| `INCIDENT_REPORTING_API_TIMEOUT` | Outbound timeout seconds (default 30; legacy: `BLOTTER_API_TIMEOUT`) |
+| `EMERGENCY_RESPONSE_API_TIMEOUT` | Outbound timeout seconds (default 30; legacy: `GROUP3_API_TIMEOUT`) |
 
 ### Local testing example
 
@@ -103,12 +107,12 @@ PATROL_REQUEST_API_KEY=test-patrol-key
 AWARENESS_EVENTS_API_KEY=test-awareness-key
 CCTV_REQUEST_API_KEY=test-cctv-key
 
-BLOTTER_API_KEY=test-group1-key
-BLOTTER_API_URL=http://localhost/cpsqc-main/api/blotter_receive.php
-TIP_BLOTTER_API_URL=http://localhost/cpsqc-main/api/tip_incident_receive.php
+INCIDENT_REPORTING_API_KEY=test-incident-reporting-key
+INCIDENT_REPORTING_API_URL=http://localhost/cpsqc-main/api/blotter_receive.php
+INCIDENT_REPORTING_TIP_API_URL=http://localhost/cpsqc-main/api/tip_incident_receive.php
 
-GROUP3_API_KEY=test-group3-key
-GROUP3_API_URL=http://localhost/cpsqc-main/api/coordination_receive.php
+EMERGENCY_RESPONSE_API_KEY=test-emergency-response-key
+EMERGENCY_RESPONSE_API_URL=http://localhost/cpsqc-main/api/coordination_receive.php
 ```
 
 ---
@@ -432,15 +436,15 @@ curl -X POST "http://localhost/cpsqc-main/api/cctv_requests_receive.php" \
   }'
 ```
 
-### Forward CCTV evidence to Group 1 (AlertaraQC → Group 1)
+### Forward CCTV evidence to Incident Reporting (AlertaraQC → Incident Reporting)
 
-When a CCTV request is approved, BPSO admin can send matching recording segments to **Group 1 Incident Logging and Classification** for evidence storage and case linking.
+When a CCTV request is approved, BPSO admin can send matching recording segments to **Incident Reporting** for evidence storage and case linking.
 
 | | |
 |---|---|
-| **Admin trigger** | `POST /api/send_cctv_to_group1.php` (admin session) |
-| **Outbound URL** | `CCTV_EVIDENCE_API_URL` (falls back to `BLOTTER_API_URL`) |
-| **API key** | `BLOTTER_API_KEY` |
+| **Admin trigger** | `POST /api/send_cctv_to_incident_reporting.php` (admin session) |
+| **Outbound URL** | `CCTV_EVIDENCE_API_URL` (falls back to `INCIDENT_REPORTING_API_URL`) |
+| **API key** | `INCIDENT_REPORTING_API_KEY` |
 | **Reference receiver (local test)** | `POST /api/cctv_evidence_receive.php` |
 | **Partner download** | `GET /api/cctv_evidence_download.php?request_id=...&file=...&api_key=...` |
 
@@ -488,7 +492,7 @@ or
 }
 ```
 
-**Expected Group 1 response:**
+**Expected Incident Reporting response:**
 
 ```json
 {
@@ -498,13 +502,13 @@ or
 }
 ```
 
-On success, the request is marked **Fulfilled** and linked with `group1_evidence_reference_id`.
+On success, the request is marked **Fulfilled** and linked with `incident_reporting_evidence_reference_id`.
 
 **Local `.env` example:**
 
 ```
-BLOTTER_API_URL=http://localhost/cpsqc-main/api/cctv_evidence_receive.php
-BLOTTER_API_KEY=your-shared-key
+INCIDENT_REPORTING_API_URL=http://localhost/cpsqc-main/api/cctv_evidence_receive.php
+INCIDENT_REPORTING_API_KEY=your-shared-key
 CCTV_EVIDENCE_API_URL=http://localhost/cpsqc-main/api/cctv_evidence_receive.php
 ```
 
@@ -711,15 +715,15 @@ AlertaraQC admin triggers these from the web UI. Partner groups must host equiva
 
 ---
 
-## B1. Group 1 — Tip Incident Logging
+## B1. Incident Reporting — Tip Incident Logging
 
-Forward a reviewed community tip to Group 1 Incident Logging and Classification.
+Forward a reviewed community tip to Incident Reporting.
 
 | | |
 |---|---|
-| **AlertaraQC sends to** | `TIP_BLOTTER_API_URL` (or `BLOTTER_API_URL` if not set) |
-| **API key** | `BLOTTER_API_KEY` |
-| **Triggered from** | Admin → Review Tip → Forward to Group 1 |
+| **AlertaraQC sends to** | `INCIDENT_REPORTING_TIP_API_URL` (or `INCIDENT_REPORTING_API_URL` if not set) |
+| **API key** | `INCIDENT_REPORTING_API_KEY` |
+| **Triggered from** | Admin → Review Tip → Forward to Incident Reporting |
 | **Reference endpoint (local test)** | `POST /api/tip_incident_receive.php` |
 
 ### Payload AlertaraQC sends
@@ -770,14 +774,14 @@ Accepted reference ID field names: `blotter_reference_id`, `incident_reference_i
 
 ---
 
-## B2. Group 1 — Digital Blotter (Complaints)
+## B2. Incident Reporting — Digital Blotter (Complaints)
 
-Forward a complaint from AlertaraQC to Group 1 Digital Blotter System.
+Forward a complaint from AlertaraQC to Incident Reporting Digital Blotter System.
 
 | | |
 |---|---|
-| **AlertaraQC sends to** | `BLOTTER_API_URL` |
-| **API key** | `BLOTTER_API_KEY` |
+| **AlertaraQC sends to** | `INCIDENT_REPORTING_API_URL` |
+| **API key** | `INCIDENT_REPORTING_API_KEY` |
 | **Triggered from** | Admin → Track Complaint → Forward to Digital Blotter |
 | **Reference endpoint (local test)** | `POST /api/blotter_receive.php` |
 
@@ -836,14 +840,14 @@ Forward a complaint from AlertaraQC to Group 1 Digital Blotter System.
 
 ---
 
-## B3. Group 3 — Inter-agency Coordination (Police Backup)
+## B3. Emergency Response — Police Backup
 
 Request police backup for a reviewed tip.
 
 | | |
 |---|---|
-| **AlertaraQC sends to** | `GROUP3_API_URL` |
-| **API key** | `GROUP3_API_KEY` |
+| **AlertaraQC sends to** | `EMERGENCY_RESPONSE_API_URL` |
+| **API key** | `EMERGENCY_RESPONSE_API_KEY` |
 | **Triggered from** | Admin → Review Tip → Request Police Backup |
 | **Reference endpoint (local test)** | `POST /api/coordination_receive.php` |
 
@@ -907,11 +911,12 @@ Request police backup for a reviewed tip.
 | Group 6 | Partner → AlertaraQC (list) | `GET /api/awareness_events.php` | `AWARENESS_EVENTS_API_KEY` |
 | CCTV partner | Partner → AlertaraQC | `POST /api/cctv_requests_receive.php` | `CCTV_REQUEST_API_KEY` |
 | CCTV partner | Partner → AlertaraQC (list) | `GET /api/cctv_requests.php` | `CCTV_REQUEST_API_KEY` |
-| Group 1 (tips) | AlertaraQC → Partner | Partner hosts URL (`TIP_BLOTTER_API_URL`) | `BLOTTER_API_KEY` |
-| Group 1 (complaints) | AlertaraQC → Partner | Partner hosts URL (`BLOTTER_API_URL`) | `BLOTTER_API_KEY` |
-| Group 1 (CCTV evidence) | AlertaraQC → Partner | Partner hosts URL (`CCTV_EVIDENCE_API_URL` or `BLOTTER_API_URL`) | `BLOTTER_API_KEY` |
-| Group 1 (CCTV download) | Partner → AlertaraQC | `GET /api/cctv_evidence_download.php` | `BLOTTER_API_KEY` |
-| Group 3 (backup) | AlertaraQC → Partner | Partner hosts URL (`GROUP3_API_URL`) | `GROUP3_API_KEY` |
+| Incident Reporting (tips) | AlertaraQC → Partner | Partner hosts URL (`INCIDENT_REPORTING_TIP_API_URL`) | `INCIDENT_REPORTING_API_KEY` |
+| Incident Reporting (complaints) | AlertaraQC → Partner | Partner hosts URL (`INCIDENT_REPORTING_API_URL`) | `INCIDENT_REPORTING_API_KEY` |
+| Incident Reporting (CCTV evidence) | AlertaraQC → Partner | Partner hosts URL (`CCTV_EVIDENCE_API_URL` or `INCIDENT_REPORTING_API_URL`) | `INCIDENT_REPORTING_API_KEY` |
+| Incident Reporting (CCTV download) | Partner → AlertaraQC | `GET /api/cctv_evidence_download.php` | `INCIDENT_REPORTING_API_KEY` |
+| Emergency Response (backup) | AlertaraQC → Partner | Partner hosts URL (`EMERGENCY_RESPONSE_API_URL`) | `EMERGENCY_RESPONSE_API_KEY` |
+| Crime Analytics (alerts) | Partner → AlertaraQC | `POST /api/crime_analytics_alerts_receive.php` | `CRIME_ANALYTICS_API_KEY` |
 
 ---
 
@@ -935,9 +940,9 @@ These endpoints require an **admin login session** (cookie-based). Do not share 
 | `GET/POST /api/users.php` | User Management |
 | `GET /api/dashboard.php` | Dashboard stats |
 | `GET /api/notifications.php` | Admin notifications |
-| `POST /api/send_to_group1.php` | Internal forward trigger (tips) |
-| `POST /api/send_cctv_to_group1.php` | Internal forward trigger (CCTV evidence) |
-| `POST /api/send_to_group3.php` | Internal forward trigger (backup) |
+| `POST /api/send_to_incident_reporting.php` | Internal forward trigger (tips) |
+| `POST /api/send_cctv_to_incident_reporting.php` | Internal forward trigger (CCTV evidence) |
+| `POST /api/send_to_emergency_response.php` | Internal forward trigger (backup) |
 
 BPSO and NW portal APIs (`bpso_*`, `nw_*`) also require their respective portal sessions.
 
@@ -951,15 +956,15 @@ BPSO and NW portal APIs (`bpso_*`, `nw_*`) also require their respective portal 
 | `api/awareness_events_receive.php` | Inbound Group 6 awareness events & reports |
 | `api/awareness_events.php` | List/manage awareness events & reports |
 | `api/cctv_requests_receive.php` | Inbound CCTV requests |
-| `api/cctv_evidence_receive.php` | Reference Group 1 CCTV evidence receiver |
+| `api/cctv_evidence_receive.php` | Reference Incident Reporting CCTV evidence receiver |
 | `api/cctv_evidence_download.php` | Partner download for forwarded CCTV files |
 | `includes/cctv_forward.php` | Outbound CCTV evidence payload builder |
-| `api/tip_incident_receive.php` | Reference Group 1 tip receiver |
-| `api/blotter_receive.php` | Reference Group 1 blotter receiver |
-| `api/coordination_receive.php` | Reference Group 3 coordination receiver |
+| `api/tip_incident_receive.php` | Reference Incident Reporting tip receiver |
+| `api/blotter_receive.php` | Reference Incident Reporting blotter receiver |
+| `api/coordination_receive.php` | Reference Emergency Response coordination receiver |
 | `includes/tip_forward.php` | Outbound tip payload builder |
 | `includes/blotter_forward.php` | Outbound complaint payload builder |
-| `includes/group3_forward.php` | Outbound police backup payload builder |
+| `includes/emergency_response_forward.php` | Outbound police backup payload builder |
 | `api/TIP_PARTNER_INTEGRATION.md` | Legacy tip-only doc (see this file for full guide) |
 
 ---

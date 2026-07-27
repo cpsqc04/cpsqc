@@ -65,13 +65,13 @@ try {
         contact_number, contact_email, office_unit, case_reference, related_complaint_id,
         purpose, purpose_details, legal_basis, incident_location, camera_id, location_description,
         incident_date, footage_start_time, footage_end_time, incident_type, incident_description,
-        delivery_method, supporting_document, status, submitted_at
+        delivery_method, supporting_document, status, review_notes, submitted_at
     ) VALUES (
         :request_id, :source, :source_reference_id, :requesting_agency, :contact_person, :contact_position,
         :contact_number, :contact_email, :office_unit, :case_reference, :related_complaint_id,
         :purpose, :purpose_details, :legal_basis, :incident_location, :camera_id, :location_description,
         :incident_date, :footage_start_time, :footage_end_time, :incident_type, :incident_description,
-        :delivery_method, :supporting_document, :status, NOW()
+        :delivery_method, :supporting_document, :status, :review_notes, NOW()
     )');
 
     $stmt->execute([
@@ -100,21 +100,41 @@ try {
         ':delivery_method' => $data['delivery_method'] !== '' ? $data['delivery_method'] : 'secure_download',
         ':supporting_document' => $data['supporting_document'] !== '' ? $data['supporting_document'] : null,
         ':status' => 'Pending',
+        ':review_notes' => ($data['review_notes'] ?? '') !== '' ? $data['review_notes'] : null,
     ]);
 
     createAdminNotification(
         $pdo,
         'cctv_request',
-        'New CCTV Footage Request',
+        'New Footage Request',
         'Request #' . $requestId . ' from ' . $data['requesting_agency'],
         'cctv-request.php?id=' . urlencode($requestId)
     );
 
     echo json_encode([
         'success' => true,
-        'message' => 'CCTV footage request received.',
+        'message' => 'Footage request received.',
         'data' => [
             'request_id' => $requestId,
+            'agency' => $data['requesting_agency'],
+            'contact_number' => $data['contact_number'],
+            'email' => $data['contact_email'] !== '' ? $data['contact_email'] : null,
+            'case_reference' => $data['case_reference'] !== '' ? $data['case_reference'] : null,
+            'purpose' => $data['purpose_details'],
+            'legal_basis' => $data['legal_basis'],
+            'incident_location' => $data['incident_location'],
+            'camera' => $data['camera_id'] !== '' ? $data['camera_id'] : null,
+            'footage_window' => [
+                'date' => $data['incident_date'],
+                'start' => $data['footage_start_time'],
+                'end' => $data['footage_end_time'],
+            ],
+            'incident_description' => $data['incident_description'],
+            'delivery_method' => $data['delivery_method'],
+            'has_supporting_document' => $data['supporting_document'] !== '',
+            'review_notes' => ($data['review_notes'] ?? '') !== '' ? $data['review_notes'] : null,
+            'date_submitted' => date('c'),
+            'status' => 'Pending',
         ],
     ]);
 } catch (PDOException $e) {

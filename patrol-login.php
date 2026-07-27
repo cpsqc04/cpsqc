@@ -11,7 +11,7 @@ require_once __DIR__ . '/includes/login_otp.php';
 bpsoSessionStart();
 
 if (isBpsoLoggedIn()) {
-    header('Location: bpso-dashboard.php');
+    header('Location: patrol-attendance.php');
     exit;
 }
 
@@ -134,7 +134,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_SESSION['bpso_personnel_code'] = $pendingLogin['personnel_code'];
             $_SESSION['bpso_email'] = $pendingLogin['email'];
             unset($_SESSION['pending_bpso_login']);
-            header('Location: bpso-dashboard.php');
+            header('Location: patrol-attendance.php');
             exit;
         }
     } elseif (!isset($_POST['resend_login_otp']) && $error === null) {

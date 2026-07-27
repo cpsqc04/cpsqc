@@ -5,6 +5,7 @@ header('Content-Type: application/json');
 require_once __DIR__ . '/../db.php';
 require_once __DIR__ . '/patrol_schedules_schema.php';
 require_once __DIR__ . '/bpso_attendance_schema.php';
+require_once __DIR__ . '/notifications_schema.php';
 require_once __DIR__ . '/../includes/bpso_auth.php';
 require_once __DIR__ . '/../includes/patrol_shifts.php';
 
@@ -116,6 +117,8 @@ if ($method === 'POST') {
             ]);
 
             $id = (int) $pdo->lastInsertId();
+            $resolvedRoute = $route !== '' ? $route : $patrolZone;
+            $resolvedLocation = $location !== '' ? $location : $patrolZone;
 
             require_once __DIR__ . '/patrol_logs_schema.php';
             ensurePatrolLogsTable($pdo);
@@ -127,13 +130,31 @@ if ($method === 'POST') {
                 ':patrol_id' => $patrolId,
                 ':schedule_id' => $id,
                 ':personnel_name' => $personnel['personnel_name'],
-                ':route' => $route !== '' ? $route : $patrolZone,
+                ':route' => $resolvedRoute,
                 ':date' => $scheduleDate,
                 ':time' => '',
                 ':status' => 'Scheduled',
-                ':location' => $location !== '' ? $location : $patrolZone,
+                ':location' => $resolvedLocation,
                 ':details' => $notes !== '' ? $notes : 'Patrol assignment scheduled by admin.',
             ]);
+
+            $scheduleLabel = $resolvedRoute !== '' ? $resolvedRoute : $patrolZone;
+            createPatrolNotification(
+                $pdo,
+                $patrolId,
+                'patrol_schedule',
+                'New Patrol Assignment',
+                'You have been assigned for patrolling on ' . $scheduleDate . ' (' . $shift . ') — ' . $scheduleLabel . '.',
+                'tab:schedule:' . $id
+            );
+            createPatrolNotification(
+                $pdo,
+                $patrolId,
+                'submit_report',
+                'Submit Report',
+                'Please submit at least one patrol report for your shift on ' . $scheduleDate . ' (' . $shift . ') — ' . $scheduleLabel . '.',
+                'tab:report:' . $id
+            );
 
             echo json_encode([
                 'success' => true,

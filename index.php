@@ -1297,11 +1297,7 @@ require_once __DIR__ . '/db.php';
             </div>
         </div>
         <nav class="sidebar-nav">
-            <!-- Dashboard Link -->
-            <a href="index.php" class="nav-module-header" data-tooltip="Dashboard" style="text-decoration: none; display: flex; align-items: center; justify-content: space-between; padding: 0.875rem 1.5rem; color: rgba(255, 255, 255, 0.9); cursor: pointer; transition: background-color 0.2s ease; font-weight: 500; user-select: none; gap: 0.75rem; <?php echo basename($_SERVER['PHP_SELF']) == 'index.php' ? 'background: rgba(76, 138, 137, 0.25); border-left: 3px solid #4c8a89;' : ''; ?>">
-                <span class="nav-module-icon"><i class="fas fa-home"></i></span>
-                <span class="nav-module-header-text">Dashboard</span>
-            </a>
+            <?php require __DIR__ . '/includes/admin_nav_dashboard.php'; ?>
             
             <!-- User Management Module (Admin Only) -->
             <?php if (isAdminUser()): ?>
@@ -1561,6 +1557,27 @@ require_once __DIR__ . '/db.php';
                                 <i class="fas fa-list"></i>
                             </div>
                             <h4 class="quick-link-title">View Events</h4>
+                        </a>
+
+                        <a href="bulletin-board.php" class="quick-link-card">
+                            <div class="quick-link-icon">
+                                <i class="fas fa-bullhorn"></i>
+                            </div>
+                            <h4 class="quick-link-title">Digital Bulletin</h4>
+                        </a>
+
+                        <a href="review-neighborhood-watcher-incidents.php" class="quick-link-card">
+                            <div class="quick-link-icon">
+                                <i class="fas fa-shield-alt"></i>
+                            </div>
+                            <h4 class="quick-link-title">Member Incident Reports</h4>
+                        </a>
+
+                        <a href="patrol-logs.php" class="quick-link-card">
+                            <div class="quick-link-icon">
+                                <i class="fas fa-clipboard-list"></i>
+                            </div>
+                            <h4 class="quick-link-title">Patrol Logs</h4>
                         </a>
                     </div>
                 </div>

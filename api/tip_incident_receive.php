@@ -1,11 +1,11 @@
 <?php
 
 /**
- * Reference inbound API for Group 1 — Incident Logging and Classification (tips).
- * Group 1 hosts an equivalent endpoint; AlertaraQC forwards tips here when configured.
+ * Reference inbound API for Incident Reporting (tips).
+ * Incident Reporting hosts an equivalent endpoint; AlertaraQC forwards tips here when configured.
  *
  * POST JSON: see includes/tip_forward.php buildTipIncidentPayload()
- * Headers: X-API-Key or Authorization: Bearer {BLOTTER_API_KEY}
+ * Headers: X-API-Key or Authorization: Bearer {INCIDENT_REPORTING_API_KEY}
  *
  * Response:
  *   { "success": true, "blotter_reference_id": "INC-2026-000001", "message": "Tip incident logged." }
@@ -22,7 +22,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 require_once __DIR__ . '/../db.php';
 require_once __DIR__ . '/../includes/api_key_auth.php';
 
-requirePartnerApiKey('BLOTTER_API_KEY', 'Incident Logging');
+requirePartnerApiKey(partnerEnvKeyCandidates('incident-reporting'), 'Incident Reporting');
 
 $input = json_decode(file_get_contents('php://input'), true);
 if (!is_array($input)) {

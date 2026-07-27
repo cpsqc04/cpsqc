@@ -125,6 +125,12 @@ try {
             'data' => [
                 'record_type' => 'event',
                 'event_id' => $eventId,
+                'event_name' => $data['event_name'],
+                'date' => $data['event_date'],
+                'time' => $data['event_time'],
+                'venue' => $data['venue'],
+                'organizer' => $data['organizer'],
+                'status' => $data['status'] !== '' ? $data['status'] : 'Pending',
                 'id' => (int) $pdo->lastInsertId(),
             ],
         ]);
@@ -152,10 +158,10 @@ try {
 
     $stmt = $pdo->prepare('INSERT INTO awareness_event_reports (
         report_id, event_id, source, source_group, source_reference_id,
-        title, event_date, attendance_count, organizer, survey_result, location, description, submitted_at
+        title, event_date, attendance_count, organizer, survey_result, evaluation_score, event_outcome, location, description, submitted_at
     ) VALUES (
         :report_id, :event_id, :source, :source_group, :source_reference_id,
-        :title, :event_date, :attendance_count, :organizer, :survey_result, :location, :description, NOW()
+        :title, :event_date, :attendance_count, :organizer, :survey_result, :evaluation_score, :event_outcome, :location, :description, NOW()
     )');
 
     $stmt->execute([
@@ -169,6 +175,8 @@ try {
         ':attendance_count' => $data['attendance_count'],
         ':organizer' => $data['organizer'],
         ':survey_result' => $data['survey_result'] !== '' ? $data['survey_result'] : null,
+        ':evaluation_score' => ($data['evaluation_score'] ?? '') !== '' ? $data['evaluation_score'] : null,
+        ':event_outcome' => ($data['event_outcome'] ?? '') !== '' ? $data['event_outcome'] : null,
         ':location' => $data['location'] !== '' ? $data['location'] : null,
         ':description' => $data['description'] !== '' ? $data['description'] : null,
     ]);
@@ -188,6 +196,10 @@ try {
             'record_type' => 'report',
             'report_id' => $reportId,
             'event_id' => $data['event_id'],
+            'attendance_count' => $data['attendance_count'],
+            'survey_results' => $data['survey_result'] !== '' ? $data['survey_result'] : null,
+            'evaluation_score' => ($data['evaluation_score'] ?? '') !== '' ? $data['evaluation_score'] : null,
+            'event_outcome' => ($data['event_outcome'] ?? '') !== '' ? $data['event_outcome'] : null,
             'id' => (int) $pdo->lastInsertId(),
         ],
     ]);

@@ -67,6 +67,21 @@
             } else if (notif.type === 'nw_incident_assignment') {
                 iconClass = 'complaint';
                 icon = 'fa-shield-alt';
+            } else if (notif.type === 'duty_schedule') {
+                iconClass = 'patrol';
+                icon = 'fa-calendar-alt';
+            } else if (notif.type === 'patrol_request_assignment') {
+                iconClass = 'patrol';
+                icon = 'fa-user-check';
+            } else if (notif.type === 'missed_patrol_report') {
+                iconClass = 'complaint';
+                icon = 'fa-exclamation-triangle';
+            } else if (notif.type === 'submit_report') {
+                iconClass = 'patrol';
+                icon = 'fa-file-alt';
+            } else if (notif.type === 'bulletin_announcement') {
+                iconClass = 'event';
+                icon = 'fa-bullhorn';
             }
             var safeLink = escapeHtml(notif.link || '');
 
@@ -216,9 +231,11 @@
         });
 
         if (link && link.indexOf('tab:') === 0) {
-            var tab = link.split(':')[1] || 'dashboard';
+            var parts = link.split(':');
+            var tab = parts[1] || 'dashboard';
+            var openPostId = parseInt(parts[2], 10) || 0;
             if (typeof window.goToTab === 'function') {
-                window.goToTab(tab);
+                window.goToTab(tab, openPostId);
             }
             var dropdown = getElements().dropdown;
             if (dropdown) {

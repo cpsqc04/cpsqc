@@ -8,6 +8,7 @@ require_once __DIR__ . '/neighborhood-watcher-members-schema.php';
 require_once __DIR__ . '/../includes/contact_validation.php';
 require_once __DIR__ . '/../includes/neighborhood-watcher-member-auth.php';
 require_once __DIR__ . '/../includes/neighborhood-watcher-member-credentials.php';
+require_once __DIR__ . '/notifications_schema.php';
 
 if (!isNwMemberLoggedIn()) {
     http_response_code(401);
@@ -113,6 +114,14 @@ if ($method === 'POST' && $action === 'update_profile') {
         $_SESSION['nw_member_name'] = $name;
         $_SESSION['nw_member_email'] = $email;
 
+        notifyAdminActorActivity(
+            $pdo,
+            'watcher',
+            $name,
+            'updated their personal information (registered email: ' . $email . ').',
+            'neighborhood-watch-application.php'
+        );
+
         $member = fetchMemberProfile($pdo, $memberId);
         echo json_encode([
             'success' => true,
@@ -168,6 +177,17 @@ if ($method === 'POST' && $action === 'change_password') {
         ]);
 
         $_SESSION['nw_member_must_change_password'] = false;
+
+        $nameStmt = $pdo->prepare('SELECT name FROM nw_members WHERE id = :id LIMIT 1');
+        $nameStmt->execute([':id' => $memberId]);
+        $actorName = trim((string) ($nameStmt->fetchColumn() ?: getNwMemberName()));
+        notifyAdminActorActivity(
+            $pdo,
+            'watcher',
+            $actorName !== '' ? $actorName : 'Neighborhood Watch member',
+            'changed their account password.',
+            'neighborhood-watch-application.php'
+        );
 
         echo json_encode(['success' => true, 'message' => 'Password updated successfully.']);
     } catch (PDOException $e) {

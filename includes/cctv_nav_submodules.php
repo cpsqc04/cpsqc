@@ -17,7 +17,7 @@ $cctvNavActive = $cctvNavActive ?? '';
     <span class="nav-submodule-icon"><i class="fas fa-cog"></i></span>
     <span class="nav-submodule-text">Camera Management</span>
 </a>
-<a href="cctv-request.php" class="nav-submodule<?php echo $cctvNavActive === 'cctv-request' ? ' active' : ''; ?>" data-tooltip="CCTV Request">
+<a href="cctv-request.php" class="nav-submodule<?php echo $cctvNavActive === 'cctv-request' ? ' active' : ''; ?>" data-tooltip="Footage Request">
     <span class="nav-submodule-icon"><i class="fas fa-file-video"></i></span>
-    <span class="nav-submodule-text">CCTV Request</span>
+    <span class="nav-submodule-text">Footage Request</span>
 </a>

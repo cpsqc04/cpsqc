@@ -195,7 +195,7 @@ if ($method === 'POST' && $action === 'manage') {
     }
 
     try {
-        $currentStmt = $pdo->prepare('SELECT request_id, status, patrols_needed FROM patrol_requests WHERE id = :id');
+        $currentStmt = $pdo->prepare('SELECT request_id, status, patrols_needed, assigned_patrol_ids, event_name, event_location, event_date FROM patrol_requests WHERE id = :id');
         $currentStmt->execute([':id' => $id]);
         $current = $currentStmt->fetch(PDO::FETCH_ASSOC);
         if (!$current) {
@@ -203,6 +203,8 @@ if ($method === 'POST' && $action === 'manage') {
             echo json_encode(['success' => false, 'message' => 'Patrol request not found.']);
             exit;
         }
+
+        $previousAssignedIds = parsePatrolRequestAssignedIds($current['assigned_patrol_ids'] ?? null);
 
         if ($assignedPatrolIds !== []) {
             $placeholders = implode(',', array_fill(0, count($assignedPatrolIds), '?'));
@@ -244,6 +246,27 @@ if ($method === 'POST' && $action === 'manage') {
             ':reviewed_by' => $_SESSION['username'] ?? 'Admin',
             ':id' => $id,
         ]);
+
+        $newlyAssignedIds = array_values(array_diff($assignedPatrolIds, $previousAssignedIds));
+        if ($newlyAssignedIds !== []) {
+            $requestCode = (string) ($current['request_id'] ?? ('#' . $id));
+            $eventName = trim((string) ($current['event_name'] ?? ''));
+            $location = trim((string) ($current['event_location'] ?? ''));
+            $eventDate = trim((string) ($current['event_date'] ?? ''));
+            $detailParts = array_filter([$eventName, $location, $eventDate !== '' ? 'on ' . $eventDate : '']);
+            $detailText = $detailParts !== [] ? implode(' — ', $detailParts) : 'a community patrol request';
+
+            foreach ($newlyAssignedIds as $assignedPatrolId) {
+                createPatrolNotification(
+                    $pdo,
+                    (int) $assignedPatrolId,
+                    'patrol_request_assignment',
+                    'Assigned for Patrolling',
+                    'You have been assigned to patrol request ' . $requestCode . ' (' . $detailText . ').',
+                    'patrol-request:' . $id . ':' . (int) $assignedPatrolId
+                );
+            }
+        }
 
         echo json_encode(['success' => true, 'message' => 'Patrol request updated successfully.']);
     } catch (PDOException $e) {

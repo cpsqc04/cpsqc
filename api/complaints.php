@@ -181,7 +181,7 @@ if ($method === 'POST') {
             $assignedLabel = $personnel['personnel_name'] . ' (' . $personnel['bpso_personnel_id'] . ')';
             $timestamp = date('Y-m-d H:i:s');
 
-            $complaintStmt = $pdo->prepare('SELECT notes FROM complaints WHERE id = :id');
+            $complaintStmt = $pdo->prepare('SELECT complaint_id, complaint_type, notes FROM complaints WHERE id = :id');
             $complaintStmt->execute([':id' => $id]);
             $complaint = $complaintStmt->fetch(PDO::FETCH_ASSOC);
             if (!$complaint) {
@@ -207,6 +207,19 @@ if ($method === 'POST') {
                 ':status' => 'Assigned',
                 ':id' => $patrolId,
             ]);
+
+            $complaintIdLabel = (string) ($complaint['complaint_id'] ?? '');
+            $complaintTypeLabel = (string) ($complaint['complaint_type'] ?? '');
+            createPatrolNotification(
+                $pdo,
+                $patrolId,
+                'complaint_assignment',
+                'Complaint Assigned',
+                'Complaint #' . ($complaintIdLabel !== '' ? $complaintIdLabel : (string) $id) .
+                    ($complaintTypeLabel !== '' ? ' (' . $complaintTypeLabel . ')' : '') . ' has been assigned to you.',
+                'tab:complaints:' . $id,
+                $timestamp
+            );
 
             echo json_encode([
                 'success' => true,

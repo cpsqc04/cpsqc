@@ -1,25 +1,29 @@
 <?php
 
 /**
- * Forward complaints from AlertaraQC to Group 1 Digital Blotter System via HTTP API.
+ * Forward complaints from AlertaraQC to Incident Reporting (Digital Blotter) via HTTP API.
  *
- * Configure in .env:
- *   BLOTTER_API_URL=https://group1.example.com/api/blotter/receive
- *   BLOTTER_API_KEY=shared-secret-key
- *   BLOTTER_API_TIMEOUT=30
+ * Configure in .env (preferred + legacy):
+ *   INCIDENT_REPORTING_API_URL=https://partner.example.com/api/blotter/receive
+ *   INCIDENT_REPORTING_API_KEY=shared-secret-key
+ *   INCIDENT_REPORTING_API_TIMEOUT=30
+ *   Legacy: BLOTTER_API_URL, BLOTTER_API_KEY, BLOTTER_API_TIMEOUT
  *
- * Expected Group 1 response (JSON):
+ * Expected response (JSON):
  *   { "success": true, "blotter_reference_id": "DB-2026-001", "message": "..." }
  */
 
 require_once __DIR__ . '/../api/complaints_schema.php';
+require_once __DIR__ . '/api_key_auth.php';
 
 function getBlotterApiConfig(): array
 {
+    $cfg = getIncidentReportingApiConfig();
+
     return [
-        'url' => trim($_ENV['BLOTTER_API_URL'] ?? ''),
-        'api_key' => trim($_ENV['BLOTTER_API_KEY'] ?? ''),
-        'timeout' => max(5, (int) ($_ENV['BLOTTER_API_TIMEOUT'] ?? 30)),
+        'url' => $cfg['url'],
+        'api_key' => $cfg['api_key'],
+        'timeout' => $cfg['timeout'],
     ];
 }
 
@@ -40,9 +44,16 @@ function buildBlotterForwardPayload(array $complaint): array
         $notes = trim(implode("\n", $lines));
     }
 
+    $complaintType = formatComplaintTypeLabel($complaint);
+    $typeOther = (($complaint['complaint_type'] ?? '') === 'Other') ? trim($complaint['complaint_type_other'] ?? '') : null;
+    $date = $complaint['incident_date'] ?? '';
+    $time = $complaint['incident_time'] ?? '';
+    $statusDescription = trim($complaint['description'] ?? '');
+
     return [
         'source' => 'alertaraqc',
         'source_complaint_id' => $complaint['complaint_id'] ?? '',
+        // Nested structure (existing contract)
         'complainant' => [
             'name' => $complaint['complainant_name'] ?? '',
             'contact_number' => $complaint['contact_number'] ?? '',
@@ -54,16 +65,27 @@ function buildBlotterForwardPayload(array $complaint): array
             'contact_number' => $complaint['defendant_contact_number'] ?? '',
         ],
         'incident' => [
-            'date' => $complaint['incident_date'] ?? '',
-            'time' => $complaint['incident_time'] ?? '',
+            'date' => $date,
+            'time' => $time,
             'location' => $complaint['location'] ?? '',
-            'type' => formatComplaintTypeLabel($complaint),
-            'type_other' => (($complaint['complaint_type'] ?? '') === 'Other') ? trim($complaint['complaint_type_other'] ?? '') : null,
-            'description' => $complaint['description'] ?? '',
+            'type' => $complaintType,
+            'type_other' => $typeOther,
+            'description' => $statusDescription,
         ],
         'priority' => $complaint['priority'] ?? 'Low',
         'notes' => $notes,
         'submitted_at' => $complaint['submitted_at'] ?? null,
+        // Flat module labels for partner mapping (Track Complaint outbound)
+        'complainant_name' => $complaint['complainant_name'] ?? '',
+        'complainant_address' => $complaint['address'] ?? '',
+        'complainant_contact_number' => $complaint['contact_number'] ?? '',
+        'date_time' => trim($date . ' ' . $time),
+        'defendant_name' => $complaint['defendant_name'] ?? '',
+        'defendant_address' => $complaint['defendant_address'] ?? '',
+        'defendant_contact_number' => $complaint['defendant_contact_number'] ?? '',
+        'complaint_type' => $complaintType,
+        'specify_complaint_type' => $typeOther,
+        'status_description' => $statusDescription,
         'metadata' => [
             'internal_id' => (int) ($complaint['id'] ?? 0),
             'forwarded_by' => 'alertaraqc_admin',
@@ -82,7 +104,7 @@ function forwardComplaintToBlotter(array $complaint): array
     if ($config['url'] === '') {
         return [
             'success' => false,
-            'message' => 'Digital Blotter API is not configured. Set BLOTTER_API_URL in .env.',
+            'message' => 'Incident Reporting API is not configured. Set INCIDENT_REPORTING_API_URL in .env.',
         ];
     }
 

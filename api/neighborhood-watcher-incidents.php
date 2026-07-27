@@ -114,11 +114,11 @@ if ($method === 'POST') {
 
             $id = (int) $pdo->lastInsertId();
 
-            createAdminNotification(
+            notifyAdminActorActivity(
                 $pdo,
-                'nw_incident',
-                'Neighborhood Watch Incident Report',
-                $reportId . ' - ' . $location . ' (' . $member['name'] . ')',
+                'watcher',
+                (string) $member['name'],
+                'submitted a Neighborhood Watch incident report (' . $reportId . ') at ' . $location . '.',
                 'review-neighborhood-watcher-incidents.php?id=' . urlencode($reportId)
             );
 

@@ -61,11 +61,60 @@ function bpsoAttendanceSelectColumns(string $prefix = ''): string
 
 require_once __DIR__ . '/../includes/patrol_shifts.php';
 
+function computeAttendanceMinutes(?string $timeIn, ?string $timeOut): ?int
+{
+    if (!$timeIn) {
+        return null;
+    }
+
+    try {
+        $start = new DateTime(str_replace(' ', 'T', $timeIn));
+        // If still clocked on, overtime/duration is measured against current Manila time.
+        $end = $timeOut
+            ? new DateTime(str_replace(' ', 'T', $timeOut))
+            : new DateTime('now');
+        return max(0, (int) round(($end->getTimestamp() - $start->getTimestamp()) / 60));
+    } catch (Exception $e) {
+        return null;
+    }
+}
+
+function formatOvertimeClock(int $overtimeMinutes): string
+{
+    $hours = intdiv(max(0, $overtimeMinutes), 60);
+    $mins = max(0, $overtimeMinutes) % 60;
+    return sprintf('%02d:%02d', $hours, $mins);
+}
+
+function formatOvertimeLabel(?string $timeIn, ?string $timeOut): string
+{
+    $minutes = computeAttendanceMinutes($timeIn, $timeOut);
+    if ($minutes === null) {
+        return '00:00';
+    }
+
+    $overtimeMinutes = max(0, $minutes - (8 * 60));
+    if ($overtimeMinutes <= 0) {
+        return '00:00';
+    }
+
+    $label = formatOvertimeClock($overtimeMinutes);
+    // Still clocked on past 8 hours — overtime keeps running.
+    if (!$timeOut) {
+        return $label . ' (running)';
+    }
+
+    return $label;
+}
+
 function enrichAttendanceRow(array $row, ?PDO $pdo = null): array
 {
     $row['is_at_hall'] = empty($row['time_out']);
-    $row['status_label'] = empty($row['time_out']) ? 'At Hall' : 'Timed Out';
+    $row['status_label'] = empty($row['time_out']) ? 'Clocked On' : 'Clocked Out';
     $row['patrol_duration_label'] = formatHallDurationLabel($row['time_in'] ?? null, $row['time_out'] ?? null);
+    $row['duration_minutes'] = computeAttendanceMinutes($row['time_in'] ?? null, $row['time_out'] ?? null);
+    $row['overtime_label'] = formatOvertimeLabel($row['time_in'] ?? null, $row['time_out'] ?? null);
+    $row['overtime_running'] = empty($row['time_out']) && ($row['duration_minutes'] ?? 0) > (8 * 60);
     $row['duty'] = $row['duty_shift'] ?? '';
 
     if ($pdo && !empty($row['patrol_id']) && $row['duty'] === '') {
@@ -91,6 +140,28 @@ function isPatrolAtHall(PDO $pdo, int $patrolId): bool
     $stmt = $pdo->prepare(
         'SELECT id FROM bpso_attendance
          WHERE patrol_id = :patrol_id AND attendance_date = CURDATE() AND time_out IS NULL
+         LIMIT 1'
+    );
+    $stmt->execute([':patrol_id' => $patrolId]);
+
+    return (bool) $stmt->fetch(PDO::FETCH_ASSOC);
+}
+
+/**
+ * Whether the patrol currently has an open clock-on session (shift not ended by clock-out).
+ */
+function isPatrolClockedOn(PDO $pdo, int $patrolId): bool
+{
+    if ($patrolId <= 0) {
+        return false;
+    }
+
+    ensureBpsoAttendanceTable($pdo);
+
+    $stmt = $pdo->prepare(
+        'SELECT id FROM bpso_attendance
+         WHERE patrol_id = :patrol_id AND time_out IS NULL
+         ORDER BY time_in DESC
          LIMIT 1'
     );
     $stmt->execute([':patrol_id' => $patrolId]);

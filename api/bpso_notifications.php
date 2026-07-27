@@ -7,6 +7,7 @@ require_once __DIR__ . '/patrol_schedules_schema.php';
 require_once __DIR__ . '/complaints_schema.php';
 require_once __DIR__ . '/neighborhood-watcher-incidents-schema.php';
 require_once __DIR__ . '/notifications_schema.php';
+require_once __DIR__ . '/../includes/patrol_shifts.php';
 
 if (!function_exists('getTimeAgo')) {
     function getTimeAgo($datetime)
@@ -87,7 +88,9 @@ if ($action === 'sync') {
                 $patrolId,
                 'patrol_schedule',
                 'New Patrol Assignment',
-                'Patrol on ' . $row['schedule_date'] . ' at ' . $row['schedule_time'] . ' — ' . $row['route'],
+                'You have been assigned for patrolling on ' . $row['schedule_date'] .
+                    ($row['schedule_time'] ? ' at ' . $row['schedule_time'] : '') .
+                    ' — ' . $row['route'],
                 $link,
                 $row['created_at']
             )) {
@@ -148,6 +151,85 @@ if ($action === 'sync') {
                 $assignedAt
             )) {
                 $synced++;
+            }
+        }
+    } catch (PDOException $e) {
+        // continue
+    }
+
+    try {
+        $stmt = $pdo->prepare("
+            SELECT id, personnel_name, route, patrol_zone, schedule_date, shift, status
+            FROM patrol_schedules
+            WHERE patrol_id = :patrol_id
+              AND schedule_date >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
+            ORDER BY schedule_date DESC, id DESC
+        ");
+        $stmt->execute([':patrol_id' => $patrolId]);
+        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+            $scheduleDate = (string) ($row['schedule_date'] ?? '');
+            $shift = (string) ($row['shift'] ?? '');
+            $status = (string) ($row['status'] ?? '');
+            if ($scheduleDate === '') {
+                continue;
+            }
+
+            $zone = trim((string) ($row['patrol_zone'] ?? $row['route'] ?? 'your assigned zone'));
+            $personnelName = trim((string) ($row['personnel_name'] ?? 'Patrol personnel'));
+            $hasCompletedReport = false;
+            try {
+                $reportCheck = $pdo->prepare("
+                    SELECT COUNT(*) FROM patrol_logs
+                    WHERE schedule_id = :schedule_id
+                      AND patrol_id = :patrol_id
+                      AND status <> 'Scheduled'
+                ");
+                $reportCheck->execute([
+                    ':schedule_id' => (int) $row['id'],
+                    ':patrol_id' => $patrolId,
+                ]);
+                $hasCompletedReport = ((int) $reportCheck->fetchColumn()) > 0;
+            } catch (PDOException $e) {
+                $hasCompletedReport = ($status === 'Completed');
+            }
+
+            if (!$hasCompletedReport && hasPatrolShiftStarted($scheduleDate, $shift) && !hasPatrolShiftEnded($scheduleDate, $shift)) {
+                $link = 'tab:report:' . $row['id'];
+                if (createPatrolNotification(
+                    $pdo,
+                    $patrolId,
+                    'submit_report',
+                    'Submit Report',
+                    'Please submit at least one patrol report for your shift on ' . $scheduleDate . ' (' . $shift . ') — ' . $zone . '.',
+                    $link
+                )) {
+                    $synced++;
+                }
+            }
+
+            if (!$hasCompletedReport && hasPatrolShiftEnded($scheduleDate, $shift)) {
+                $patrolLink = 'tab:schedule:missed:' . $row['id'];
+                if (createPatrolNotification(
+                    $pdo,
+                    $patrolId,
+                    'missed_patrol_report',
+                    'Missing Patrol Report',
+                    'You missed submitting a report for your shift on ' . $scheduleDate . ' (' . $shift . ').',
+                    $patrolLink
+                )) {
+                    $synced++;
+                }
+
+                $adminLink = 'missed-report:' . $row['id'];
+                if (createAdminNotification(
+                    $pdo,
+                    'missed_patrol_report',
+                    'Missed Patrol Report',
+                    $personnelName,
+                    $adminLink
+                )) {
+                    $synced++;
+                }
             }
         }
     } catch (PDOException $e) {

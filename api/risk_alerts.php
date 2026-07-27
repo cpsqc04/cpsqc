@@ -1,9 +1,9 @@
 <?php
 
 /**
- * List high-risk alerts from Group 5 for admin patrol scheduling.
+ * List high-risk alerts from Crime Analytics for admin patrol scheduling.
  *
- * GET — admin session or GROUP5_API_KEY
+ * GET — admin session or CRIME_ANALYTICS_API_KEY (legacy: GROUP5_API_KEY)
  * Query: status=active (default) | all, severity=CRITICAL|HIGH|...
  */
 
@@ -13,6 +13,7 @@ header('Content-Type: application/json; charset=utf-8');
 require_once __DIR__ . '/../db.php';
 require_once __DIR__ . '/risk_alerts_schema.php';
 require_once __DIR__ . '/../includes/bpso_auth.php';
+require_once __DIR__ . '/../includes/api_key_auth.php';
 
 if (!$pdo instanceof PDO) {
     http_response_code(500);
@@ -29,15 +30,15 @@ try {
 }
 
 $isAdmin = isAdminLoggedIn();
-$hasApiKey = validateGroup5AlertApiKey(true);
+$hasApiKey = validateCrimeAnalyticsAlertApiKey(true);
 
 if (!$isAdmin && !$hasApiKey) {
-    $expectedKey = trim($_ENV['GROUP5_API_KEY'] ?? '');
+    $expectedKey = envFirst(...partnerEnvKeyCandidates('crime-analytics'));
     http_response_code($expectedKey === '' ? 503 : 401);
     echo json_encode([
         'success' => false,
         'message' => $expectedKey === ''
-            ? 'Group 5 alert API is not configured. Set GROUP5_API_KEY in .env.'
+            ? 'Crime Analytics API is not configured. Set CRIME_ANALYTICS_API_KEY in .env.'
             : 'Unauthorized.',
     ]);
     exit;

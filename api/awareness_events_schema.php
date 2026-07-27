@@ -86,6 +86,8 @@ function ensureAwarenessEventReportsTable(PDO $pdo): void
             attendance_count INT NOT NULL DEFAULT 0,
             organizer VARCHAR(255) NOT NULL,
             survey_result VARCHAR(100) DEFAULT NULL,
+            evaluation_score VARCHAR(50) DEFAULT NULL,
+            event_outcome TEXT DEFAULT NULL,
             location TEXT DEFAULT NULL,
             description TEXT DEFAULT NULL,
             submitted_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -101,6 +103,8 @@ function ensureAwarenessEventReportsTable(PDO $pdo): void
             'source' => "ALTER TABLE awareness_event_reports ADD COLUMN source VARCHAR(100) DEFAULT 'partner_api' AFTER event_id",
             'source_group' => "ALTER TABLE awareness_event_reports ADD COLUMN source_group VARCHAR(50) NOT NULL DEFAULT 'group_6' AFTER source",
             'source_reference_id' => 'ALTER TABLE awareness_event_reports ADD COLUMN source_reference_id VARCHAR(100) DEFAULT NULL AFTER source_group',
+            'evaluation_score' => 'ALTER TABLE awareness_event_reports ADD COLUMN evaluation_score VARCHAR(50) DEFAULT NULL AFTER survey_result',
+            'event_outcome' => 'ALTER TABLE awareness_event_reports ADD COLUMN event_outcome TEXT DEFAULT NULL AFTER evaluation_score',
             'submitted_at' => 'ALTER TABLE awareness_event_reports ADD COLUMN submitted_at DATETIME DEFAULT CURRENT_TIMESTAMP AFTER description',
             'updated_at' => 'ALTER TABLE awareness_event_reports ADD COLUMN updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP AFTER submitted_at',
         ];
@@ -133,7 +137,7 @@ function awarenessEventReportsSelectColumns(string $prefix = ''): string
     }, [
         'id', 'report_id', 'event_id', 'source', 'source_group', 'source_reference_id',
         'title', 'event_date', 'attendance_count', 'organizer', 'survey_result',
-        'location', 'description', 'submitted_at', 'updated_at',
+        'evaluation_score', 'event_outcome', 'location', 'description', 'submitted_at', 'updated_at',
     ]));
 }
 
@@ -246,19 +250,29 @@ function normalizeAwarenessEventReportInput(array $input): array
         $sourceGroup = 'group_6';
     }
 
+    $survey = trim($input['survey_result'] ?? $input['survey_results'] ?? '');
+    $evaluation = trim((string) ($input['evaluation_score'] ?? $input['evaluation'] ?? ''));
+    $outcome = trim($input['event_outcome'] ?? $input['outcome'] ?? '');
+    $description = trim($input['description'] ?? '');
+    if ($description === '' && $outcome !== '') {
+        $description = $outcome;
+    }
+
     return [
         'source' => trim($input['source'] ?? 'partner_api'),
         'source_group' => $sourceGroup,
         'source_reference_id' => trim($input['source_reference_id'] ?? ''),
         'report_id' => trim($input['report_id'] ?? ''),
         'event_id' => trim($input['event_id'] ?? ''),
-        'title' => trim($input['title'] ?? $input['event_name'] ?? ''),
+        'title' => trim($input['title'] ?? $input['event_name'] ?? $input['event_id'] ?? ''),
         'event_date' => trim($input['event_date'] ?? $input['date'] ?? ''),
         'attendance_count' => (int) ($input['attendance_count'] ?? $input['attendance'] ?? 0),
         'organizer' => trim($input['organizer'] ?? ''),
-        'survey_result' => trim($input['survey_result'] ?? ''),
+        'survey_result' => $survey,
+        'evaluation_score' => $evaluation,
+        'event_outcome' => $outcome,
         'location' => trim($input['location'] ?? $input['venue'] ?? ''),
-        'description' => trim($input['description'] ?? ''),
+        'description' => $description,
     ];
 }
 
@@ -298,7 +312,6 @@ function validateAwarenessEventReportFields(array $data): ?string
 
     $required = [
         'event_id' => 'Event ID',
-        'title' => 'Report title',
         'event_date' => 'Event date',
         'organizer' => 'Organizer',
     ];
@@ -307,6 +320,10 @@ function validateAwarenessEventReportFields(array $data): ?string
         if ($data[$field] === '') {
             return $label . ' is required.';
         }
+    }
+
+    if (trim($data['title'] ?? '') === '') {
+        return 'Report title (or event_name) is required.';
     }
 
     if ($data['attendance_count'] < 0) {

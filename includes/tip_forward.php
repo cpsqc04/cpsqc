@@ -1,41 +1,24 @@
 <?php
 
 /**
- * Forward BPSO tips to Group 1 Incident Logging and Classification module.
+ * Forward BPSO tips to Incident Reporting (tips / incident logging).
  *
- * Configure in .env:
- *   TIP_BLOTTER_API_URL=   (optional; falls back to BLOTTER_API_URL)
- *   BLOTTER_API_URL=
- *   BLOTTER_API_KEY=
- *   BLOTTER_API_TIMEOUT=30
- *
- * Outbound payload (JSON):
- *   {
- *     "source": "alertaraqc",
- *     "record_type": "tip",
- *     "source_tip_id": "TIP-2026-002",
- *     "incident": { "location", "description", "submitted_at" },
- *     "review": { "status", "outcome" },
- *     "reporter": { "contact_number" },
- *     "metadata": { "internal_id", "forwarded_by", "forwarded_at" },
- *     "has_photo": true
- *   }
- *
- * Expected response:
- *   { "success": true, "blotter_reference_id": "INC-2026-000001", "message": "..." }
+ * Configure in .env (preferred + legacy):
+ *   INCIDENT_REPORTING_TIP_API_URL=   (optional; falls back to INCIDENT_REPORTING_API_URL / TIP_BLOTTER_API_URL / BLOTTER_API_URL)
+ *   INCIDENT_REPORTING_API_KEY=       (legacy: BLOTTER_API_KEY)
+ *   INCIDENT_REPORTING_API_TIMEOUT=30
  */
+
+require_once __DIR__ . '/api_key_auth.php';
 
 function getTipBlotterApiConfig(): array
 {
-    $url = trim($_ENV['TIP_BLOTTER_API_URL'] ?? '');
-    if ($url === '') {
-        $url = trim($_ENV['BLOTTER_API_URL'] ?? '');
-    }
+    $cfg = getIncidentReportingApiConfig();
 
     return [
-        'url' => $url,
-        'api_key' => trim($_ENV['BLOTTER_API_KEY'] ?? ''),
-        'timeout' => max(5, (int) ($_ENV['BLOTTER_API_TIMEOUT'] ?? 30)),
+        'url' => $cfg['tip_url'],
+        'api_key' => $cfg['api_key'],
+        'timeout' => $cfg['timeout'],
     ];
 }
 
@@ -50,10 +33,18 @@ function buildTipIncidentPayload(array $tip): array
         }
     }
 
+    $hasPhoto = !empty($tip['photo_data']);
+    $photoData = $hasPhoto ? (string) $tip['photo_data'] : null;
+    // Keep outbound payload reasonable for partners who only need a flag + optional data URL.
+    if ($photoData !== null && strlen($photoData) > 2_500_000) {
+        $photoData = null;
+    }
+
     return [
         'source' => 'alertaraqc',
         'record_type' => 'tip',
         'source_tip_id' => $tip['tip_id'] ?? '',
+        // Nested structure (existing contract)
         'incident' => [
             'location' => $tip['location'] ?? '',
             'description' => $tip['description'] ?? '',
@@ -68,7 +59,19 @@ function buildTipIncidentPayload(array $tip): array
             'status' => $tip['status'] ?? 'Under Review',
             'outcome' => $tip['outcome'] ?? 'No Outcome Yet',
         ],
-        'has_photo' => !empty($tip['photo_data']),
+        'has_photo' => $hasPhoto,
+        'attached_evidence' => [
+            'type' => $hasPhoto ? 'photo' : null,
+            'photo_data' => $photoData,
+            'available' => $hasPhoto,
+        ],
+        // Flat module labels for partner mapping (Review Tip outbound)
+        'tip_id' => $tip['tip_id'] ?? '',
+        'date_time' => $submittedAt,
+        'location' => $tip['location'] ?? '',
+        'tip_description' => $tip['description'] ?? '',
+        'status' => $tip['status'] ?? 'Under Review',
+        'outcome' => $tip['outcome'] ?? 'No Outcome Yet',
         'metadata' => [
             'internal_id' => (int) ($tip['id'] ?? 0),
             'forwarded_by' => 'alertaraqc_bpso_admin',
@@ -77,7 +80,7 @@ function buildTipIncidentPayload(array $tip): array
     ];
 }
 
-function forwardTipToGroup1(array $tip): array
+function forwardTipToIncidentReporting(array $tip): array
 {
     if (!function_exists('curl_init')) {
         return ['success' => false, 'message' => 'cURL extension is required to forward tips.'];
@@ -87,7 +90,7 @@ function forwardTipToGroup1(array $tip): array
     if ($config['url'] === '') {
         return [
             'success' => false,
-            'message' => 'Incident Logging API is not configured. Set TIP_BLOTTER_API_URL or BLOTTER_API_URL in .env.',
+            'message' => 'Incident Reporting tip API is not configured. Set INCIDENT_REPORTING_TIP_API_URL or INCIDENT_REPORTING_API_URL in .env.',
         ];
     }
 
@@ -122,7 +125,7 @@ function forwardTipToGroup1(array $tip): array
     if ($responseBody === false) {
         return [
             'success' => false,
-            'message' => 'Failed to reach Incident Logging API: ' . ($curlError ?: 'Unknown error'),
+            'message' => 'Failed to reach Incident Reporting API: ' . ($curlError ?: 'Unknown error'),
         ];
     }
 
@@ -130,13 +133,13 @@ function forwardTipToGroup1(array $tip): array
     if (!is_array($decoded)) {
         return [
             'success' => false,
-            'message' => 'Incident Logging API returned an invalid response (HTTP ' . $httpCode . ').',
+            'message' => 'Incident Reporting API returned an invalid response (HTTP ' . $httpCode . ').',
             'http_code' => $httpCode,
         ];
     }
 
     if ($httpCode < 200 || $httpCode >= 300) {
-        $message = trim($decoded['message'] ?? $decoded['error'] ?? 'Incident Logging API request failed.');
+        $message = trim($decoded['message'] ?? $decoded['error'] ?? 'Incident Reporting API request failed.');
         return [
             'success' => false,
             'message' => $message . ' (HTTP ' . $httpCode . ')',
@@ -147,7 +150,7 @@ function forwardTipToGroup1(array $tip): array
     if (empty($decoded['success'])) {
         return [
             'success' => false,
-            'message' => trim($decoded['message'] ?? $decoded['error'] ?? 'Incident Logging API rejected the tip.'),
+            'message' => trim($decoded['message'] ?? $decoded['error'] ?? 'Incident Reporting API rejected the tip.'),
             'http_code' => $httpCode,
         ];
     }
@@ -158,8 +161,14 @@ function forwardTipToGroup1(array $tip): array
 
     return [
         'success' => true,
-        'message' => trim($decoded['message'] ?? 'Tip forwarded to Incident Logging and Classification.'),
+        'message' => trim($decoded['message'] ?? 'Tip forwarded to Incident Reporting.'),
         'blotter_reference_id' => $referenceId,
         'http_code' => $httpCode,
     ];
+}
+
+/** @deprecated Use forwardTipToIncidentReporting() */
+function forwardTipToGroup1(array $tip): array
+{
+    return forwardTipToIncidentReporting($tip);
 }

@@ -158,10 +158,8 @@ define('NW_PAGE_MODE', 'incidents');
             </div>
         </div>
         <nav class="sidebar-nav">
-            <a href="index.php" class="nav-module-header" data-tooltip="Dashboard" style="text-decoration: none;">
-                <span class="nav-module-icon"><i class="fas fa-home"></i></span>
-                <span class="nav-module-header-text">Dashboard</span>
-            </a>
+            
+            <?php require __DIR__ . '/includes/admin_nav_dashboard.php'; ?>
 
             <?php if (isAdminUser()): ?>
             <div class="nav-module">

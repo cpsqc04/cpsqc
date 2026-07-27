@@ -4,6 +4,8 @@
  * Tips table schema and column helpers.
  */
 
+require_once __DIR__ . '/../includes/schema_helpers.php';
+
 function ensureTipsTable(PDO $pdo): void
 {
     $columns = [];
@@ -32,11 +34,24 @@ function ensureTipsTable(PDO $pdo): void
             forwarded_at DATETIME DEFAULT NULL,
             blotter_reference_id VARCHAR(100) DEFAULT NULL,
             backup_requested_at DATETIME DEFAULT NULL,
-            group3_reference_id VARCHAR(100) DEFAULT NULL,
+            emergency_response_reference_id VARCHAR(100) DEFAULT NULL,
             submitted_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
         return;
+    }
+
+    renameTableColumnIfNeeded(
+        $pdo,
+        'tips',
+        'group3_reference_id',
+        'emergency_response_reference_id',
+        'VARCHAR(100) DEFAULT NULL'
+    );
+
+    $columns = [];
+    foreach ($pdo->query('SHOW COLUMNS FROM tips') as $row) {
+        $columns[$row['Field']] = true;
     }
 
     $alterations = [
@@ -51,8 +66,8 @@ function ensureTipsTable(PDO $pdo): void
         'forwarded_at' => 'ALTER TABLE tips ADD COLUMN forwarded_at DATETIME DEFAULT NULL AFTER police_backup_reason',
         'blotter_reference_id' => 'ALTER TABLE tips ADD COLUMN blotter_reference_id VARCHAR(100) DEFAULT NULL AFTER forwarded_at',
         'backup_requested_at' => 'ALTER TABLE tips ADD COLUMN backup_requested_at DATETIME DEFAULT NULL AFTER blotter_reference_id',
-        'group3_reference_id' => 'ALTER TABLE tips ADD COLUMN group3_reference_id VARCHAR(100) DEFAULT NULL AFTER backup_requested_at',
-        'submitted_at' => 'ALTER TABLE tips ADD COLUMN submitted_at DATETIME DEFAULT CURRENT_TIMESTAMP AFTER group3_reference_id',
+        'emergency_response_reference_id' => 'ALTER TABLE tips ADD COLUMN emergency_response_reference_id VARCHAR(100) DEFAULT NULL AFTER backup_requested_at',
+        'submitted_at' => 'ALTER TABLE tips ADD COLUMN submitted_at DATETIME DEFAULT CURRENT_TIMESTAMP AFTER emergency_response_reference_id',
         'created_at' => 'ALTER TABLE tips ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP',
     ];
 
@@ -79,7 +94,7 @@ function tipsSelectColumns(string $prefix = ''): string
         "{$p}forwarded_at",
         "{$p}blotter_reference_id",
         "{$p}backup_requested_at",
-        "{$p}group3_reference_id",
+        "{$p}emergency_response_reference_id",
         "{$p}submitted_at",
         "{$p}created_at",
     ]);

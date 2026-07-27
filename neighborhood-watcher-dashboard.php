@@ -8,7 +8,7 @@ requireNwMemberPasswordChanged();
 $memberName = htmlspecialchars(getNwMemberName());
 $memberEmail = htmlspecialchars(getNwMemberEmail());
 $passwordChanged = isset($_GET['password_changed']);
-$nwActiveNav = 'report';
+$nwActiveNav = 'bulletin';
 ?>
 <!doctype html>
 <html lang="en">
@@ -20,6 +20,8 @@ $nwActiveNav = 'report';
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="css/theme.css">
     <link rel="stylesheet" href="css/admin-sidebar.css">
+    <link rel="stylesheet" href="css/digital-bulletin.css">
+    <link rel="stylesheet" href="css/notifications.css">
     <style>
         body { margin: 0; padding: 0; font-family: var(--font-family); background-color: var(--bg-color); display: flex; min-height: 100vh; }
         .sidebar { width: 320px; background: var(--tertiary-color); color: #fff; position: fixed; left: 0; top: 0; height: 100vh; overflow: hidden; box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1); z-index: 1000; transition: width 0.3s ease; display: flex; flex-direction: column; }
@@ -30,11 +32,9 @@ $nwActiveNav = 'report';
         .sidebar.collapsed .logo-container img { height: 70px; width: 70px; }
         .user-name-display { color: rgba(255, 255, 255, 0.9); font-size: 0.95rem; font-weight: 500; text-align: center; padding: 0.5rem 1rem; word-break: break-word; max-width: 100%; }
         .sidebar.collapsed .user-name-display { opacity: 0; height: 0; padding: 0; overflow: hidden; font-size: 0; }
-        .sidebar.collapsed .member-status-chip { opacity: 0; height: 0; padding: 0; margin: 0; overflow: hidden; font-size: 0; }
-        .member-status-chip { display: inline-flex; align-items: center; gap: 0.4rem; margin-top: 0.35rem; padding: 0.35rem 0.75rem; border-radius: 999px; font-size: 0.8rem; font-weight: 600; background: rgba(16,185,129,0.2); color: #a7f3d0; }
         .sidebar-nav { padding: 0.5rem 0; overflow-y: auto; flex: 1; display: flex; flex-direction: column; min-height: 0; }
-        .nav-submodule { padding: 0.75rem 1.5rem; color: rgba(255, 255, 255, 0.75); text-decoration: none; display: flex; align-items: center; gap: 0.75rem; transition: all 0.2s ease; font-size: 0.85rem; cursor: pointer; border: none; background: none; width: 100%; text-align: left; font-family: inherit; position: relative; }
-        .nav-submodule:hover { background: rgba(255, 255, 255, 0.08); color: #fff; padding-left: 2rem; }
+        .nav-submodule { padding: 0.75rem 1.5rem !important; color: rgba(255, 255, 255, 0.75); text-decoration: none; display: flex; align-items: center; gap: 0.75rem; transition: all 0.2s ease; font-size: 0.84rem !important; cursor: pointer; border: none; background: none; width: 100%; text-align: left; font-family: inherit; position: relative; }
+        .nav-submodule:hover { background: rgba(255, 255, 255, 0.08); color: #fff; padding-left: 1.5rem !important; }
         .nav-submodule.active { background: rgba(76, 138, 137, 0.35); color: #fff; border-left: 3px solid var(--primary-color); font-weight: 600; }
         .nav-submodule-icon { width: 22px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
         .nav-submodule-text { flex: 1; }
@@ -151,7 +151,6 @@ $nwActiveNav = 'report';
                     <img src="images/tara.png" alt="Alertara Logo">
                 </a>
                 <div class="user-name-display"><?php echo $memberName; ?></div>
-                <div class="member-status-chip"><i class="fas fa-user-shield"></i> Active Member</div>
             </div>
         </div>
         <nav class="sidebar-nav">
@@ -172,7 +171,7 @@ $nwActiveNav = 'report';
                     <span></span>
                 </button>
                 <div>
-                    <h1 class="page-title">Neighborhood Watch Portal</h1>
+                    <h1 class="page-title" id="pageTitle">Digital Bulletin</h1>
                 </div>
             </div>
             <div class="user-info">
@@ -180,16 +179,41 @@ $nwActiveNav = 'report';
                     <span class="date-part" id="currentDate"></span>
                     <span class="time-part" id="currentTime"></span>
                 </div>
+                <div class="notification-container">
+                    <button class="notification-bell" type="button" onclick="toggleNotifications(event)" aria-label="Notifications">
+                        <i class="fas fa-bell"></i>
+                        <span class="notification-badge" id="notificationBadge"></span>
+                    </button>
+                    <div class="notification-dropdown" id="notificationDropdown">
+                        <div class="notification-header">
+                            <h3>Notifications</h3>
+                            <button type="button" onclick="markAllNotificationsRead()">Mark all read</button>
+                        </div>
+                        <div class="notification-list" id="notificationList">
+                            <div class="notification-empty">
+                                <i class="fas fa-bell-slash"></i>
+                                <p>No notifications</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </header>
 
-        <main class="content-area">
-            <div class="page-content">
+        <main class="content-area bulletin-fullscreen">
+            <div class="page-content bulletin-fullscreen">
                 <?php if ($passwordChanged): ?>
                     <div class="alert alert-success">Your password has been updated successfully.</div>
                 <?php endif; ?>
 
-                <section id="reportSection" class="section-block is-active">
+                <section id="bulletinSection" class="section-block is-active">
+                    <div id="nwBulletinRoot">
+                        <div data-db-carousel></div>
+                        <div data-db-announcements></div>
+                    </div>
+                </section>
+
+                <section id="reportSection" class="section-block">
                     <h2 class="section-heading"><i class="fas fa-exclamation-triangle"></i> Report Incident to BPSO</h2>
                     <div class="report-notice">This form is for genuine community safety incidents. Reports must be truthful and made in good faith.</div>
                     <div id="reportAlert" style="display:none;"></div>
@@ -237,6 +261,7 @@ $nwActiveNav = 'report';
         </div>
     </div>
 
+    <script src="js/digital-bulletin.js"></script>
     <script>
         const NW_INCIDENT_TERMS_VERSION = <?php echo json_encode(getNwIncidentTermsVersion()); ?>;
         let photoDataUrl = null;
@@ -260,20 +285,35 @@ $nwActiveNav = 'report';
             }
         }
 
-        function showPortalSection(sectionId, updateHash) {
-            const reportSection = document.getElementById('reportSection');
-            const reportsSection = document.getElementById('reportsSection');
-            const targetId = sectionId === 'reportsSection' ? 'reportsSection' : 'reportSection';
+        function showPortalSection(sectionId, updateHash, openPostId) {
+            const allowed = ['bulletinSection', 'reportSection', 'reportsSection'];
+            const targetId = allowed.includes(sectionId) ? sectionId : 'bulletinSection';
+            const titles = {
+                bulletinSection: 'Digital Bulletin',
+                reportSection: 'Report Incident',
+                reportsSection: 'My Reports'
+            };
 
-            if (reportSection) reportSection.classList.toggle('is-active', targetId === 'reportSection');
-            if (reportsSection) reportsSection.classList.toggle('is-active', targetId === 'reportsSection');
+            ['bulletinSection', 'reportSection', 'reportsSection'].forEach((id) => {
+                const el = document.getElementById(id);
+                if (el) el.classList.toggle('is-active', id === targetId);
+            });
 
             document.querySelectorAll('.nav-submodule[data-section]').forEach((link) => {
                 link.classList.toggle('active', link.getAttribute('data-section') === targetId);
             });
 
+            const pageTitle = document.getElementById('pageTitle');
+            if (pageTitle) pageTitle.textContent = titles[targetId] || 'Neighborhood Watch Portal';
+
+            const contentArea = document.querySelector('.content-area');
+            const pageContent = document.querySelector('.page-content');
+            const isBulletin = targetId === 'bulletinSection';
+            if (contentArea) contentArea.classList.toggle('bulletin-fullscreen', isBulletin);
+            if (pageContent) pageContent.classList.toggle('bulletin-fullscreen', isBulletin);
+
             if (updateHash !== false) {
-                const nextHash = targetId === 'reportsSection' ? '#reportsSection' : '#reportSection';
+                const nextHash = '#' + targetId;
                 if (window.location.hash !== nextHash) {
                     history.replaceState(null, '', nextHash);
                 }
@@ -282,7 +322,16 @@ $nwActiveNav = 'report';
             if (targetId === 'reportsSection') {
                 loadReports();
             }
+            if (targetId === 'bulletinSection' && window.DigitalBulletin) {
+                DigitalBulletin.mount({
+                    root: '#nwBulletinRoot',
+                    audience: 'watcher',
+                    openPostId: parseInt(openPostId, 10) || 0
+                });
+            }
         }
+
+        window.showPortalSection = showPortalSection;
 
         function scrollToSection(sectionId) {
             showPortalSection(sectionId, true);
@@ -507,13 +556,14 @@ $nwActiveNav = 'report';
 
             window.addEventListener('hashchange', function() {
                 const hash = window.location.hash.replace('#', '');
-                showPortalSection(hash === 'reportsSection' ? 'reportsSection' : 'reportSection', false);
+                showPortalSection(hash || 'bulletinSection', false);
             });
 
             const initialHash = window.location.hash.replace('#', '');
-            showPortalSection(initialHash === 'reportsSection' ? 'reportsSection' : 'reportSection', false);
+            showPortalSection(initialHash || 'bulletinSection', false);
         });
     </script>
+    <script src="js/nw-notifications.js"></script>
     <script src="js/mobile-shell.js"></script>
 </body>
 </html>

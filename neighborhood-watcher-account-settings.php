@@ -27,11 +27,9 @@ $nwActiveNav = 'account';
         .sidebar.collapsed .logo-container img { height: 70px; width: 70px; }
         .user-name-display { color: rgba(255, 255, 255, 0.9); font-size: 0.95rem; font-weight: 500; text-align: center; padding: 0.5rem 1rem; word-break: break-word; max-width: 100%; }
         .sidebar.collapsed .user-name-display { opacity: 0; height: 0; padding: 0; overflow: hidden; font-size: 0; }
-        .sidebar.collapsed .member-status-chip { opacity: 0; height: 0; padding: 0; margin: 0; overflow: hidden; font-size: 0; }
-        .member-status-chip { display: inline-flex; align-items: center; gap: 0.4rem; margin-top: 0.35rem; padding: 0.35rem 0.75rem; border-radius: 999px; font-size: 0.8rem; font-weight: 600; background: rgba(16,185,129,0.2); color: #a7f3d0; }
         .sidebar-nav { padding: 0.5rem 0; overflow-y: auto; flex: 1; display: flex; flex-direction: column; min-height: 0; }
-        .nav-submodule { padding: 0.75rem 1.5rem; color: rgba(255, 255, 255, 0.75); text-decoration: none; display: flex; align-items: center; gap: 0.75rem; transition: all 0.2s ease; font-size: 0.85rem; position: relative; }
-        .nav-submodule:hover { background: rgba(255, 255, 255, 0.08); color: #fff; padding-left: 2rem; }
+        .nav-submodule { padding: 0.75rem 1.5rem !important; color: rgba(255, 255, 255, 0.75); text-decoration: none; display: flex; align-items: center; gap: 0.75rem; transition: all 0.2s ease; font-size: 0.84rem !important; position: relative; }
+        .nav-submodule:hover { background: rgba(255, 255, 255, 0.08); color: #fff; padding-left: 1.5rem !important; }
         .nav-submodule.active { background: rgba(76, 138, 137, 0.35); color: #fff; border-left: 3px solid var(--primary-color); font-weight: 600; }
         .nav-submodule-icon { width: 22px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
         .sidebar.collapsed .nav-submodule-text { opacity: 0; width: 0; overflow: hidden; display: none; }
@@ -89,7 +87,6 @@ $nwActiveNav = 'account';
                     <img src="images/tara.png" alt="Alertara Logo">
                 </a>
                 <div class="user-name-display" id="sidebarMemberName"><?php echo $memberName; ?></div>
-                <div class="member-status-chip"><i class="fas fa-user-shield"></i> Active Member</div>
             </div>
         </div>
         <nav class="sidebar-nav">

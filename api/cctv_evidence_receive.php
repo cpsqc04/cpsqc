@@ -1,11 +1,11 @@
 <?php
 
 /**
- * Reference inbound API for Group 1 — CCTV evidence packages.
- * Group 1 hosts an equivalent endpoint; AlertaraQC forwards evidence here when configured.
+ * Reference inbound API for Incident Reporting — CCTV evidence packages.
+ * Incident Reporting hosts an equivalent endpoint; AlertaraQC forwards evidence here when configured.
  *
  * POST JSON: see includes/cctv_forward.php buildCctvEvidencePayload()
- * Headers: X-API-Key or Authorization: Bearer {BLOTTER_API_KEY}
+ * Headers: X-API-Key or Authorization: Bearer {INCIDENT_REPORTING_API_KEY}
  *
  * Response:
  *   { "success": true, "evidence_reference_id": "EVD-2026-000001", "message": "CCTV evidence received." }
@@ -22,7 +22,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 require_once __DIR__ . '/../db.php';
 require_once __DIR__ . '/../includes/api_key_auth.php';
 
-requirePartnerApiKey('BLOTTER_API_KEY', 'CCTV Evidence');
+requirePartnerApiKey(partnerEnvKeyCandidates('incident-reporting'), 'CCTV Evidence');
 
 $input = json_decode(file_get_contents('php://input'), true);
 if (!is_array($input)) {

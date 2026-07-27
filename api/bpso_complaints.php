@@ -97,6 +97,18 @@ if ($method === 'POST' && $action === 'submit_resolution') {
             ]);
         }
 
+        require_once __DIR__ . '/notifications_schema.php';
+        $complaintLabel = (string) ($complaint['complaint_id'] ?? ('#' . $complaintDbId));
+        notifyAdminActorActivity(
+            $pdo,
+            'patrol',
+            $personnelName !== '' ? $personnelName : 'Patrol personnel',
+            $status === 'Resolved'
+                ? 'resolved community complaint ' . $complaintLabel . '.'
+                : 'updated progress on community complaint ' . $complaintLabel . '.',
+            'track-complaint.php'
+        );
+
         echo json_encode(['success' => true, 'message' => $status === 'Resolved' ? 'Complaint marked as resolved.' : 'Progress report saved.']);
     } catch (PDOException $e) {
         http_response_code(500);

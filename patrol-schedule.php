@@ -13,7 +13,7 @@ require_once __DIR__ . '/db.php';
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>Patrol Schedule - Alertara</title>
+    <title>Assign Patrol Schedule - Alertara</title>
     <link rel="icon" type="image/x-icon" href="images/favicon.ico">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="css/theme.css">
@@ -419,11 +419,7 @@ require_once __DIR__ . '/db.php';
             </div>
         </div>
         <nav class="sidebar-nav">
-            <!-- Dashboard Link -->
-            <a href="index.php" class="nav-module-header" data-tooltip="Dashboard" style="text-decoration: none; display: flex; align-items: center; justify-content: space-between; padding: 0.875rem 1.5rem; color: rgba(255, 255, 255, 0.9); cursor: pointer; transition: background-color 0.2s ease; font-weight: 500; user-select: none; gap: 0.75rem; <?php echo basename($_SERVER['PHP_SELF']) == 'index.php' ? 'background: rgba(76, 138, 137, 0.25); border-left: 3px solid #4c8a89;' : ''; ?>">
-                <span class="nav-module-icon"><i class="fas fa-home"></i></span>
-                <span class="nav-module-header-text">Dashboard</span>
-            </a>
+            <?php require __DIR__ . '/includes/admin_nav_dashboard.php'; ?>
             
             <!-- User Management Module (Admin Only) -->
             <?php if (isAdminUser()): ?>
@@ -539,7 +535,7 @@ require_once __DIR__ . '/db.php';
                 <button class="content-burger-btn" onclick="toggleSidebar()" aria-label="Toggle sidebar">
                     <span></span>
                 </button>
-                <h1 class="page-title">Patrol Schedule</h1>
+                <h1 class="page-title">Assign Patrol Schedule</h1>
             </div>
             <div class="user-info">
                 <div class="datetime-display">
@@ -758,7 +754,7 @@ require_once __DIR__ . '/db.php';
 
         function buildHotspotNotes(alert) {
             const parts = [
-                'Group 5 high-risk alert — recommended extra patrol.',
+                'Crime Analytics high-risk alert — recommended extra patrol.',
                 alert.rule_name ? `Rule: ${alert.rule_name}` : '',
                 alert.severity ? `Severity: ${alert.severity}` : '',
                 alert.condition_text ? `Condition: ${alert.condition_text}` : '',
@@ -784,7 +780,7 @@ require_once __DIR__ . '/db.php';
                 const rows = result.data || [];
 
                 if (rows.length === 0) {
-                    listEl.innerHTML = '<div class="risk-alerts-empty">No active high-risk alerts from Group 5 right now.</div>';
+                    listEl.innerHTML = '<div class="risk-alerts-empty">No active high-risk alerts right now.</div>';
                     return;
                 }
 
