@@ -808,12 +808,11 @@ if ($pdo instanceof PDO) {
                             <div class="bb-form-group">
                                 <label for="bbAudience">Target Audience *</label>
                                 <select id="bbAudience" required>
-                                    <option value="all">All (Patrol, Watcher &amp; Resident)</option>
+                                    <option value="all">All</option>
                                     <option value="patrol">Patrol</option>
                                     <option value="watcher">Watcher</option>
-                                    <option value="resident">Resident</option>
                                 </select>
-                                <div class="hint">Choose All to publish this announcement to Patrol, Watcher, and Resident portals.</div>
+                                <div class="hint">Choose All to publish this announcement to Patrol and Watcher portals.</div>
                             </div>
                             <div class="bb-form-group">
                                 <label for="bbMedia">Media &amp; Images</label>
@@ -865,7 +864,6 @@ if ($pdo instanceof PDO) {
                                 <option value="all">Target: All</option>
                                 <option value="patrol">Patrol</option>
                                 <option value="watcher">Watcher</option>
-                                <option value="resident">Resident</option>
                             </select>
                             <select id="bbFilterStatus" onchange="loadBulletinPosts()">
                                 <option value="all">All statuses</option>
@@ -1048,7 +1046,7 @@ if ($pdo instanceof PDO) {
             document.getElementById('bbPostId').value = post.id;
             document.getElementById('bbTitle').value = post.title || '';
             document.getElementById('bbBody').value = post.body || '';
-            document.getElementById('bbAudience').value = post.target_audience || 'all';
+            document.getElementById('bbAudience').value = (post.target_audience === 'resident' ? 'all' : (post.target_audience || 'all'));
             document.getElementById('bbPublishAt').value = toLocalInputValue(post.publish_at);
             document.getElementById('bbExpiresAt').value = toLocalInputValue(post.expires_at);
             document.getElementById('bbPinned').checked = !!post.is_pinned;
@@ -1113,7 +1111,7 @@ if ($pdo instanceof PDO) {
                 if (!json.success) throw new Error(json.message || 'Save failed');
                 const savedAudience = json.data?.target_audience || audienceValue;
                 const audienceLabel = savedAudience === 'all'
-                    ? 'All (Patrol, Watcher & Resident)'
+                    ? 'All'
                     : savedAudience;
                 showBbAlert((json.message || 'Saved.') + ' Audience: ' + audienceLabel, 'success');
                 resetBbForm();

@@ -215,7 +215,7 @@ try {
         $title = trim((string) ($input['title'] ?? ''));
         $body = trim((string) ($input['body'] ?? ''));
         $rawAudience = $input['target_audience'] ?? $_POST['target_audience'] ?? 'all';
-        $audience = bulletinNormalizeAudience(is_string($rawAudience) ? $rawAudience : 'all');
+        $audience = bulletinNormalizeAudience(is_string($rawAudience) ? $rawAudience : 'all', false);
         $publishAt = bulletinParseDateTime($input['publish_at'] ?? null);
         $expiresAt = bulletinParseDateTime($input['expires_at'] ?? null);
         $isPinned = !empty($input['is_pinned']) && ($input['is_pinned'] === true || $input['is_pinned'] === '1' || $input['is_pinned'] === 1 || $input['is_pinned'] === 'true');

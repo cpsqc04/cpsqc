@@ -10,17 +10,6 @@ $autoOpenLogin = false;
     <link rel="icon" type="image/x-icon" href="images/favicon.ico">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="css/portal-landing.css?v=20260721b">
-    <link rel="stylesheet" href="css/digital-bulletin.css">
-    <style>
-        #bulletin .digital-bulletin-carousel,
-        #bulletin .digital-bulletin-empty {
-            min-height: 420px;
-            max-height: 560px;
-        }
-        #bulletin .digital-bulletin-carousel .db-slide {
-            padding: 1rem 3.5rem;
-        }
-    </style>
     <link rel="stylesheet" href="css/mobile-responsive.css">
 </head>
 <body>
@@ -33,7 +22,6 @@ $autoOpenLogin = false;
         </a>
         <button class="nav-toggle" id="navToggle" aria-label="Menu"><i class="fas fa-bars"></i></button>
         <ul class="nav-links" id="navLinks">
-            <li><a href="#bulletin">Digital Bulletin</a></li>
             <li><a href="#about">About</a></li>
             <li><a href="#complaint">Submit Complaint</a></li>
             <li><a href="#tip">Send Tip</a></li>
@@ -94,17 +82,6 @@ $autoOpenLogin = false;
                         Every submission helps strengthen awareness and safety across Barangay San Agustin.
                     </li>
                 </ul>
-            </div>
-        </section>
-
-        <section class="section" id="bulletin">
-            <div class="section-inner">
-                <p class="section-label reveal">Community updates</p>
-                <h2 class="reveal reveal-delay-1">Digital Bulletin</h2>
-                <p class="sub reveal reveal-delay-2">Announcements shared with residents of Barangay San Agustin.</p>
-                <div id="residentBulletinRoot" class="reveal reveal-delay-3" style="margin-top:1.25rem;">
-                    <div data-db-carousel></div>
-                </div>
             </div>
         </section>
 
@@ -307,15 +284,7 @@ $autoOpenLogin = false;
     </div>
 
     <script src="js/form-contact-validation.js"></script>
-    <script src="js/digital-bulletin.js"></script>
     <script src="js/resident-portal.js"></script>
-    <script>
-        document.addEventListener('DOMContentLoaded', function () {
-            if (window.DigitalBulletin) {
-                DigitalBulletin.mount({ root: '#residentBulletinRoot', audience: 'resident' });
-            }
-        });
-    </script>
 
 <?php
 $forgotApiEndpoint = 'api/forgot-password.php';

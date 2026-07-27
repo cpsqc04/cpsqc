@@ -80,10 +80,13 @@ function bulletinDecodeJsonList(?string $value): array
     })) : [];
 }
 
-function bulletinNormalizeAudience(?string $audience): string
+function bulletinNormalizeAudience(?string $audience, bool $allowResident = true): string
 {
     $audience = strtolower(trim((string) $audience));
-    $allowed = ['all', 'patrol', 'watcher', 'resident'];
+    $allowed = ['all', 'patrol', 'watcher'];
+    if ($allowResident) {
+        $allowed[] = 'resident';
+    }
     return in_array($audience, $allowed, true) ? $audience : 'all';
 }
 
