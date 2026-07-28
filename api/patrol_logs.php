@@ -6,6 +6,7 @@ require_once __DIR__ . '/../db.php';
 require_once __DIR__ . '/patrol_logs_schema.php';
 require_once __DIR__ . '/../includes/bpso_auth.php';
 require_once __DIR__ . '/../includes/patrol_shifts.php';
+require_once __DIR__ . '/../includes/patrol_availability.php';
 
 function validatePatrolDocumentationPhoto(?string $photoData, bool $required = true): ?string
 {
@@ -217,6 +218,8 @@ if ($method === 'POST' && $action === 'submit_report') {
                 ':id' => $scheduleId,
                 ':patrol_id' => $patrolId,
             ]);
+
+            refreshPatrolAvailabilityStatus($pdo, $patrolId);
 
             require_once __DIR__ . '/notifications_schema.php';
             notifyAdminActorActivity(

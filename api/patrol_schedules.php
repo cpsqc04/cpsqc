@@ -8,6 +8,13 @@ require_once __DIR__ . '/bpso_attendance_schema.php';
 require_once __DIR__ . '/notifications_schema.php';
 require_once __DIR__ . '/../includes/bpso_auth.php';
 require_once __DIR__ . '/../includes/patrol_shifts.php';
+require_once __DIR__ . '/../includes/patrol_availability.php';
+require_once __DIR__ . '/../includes/bpso_credentials.php';
+
+$autoloadPath = __DIR__ . '/../vendor/autoload.php';
+if (file_exists($autoloadPath)) {
+    require_once $autoloadPath;
+}
 
 try {
     ensurePatrolSchedulesTable($pdo);
@@ -75,7 +82,7 @@ if ($method === 'POST') {
         }
 
         try {
-            $personnelStmt = $pdo->prepare('SELECT personnel_name, duty_shift FROM patrols WHERE id = :id');
+            $personnelStmt = $pdo->prepare('SELECT personnel_name, duty_shift, status, email FROM patrols WHERE id = :id');
             $personnelStmt->execute([':id' => $patrolId]);
             $personnel = $personnelStmt->fetch(PDO::FETCH_ASSOC);
             if (!$personnel) {
@@ -87,6 +94,17 @@ if ($method === 'POST') {
             if (!isPatrolAtHall($pdo, $patrolId)) {
                 http_response_code(400);
                 echo json_encode(['success' => false, 'message' => 'Selected personnel is not at the barangay hall. Only personnel who have timed in today can be assigned to patrol.']);
+                exit;
+            }
+
+            $availability = resolvePatrolAvailabilityStatus(
+                $pdo,
+                $patrolId,
+                isset($personnel['status']) ? (string) $personnel['status'] : null
+            );
+            if ($availability !== 'Available') {
+                http_response_code(400);
+                echo json_encode(['success' => false, 'message' => 'Selected personnel is currently "' . $availability . '". Only Available personnel can be assigned.']);
                 exit;
             }
 
@@ -144,7 +162,7 @@ if ($method === 'POST') {
                 $patrolId,
                 'patrol_schedule',
                 'New Patrol Assignment',
-                'You have been assigned for patrolling on ' . $scheduleDate . ' (' . $shift . ') — ' . $scheduleLabel . '.',
+                'You have been assigned for patrolling on ' . $scheduleDate . ' (' . $shift . ') — ' . $scheduleLabel . '. Check My Schedule for details.',
                 'tab:schedule:' . $id
             );
             createPatrolNotification(
@@ -155,6 +173,19 @@ if ($method === 'POST') {
                 'Please submit at least one patrol report for your shift on ' . $scheduleDate . ' (' . $shift . ') — ' . $scheduleLabel . '.',
                 'tab:report:' . $id
             );
+
+            $personnelEmail = trim((string) ($personnel['email'] ?? ''));
+            if ($personnelEmail !== '') {
+                sendBpsoAssignmentEmail(
+                    $personnelEmail,
+                    (string) $personnel['personnel_name'],
+                    $scheduleDate,
+                    $shift,
+                    $scheduleLabel
+                );
+            }
+
+            refreshPatrolAvailabilityStatus($pdo, $patrolId);
 
             echo json_encode([
                 'success' => true,
@@ -229,6 +260,8 @@ if ($method === 'POST') {
                 ':schedule_id' => $scheduleId,
                 ':patrol_id' => $patrolId,
             ]);
+
+            setPatrolAvailabilityStatus($pdo, $patrolId, 'On Patrol');
 
             echo json_encode([
                 'success' => true,

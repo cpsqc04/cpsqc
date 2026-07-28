@@ -136,7 +136,7 @@ if ($action === 'reset') {
 
     try {
         $passwordHash = password_hash($newPassword, PASSWORD_DEFAULT);
-        $stmt = $pdo->prepare('UPDATE patrols SET password_hash = :password_hash WHERE id = :id');
+        $stmt = $pdo->prepare('UPDATE patrols SET password_hash = :password_hash, must_change_password = 0 WHERE id = :id');
         $stmt->execute([
             ':password_hash' => $passwordHash,
             ':id' => (int) $resetData['patrol_id'],

@@ -234,6 +234,12 @@ $autoOpenLogin = false;
                         <option value="Vandalism">Vandalism</option>
                         <option value="Trespassing">Trespassing</option>
                         <option value="Safety">Safety Concern</option>
+                        <option value="Robbery">Robbery</option>
+                        <option value="Murder">Murder</option>
+                        <option value="Rape">Rape</option>
+                        <option value="Illegal Drugs">Illegal Drugs</option>
+                        <option value="Carnapping/Motornapping">Carnapping/Motornapping</option>
+                        <option value="Kidnapping">Kidnapping</option>
                         <option value="Other">Other</option>
                     </select>
                 </div>

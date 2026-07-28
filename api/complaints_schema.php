@@ -108,6 +108,45 @@ function formatComplaintTypeLabel(array $row): string
     return $type !== '' ? $type : 'Unknown';
 }
 
+/**
+ * Complaint types that may be forwarded to Digital Blotter.
+ *
+ * @return list<string>
+ */
+function blotterForwardableComplaintTypes(): array
+{
+    return [
+        'Robbery',
+        'Murder',
+        'Rape',
+        'Illegal Drugs',
+        'Carnapping/Motornapping',
+        'Kidnapping',
+    ];
+}
+
+function isComplaintTypeForwardableToBlotter(?string $complaintType): bool
+{
+    $type = trim((string) $complaintType);
+    if ($type === '') {
+        return false;
+    }
+
+    foreach (blotterForwardableComplaintTypes() as $allowed) {
+        if (strcasecmp($type, $allowed) === 0) {
+            return true;
+        }
+    }
+
+    // Accept close variants for carnapping/motornapping wording
+    $normalized = strtolower(preg_replace('/[\s_\-]+/', '', $type) ?? '');
+    if (in_array($normalized, ['carnapping', 'motornapping', 'carnapping/motornapping', 'carnappingmotornapping'], true)) {
+        return true;
+    }
+
+    return false;
+}
+
 function normalizeComplaintTypeInput(string $complaintType, string $complaintTypeOther): array
 {
     $complaintType = trim($complaintType);

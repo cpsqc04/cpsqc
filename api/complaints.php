@@ -207,6 +207,8 @@ if ($method === 'POST') {
                 ':status' => 'Assigned',
                 ':id' => $patrolId,
             ]);
+            require_once __DIR__ . '/../includes/patrol_availability.php';
+            refreshPatrolAvailabilityStatus($pdo, $patrolId);
 
             $complaintIdLabel = (string) ($complaint['complaint_id'] ?? '');
             $complaintTypeLabel = (string) ($complaint['complaint_type'] ?? '');
@@ -264,6 +266,15 @@ if ($method === 'POST') {
                         'forwarded_at' => $complaint['forwarded_at'],
                         'blotter_reference_id' => $complaint['blotter_reference_id'] ?? '',
                     ],
+                ]);
+                exit;
+            }
+
+            if (!isComplaintTypeForwardableToBlotter($complaint['complaint_type'] ?? '')) {
+                http_response_code(400);
+                echo json_encode([
+                    'success' => false,
+                    'message' => 'Only Robbery, Murder, Rape, Illegal Drugs, Carnapping/Motornapping, and Kidnapping complaints can be forwarded to the Digital Blotter.',
                 ]);
                 exit;
             }
@@ -365,10 +376,8 @@ if ($method === 'POST') {
             ]);
 
             if ($status === 'Resolved' && !empty($current['assigned_patrol_id'])) {
-                $pdo->prepare('UPDATE patrols SET status = :status WHERE id = :id')->execute([
-                    ':status' => 'Available',
-                    ':id' => (int) $current['assigned_patrol_id'],
-                ]);
+                require_once __DIR__ . '/../includes/patrol_availability.php';
+                refreshPatrolAvailabilityStatus($pdo, (int) $current['assigned_patrol_id']);
             }
 
             echo json_encode(['success' => true, 'message' => 'Complaint updated successfully.']);

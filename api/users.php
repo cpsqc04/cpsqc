@@ -345,7 +345,10 @@ if ($method === 'GET') {
             $status = trim($data['status'] ?? '');
 
             if ($parsed['type'] === 'bpso') {
-                $allowed = ['Available', 'Assigned', 'Off Duty'];
+                $allowed = ['Available', 'Assigned', 'Assigned to Simulation', 'On Patrol', 'Unavailable'];
+                if ($status === 'Off Duty' || $status === 'Off-Duty') {
+                    $status = 'Unavailable';
+                }
                 if (!in_array($status, $allowed, true)) {
                     ob_clean();
                     http_response_code(400);

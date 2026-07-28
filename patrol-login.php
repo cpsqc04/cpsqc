@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/includes/bpso_auth.php';
 require_once __DIR__ . '/db.php';
+require_once __DIR__ . '/includes/bpso_credentials.php';
 
 $autoloadPath = __DIR__ . DIRECTORY_SEPARATOR . 'vendor' . DIRECTORY_SEPARATOR . 'autoload.php';
 if (file_exists($autoloadPath)) {
@@ -10,17 +11,26 @@ require_once __DIR__ . '/includes/login_otp.php';
 
 bpsoSessionStart();
 
-if (isBpsoLoggedIn()) {
-    header('Location: patrol-attendance.php');
-    exit;
+if ($pdo instanceof PDO) {
+    ensureBpsoMustChangePasswordColumn($pdo);
 }
 
 $error = null;
 $otpPrompt = null;
 $showOtpForm = false;
+$showSetPasswordModal = false;
 $otpEmailMasked = null;
 $otpExpiresAtText = null;
 $otpResendCooldown = 0;
+
+if (isBpsoLoggedIn() && !bpsoMustChangePassword()) {
+    header('Location: patrol-attendance.php');
+    exit;
+}
+
+if (isBpsoLoggedIn() && bpsoMustChangePassword() && $_SERVER['REQUEST_METHOD'] !== 'POST') {
+    $showSetPasswordModal = true;
+}
 
 if (isset($_GET['cancel_otp'])) {
     unset($_SESSION['pending_bpso_login']);
@@ -133,11 +143,51 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_SESSION['bpso_personnel_name'] = $pendingLogin['personnel_name'];
             $_SESSION['bpso_personnel_code'] = $pendingLogin['personnel_code'];
             $_SESSION['bpso_email'] = $pendingLogin['email'];
+            $_SESSION['bpso_must_change_password'] = !empty($pendingLogin['must_change_password']);
             unset($_SESSION['pending_bpso_login']);
-            header('Location: patrol-attendance.php');
-            exit;
+
+            if (!empty($pendingLogin['must_change_password'])) {
+                $showSetPasswordModal = true;
+                $showOtpForm = false;
+                $otpPrompt = null;
+            } else {
+                header('Location: patrol-attendance.php');
+                exit;
+            }
         }
-    } elseif (!isset($_POST['resend_login_otp']) && $error === null) {
+    } elseif (isset($_POST['set_bpso_password']) && $error === null) {
+        if (!isBpsoLoggedIn() || !bpsoMustChangePassword()) {
+            $error = 'Please sign in again to set your password.';
+        } else {
+            $newPassword = (string) ($_POST['new_password'] ?? '');
+            $confirmPassword = (string) ($_POST['confirm_password'] ?? '');
+            if ($newPassword === '' || $confirmPassword === '') {
+                $error = 'Please fill in all password fields.';
+                $showSetPasswordModal = true;
+            } elseif ($newPassword !== $confirmPassword) {
+                $error = 'Passwords do not match.';
+                $showSetPasswordModal = true;
+            } elseif (!isValidBpsoAccountPassword($newPassword)) {
+                $error = bpsoAccountPasswordMessage();
+                $showSetPasswordModal = true;
+            } else {
+                try {
+                    $passwordHash = password_hash($newPassword, PASSWORD_DEFAULT);
+                    $update = $pdo->prepare('UPDATE patrols SET password_hash = :password_hash, must_change_password = 0 WHERE id = :id');
+                    $update->execute([
+                        ':password_hash' => $passwordHash,
+                        ':id' => getBpsoPatrolId(),
+                    ]);
+                    $_SESSION['bpso_must_change_password'] = false;
+                    header('Location: patrol-attendance.php?password_set=1');
+                    exit;
+                } catch (PDOException $e) {
+                    $error = 'System error. Please try again later.';
+                    $showSetPasswordModal = true;
+                }
+            }
+        }
+    } elseif (!isset($_POST['resend_login_otp']) && !isset($_POST['set_bpso_password']) && $error === null) {
         $email = trim($_POST['email'] ?? '');
         $password = $_POST['password'] ?? '';
 
@@ -148,7 +198,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $error = 'Please enter both email and password.';
         } else {
             try {
-                $stmt = $pdo->prepare('SELECT id, personnel_name, bpso_personnel_id, email, password_hash FROM patrols WHERE email = :email LIMIT 1');
+                $stmt = $pdo->prepare('SELECT id, personnel_name, bpso_personnel_id, email, password_hash, must_change_password FROM patrols WHERE email = :email LIMIT 1');
                 $stmt->execute([':email' => $email]);
                 $personnel = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -165,6 +215,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         'personnel_name' => $personnel['personnel_name'],
                         'personnel_code' => $personnel['bpso_personnel_id'],
                         'email' => $personnel['email'],
+                        'must_change_password' => (int) ($personnel['must_change_password'] ?? 0),
                         'otp' => $otp,
                         'expires_at' => $expiresAt,
                         'attempts' => 0,
@@ -200,7 +251,8 @@ if ($showOtpForm && empty($otpPrompt) && isset($_SESSION['pending_bpso_login']))
     $otpResendCooldown = $otpView['otp_resend_cooldown'];
 }
 
-$autoOpenLogin = !empty($showOtpForm) || ($error !== null);
+$autoOpenLogin = !empty($showOtpForm) || ($error !== null && empty($showSetPasswordModal));
+$autoOpenSetPassword = !empty($showSetPasswordModal);
 ?>
 <!doctype html>
 <html lang="en">
@@ -345,13 +397,13 @@ $autoOpenLogin = !empty($showOtpForm) || ($error !== null);
         </div>
     </footer>
 
-    <div class="modal-overlay" id="loginModal" role="dialog" aria-modal="true" aria-labelledby="login-title">
+    <div class="modal-overlay<?php echo !empty($autoOpenLogin) ? ' open' : ''; ?>" id="loginModal" role="dialog" aria-modal="true" aria-labelledby="login-title">
         <div class="modal-panel">
             <div class="modal-header">
                 <h2 id="login-title">Login</h2>
                 <button type="button" class="modal-close" onclick="closeLoginModal()" aria-label="Close">&times;</button>
             </div>
-            <?php if ($error !== null): ?>
+            <?php if ($error !== null && empty($showSetPasswordModal)): ?>
                 <div class="alert alert-error"><?php echo htmlspecialchars($error); ?></div>
             <?php endif; ?>
             <?php if (!empty($otpPrompt)): ?>
@@ -382,6 +434,32 @@ $autoOpenLogin = !empty($showOtpForm) || ($error !== null);
                     </div>
                 </form>
             <?php endif; ?>
+        </div>
+    </div>
+
+    <div class="modal-overlay<?php echo !empty($autoOpenSetPassword) ? ' open' : ''; ?>" id="setPasswordModal" role="dialog" aria-modal="true" aria-labelledby="set-password-title" style="z-index:3200;">
+        <div class="modal-panel">
+            <div class="modal-header">
+                <h2 id="set-password-title">Set Your Password</h2>
+            </div>
+            <?php if ($error !== null && !empty($showSetPasswordModal)): ?>
+                <div class="alert alert-error"><?php echo htmlspecialchars($error); ?></div>
+            <?php endif; ?>
+            <p class="register-hint">Create a new password before accessing the Patrol Portal. It must be at least 8 characters and include an uppercase letter, a lowercase letter, and a number or special character (e.g. @, #, _).</p>
+            <form method="POST" action="">
+                <input type="hidden" name="set_bpso_password" value="1">
+                <div class="field">
+                    <label for="new_password">New Password *</label>
+                    <input id="new_password" name="new_password" type="password" minlength="8" autocomplete="new-password" required>
+                </div>
+                <div class="field">
+                    <label for="confirm_password">Confirm Password *</label>
+                    <input id="confirm_password" name="confirm_password" type="password" minlength="8" autocomplete="new-password" required>
+                </div>
+                <div class="button-group">
+                    <button class="btn" type="submit" style="width:100%;">Save Password</button>
+                </div>
+            </form>
         </div>
     </div>
 

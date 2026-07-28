@@ -8,6 +8,13 @@ require_once __DIR__ . '/patrol_logs_schema.php';
 require_once __DIR__ . '/notifications_schema.php';
 require_once __DIR__ . '/../includes/contact_validation.php';
 require_once __DIR__ . '/../includes/patrol_shifts.php';
+require_once __DIR__ . '/../includes/patrol_availability.php';
+require_once __DIR__ . '/../includes/bpso_credentials.php';
+
+$autoloadPath = __DIR__ . '/../vendor/autoload.php';
+if (file_exists($autoloadPath)) {
+    require_once $autoloadPath;
+}
 
 /**
  * Generate the next BPSO personnel ID in PER-XX format.
@@ -54,6 +61,7 @@ function ensurePatrolsTable(PDO $pdo): void
             status VARCHAR(50) NOT NULL DEFAULT 'Available',
             email VARCHAR(255) NULL,
             password_hash VARCHAR(255) NULL,
+            must_change_password TINYINT(1) NOT NULL DEFAULT 0,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
         return;
@@ -94,6 +102,9 @@ function ensurePatrolsTable(PDO $pdo): void
     }
     if (!isset($columns['password_hash'])) {
         $pdo->exec('ALTER TABLE patrols ADD COLUMN password_hash VARCHAR(255) NULL AFTER email');
+    }
+    if (!isset($columns['must_change_password'])) {
+        $pdo->exec('ALTER TABLE patrols ADD COLUMN must_change_password TINYINT(1) NOT NULL DEFAULT 0 AFTER password_hash');
     }
     if (!isset($columns['created_at'])) {
         $pdo->exec('ALTER TABLE patrols ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP');
@@ -137,7 +148,20 @@ if ($method === 'GET') {
         }
 
         $stmt = $pdo->query('SELECT id, bpso_personnel_id, personnel_name, contact_number, email, schedule, duty_shift, status, created_at FROM patrols ORDER BY id DESC');
-        $patrols = $stmt->fetchAll();
+        $patrols = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        foreach ($patrols as $index => $patrol) {
+            $resolved = resolvePatrolAvailabilityStatus(
+                $pdo,
+                (int) ($patrol['id'] ?? 0),
+                (string) ($patrol['status'] ?? 'Available')
+            );
+            if ($resolved !== normalizePatrolAvailabilityStatus((string) ($patrol['status'] ?? ''))) {
+                setPatrolAvailabilityStatus($pdo, (int) $patrol['id'], $resolved);
+            }
+            $patrols[$index]['status'] = $resolved;
+            $patrols[$index]['status_class'] = patrolAvailabilityStatusCssClass($resolved);
+        }
 
         echo json_encode([
             'success' => true,
@@ -158,12 +182,16 @@ if ($method === 'POST') {
         $personnelName = trim($input['personnel_name'] ?? '');
         $contactNumber = trim($input['contact_number'] ?? '');
         $email = trim($input['email'] ?? '');
-        $password = $input['password'] ?? '';
         $schedule = trim($input['schedule'] ?? '');
         $dutyShift = trim($input['duty_shift'] ?? $schedule);
-        $status = trim($input['status'] ?? 'Available');
+        $status = normalizePatrolAvailabilityStatus(trim($input['status'] ?? 'Available'));
+        if (!isValidPatrolAvailabilityStatus($status)) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'message' => 'Invalid personnel status.']);
+            exit;
+        }
 
-        if ($personnelName === '' || $contactNumber === '' || $email === '' || $password === '' || !isValidPatrolShift($dutyShift)) {
+        if ($personnelName === '' || $contactNumber === '' || $email === '' || !isValidPatrolShift($dutyShift)) {
             http_response_code(400);
             echo json_encode(['success' => false, 'message' => 'Missing required fields. Select a duty shift (Day Shift or Night Shift).']);
             exit;
@@ -183,13 +211,8 @@ if ($method === 'POST') {
             exit;
         }
 
-        if (!preg_match('/[A-Z]/', $password) || !preg_match('/[0-9!@#$%^&*(),.?":{}|<>]/', $password)) {
-            http_response_code(400);
-            echo json_encode(['success' => false, 'message' => 'Password must contain at least one capital letter and one number or special character.']);
-            exit;
-        }
-
-        $passwordHash = password_hash($password, PASSWORD_DEFAULT);
+        $tempPassword = generateBpsoTempPassword();
+        $passwordHash = password_hash($tempPassword, PASSWORD_DEFAULT);
 
         try {
             $emailCheck = $pdo->prepare('SELECT COUNT(*) FROM patrols WHERE email = :email');
@@ -201,7 +224,7 @@ if ($method === 'POST') {
             }
 
             $personnelId = generateNextBpsoPersonnelId($pdo);
-            $stmt = $pdo->prepare('INSERT INTO patrols (bpso_personnel_id, personnel_name, contact_number, email, password_hash, schedule, duty_shift, status) VALUES (:bpso_personnel_id, :personnel_name, :contact_number, :email, :password_hash, :schedule, :duty_shift, :status)');
+            $stmt = $pdo->prepare('INSERT INTO patrols (bpso_personnel_id, personnel_name, contact_number, email, password_hash, must_change_password, schedule, duty_shift, status) VALUES (:bpso_personnel_id, :personnel_name, :contact_number, :email, :password_hash, 1, :schedule, :duty_shift, :status)');
 
             $inserted = false;
             for ($attempt = 0; $attempt < 5; $attempt++) {
@@ -233,7 +256,25 @@ if ($method === 'POST') {
                 exit;
             }
 
-            $id = (int)$pdo->lastInsertId();
+            $id = (int) $pdo->lastInsertId();
+
+            $mailResult = sendBpsoWelcomeCredentialsEmail(
+                $email,
+                $personnelName,
+                $personnelId,
+                $tempPassword
+            );
+
+            if (empty($mailResult['success'])) {
+                // Roll back account if credentials email cannot be delivered
+                $pdo->prepare('DELETE FROM patrols WHERE id = :id')->execute([':id' => $id]);
+                http_response_code(500);
+                echo json_encode([
+                    'success' => false,
+                    'message' => 'Personnel was not saved because the credentials email failed to send. ' . ($mailResult['error'] ?? 'Please check mail settings and try again.'),
+                ]);
+                exit;
+            }
 
             createPatrolNotification(
                 $pdo,
@@ -246,6 +287,7 @@ if ($method === 'POST') {
 
             echo json_encode([
                 'success' => true,
+                'message' => 'BPSO personnel added. Portal URL and temporary password were sent to ' . $email . '.',
                 'data' => [
                     'id' => $id,
                     'bpso_personnel_id' => $personnelId,
@@ -255,6 +297,7 @@ if ($method === 'POST') {
                     'schedule' => $dutyShift,
                     'duty_shift' => $dutyShift,
                     'status' => $status,
+                    'credentials_emailed' => true,
                 ],
             ]);
         } catch (PDOException $e) {
@@ -277,9 +320,9 @@ if ($method === 'POST') {
         $password = $input['password'] ?? '';
         $schedule = trim($input['schedule'] ?? '');
         $dutyShift = trim($input['duty_shift'] ?? $schedule);
-        $status = trim($input['status'] ?? '');
+        $status = normalizePatrolAvailabilityStatus(trim($input['status'] ?? ''));
 
-        if ($id <= 0 || $personnelId === '' || $personnelName === '' || $contactNumber === '' || $email === '' || !isValidPatrolShift($dutyShift) || $status === '') {
+        if ($id <= 0 || $personnelId === '' || $personnelName === '' || $contactNumber === '' || $email === '' || !isValidPatrolShift($dutyShift) || $status === '' || !isValidPatrolAvailabilityStatus($status)) {
             http_response_code(400);
             echo json_encode(['success' => false, 'message' => 'Missing required fields. Select a duty shift (Day Shift or Night Shift).']);
             exit;

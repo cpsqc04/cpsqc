@@ -161,8 +161,10 @@ $patrolNavActive = 'patrol-request';
         .status-rejected { background: #f8d7da; color: #842029; }
         .status-cancelled { background: #e9ecef; color: #6c757d; }
         .action-buttons { display: flex; gap: 0.5rem; flex-wrap: wrap; }
-        .btn-view, .btn-manage, .btn-link { padding: 0.5rem 1rem; border: none; border-radius: 6px; font-size: 0.85rem; cursor: pointer; color: #fff; background: var(--primary-color); text-decoration: none; display: inline-flex; align-items: center; }
+        .btn-view, .btn-manage, .btn-link, .btn-assign, .btn-decline { padding: 0.5rem 1rem; border: none; border-radius: 6px; font-size: 0.85rem; cursor: pointer; color: #fff; background: var(--primary-color); text-decoration: none; display: inline-flex; align-items: center; }
         .btn-manage { background: #ff9800; }
+        .btn-assign { background: #0f766e; }
+        .btn-decline { background: #b91c1c; }
         .btn-link { background: #6366f1; }
         .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 2000; align-items: center; justify-content: center; }
         .modal.active { display: flex; }
@@ -392,44 +394,10 @@ $patrolNavActive = 'patrol-request';
                 <button class="close-modal" onclick="closeViewModal()">&times;</button>
             </div>
             <div id="viewDetails"></div>
-        </div>
-    </div>
-
-    <div id="manageModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2>Manage Patrol Request</h2>
-                <button class="close-modal" onclick="closeManageModal()">&times;</button>
+            <div class="form-actions" id="viewRequestActions" style="display:none;">
+                <button type="button" class="btn-decline" id="declineRequestBtn" onclick="declineRequest()">Decline</button>
+                <button type="button" class="btn-assign" id="assignPersonnelBtn" onclick="assignPersonnelFromRequest()">Assign Personnel</button>
             </div>
-            <p id="manageRequestRef" style="margin:0 0 1rem;font-weight:600;color:var(--tertiary-color);"></p>
-            <form id="manageForm" onsubmit="saveManage(event)">
-                <input type="hidden" id="manageId">
-                <div class="form-group">
-                    <label for="manageStatus">Status *</label>
-                    <select id="manageStatus" required>
-                        <option value="Pending">Pending</option>
-                        <option value="Under Review">Under Review</option>
-                        <option value="Approved">Approved</option>
-                        <option value="Scheduled">Scheduled</option>
-                        <option value="Rejected">Rejected</option>
-                        <option value="Cancelled">Cancelled</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label for="manageAssignedPatrols">Assign BPSO Personnel</label>
-                    <select id="manageAssignedPatrols" multiple size="8"></select>
-                    <small>All BPSO personnel are listed for assignment.</small>
-                    <small id="managePatrolsNeededHint"></small>
-                </div>
-                <div class="form-group">
-                    <label for="manageReviewNotes">Review Notes (internal)</label>
-                    <textarea id="manageReviewNotes" rows="3"></textarea>
-                </div>
-                <div class="form-actions">
-                    <button type="button" class="btn-cancel" onclick="closeManageModal()">Cancel</button>
-                    <button type="submit" class="btn-save">Save Changes</button>
-                </div>
-            </form>
         </div>
     </div>
 
@@ -448,6 +416,7 @@ $patrolNavActive = 'patrol-request';
 
         let requestData = {};
         let allRequests = [];
+        let currentViewRequestId = null;
 
         function groupLabel(item) {
             return item.source_group_label || item.source_group || '—';
@@ -478,56 +447,6 @@ $patrolNavActive = 'patrol-request';
             }).join(', ');
         }
 
-        function updatePatrolSelectionHint(patrolsNeeded) {
-            const select = document.getElementById('manageAssignedPatrols');
-            const hint = document.getElementById('managePatrolsNeededHint');
-            if (!select || !hint) return;
-            const selectedCount = Array.from(select.selectedOptions).length;
-            hint.textContent = 'Patrols needed: ' + patrolsNeeded + ' | Selected: ' + selectedCount;
-        }
-
-        async function loadAvailablePersonnel(selectedPatrolIds, patrolsNeeded) {
-            const select = document.getElementById('manageAssignedPatrols');
-            if (!select) return;
-
-            const selectedSet = new Set((selectedPatrolIds || []).map(function(id) { return String(id); }));
-            select.innerHTML = '';
-
-            try {
-                const response = await fetch('api/patrols.php');
-                const result = await response.json();
-                if (!result.success || !result.data) return;
-
-                if (!result.data.length) {
-                    const option = document.createElement('option');
-                    option.value = '';
-                    option.textContent = 'No BPSO personnel found';
-                    option.disabled = true;
-                    select.appendChild(option);
-                    updatePatrolSelectionHint(patrolsNeeded || 0);
-                    return;
-                }
-
-                result.data.forEach(function(personnel) {
-                    const option = document.createElement('option');
-                    option.value = personnel.id;
-                    const statusLabel = personnel.status || 'Unknown';
-                    option.textContent = personnel.bpso_personnel_id + ' - ' + personnel.personnel_name + ' (' + statusLabel + ')';
-                    if (selectedSet.has(String(personnel.id))) {
-                        option.selected = true;
-                    }
-                    select.appendChild(option);
-                });
-            } catch (err) {
-                console.error('Error loading BPSO personnel:', err);
-            }
-
-            select.onchange = function() {
-                updatePatrolSelectionHint(patrolsNeeded || 0);
-            };
-            updatePatrolSelectionHint(patrolsNeeded || 0);
-        }
-
         function formatTime(value) {
             if (!value) return '—';
             return String(value).slice(0, 5);
@@ -538,6 +457,11 @@ $patrolNavActive = 'patrol-request';
             const date = new Date(value);
             if (Number.isNaN(date.getTime())) return value;
             return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+        }
+
+        function canActOnRequest(item) {
+            const status = String(item.status || '').toLowerCase();
+            return !['rejected', 'cancelled', 'scheduled'].includes(status);
         }
 
         async function loadRequests() {
@@ -593,7 +517,6 @@ $patrolNavActive = 'patrol-request';
                     <td>
                         <div class="action-buttons">
                             <button class="btn-view" onclick="viewRequest('${item.request_id}')">View</button>
-                            <button class="btn-manage" onclick="manageRequest('${item.request_id}')">Manage</button>
                         </div>
                     </td>
                 `;
@@ -604,14 +527,14 @@ $patrolNavActive = 'patrol-request';
         function viewRequest(requestId) {
             const item = requestData[requestId];
             if (!item) return;
+            currentViewRequestId = requestId;
             const endTime = item.event_end_time ? formatTime(item.event_end_time) : '—';
             document.getElementById('viewDetails').innerHTML = `
                 <div class="detail-row"><span class="detail-label">Request ID</span><span>${item.request_id}</span></div>
                 <div class="detail-row"><span class="detail-label">Source Group</span><span>${groupLabel(item)}</span></div>
                 <div class="detail-row"><span class="detail-label">Reference ID</span><span>${item.source_reference_id || '—'}</span></div>
                 <div class="detail-row"><span class="detail-label">Requesting Unit</span><span>${formatRequestingUnit(item.requesting_unit)}</span></div>
-                <div class="detail-row"><span class="detail-label">Contact</span><span>${item.contact_person}${item.contact_position ? ' (' + item.contact_position + ')' : ''} — ${item.contact_number}</span></div>
-                <div class="detail-row"><span class="detail-label">Email</span><span>${item.contact_email || '—'}</span></div>
+                <div class="detail-row"><span class="detail-label">Contact</span><span>${item.contact_person}${item.contact_position ? ' (' + item.contact_position + ')' : ''}</span></div>
                 <div class="detail-row"><span class="detail-label">Event Name</span><span>${item.event_name}</span></div>
                 <div class="detail-row"><span class="detail-label">Event Date / Time</span><span>${formatDate(item.event_date)} ${formatTime(item.event_start_time)}${endTime !== '—' ? ' - ' + endTime : ''}</span></div>
                 <div class="detail-row"><span class="detail-label">Event Location</span><span>${item.event_location}</span></div>
@@ -622,60 +545,87 @@ $patrolNavActive = 'patrol-request';
                 <div class="detail-row"><span class="detail-label">Patrols Assigned</span><span>${formatAssignedPersonnel(item)}</span></div>
                 <div class="detail-row"><span class="detail-label">Review Notes</span><span>${item.review_notes || '—'}</span></div>
             `;
+
+            const actions = document.getElementById('viewRequestActions');
+            const canAct = canActOnRequest(item);
+            actions.style.display = canAct ? 'flex' : 'none';
+            document.getElementById('assignPersonnelBtn').disabled = !canAct;
+            document.getElementById('declineRequestBtn').disabled = !canAct;
+
             document.getElementById('viewModal').classList.add('active');
         }
 
         function closeViewModal() {
             document.getElementById('viewModal').classList.remove('active');
+            currentViewRequestId = null;
         }
 
-        async function manageRequest(requestId) {
-            const item = requestData[requestId];
+        function assignPersonnelFromRequest() {
+            const item = requestData[currentViewRequestId];
             if (!item) return;
-            document.getElementById('manageId').value = item.id;
-            document.getElementById('manageRequestRef').textContent = 'Request ID: ' + item.request_id + ' — ' + item.event_name;
-            document.getElementById('manageStatus').value = item.status;
-            document.getElementById('manageReviewNotes').value = item.review_notes || '';
-            await loadAvailablePersonnel(item.assigned_patrol_ids || [], item.patrols_needed);
-            document.getElementById('manageModal').classList.add('active');
+
+            const needed = Number(item.patrols_needed || 0);
+            const alreadyAssigned = Array.isArray(item.assigned_patrol_ids) ? item.assigned_patrol_ids.length : Number(item.patrols_assigned || 0);
+            const remaining = needed > 0 ? Math.max(needed - alreadyAssigned, 0) : 0;
+
+            if (needed > 0 && remaining <= 0) {
+                alert('All required patrol personnel for this request have already been assigned.');
+                return;
+            }
+
+            const params = new URLSearchParams({
+                assign: '1',
+                request_id: item.request_id,
+                pr_id: String(item.id),
+                zone: item.event_location || '',
+                route: item.event_location || '',
+                date: String(item.event_date || '').slice(0, 10),
+                patrols_needed: String(needed),
+                already_assigned: String(alreadyAssigned),
+                slots: String(remaining || needed || 1),
+                assigned_ids: Array.isArray(item.assigned_patrol_ids) ? item.assigned_patrol_ids.join(',') : '',
+                notes: [
+                    'Patrol request: ' + item.request_id,
+                    item.event_name ? 'Event: ' + item.event_name : '',
+                    item.event_start_time ? 'Start: ' + String(item.event_start_time).slice(0, 5) : '',
+                    item.special_instructions ? 'Instructions: ' + item.special_instructions : ''
+                ].filter(Boolean).join('\n')
+            });
+
+            window.location.href = 'patrol-schedule.php?' + params.toString();
         }
 
-        function closeManageModal() {
-            document.getElementById('manageModal').classList.remove('active');
-        }
+        async function declineRequest() {
+            const item = requestData[currentViewRequestId];
+            if (!item) return;
+            if (!confirm('Decline this patrol request?')) return;
 
-        function saveManage(event) {
-            event.preventDefault();
-            const id = parseInt(document.getElementById('manageId').value, 10);
-            const status = document.getElementById('manageStatus').value;
-            const assignedPatrolIds = Array.from(document.getElementById('manageAssignedPatrols').selectedOptions)
-                .map(function(option) { return parseInt(option.value, 10); })
-                .filter(function(id) { return id > 0; });
-
-            fetch('api/patrol_requests.php', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    action: 'manage',
-                    id,
-                    status,
-                    assigned_patrol_ids: assignedPatrolIds,
-                    review_notes: document.getElementById('manageReviewNotes').value.trim()
-                })
-            })
-            .then(res => res.json())
-            .then(result => {
-                if (!result.success) throw new Error(result.message || 'Update failed');
-                closeManageModal();
-                loadRequests();
-                alert('Patrol request updated successfully.');
-            })
-            .catch(err => alert(err.message || 'Failed to update request.'));
+            try {
+                const res = await fetch('api/patrol_requests.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        action: 'manage',
+                        id: item.id,
+                        status: 'Rejected',
+                        review_notes: item.review_notes || 'Declined by admin.',
+                        assigned_patrol_ids: item.assigned_patrol_ids || []
+                    })
+                });
+                const result = await res.json();
+                if (!result.success) {
+                    throw new Error(result.message || 'Failed to decline request.');
+                }
+                closeViewModal();
+                await loadRequests();
+                alert('Patrol request declined.');
+            } catch (err) {
+                alert(err.message || 'Failed to decline request.');
+            }
         }
 
         window.onclick = function(event) {
             if (event.target === document.getElementById('viewModal')) closeViewModal();
-            if (event.target === document.getElementById('manageModal')) closeManageModal();
         };
 
         function toggleSidebar() {

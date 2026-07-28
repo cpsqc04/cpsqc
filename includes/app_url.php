@@ -25,3 +25,8 @@ function getNwMemberPortalUrl(): string
 {
     return getAppBaseUrl() . '/neighborhood-watcher-login.php';
 }
+
+function getBpsoPortalUrl(): string
+{
+    return getAppBaseUrl() . '/patrol-login.php';
+}

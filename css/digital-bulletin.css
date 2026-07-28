@@ -286,6 +286,20 @@
     background: #f1f5f9;
 }
 
+.db-detail-media-link {
+    display: block;
+    cursor: pointer;
+}
+
+.db-detail-media-link:hover img {
+    opacity: 0.92;
+}
+
+.db-slide.db-slide-linked,
+.db-slide.db-slide-linked .db-slide-img {
+    cursor: pointer;
+}
+
 .db-detail-dialog h3 {
     margin: 0 0 0.35rem;
     color: var(--tertiary-color, #1e3a3a);

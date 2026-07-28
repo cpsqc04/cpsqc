@@ -22,6 +22,7 @@ function ensureBulletinBoardTable(PDO $pdo): void
             target_audience VARCHAR(50) NOT NULL DEFAULT 'all',
             media_json LONGTEXT DEFAULT NULL,
             attachments_json LONGTEXT DEFAULT NULL,
+            link_url VARCHAR(500) DEFAULT NULL,
             publish_at DATETIME DEFAULT NULL,
             expires_at DATETIME DEFAULT NULL,
             is_pinned TINYINT(1) NOT NULL DEFAULT 0,
@@ -44,7 +45,8 @@ function ensureBulletinBoardTable(PDO $pdo): void
         'target_audience' => "ALTER TABLE bulletin_posts ADD COLUMN target_audience VARCHAR(50) NOT NULL DEFAULT 'all' AFTER body",
         'media_json' => 'ALTER TABLE bulletin_posts ADD COLUMN media_json LONGTEXT DEFAULT NULL AFTER target_audience',
         'attachments_json' => 'ALTER TABLE bulletin_posts ADD COLUMN attachments_json LONGTEXT DEFAULT NULL AFTER media_json',
-        'publish_at' => 'ALTER TABLE bulletin_posts ADD COLUMN publish_at DATETIME DEFAULT NULL AFTER attachments_json',
+        'link_url' => 'ALTER TABLE bulletin_posts ADD COLUMN link_url VARCHAR(500) DEFAULT NULL AFTER attachments_json',
+        'publish_at' => 'ALTER TABLE bulletin_posts ADD COLUMN publish_at DATETIME DEFAULT NULL AFTER link_url',
         'expires_at' => 'ALTER TABLE bulletin_posts ADD COLUMN expires_at DATETIME DEFAULT NULL AFTER publish_at',
         'is_pinned' => 'ALTER TABLE bulletin_posts ADD COLUMN is_pinned TINYINT(1) NOT NULL DEFAULT 0 AFTER expires_at',
         'status' => "ALTER TABLE bulletin_posts ADD COLUMN status VARCHAR(50) NOT NULL DEFAULT 'active' AFTER is_pinned",
@@ -90,6 +92,29 @@ function bulletinNormalizeAudience(?string $audience, bool $allowResident = true
     return in_array($audience, $allowed, true) ? $audience : 'all';
 }
 
+function bulletinNormalizeLinkUrl(?string $url): ?string
+{
+    $url = trim((string) $url);
+    if ($url === '') {
+        return null;
+    }
+
+    if (!preg_match('#^https?://#i', $url)) {
+        $url = 'https://' . ltrim($url, '/');
+    }
+
+    if (!filter_var($url, FILTER_VALIDATE_URL)) {
+        return null;
+    }
+
+    $scheme = strtolower((string) (parse_url($url, PHP_URL_SCHEME) ?? ''));
+    if (!in_array($scheme, ['http', 'https'], true)) {
+        return null;
+    }
+
+    return $url;
+}
+
 function bulletinFormatPost(array $row): array
 {
     $media = bulletinDecodeJsonList($row['media_json'] ?? null);
@@ -102,6 +127,7 @@ function bulletinFormatPost(array $row): array
         'target_audience' => bulletinNormalizeAudience($row['target_audience'] ?? 'all'),
         'media' => $media,
         'attachments' => $attachments,
+        'link_url' => bulletinNormalizeLinkUrl($row['link_url'] ?? null),
         'publish_at' => $row['publish_at'] ?? null,
         'expires_at' => $row['expires_at'] ?? null,
         'is_pinned' => !empty($row['is_pinned']),

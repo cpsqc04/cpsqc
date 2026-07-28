@@ -630,6 +630,10 @@ require_once __DIR__ . '/db.php';
                 <label style="display: block; margin-bottom: 0.75rem; color: var(--text-color); font-weight: 500; font-size: 0.95rem;">Select Actions:</label>
                 <div style="display: flex; flex-direction: column; gap: 0.75rem; margin-top: 0.5rem;">
                     <label style="display: flex; align-items: flex-start; gap: 0.75rem; cursor: pointer; padding: 0.5rem; border-radius: 6px; transition: background 0.2s ease;">
+                        <input type="checkbox" id="saveTipOnly" value="save" style="margin-top: 0.25rem; flex-shrink: 0; width: 18px; height: 18px; cursor: pointer;">
+                        <span style="flex: 1; line-height: 1.5;">Save</span>
+                    </label>
+                    <label style="display: flex; align-items: flex-start; gap: 0.75rem; cursor: pointer; padding: 0.5rem; border-radius: 6px; transition: background 0.2s ease;">
                         <input type="checkbox" id="sendToIncidentReporting" value="incident_reporting" style="margin-top: 0.25rem; flex-shrink: 0; width: 18px; height: 18px; cursor: pointer;">
                         <span style="flex: 1; line-height: 1.5;">Send to Incident Reporting</span>
                     </label>
@@ -1072,12 +1076,15 @@ require_once __DIR__ . '/db.php';
             }
             
             // Reset checkboxes
+            document.getElementById('saveTipOnly').checked = false;
             document.getElementById('sendToIncidentReporting').checked = false;
             document.getElementById('sendToEmergencyResponse').checked = false;
             document.getElementById('exportWord').checked = false;
 
+            const saveTipInput = document.getElementById('saveTipOnly');
             const incidentReportingInput = document.getElementById('sendToIncidentReporting');
             const emergencyResponseInput = document.getElementById('sendToEmergencyResponse');
+            saveTipInput.disabled = Boolean(tip.saved_at);
             incidentReportingInput.disabled = Boolean(tip.forwarded_at);
             emergencyResponseInput.disabled = Boolean(tip.backup_requested_at);
             incidentReportingInput.onchange = updateActionReviewPreview;
@@ -1085,6 +1092,9 @@ require_once __DIR__ . '/db.php';
             updateActionReviewPreview();
 
             let statusHtml = '';
+            if (tip.saved_at) {
+                statusHtml += `<p style="margin-bottom:0.5rem;color:#0f5132;"><strong>Saved:</strong> Kept on record ${new Date(tip.saved_at).toLocaleString()} (no forward)</p>`;
+            }
             if (tip.forwarded_at) {
                 statusHtml += `<p style="margin-bottom:0.5rem;color:#0f5132;"><strong>Incident Reporting:</strong> Sent ${new Date(tip.forwarded_at).toLocaleString()}${tip.blotter_reference_id ? ' — Ref: ' + tip.blotter_reference_id : ''}</p>`;
             }
@@ -1111,12 +1121,18 @@ require_once __DIR__ . '/db.php';
             if (!currentTipId) return;
             
             const tip = tipData[currentTipId];
+            const saveTipOnly = document.getElementById('saveTipOnly').checked;
             const sendToIncidentReporting = document.getElementById('sendToIncidentReporting').checked;
             const sendToEmergencyResponse = document.getElementById('sendToEmergencyResponse').checked;
             const exportWord = document.getElementById('exportWord').checked;
             
-            if (!sendToIncidentReporting && !sendToEmergencyResponse && !exportWord) {
+            if (!saveTipOnly && !sendToIncidentReporting && !sendToEmergencyResponse && !exportWord) {
                 alert('Please select at least one action.');
+                return;
+            }
+
+            if (saveTipOnly && tip.saved_at) {
+                alert('This tip was already saved.');
                 return;
             }
 
@@ -1138,10 +1154,44 @@ require_once __DIR__ . '/db.php';
             let actionsCompleted = 0;
             let totalActions = 0;
             const results = {
+                save: null,
                 incidentReporting: null,
                 emergencyResponse: null,
                 export: null
             };
+
+            if (saveTipOnly) {
+                totalActions++;
+                fetch('api/tips.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'save', id: tip.id })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    results.save = data;
+                    if (data.success) {
+                        tip.saved_at = data.data?.saved_at || new Date().toISOString();
+                        tip.status = data.data?.status || tip.status || 'Reviewed';
+                        const row = document.querySelector(`tr[data-tip-id="${currentTipId}"]`);
+                        if (row) {
+                            const cells = row.querySelectorAll('td');
+                            if (cells[5]) {
+                                cells[5].innerHTML = `<span class="status-badge status-reviewed">${tip.status}</span>`;
+                            }
+                        }
+                        const statusSelect = document.getElementById('tipStatus');
+                        if (statusSelect) statusSelect.value = tip.status;
+                    }
+                    actionsCompleted++;
+                    checkAllActionsComplete();
+                })
+                .catch(error => {
+                    results.save = { success: false, message: error.message };
+                    actionsCompleted++;
+                    checkAllActionsComplete();
+                });
+            }
             
             if (sendToIncidentReporting) {
                 totalActions++;
@@ -1212,6 +1262,15 @@ require_once __DIR__ . '/db.php';
                 let message = 'Actions completed:\n';
                 let hasError = false;
 
+                if (saveTipOnly) {
+                    if (results.save?.success) {
+                        message += '- Tip saved (no forward)\n';
+                    } else {
+                        hasError = true;
+                        message += '- Save failed: ' + (results.save?.message || 'Unknown error') + '\n';
+                    }
+                }
+
                 if (sendToIncidentReporting) {
                     if (results.incidentReporting?.success) {
                         message += '- Sent to Incident Reporting';
@@ -1248,7 +1307,7 @@ require_once __DIR__ . '/db.php';
                 }
 
                 alert(message.trim());
-                if (!hasError || (sendToIncidentReporting && results.incidentReporting?.success) || (sendToEmergencyResponse && results.emergencyResponse?.success)) {
+                if (!hasError || (saveTipOnly && results.save?.success) || (sendToIncidentReporting && results.incidentReporting?.success) || (sendToEmergencyResponse && results.emergencyResponse?.success)) {
                     closeActionModal();
                 }
             }

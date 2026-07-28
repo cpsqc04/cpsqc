@@ -59,6 +59,7 @@
                     postId: post.id,
                     title: post.title || '',
                     body: post.body || '',
+                    link_url: post.link_url || '',
                     attachments: post.attachments || [],
                     pinned: !!post.is_pinned,
                     created_at: post.created_at || post.publish_at || '',
@@ -67,6 +68,22 @@
             });
         });
         return slides;
+    }
+
+    function normalizeExternalUrl(url) {
+        var value = String(url || '').trim();
+        if (!value) return '';
+        if (!/^https?:\/\//i.test(value)) {
+            value = 'https://' + value.replace(/^\/+/, '');
+        }
+        return value;
+    }
+
+    function openExternalUrl(url) {
+        var href = normalizeExternalUrl(url);
+        if (!href) return false;
+        window.open(href, '_blank', 'noopener,noreferrer');
+        return true;
     }
 
     function collectListPosts(posts) {
@@ -145,6 +162,7 @@
                 title: postOrSlide.title || 'Announcement',
                 body: postOrSlide.body || '',
                 media: postOrSlide.src ? [postOrSlide.src] : (postOrSlide.media || []),
+                link_url: postOrSlide.link_url || '',
                 attachments: postOrSlide.attachments || [],
                 created_at: postOrSlide.created_at || '',
                 publish_at: postOrSlide.publish_at || '',
@@ -165,6 +183,12 @@
             : (postOrSlide && postOrSlide.src ? [postOrSlide.src] : []);
         mediaEl.innerHTML = media.length
             ? media.map(function (src) {
+                var link = normalizeExternalUrl(post.link_url || postOrSlide.link_url || '');
+                if (link) {
+                    return '<a href="' + escapeHtml(link) + '" target="_blank" rel="noopener noreferrer" class="db-detail-media-link">' +
+                        '<img src="' + escapeHtml(src) + '" alt="">' +
+                        '</a>';
+                }
                 return '<img src="' + escapeHtml(src) + '" alt="">';
             }).join('')
             : '';
@@ -199,7 +223,8 @@
         }
 
         var slidesHtml = slides.map(function (slide, i) {
-            return '<div class="db-slide' + (i === 0 ? ' active' : '') + '" data-index="' + i + '" data-post-id="' + escapeHtml(String(slide.postId || '')) + '">' +
+            var hasLink = !!normalizeExternalUrl(slide.link_url || '');
+            return '<div class="db-slide' + (i === 0 ? ' active' : '') + (hasLink ? ' db-slide-linked' : '') + '" data-index="' + i + '" data-post-id="' + escapeHtml(String(slide.postId || '')) + '">' +
                 '<img src="' + escapeHtml(slide.src) + '" alt="' + escapeHtml(slide.title || 'Bulletin image') + '" class="db-slide-img" data-index="' + i + '">' +
                 '</div>';
         }).join('');
@@ -257,7 +282,7 @@
             });
         });
 
-        // Click the image/slide to open announcement details
+        // Click the image/slide: open linked webpage if URL is set, otherwise announcement details
         slideEls.forEach(function (slideEl) {
             slideEl.addEventListener('click', function (e) {
                 if (e.target.closest('.db-arrow') || e.target.closest('.db-dot')) {
@@ -266,11 +291,13 @@
                 var i = parseInt(slideEl.getAttribute('data-index'), 10);
                 if (Number.isNaN(i)) i = index;
                 var slide = slides[i];
-                if (slide) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    openDetail(slide);
+                if (!slide) return;
+                e.preventDefault();
+                e.stopPropagation();
+                if (openExternalUrl(slide.link_url)) {
+                    return;
                 }
+                openDetail(slide);
             });
         });
 

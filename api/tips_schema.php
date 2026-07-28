@@ -35,6 +35,7 @@ function ensureTipsTable(PDO $pdo): void
             blotter_reference_id VARCHAR(100) DEFAULT NULL,
             backup_requested_at DATETIME DEFAULT NULL,
             emergency_response_reference_id VARCHAR(100) DEFAULT NULL,
+            saved_at DATETIME DEFAULT NULL,
             submitted_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
@@ -67,7 +68,8 @@ function ensureTipsTable(PDO $pdo): void
         'blotter_reference_id' => 'ALTER TABLE tips ADD COLUMN blotter_reference_id VARCHAR(100) DEFAULT NULL AFTER forwarded_at',
         'backup_requested_at' => 'ALTER TABLE tips ADD COLUMN backup_requested_at DATETIME DEFAULT NULL AFTER blotter_reference_id',
         'emergency_response_reference_id' => 'ALTER TABLE tips ADD COLUMN emergency_response_reference_id VARCHAR(100) DEFAULT NULL AFTER backup_requested_at',
-        'submitted_at' => 'ALTER TABLE tips ADD COLUMN submitted_at DATETIME DEFAULT CURRENT_TIMESTAMP AFTER emergency_response_reference_id',
+        'saved_at' => 'ALTER TABLE tips ADD COLUMN saved_at DATETIME DEFAULT NULL AFTER emergency_response_reference_id',
+        'submitted_at' => 'ALTER TABLE tips ADD COLUMN submitted_at DATETIME DEFAULT CURRENT_TIMESTAMP AFTER saved_at',
         'created_at' => 'ALTER TABLE tips ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP',
     ];
 
@@ -95,6 +97,7 @@ function tipsSelectColumns(string $prefix = ''): string
         "{$p}blotter_reference_id",
         "{$p}backup_requested_at",
         "{$p}emergency_response_reference_id",
+        "{$p}saved_at",
         "{$p}submitted_at",
         "{$p}created_at",
     ]);

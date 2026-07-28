@@ -351,7 +351,10 @@ require_once __DIR__ . '/db.php';
         tbody tr:last-child td { border-bottom: none; }
         .status-badge { padding: 0.25rem 0.75rem; border-radius: 12px; font-size: 0.85rem; font-weight: 500; display: inline-block; }
         .status-available { background: #d1e7dd; color: #0f5132; }
-        .status-assigned { background: #fff3cd; color: #856404; }
+        .status-assigned { background: #cfe2ff; color: #084298; }
+        .status-simulation { background: #ffe5d0; color: #9a3412; }
+        .status-on-patrol { background: #fff3cd; color: #856404; }
+        .status-unavailable { background: #f8d7da; color: #842029; }
         .status-off-duty { background: #f8d7da; color: #842029; }
         .btn-view { padding: 0.5rem 1rem; background: var(--primary-color); color: #fff; border: none; border-radius: 6px; font-size: 0.85rem; cursor: pointer; transition: all 0.2s ease; }
         .btn-view:hover { background: #4ca8a6; }
@@ -363,6 +366,24 @@ require_once __DIR__ . '/db.php';
         .btn-delete { padding: 0.5rem 1rem; background: #dc3545; color: #fff; border: none; border-radius: 6px; font-size: 0.85rem; cursor: pointer; transition: all 0.2s ease; }
         .btn-delete:hover { background: #c82333; }
         .action-buttons { display: flex; gap: 0.5rem; align-items: center; }
+        .toast-popup {
+            position: fixed;
+            top: 24px;
+            right: 24px;
+            z-index: 10000;
+            background: #047857;
+            color: #fff;
+            padding: 0.9rem 1.2rem;
+            border-radius: 10px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.18);
+            font-weight: 600;
+            opacity: 0;
+            transform: translateY(-8px);
+            pointer-events: none;
+            transition: opacity 0.2s ease, transform 0.2s ease;
+            max-width: min(420px, calc(100vw - 48px));
+        }
+        .toast-popup.show { opacity: 1; transform: translateY(0); }
         .modal { display: none; position: fixed; z-index: 2000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.5); overflow: auto; }
         .modal-content { background-color: var(--card-bg); margin: 5% auto; padding: 2rem; border: 1px solid var(--border-color); border-radius: 12px; width: 90%; max-width: 600px; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3); }
         .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; padding-bottom: 1rem; border-bottom: 2px solid var(--border-color); }
@@ -593,15 +614,7 @@ require_once __DIR__ . '/db.php';
                 <div class="form-group">
                     <label for="officerEmail">Email Address *</label>
                     <input type="email" id="officerEmail" name="email" required>
-                </div>
-                <div class="form-group">
-                    <label for="officerPassword">Create Password *</label>
-                    <input type="password" id="officerPassword" name="password" required minlength="8" autocomplete="new-password">
-                    <small style="display:block;margin-top:0.35rem;color:var(--text-secondary);font-size:0.85rem;">Must include at least one capital letter and one number or special character.</small>
-                </div>
-                <div class="form-group">
-                    <label for="officerConfirmPassword">Confirm Password *</label>
-                    <input type="password" id="officerConfirmPassword" name="confirmPassword" required minlength="8" autocomplete="new-password">
+                    <small style="display:block;margin-top:0.35rem;color:var(--text-secondary);font-size:0.85rem;">A temporary password and the Patrol Portal link will be emailed to this address. The personnel must set a new password on first login.</small>
                 </div>
                 <div class="form-group">
                     <label for="officerDutyShift">Duty Shift *</label>
@@ -616,7 +629,9 @@ require_once __DIR__ . '/db.php';
                     <select id="officerStatus" name="status" required>
                         <option value="Available">Available</option>
                         <option value="Assigned">Assigned</option>
-                        <option value="Off-Duty">Off-Duty</option>
+                        <option value="Assigned to Simulation">Assigned to Simulation</option>
+                        <option value="On Patrol">On Patrol</option>
+                        <option value="Unavailable">Unavailable</option>
                     </select>
                 </div>
                 <div class="form-actions">
@@ -689,7 +704,9 @@ require_once __DIR__ . '/db.php';
                     <select id="editOfficerStatus" name="status" required>
                         <option value="Available">Available</option>
                         <option value="Assigned">Assigned</option>
-                        <option value="Off-Duty">Off-Duty</option>
+                        <option value="Assigned to Simulation">Assigned to Simulation</option>
+                        <option value="On Patrol">On Patrol</option>
+                        <option value="Unavailable">Unavailable</option>
                     </select>
                 </div>
                 <div class="form-actions">
@@ -699,6 +716,8 @@ require_once __DIR__ . '/db.php';
             </form>
         </div>
     </div>
+
+    <div id="toastPopup" class="toast-popup" role="status" aria-live="polite"></div>
 
     <script src="js/form-contact-validation.js"></script>
     <script>
@@ -711,6 +730,16 @@ require_once __DIR__ . '/db.php';
             }
             loadPatrols();
         });
+
+        function showToast(message, isError) {
+            const toast = document.getElementById('toastPopup');
+            if (!toast) return;
+            toast.textContent = message;
+            toast.style.background = isError ? '#b91c1c' : '#047857';
+            toast.classList.add('show');
+            window.clearTimeout(showToast._timer);
+            showToast._timer = window.setTimeout(() => toast.classList.remove('show'), 3200);
+        }
         function toggleSidebar() {
             const sidebar = document.getElementById('sidebar');
             const isCollapsed = sidebar.classList.contains('collapsed');
@@ -790,7 +819,75 @@ require_once __DIR__ . '/db.php';
                 console.error('Error loading patrols:', e);
             }
         }
+
+        // Quietly refresh live availability badges without rebuilding the whole table
+        async function refreshPatrolAvailabilityLive() {
+            // Avoid clobbering the table while an edit/add modal is open
+            const addModal = document.getElementById('addOfficerModal');
+            const editModal = document.getElementById('editOfficerModal');
+            const viewModal = document.getElementById('viewOfficerModal');
+            if ((addModal && addModal.style.display === 'block') ||
+                (editModal && editModal.style.display === 'block') ||
+                (viewModal && viewModal.style.display === 'block')) {
+                return;
+            }
+
+            try {
+                const response = await fetch('api/patrols.php');
+                const result = await response.json();
+                if (!result.success || !Array.isArray(result.data)) return;
+
+                const patrols = result.data;
+                const existingIds = new Set(Object.keys(officerData).map(String));
+                const incomingIds = new Set(patrols.map(p => String(p.id)));
+
+                // Full reload if roster membership changed
+                if (existingIds.size !== incomingIds.size || [...incomingIds].some(id => !existingIds.has(id))) {
+                    await loadPatrols();
+                    return;
+                }
+
+                patrols.forEach(p => {
+                    officerData[p.id] = p;
+                    const row = document.querySelector(`tr[data-officer-id="${p.id}"]`);
+                    if (!row) return;
+                    const badge = row.querySelector('.status-badge');
+                    if (!badge) return;
+                    const statusLabel = normalizeOfficerStatus(p.status);
+                    badge.className = `status-badge ${officerStatusClass(statusLabel)}`;
+                    badge.textContent = statusLabel;
+                });
+            } catch (e) {
+                console.error('Error refreshing patrol availability:', e);
+            }
+        }
         
+        function normalizeOfficerStatus(status) {
+            const raw = String(status || 'Available').trim();
+            const map = {
+                'Available': 'Available',
+                'Assigned': 'Assigned',
+                'Assigned to Simulation': 'Assigned to Simulation',
+                'On Patrol': 'On Patrol',
+                'Unavailable': 'Unavailable',
+                'Off Duty': 'Unavailable',
+                'Off-Duty': 'Unavailable',
+                'Off-duty': 'Unavailable'
+            };
+            return map[raw] || 'Available';
+        }
+
+        function officerStatusClass(status) {
+            switch (normalizeOfficerStatus(status)) {
+                case 'Available': return 'status-available';
+                case 'Assigned': return 'status-assigned';
+                case 'Assigned to Simulation': return 'status-simulation';
+                case 'On Patrol': return 'status-on-patrol';
+                case 'Unavailable': return 'status-unavailable';
+                default: return 'status-available';
+            }
+        }
+
         function addTableRow(id) {
             const officer = officerData[id];
             if (!officer) return;
@@ -798,17 +895,14 @@ require_once __DIR__ . '/db.php';
             const tbody = document.getElementById('patrolOfficersTableBody');
             const row = document.createElement('tr');
             row.setAttribute('data-officer-id', id);
-            
-            const statusClass = officer.status === 'Available' ? 'status-available' : 
-                                officer.status === 'Assigned' ? 'status-assigned' : 
-                                'status-off-duty';
+            const statusLabel = normalizeOfficerStatus(officer.status);
             
             row.innerHTML = `
                 <td>${officer.bpso_personnel_id || ''}</td>
                 <td>${officer.personnel_name || ''}</td>
                 <td>${officer.contact_number || ''}</td>
                 <td>${officer.duty_shift || officer.schedule || ''}</td>
-                <td><span class="status-badge ${statusClass}">${officer.status || 'Available'}</span></td>
+                <td><span class="status-badge ${officerStatusClass(statusLabel)}">${statusLabel}</span></td>
                 <td>
                     <div class="action-buttons">
                         <button class="btn-view" onclick="viewOfficer('${id}')">View</button>
@@ -856,7 +950,7 @@ require_once __DIR__ . '/db.php';
                     <p><strong>Contact Number:</strong> ${officer.contact_number || ''}</p>
                     <p><strong>Email Address:</strong> ${officer.email || ''}</p>
                     <p><strong>Duty Shift:</strong> ${officer.duty_shift || officer.schedule || ''}</p>
-                    <p><strong>Status:</strong> ${officer.status || 'Available'}</p>
+                    <p><strong>Status:</strong> ${normalizeOfficerStatus(officer.status)}</p>
                 </div>
             `;
             
@@ -880,7 +974,7 @@ require_once __DIR__ . '/db.php';
             document.getElementById('editOfficerPassword').value = '';
             document.getElementById('editOfficerConfirmPassword').value = '';
             document.getElementById('editOfficerDutyShift').value = officer.duty_shift || officer.schedule || 'Day Shift';
-            document.getElementById('editOfficerStatus').value = officer.status || 'Available';
+            document.getElementById('editOfficerStatus').value = normalizeOfficerStatus(officer.status);
             
             document.getElementById('editOfficerModal').style.display = 'block';
         }
@@ -933,20 +1027,17 @@ require_once __DIR__ . '/db.php';
             event.preventDefault();
             
             const formData = new FormData(event.target);
-            const password = formData.get('password');
-            const confirmPassword = formData.get('confirmPassword');
 
             const apiData = {
                 action: 'create',
                 personnel_name: formData.get('name').trim(),
                 contact_number: formData.get('contact').trim(),
                 email: formData.get('email').trim(),
-                password: password,
                 duty_shift: formData.get('duty_shift'),
                 status: formData.get('status')
             };
             
-            if (!apiData.personnel_name || !apiData.contact_number || !apiData.email || !password || !confirmPassword || !apiData.duty_shift) {
+            if (!apiData.personnel_name || !apiData.contact_number || !apiData.email || !apiData.duty_shift) {
                 alert('Please fill in all required fields.');
                 return;
             }
@@ -960,16 +1051,6 @@ require_once __DIR__ . '/db.php';
             const contactError = AlertaraFormEnhancements.validateContactInput(document.getElementById('officerContact'), 'Contact number');
             if (contactError) {
                 alert(contactError);
-                return;
-            }
-            
-            if (password !== confirmPassword) {
-                alert('Passwords do not match.');
-                return;
-            }
-
-            if (!/[A-Z]/.test(password) || !/[0-9!@#$%^&*(),.?":{}|<>]/.test(password)) {
-                alert('Password must contain at least one capital letter and one number or special character.');
                 return;
             }
             
@@ -998,18 +1079,17 @@ require_once __DIR__ . '/db.php';
             })
             .then(result => {
                 if (!result.success) {
-                    alert(result.message || 'Failed to save BPSO personnel.');
+                    showToast(result.message || 'Failed to save BPSO personnel.', true);
                     return;
                 }
                 
-                // Reload patrols to refresh the table
                 loadPatrols();
-                alert('BPSO personnel added successfully!');
+                showToast('BPSO Personnel was successfully added and will receive an email.');
                 closeAddOfficerModal();
             })
             .catch(err => {
                 console.error('Error saving BPSO personnel:', err);
-                alert('Error saving BPSO personnel: ' + (err.message || 'Please try again.'));
+                showToast('Error saving BPSO personnel: ' + (err.message || 'Please try again.'), true);
             });
         }
 
@@ -1141,6 +1221,14 @@ require_once __DIR__ . '/db.php';
         // Update date/time immediately and then every second
         updateDateTime();
         setInterval(updateDateTime, 1000);
+
+        // Live availability: Assigned / On Patrol (and other statuses) update without full page reload
+        setInterval(refreshPatrolAvailabilityLive, 8000);
+        document.addEventListener('visibilitychange', function() {
+            if (!document.hidden) {
+                refreshPatrolAvailabilityLive();
+            }
+        });
     </script>
     <?php require __DIR__ . '/includes/admin_notifications_script.php'; ?>
     <script src="js/mobile-shell.js"></script>

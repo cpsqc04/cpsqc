@@ -147,8 +147,9 @@ try {
         }
 
         $newHash = password_hash($newPassword, PASSWORD_DEFAULT);
-        $update = $pdo->prepare('UPDATE patrols SET password_hash = :password_hash WHERE id = :id');
+        $update = $pdo->prepare('UPDATE patrols SET password_hash = :password_hash, must_change_password = 0 WHERE id = :id');
         $update->execute([':password_hash' => $newHash, ':id' => $patrolId]);
+        $_SESSION['bpso_must_change_password'] = false;
 
         notifyAdminActorActivity(
             $pdo,

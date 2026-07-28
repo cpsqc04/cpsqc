@@ -130,6 +130,58 @@ if ($method === 'POST') {
         exit;
     }
 
+    if ($action === 'save') {
+        $id = (int) ($input['id'] ?? 0);
+        if ($id <= 0) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'message' => 'Invalid tip ID.']);
+            exit;
+        }
+
+        try {
+            $check = $pdo->prepare('SELECT id, status, saved_at FROM tips WHERE id = :id LIMIT 1');
+            $check->execute([':id' => $id]);
+            $tip = $check->fetch(PDO::FETCH_ASSOC);
+            if (!$tip) {
+                http_response_code(404);
+                echo json_encode(['success' => false, 'message' => 'Tip not found.']);
+                exit;
+            }
+
+            if (!empty($tip['saved_at'])) {
+                echo json_encode([
+                    'success' => true,
+                    'message' => 'Tip was already saved.',
+                    'data' => ['saved_at' => $tip['saved_at']],
+                ]);
+                exit;
+            }
+
+            $stmt = $pdo->prepare('UPDATE tips SET status = :status, saved_at = NOW() WHERE id = :id');
+            $stmt->execute([
+                ':status' => 'Reviewed',
+                ':id' => $id,
+            ]);
+
+            $savedStmt = $pdo->prepare('SELECT saved_at FROM tips WHERE id = :id LIMIT 1');
+            $savedStmt->execute([':id' => $id]);
+            $savedAt = $savedStmt->fetchColumn();
+
+            echo json_encode([
+                'success' => true,
+                'message' => 'Tip saved successfully. No forward was sent.',
+                'data' => [
+                    'status' => 'Reviewed',
+                    'saved_at' => $savedAt,
+                ],
+            ]);
+        } catch (PDOException $e) {
+            http_response_code(500);
+            echo json_encode(['success' => false, 'message' => 'Failed to save tip: ' . $e->getMessage()]);
+        }
+        exit;
+    }
+
     if ($action === 'delete') {
         $id = (int) ($input['id'] ?? 0);
         if ($id <= 0) {

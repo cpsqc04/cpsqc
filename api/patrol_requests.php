@@ -74,6 +74,14 @@ if ($method === 'GET') {
         foreach ($rows as $index => $row) {
             $rows[$index]['source_group_label'] = patrolRequestSourceGroupLabel((string) $row['source_group']);
             $rows[$index] = enrichPatrolRequestAssignments($pdo, $rows[$index]);
+
+            // Internal admin fields — never expose to partner API consumers
+            if (!$isAdmin) {
+                unset(
+                    $rows[$index]['review_notes'],
+                    $rows[$index]['scheduling_notes']
+                );
+            }
         }
 
         jsonResponse([
@@ -262,8 +270,8 @@ if ($method === 'POST' && $action === 'manage') {
                     (int) $assignedPatrolId,
                     'patrol_request_assignment',
                     'Assigned for Patrolling',
-                    'You have been assigned to patrol request ' . $requestCode . ' (' . $detailText . ').',
-                    'patrol-request:' . $id . ':' . (int) $assignedPatrolId
+                    'You have been assigned to patrol request ' . $requestCode . ' (' . $detailText . '). Open My Schedule to view your assignment.',
+                    'tab:schedule'
                 );
             }
         }

@@ -821,6 +821,11 @@ if ($pdo instanceof PDO) {
                                 <div id="bbExistingMedia" class="bb-thumbs"></div>
                             </div>
                             <div class="bb-form-group">
+                                <label for="bbLinkUrl">Image Link URL</label>
+                                <input type="url" id="bbLinkUrl" maxlength="500" placeholder="https://example.com">
+                                <div class="hint">Optional. If set, clicking the announcement image opens this webpage.</div>
+                            </div>
+                            <div class="bb-form-group">
                                 <label for="bbAttachments">File Attachments</label>
                                 <input type="file" id="bbAttachments" multiple>
                                 <div class="hint">PDF, Office docs, images, or zip (max 12 MB each).</div>
@@ -1051,6 +1056,7 @@ if ($pdo instanceof PDO) {
             document.getElementById('bbExpiresAt').value = toLocalInputValue(post.expires_at);
             document.getElementById('bbPinned').checked = !!post.is_pinned;
             document.getElementById('bbStatus').value = post.status || 'active';
+            document.getElementById('bbLinkUrl').value = post.link_url || '';
             document.getElementById('bbMedia').value = '';
             document.getElementById('bbAttachments').value = '';
             existingMedia = Array.isArray(post.media) ? post.media.slice() : [];
@@ -1092,6 +1098,7 @@ if ($pdo instanceof PDO) {
             formData.append('expires_at', document.getElementById('bbExpiresAt').value);
             formData.append('is_pinned', document.getElementById('bbPinned').checked ? '1' : '0');
             formData.append('status', document.getElementById('bbStatus').value);
+            formData.append('link_url', document.getElementById('bbLinkUrl').value.trim());
             formData.append('existing_media', JSON.stringify(existingMedia));
             formData.append('existing_attachments', JSON.stringify(existingAttachments));
 

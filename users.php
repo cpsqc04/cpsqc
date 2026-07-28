@@ -694,6 +694,12 @@ if (!isAdminUser()) {
             background: #fee2e2;
             color: #991b1b;
         }
+
+        .status-available { background: #d1e7dd; color: #0f5132; }
+        .status-assigned { background: #cfe2ff; color: #084298; }
+        .status-simulation { background: #ffe5d0; color: #9a3412; }
+        .status-on-patrol { background: #fff3cd; color: #856404; }
+        .status-unavailable { background: #f8d7da; color: #842029; }
         
         .btn-action {
             padding: 0.5rem 1rem;
@@ -1298,9 +1304,34 @@ if (!isAdminUser()) {
             return user.account_type === 'bpso' || formatRoleLabel(user.role) === 'BPSO Personnel';
         }
 
+        function normalizeBpsoStatus(status) {
+            const raw = String(status || 'Available').trim();
+            const map = {
+                'Available': 'Available',
+                'Assigned': 'Assigned',
+                'Assigned to Simulation': 'Assigned to Simulation',
+                'On Patrol': 'On Patrol',
+                'Unavailable': 'Unavailable',
+                'Off Duty': 'Unavailable',
+                'Off-Duty': 'Unavailable'
+            };
+            return map[raw] || 'Available';
+        }
+
+        function bpsoStatusClass(status) {
+            switch (normalizeBpsoStatus(status)) {
+                case 'Available': return 'status-available';
+                case 'Assigned': return 'status-assigned';
+                case 'Assigned to Simulation': return 'status-simulation';
+                case 'On Patrol': return 'status-on-patrol';
+                case 'Unavailable': return 'status-unavailable';
+                default: return 'status-available';
+            }
+        }
+
         function isAccountActive(user) {
             if (isBpsoAccount(user)) {
-                return (user.status || '').toLowerCase() !== 'off duty';
+                return normalizeBpsoStatus(user.status) !== 'Unavailable';
             }
             return user.status === 'Active';
         }
@@ -1314,9 +1345,9 @@ if (!isAdminUser()) {
                 const isActive = isAccountActive(user);
                 const isBpso = isBpsoAccount(user);
                 const roleLabel = formatRoleLabel(user.role);
-                const statusLabel = isBpso ? (user.status || 'Available') : (user.status || 'Active');
+                const statusLabel = isBpso ? normalizeBpsoStatus(user.status) : (user.status || 'Active');
                 const statusClass = isBpso
-                    ? (statusLabel === 'Available' ? 'status-active' : 'status-inactive')
+                    ? bpsoStatusClass(statusLabel)
                     : (isActive ? 'status-active' : 'status-inactive');
 
                 tr.innerHTML = `
@@ -1348,13 +1379,13 @@ if (!isAdminUser()) {
 
         async function toggleUserStatus(userId, isActive, accountType) {
             const newStatus = accountType === 'bpso'
-                ? (isActive ? 'Available' : 'Off Duty')
+                ? (isActive ? 'Available' : 'Unavailable')
                 : (isActive ? 'Active' : 'Inactive');
             const statusBadge = document.getElementById(`status-badge-${userId}`);
 
             if (statusBadge) {
                 statusBadge.textContent = newStatus;
-                statusBadge.className = `status-badge ${isActive ? 'status-active' : 'status-inactive'}`;
+                statusBadge.className = `status-badge ${accountType === 'bpso' ? (isActive ? 'status-available' : 'status-unavailable') : (isActive ? 'status-active' : 'status-inactive')}`;
             }
 
             try {

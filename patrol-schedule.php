@@ -617,24 +617,27 @@ require_once __DIR__ . '/db.php';
                 <span class="close" onclick="closeAssignPatrolModal()">&times;</span>
             </div>
             <form id="assignPatrolForm" onsubmit="savePatrolAssignment(event)">
+                <input type="hidden" id="linkedPatrolRequestId" name="linked_request_id" value="">
+                <input type="hidden" id="linkedPatrolRequestCode" name="linked_request_code" value="">
+                <input type="hidden" id="assignSlotsRemaining" value="">
                 <div class="form-group">
                     <label for="patrolOfficer">BPSO Personnel *</label>
-                    <select id="patrolOfficer" name="patrol_id" required>
+                    <select id="patrolOfficer" name="patrol_id" required onchange="onPatrolOfficerSelectionChange()">
                         <option value="">Select BPSO Personnel</option>
                     </select>
-                    <small style="display:block;margin-top:0.35rem;color:var(--text-secondary);font-size:0.85rem;">Only personnel <strong>currently at the barangay hall</strong> (timed in today) are shown.</small>
                 </div>
-                <div class="form-group">
-                    <label for="patrolDate">Date *</label>
-                    <input type="date" id="patrolDate" name="date" required>
-                </div>
-                <div class="form-group">
+                <div class="form-group" id="patrolShiftGroup">
                     <label for="patrolShift">Shift *</label>
                     <select id="patrolShift" name="shift" required>
                         <option value="">Select shift</option>
                         <option value="Day Shift">Day Shift (8:00 AM – 8:00 PM)</option>
                         <option value="Night Shift">Night Shift (8:00 PM – 8:00 AM)</option>
                     </select>
+                    <small id="patrolShiftHint" style="display:block;margin-top:0.35rem;color:var(--text-secondary);font-size:0.85rem;">Filled from the selected personnel's fixed duty shift.</small>
+                </div>
+                <div class="form-group">
+                    <label for="patrolDate">Date *</label>
+                    <input type="date" id="patrolDate" name="date" required>
                 </div>
                 <div class="form-group">
                     <label for="patrolZone">Patrol Zone *</label>
@@ -826,6 +829,7 @@ require_once __DIR__ . '/db.php';
                 return;
             }
             await openAssignPatrolModal({
+                zone: hotspot.area_name || hotspot.location || '',
                 route: hotspot.route_suggestion || hotspot.area_name || hotspot.location || '',
                 notes: buildHotspotNotes(hotspot)
             });
@@ -893,20 +897,33 @@ require_once __DIR__ . '/db.php';
 
         async function openAssignPatrolModal(prefill = null) {
             const patrolOfficerSelect = document.getElementById('patrolOfficer');
-            patrolOfficerSelect.innerHTML = '<option value="">Select BPSO Personnel</option>';
+            const slotsRemaining = prefill && Number(prefill.slots) > 0 ? Number(prefill.slots) : 0;
+            const isRequestAssign = !!(prefill && (prefill.pr_id || prefill.request_id));
+            const maxSelectable = isRequestAssign ? Math.max(slotsRemaining, 1) : 1;
+
+            document.getElementById('assignSlotsRemaining').value = String(maxSelectable);
+            document.getElementById('linkedPatrolRequestId').value = (prefill && prefill.pr_id) ? String(prefill.pr_id) : '';
+            document.getElementById('linkedPatrolRequestCode').value = (prefill && prefill.request_id) ? String(prefill.request_id) : '';
+
+            configurePatrolOfficerSelect(maxSelectable, isRequestAssign);
 
             const today = new Date().toISOString().split('T')[0];
-            document.getElementById('patrolDate').value = today;
-            document.getElementById('patrolRoute').value = '';
-            document.getElementById('patrolZone').value = '';
+            document.getElementById('patrolDate').value = (prefill && prefill.date) ? prefill.date : today;
+            document.getElementById('patrolRoute').value = (prefill && prefill.route) ? prefill.route : '';
+            document.getElementById('patrolZone').value = (prefill && (prefill.zone || prefill.route)) ? (prefill.zone || prefill.route) : '';
             document.getElementById('patrolShift').value = '';
-            document.getElementById('patrolNotes').value = '';
+            document.getElementById('patrolNotes').value = (prefill && prefill.notes) ? prefill.notes : '';
 
-            if (prefill) {
-                document.getElementById('patrolZone').value = prefill.route || '';
-                document.getElementById('patrolRoute').value = prefill.route || '';
-                document.getElementById('patrolNotes').value = prefill.notes || '';
-            }
+            const alreadyAssignedIds = new Set(
+                String((prefill && prefill.assigned_ids) || '')
+                    .split(',')
+                    .map(id => id.trim())
+                    .filter(Boolean)
+            );
+
+            patrolOfficerSelect.innerHTML = maxSelectable > 1
+                ? ''
+                : '<option value="">Select BPSO Personnel</option>';
 
             try {
                 const [patrolResponse, hallResponse] = await Promise.all([
@@ -934,7 +951,16 @@ require_once __DIR__ . '/db.php';
                         atHallPersonnel.forEach(officer => {
                             const option = document.createElement('option');
                             option.value = officer.id;
-                            option.textContent = `${officer.bpso_personnel_id} - ${officer.personnel_name} (At Hall)`;
+                            const dutyShift = normalizeDutyShift(officer.duty_shift || officer.schedule || '');
+                            const status = normalizeAvailabilityStatus(officer.status);
+                            const alreadyOnRequest = alreadyAssignedIds.has(String(officer.id));
+                            option.dataset.dutyShift = dutyShift;
+                            option.dataset.status = status;
+                            option.textContent = `${officer.bpso_personnel_id} - ${officer.personnel_name} (${alreadyOnRequest ? 'Already assigned to request' : status})`;
+                            // Only Available officers can be selected; others stay visible for status matching
+                            if (status !== 'Available' || alreadyOnRequest) {
+                                option.disabled = true;
+                            }
                             patrolOfficerSelect.appendChild(option);
                         });
                     }
@@ -943,7 +969,85 @@ require_once __DIR__ . '/db.php';
                 console.error('Error loading BPSO personnel:', e);
             }
 
+            onPatrolOfficerSelectionChange();
             document.getElementById('assignPatrolModal').style.display = 'block';
+        }
+
+        function configurePatrolOfficerSelect(maxSelectable, isRequestAssign) {
+            const select = document.getElementById('patrolOfficer');
+            const shiftSelect = document.getElementById('patrolShift');
+            const shiftHint = document.getElementById('patrolShiftHint');
+
+            if (maxSelectable > 1) {
+                select.multiple = true;
+                select.size = Math.min(Math.max(maxSelectable + 2, 6), 10);
+                select.removeAttribute('required');
+                select.name = 'patrol_ids';
+                shiftSelect.required = false;
+                shiftSelect.value = '';
+                shiftHint.textContent = 'Each selected personnel uses their own fixed duty shift.';
+            } else {
+                select.multiple = false;
+                select.removeAttribute('size');
+                select.required = true;
+                select.name = 'patrol_id';
+                shiftSelect.required = true;
+                shiftHint.textContent = 'Filled from the selected personnel\'s fixed duty shift.';
+            }
+        }
+
+        function normalizeAvailabilityStatus(status) {
+            const raw = String(status || 'Available').trim();
+            const map = {
+                'Available': 'Available',
+                'Assigned': 'Assigned',
+                'Assigned to Simulation': 'Assigned to Simulation',
+                'On Patrol': 'On Patrol',
+                'Unavailable': 'Unavailable',
+                'Off Duty': 'Unavailable',
+                'Off-Duty': 'Unavailable',
+                'Off-duty': 'Unavailable'
+            };
+            return map[raw] || 'Available';
+        }
+
+        function normalizeDutyShift(value) {
+            const raw = String(value || '').trim().toLowerCase();
+            if (raw.includes('night')) return 'Night Shift';
+            if (raw.includes('day')) return 'Day Shift';
+            if (value === 'Day Shift' || value === 'Night Shift') return value;
+            return '';
+        }
+
+        function getSelectedPatrolOptions() {
+            const select = document.getElementById('patrolOfficer');
+            return Array.from(select.selectedOptions).filter(opt => opt.value && !opt.disabled);
+        }
+
+        function onPatrolOfficerSelectionChange() {
+            const select = document.getElementById('patrolOfficer');
+            const maxSelectable = parseInt(document.getElementById('assignSlotsRemaining').value, 10) || 1;
+            let selected = getSelectedPatrolOptions();
+
+            if (select.multiple && selected.length > maxSelectable) {
+                // Keep only the first N selections
+                selected.slice(maxSelectable).forEach(opt => { opt.selected = false; });
+                selected = getSelectedPatrolOptions();
+                alert(`You can select only ${maxSelectable} patrol personnel for this request.`);
+            }
+
+            if (!select.multiple) {
+                applyPersonnelDutyShift();
+            } else {
+                document.getElementById('patrolShift').value = '';
+            }
+        }
+
+        function applyPersonnelDutyShift() {
+            const select = document.getElementById('patrolOfficer');
+            const option = select.options[select.selectedIndex];
+            const dutyShift = option && option.dataset ? (option.dataset.dutyShift || '') : '';
+            document.getElementById('patrolShift').value = dutyShift;
         }
 
         async function assignPatrolToDispatch(id) {
@@ -952,7 +1056,16 @@ require_once __DIR__ . '/db.php';
 
         function closeAssignPatrolModal() {
             document.getElementById('assignPatrolModal').style.display = 'none';
+            const select = document.getElementById('patrolOfficer');
+            select.multiple = false;
+            select.removeAttribute('size');
+            select.required = true;
+            select.name = 'patrol_id';
+            document.getElementById('patrolShift').required = true;
             document.getElementById('assignPatrolForm').reset();
+            document.getElementById('linkedPatrolRequestId').value = '';
+            document.getElementById('linkedPatrolRequestCode').value = '';
+            document.getElementById('assignSlotsRemaining').value = '';
         }
 
         function openViewPatrolModal(id) {
@@ -986,45 +1099,145 @@ require_once __DIR__ . '/db.php';
             openViewPatrolModal(id);
         }
 
+        async function createPatrolScheduleForOfficer(patrolId, shift, sharedFields) {
+            const response = await fetch('api/patrol_schedules.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    action: 'create',
+                    patrol_id: patrolId,
+                    schedule_date: sharedFields.schedule_date,
+                    shift: shift,
+                    patrol_zone: sharedFields.patrol_zone,
+                    route: sharedFields.route,
+                    location: sharedFields.location,
+                    notes: sharedFields.notes
+                })
+            });
+            return response.json();
+        }
+
         async function savePatrolAssignment(event) {
             event.preventDefault();
-            
-            const formData = new FormData(event.target);
-            const patrolId = parseInt(formData.get('patrol_id'), 10);
 
-            if (!patrolId) {
-                alert('Please select BPSO personnel.');
+            const formData = new FormData(event.target);
+            const linkedRequestId = parseInt(document.getElementById('linkedPatrolRequestId').value, 10) || 0;
+            const linkedRequestCode = document.getElementById('linkedPatrolRequestCode').value || '';
+            const maxSelectable = parseInt(document.getElementById('assignSlotsRemaining').value, 10) || 1;
+            const selectedOptions = getSelectedPatrolOptions();
+
+            if (!selectedOptions.length) {
+                alert('Please select Available BPSO personnel.');
                 return;
             }
 
-            const assignmentData = {
-                action: 'create',
-                patrol_id: patrolId,
+            if (selectedOptions.length > maxSelectable) {
+                alert(`You can assign only ${maxSelectable} patrol personnel for this request.`);
+                return;
+            }
+
+            const unavailable = selectedOptions.filter(opt => (opt.dataset.status || '') !== 'Available');
+            if (unavailable.length) {
+                alert('Only personnel with Available status can be assigned. Status must match Patrol List.');
+                return;
+            }
+
+            const sharedFields = {
                 schedule_date: formData.get('date'),
-                shift: formData.get('shift'),
                 patrol_zone: formData.get('patrol_zone'),
                 route: formData.get('route') || formData.get('patrol_zone'),
                 location: formData.get('patrol_zone'),
                 notes: formData.get('notes') || ''
             };
 
-            try {
-                const response = await fetch('api/patrol_schedules.php', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(assignmentData)
-                });
-                const data = await response.json();
-                if (data.success) {
-                    alert('Patrol assignment created successfully. The assigned personnel can view it in the BPSO portal.');
-                    closeAssignPatrolModal();
-                    await loadPatrolSchedules();
-                } else {
-                    alert('Error creating assignment: ' + (data.message || 'Unknown error'));
+            const officers = selectedOptions.map(opt => ({
+                id: parseInt(opt.value, 10),
+                shift: normalizeDutyShift(opt.dataset.dutyShift || formData.get('shift') || '')
+            }));
+
+            for (const officer of officers) {
+                if (!officer.shift) {
+                    alert('Each selected personnel must have a fixed duty shift (Day Shift or Night Shift).');
+                    return;
                 }
+            }
+
+            try {
+                const assignedIds = [];
+                for (const officer of officers) {
+                    const data = await createPatrolScheduleForOfficer(officer.id, officer.shift, sharedFields);
+                    if (!data.success) {
+                        throw new Error(data.message || 'Failed to create assignment for one or more personnel.');
+                    }
+                    assignedIds.push(officer.id);
+                }
+
+                if (linkedRequestId > 0) {
+                    await markPatrolRequestScheduled(linkedRequestId, assignedIds, linkedRequestCode);
+                }
+
+                alert(
+                    assignedIds.length > 1
+                        ? `${assignedIds.length} patrol assignments created successfully.`
+                        : 'Patrol assignment created successfully. The assigned personnel can view it in the BPSO portal.'
+                );
+                closeAssignPatrolModal();
+                if (window.history && window.history.replaceState) {
+                    window.history.replaceState({}, document.title, 'patrol-schedule.php');
+                }
+                await loadPatrolSchedules();
             } catch (error) {
                 console.error('Error:', error);
-                alert('Failed to create patrol assignment.');
+                alert(error.message || 'Failed to create patrol assignment.');
+            }
+        }
+
+        async function markPatrolRequestScheduled(requestDbId, patrolIds, requestCode) {
+            try {
+                const idsToAdd = (Array.isArray(patrolIds) ? patrolIds : [patrolIds])
+                    .map(Number)
+                    .filter(id => id > 0);
+
+                const listRes = await fetch('api/patrol_requests.php');
+                const listResult = await listRes.json();
+                if (!listResult.success) return;
+
+                const request = (listResult.data || []).find(item => Number(item.id) === Number(requestDbId));
+                if (!request) return;
+
+                const assigned = Array.isArray(request.assigned_patrol_ids)
+                    ? request.assigned_patrol_ids.map(Number)
+                    : [];
+                idsToAdd.forEach(id => {
+                    if (!assigned.includes(id)) assigned.push(id);
+                });
+
+                const needed = Number(request.patrols_needed || 0);
+                if (needed > 0 && assigned.length > needed) {
+                    throw new Error(`Cannot assign more than ${needed} personnel for this request.`);
+                }
+
+                const status = (needed > 0 && assigned.length >= needed) ? 'Scheduled' : 'Approved';
+
+                const manageRes = await fetch('api/patrol_requests.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        action: 'manage',
+                        id: requestDbId,
+                        status: status,
+                        assigned_patrol_ids: assigned,
+                        review_notes: request.review_notes || ('Assigned via patrol schedule' + (requestCode ? ' for ' + requestCode : '') + '.'),
+                        scheduling_notes: 'Linked schedule assignment for ' + (requestCode || ('#' + requestDbId))
+                    })
+                });
+                const manageResult = await manageRes.json();
+                if (!manageResult.success) {
+                    throw new Error(manageResult.message || 'Failed to update patrol request.');
+                }
+            } catch (err) {
+                console.error('Failed to update linked patrol request:', err);
+                throw err;
             }
         }
 
@@ -1041,10 +1254,31 @@ require_once __DIR__ . '/db.php';
             }
         }
 
+        async function openAssignFromQueryParams() {
+            const params = new URLSearchParams(window.location.search);
+            if (params.get('assign') !== '1') return;
+
+            const slots = parseInt(params.get('slots') || params.get('patrols_needed') || '1', 10) || 1;
+
+            await openAssignPatrolModal({
+                zone: params.get('zone') || '',
+                route: params.get('route') || '',
+                date: params.get('date') || '',
+                notes: params.get('notes') || '',
+                request_id: params.get('request_id') || '',
+                pr_id: params.get('pr_id') || '',
+                slots: String(slots),
+                patrols_needed: params.get('patrols_needed') || '',
+                already_assigned: params.get('already_assigned') || '',
+                assigned_ids: params.get('assigned_ids') || ''
+            });
+        }
+
         // Initialize data on page load
         document.addEventListener('DOMContentLoaded', function() {
             loadRiskAlerts();
             loadPatrolSchedules();
+            openAssignFromQueryParams();
         });
         
         // Date and Time Display

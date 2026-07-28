@@ -173,10 +173,8 @@ if ($method === 'POST') {
                     ':id' => $id,
                 ]);
                 if ($previousPatrolId > 0) {
-                    $pdo->prepare('UPDATE patrols SET status = :status WHERE id = :id')->execute([
-                        ':status' => 'Available',
-                        ':id' => $previousPatrolId,
-                    ]);
+                    require_once __DIR__ . '/../includes/patrol_availability.php';
+                    refreshPatrolAvailabilityStatus($pdo, $previousPatrolId);
                 }
                 echo json_encode(['success' => true, 'message' => 'Assignment cleared.']);
                 exit;
@@ -233,11 +231,11 @@ if ($method === 'POST') {
                 ':id' => $patrolId,
             ]);
 
+            require_once __DIR__ . '/../includes/patrol_availability.php';
+            refreshPatrolAvailabilityStatus($pdo, $patrolId);
+
             if ($previousPatrolId > 0 && $previousPatrolId !== $patrolId) {
-                $pdo->prepare('UPDATE patrols SET status = :status WHERE id = :id')->execute([
-                    ':status' => 'Available',
-                    ':id' => $previousPatrolId,
-                ]);
+                refreshPatrolAvailabilityStatus($pdo, $previousPatrolId);
             }
 
             createPatrolNotification(

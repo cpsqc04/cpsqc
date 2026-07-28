@@ -214,6 +214,13 @@ try {
 
         $title = trim((string) ($input['title'] ?? ''));
         $body = trim((string) ($input['body'] ?? ''));
+        $linkUrlRaw = trim((string) ($input['link_url'] ?? ''));
+        $linkUrl = $linkUrlRaw !== '' ? bulletinNormalizeLinkUrl($linkUrlRaw) : null;
+        if ($linkUrlRaw !== '' && $linkUrl === null) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'message' => 'Link URL must be a valid http or https address.']);
+            exit;
+        }
         $rawAudience = $input['target_audience'] ?? $_POST['target_audience'] ?? 'all';
         $audience = bulletinNormalizeAudience(is_string($rawAudience) ? $rawAudience : 'all', false);
         $publishAt = bulletinParseDateTime($input['publish_at'] ?? null);
@@ -283,6 +290,7 @@ try {
                 target_audience = :audience,
                 media_json = :media,
                 attachments_json = :attachments,
+                link_url = :link_url,
                 publish_at = :publish_at,
                 expires_at = :expires_at,
                 is_pinned = :pinned,
@@ -294,6 +302,7 @@ try {
                 ':audience' => $audience,
                 ':media' => $mediaJson,
                 ':attachments' => $attachmentsJson,
+                ':link_url' => $linkUrl,
                 ':publish_at' => $publishAt,
                 ':expires_at' => $expiresAt,
                 ':pinned' => $isPinned ? 1 : 0,
@@ -303,14 +312,15 @@ try {
             $message = 'Bulletin post updated.';
         } else {
             $stmt = $pdo->prepare('INSERT INTO bulletin_posts
-                (title, body, target_audience, media_json, attachments_json, publish_at, expires_at, is_pinned, status, created_by)
-                VALUES (:title, :body, :audience, :media, :attachments, :publish_at, :expires_at, :pinned, :status, :created_by)');
+                (title, body, target_audience, media_json, attachments_json, link_url, publish_at, expires_at, is_pinned, status, created_by)
+                VALUES (:title, :body, :audience, :media, :attachments, :link_url, :publish_at, :expires_at, :pinned, :status, :created_by)');
             $stmt->execute([
                 ':title' => $title,
                 ':body' => $body !== '' ? $body : null,
                 ':audience' => $audience,
                 ':media' => $mediaJson,
                 ':attachments' => $attachmentsJson,
+                ':link_url' => $linkUrl,
                 ':publish_at' => $publishAt,
                 ':expires_at' => $expiresAt,
                 ':pinned' => $isPinned ? 1 : 0,
