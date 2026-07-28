@@ -4,7 +4,7 @@
  * Inbound API for Group 6 and Group 8 event patrol requests.
  *
  * POST JSON with patrol request fields.
- * Headers: X-API-Key or Authorization: Bearer {PATROL_REQUEST_API_KEY}
+ * Public — no API key required.
  */
 
 header('Content-Type: application/json');
@@ -22,18 +22,6 @@ require_once __DIR__ . '/notifications_schema.php';
 if (!$pdo instanceof PDO) {
     http_response_code(500);
     echo json_encode(['success' => false, 'message' => 'Database connection unavailable.']);
-    exit;
-}
-
-if (!requireConfiguredPatrolRequestApiKey()) {
-    $expectedKey = trim($_ENV['PATROL_REQUEST_API_KEY'] ?? '');
-    http_response_code($expectedKey === '' ? 503 : 401);
-    echo json_encode([
-        'success' => false,
-        'message' => $expectedKey === ''
-            ? 'Patrol request API is not configured. Set PATROL_REQUEST_API_KEY in .env.'
-            : 'Invalid or missing API key.',
-    ]);
     exit;
 }
 

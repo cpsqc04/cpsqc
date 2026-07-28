@@ -30,15 +30,12 @@ function wantsPrettyJson(): bool
 }
 
 /**
- * Allow admin session or a configured partner API key.
+ * Partner list endpoints are public (no API key). Admin session also allowed.
+ * $envKeyName kept for call-site compatibility.
  */
 function canAccessPartnerList(bool $isAdmin, string $envKeyName): bool
 {
-    if ($isAdmin) {
-        return true;
-    }
-
-    return validatePartnerApiKey($envKeyName, true);
+    return true;
 }
 
 /**

@@ -4,7 +4,7 @@
  * Inbound API for Group 6 — Awareness and Outreach Event Tracking.
  *
  * POST JSON with record_type: "event" or "report"
- * Headers: X-API-Key or Authorization: Bearer {AWARENESS_EVENTS_API_KEY}
+ * Public — no API key required.
  */
 
 header('Content-Type: application/json; charset=utf-8');
@@ -22,18 +22,6 @@ require_once __DIR__ . '/notifications_schema.php';
 if (!$pdo instanceof PDO) {
     http_response_code(500);
     echo json_encode(['success' => false, 'message' => 'Database connection unavailable.']);
-    exit;
-}
-
-if (!requireConfiguredAwarenessEventApiKey()) {
-    $expectedKey = trim($_ENV['AWARENESS_EVENTS_API_KEY'] ?? '');
-    http_response_code($expectedKey === '' ? 503 : 401);
-    echo json_encode([
-        'success' => false,
-        'message' => $expectedKey === ''
-            ? 'Awareness events API is not configured. Set AWARENESS_EVENTS_API_KEY in .env.'
-            : 'Invalid or missing API key.',
-    ]);
     exit;
 }
 

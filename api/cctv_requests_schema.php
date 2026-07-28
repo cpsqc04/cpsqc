@@ -197,14 +197,7 @@ function requireConfiguredCctvRequestApiKey(): bool
 
 function canCreateCctvRequest(bool $isAdmin): bool
 {
-    if ($isAdmin) {
-        return true;
-    }
-    if (validateCctvRequestApiKey()) {
-        return true;
-    }
-    $allowPublic = filter_var($_ENV['CCTV_REQUEST_ALLOW_PUBLIC_FORM'] ?? 'false', FILTER_VALIDATE_BOOLEAN);
-    return $allowPublic;
+    return true;
 }
 
 function normalizeCctvRequestInput(array $input): array

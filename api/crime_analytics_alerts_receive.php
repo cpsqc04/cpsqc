@@ -4,8 +4,7 @@
  * Inbound API for Crime Analytics — high-risk areas / hotspots.
  *
  * POST JSON with alert fields when a rule triggers.
- * Headers: X-API-Key or Authorization: Bearer {CRIME_ANALYTICS_API_KEY}
- * Legacy key: GROUP5_API_KEY
+ * Public — no API key required.
  */
 
 header('Content-Type: application/json; charset=utf-8');
@@ -23,18 +22,6 @@ require_once __DIR__ . '/../includes/api_key_auth.php';
 if (!$pdo instanceof PDO) {
     http_response_code(500);
     echo json_encode(['success' => false, 'message' => 'Database connection unavailable.']);
-    exit;
-}
-
-if (!requireConfiguredCrimeAnalyticsAlertApiKey()) {
-    $expectedKey = envFirst(...partnerEnvKeyCandidates('crime-analytics'));
-    http_response_code($expectedKey === '' ? 503 : 401);
-    echo json_encode([
-        'success' => false,
-        'message' => $expectedKey === ''
-            ? 'Crime Analytics API is not configured. Set CRIME_ANALYTICS_API_KEY in .env.'
-            : 'Invalid or missing API key.',
-    ]);
     exit;
 }
 

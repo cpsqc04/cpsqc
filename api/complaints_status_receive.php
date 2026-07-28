@@ -13,7 +13,7 @@
  *     "status_description": "Optional"
  *   }
  *
- * Headers: X-API-Key or Authorization: Bearer {INCIDENT_REPORTING_API_KEY}
+ * Public — no API key required.
  */
 
 header('Content-Type: application/json; charset=utf-8');
@@ -26,7 +26,6 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 
 require_once __DIR__ . '/../db.php';
 require_once __DIR__ . '/complaints_schema.php';
-require_once __DIR__ . '/../includes/api_key_auth.php';
 require_once __DIR__ . '/notifications_schema.php';
 
 if (!$pdo instanceof PDO) {
@@ -34,8 +33,6 @@ if (!$pdo instanceof PDO) {
     echo json_encode(['success' => false, 'message' => 'Database connection unavailable.']);
     exit;
 }
-
-requirePartnerApiKey(partnerEnvKeyCandidates('incident-reporting'), 'Complaint status');
 
 try {
     ensureComplaintsTable($pdo);

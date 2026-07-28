@@ -49,9 +49,9 @@ function getIntegrationCatalog(): array
         'conventions' => [
             'content_type' => 'application/json',
             'pretty_print' => 'Compact JSON by default (like production APIs). Use browser Pretty-print checkbox, or pass ?pretty=1 for server-side formatting',
-            'partner_api_key_query' => 'GET list endpoints accept ?api_key= for browser testing',
+            'partner_api_key_query' => 'Inbound partner APIs are public; outbound to partners still use API keys from .env',
             'auth_types' => [
-                'api_key' => $authHeader,
+                'api_key' => $authHeader . ' (outbound / reference receivers only)',
                 'admin_session' => 'PHP session cookie after admin login',
                 'bpso_session' => 'PHP session cookie after BPSO personnel login',
                 'nw_session' => 'PHP session cookie after NW member login',
@@ -59,11 +59,7 @@ function getIntegrationCatalog(): array
             ],
         ],
         'environment_variables' => [
-            'PATROL_REQUEST_API_KEY' => 'Group 6 & 8 patrol request integration',
-            'CCTV_REQUEST_API_KEY' => 'Partner CCTV footage request integration',
-            'AWARENESS_EVENTS_API_KEY' => 'Group 6 awareness events & reports integration',
-            'CRIME_ANALYTICS_API_KEY' => 'Crime Analytics high-risk alert integration (legacy: GROUP5_API_KEY)',
-            'INCIDENT_REPORTING_API_KEY' => 'Incident Reporting blotter + tips + CCTV evidence (legacy: BLOTTER_API_KEY)',
+            'INCIDENT_REPORTING_API_KEY' => 'Outbound to Incident Reporting (legacy: BLOTTER_API_KEY)',
             'INCIDENT_REPORTING_API_URL' => 'AlertaraQC → Incident Reporting complaint forward URL (legacy: BLOTTER_API_URL)',
             'INCIDENT_REPORTING_TIP_API_URL' => 'AlertaraQC → Incident Reporting tip forward URL (legacy: TIP_BLOTTER_API_URL)',
             'EMERGENCY_RESPONSE_API_KEY' => 'Emergency Response police backup (legacy: GROUP3_API_KEY)',
@@ -71,13 +67,12 @@ function getIntegrationCatalog(): array
         ],
         'partner_apis' => [
             'inbound_to_alertaraqc' => [
-                'description' => 'Partner groups send data INTO AlertaraQC',
+                'description' => 'Partner groups send data INTO AlertaraQC (public — no API key)',
                 'endpoints' => [
                     endpoint('/api/patrol_requests_receive.php', [
                         'name' => 'Submit Patrol Request',
                         'methods' => ['POST'],
-                        'auth' => 'api_key',
-                        'env_key' => 'PATROL_REQUEST_API_KEY',
+                        'auth' => 'public',
                         'groups' => ['group_6', 'group_8'],
                         'description' => 'Submit event patrol request from Group 6 or Group 8',
                         'sample_request' => [
@@ -100,15 +95,13 @@ function getIntegrationCatalog(): array
                     endpoint('/api/patrol_requests.php', [
                         'name' => 'List Patrol Requests',
                         'methods' => ['GET'],
-                        'auth' => 'api_key_or_admin_session',
-                        'env_key' => 'PATROL_REQUEST_API_KEY',
+                        'auth' => 'public',
                         'description' => 'List patrol requests',
                         'query_params' => [
                             'request_id' => 'Filter by PT-REQ-YYYY-###',
                             'status' => 'Pending | Under Review | Approved | Scheduled | Rejected | Cancelled',
                             'source_group' => 'group_6 | group_8',
                             'source_reference_id' => 'Partner reference ID',
-                            'api_key' => 'API key for browser access',
                             'pretty' => '1 for server-side pretty-print (optional)',
                         ],
                         'sample_response' => [
@@ -120,8 +113,7 @@ function getIntegrationCatalog(): array
                     endpoint('/api/cctv_requests_receive.php', [
                         'name' => 'Submit Footage Request',
                         'methods' => ['POST'],
-                        'auth' => 'api_key',
-                        'env_key' => 'CCTV_REQUEST_API_KEY',
+                        'auth' => 'public',
                         'module' => 'Footage Request',
                         'direction' => 'inbound',
                         'description' => 'Submit CCTV footage request from partner agency',
@@ -151,15 +143,13 @@ function getIntegrationCatalog(): array
                     endpoint('/api/cctv_requests.php', [
                         'name' => 'List CCTV Requests',
                         'methods' => ['GET'],
-                        'auth' => 'api_key_or_admin_session',
-                        'env_key' => 'CCTV_REQUEST_API_KEY',
+                        'auth' => 'public',
                         'description' => 'List CCTV requests',
                         'query_params' => [
                             'request_id' => 'Filter by CCTV-REQ-YYYY-###',
                             'status' => 'Pending | Under Review | Approved | Fulfilled | Rejected | Cancelled',
                             'source_reference_id' => 'Partner reference ID',
                             'requesting_agency' => 'Partial agency name match',
-                            'api_key' => 'API key for browser access',
                             'pretty' => '1 for server-side pretty-print (optional)',
                         ],
                         'sample_response' => [
@@ -171,8 +161,7 @@ function getIntegrationCatalog(): array
                     endpoint('/api/awareness_events_receive.php', [
                         'name' => 'Submit Awareness Event or Report',
                         'methods' => ['POST'],
-                        'auth' => 'api_key',
-                        'env_key' => 'AWARENESS_EVENTS_API_KEY',
+                        'auth' => 'public',
                         'groups' => ['group_6'],
                         'description' => 'Submit scheduled awareness event or post-event report from Group 6',
                         'sample_request_event' => [
@@ -209,8 +198,7 @@ function getIntegrationCatalog(): array
                     endpoint('/api/crime_analytics_alerts_receive.php', [
                         'name' => 'Submit Risk Alert / Hotspot',
                         'methods' => ['POST'],
-                        'auth' => 'api_key',
-                        'env_key' => 'CRIME_ANALYTICS_API_KEY',
+                        'auth' => 'public',
                         'groups' => ['crime_analytics'],
                         'description' => 'Submit triggered alert from Crime Analytics when a high-risk area is detected',
                         'sample_request' => [
@@ -236,14 +224,12 @@ function getIntegrationCatalog(): array
                     endpoint('/api/risk_alerts.php', [
                         'name' => 'List High-Risk Alerts',
                         'methods' => ['GET'],
-                        'auth' => 'api_key_or_admin_session',
-                        'env_key' => 'CRIME_ANALYTICS_API_KEY',
+                        'auth' => 'public',
                         'groups' => ['crime_analytics'],
                         'description' => 'List active high-risk alerts for patrol scheduling',
                         'query_params' => [
                             'status' => 'active (default) | all | resolved | inactive',
                             'severity' => 'CRITICAL | HIGH | MEDIUM | LOW',
-                            'api_key' => 'API key for browser access',
                         ],
                         'sample_response' => [
                             'success' => true,
@@ -260,8 +246,7 @@ function getIntegrationCatalog(): array
                     endpoint('/api/awareness_events.php', [
                         'name' => 'List Awareness Events or Reports',
                         'methods' => ['GET'],
-                        'auth' => 'api_key_or_admin_session',
-                        'env_key' => 'AWARENESS_EVENTS_API_KEY',
+                        'auth' => 'public',
                         'description' => 'List awareness events (Event List) or post-event reports (Event Reports)',
                         'query_params' => [
                             'record_type' => 'event | report (default: event)',
@@ -269,7 +254,6 @@ function getIntegrationCatalog(): array
                             'report_id' => 'Filter by EVT-RPT-YYYY-### (reports only)',
                             'status' => 'Filter events by status (Scheduled, Pending, etc.)',
                             'event_type' => 'Filter events by type (Awareness, Meeting, Training)',
-                            'api_key' => 'API key for browser access',
                             'pretty' => '1 for server-side pretty-print (optional)',
                         ],
                         'sample_response' => [
@@ -339,8 +323,7 @@ function getIntegrationCatalog(): array
                     endpoint('/api/complaints_status_receive.php', [
                         'name' => 'Update Complaint Status (inbound)',
                         'methods' => ['POST'],
-                        'auth' => 'api_key',
-                        'env_key' => 'INCIDENT_REPORTING_API_KEY',
+                        'auth' => 'public',
                         'module' => 'Track Complaint',
                         'direction' => 'inbound',
                         'description' => 'Incident Reporting pushes complaint Status updates back to AlertaraQC',
@@ -445,19 +428,19 @@ function getIntegrationCatalog(): array
                     endpoint('/api/patrol_requests.php', [
                         'name' => 'Patrol Requests (admin manage)',
                         'methods' => ['GET', 'POST'],
-                        'auth' => 'admin_session or api_key (GET)',
+                        'auth' => 'admin_session (manage) or public (GET/create)',
                         'actions' => ['create', 'manage'],
                     ]),
                     endpoint('/api/cctv_requests.php', [
                         'name' => 'CCTV Requests (admin manage)',
                         'methods' => ['GET', 'POST'],
-                        'auth' => 'admin_session or api_key (GET)',
+                        'auth' => 'admin_session (manage) or public (GET/create)',
                         'actions' => ['create', 'manage', 'get_document'],
                     ]),
                     endpoint('/api/awareness_events.php', [
                         'name' => 'Awareness Events (admin manage)',
                         'methods' => ['GET', 'POST'],
-                        'auth' => 'admin_session or api_key (GET)',
+                        'auth' => 'admin_session (manage) or public (GET/create)',
                         'actions' => ['create'],
                     ]),
                     endpoint('/api/cameras.php', ['name' => 'Camera Management', 'methods' => ['GET', 'POST'], 'auth' => 'admin_session']),

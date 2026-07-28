@@ -35,8 +35,9 @@ All endpoints below are relative to this base URL (e.g. `/api/patrol_requests_re
 | Content-Type | `application/json` |
 | Request body | JSON object |
 | Response body | JSON object with `success` boolean |
-| Authentication | `X-API-Key: {key}` **or** `Authorization: Bearer {key}` |
-| HTTP methods | Partner inbound endpoints use **POST** only |
+| **Inbound auth** | **Public — no API key** |
+| Outbound auth | AlertaraQC sends `X-API-Key` / `Bearer` when calling partner URLs |
+| HTTP methods | Partner inbound endpoints use **POST** (lists use **GET**) |
 
 ### Standard error response
 
@@ -53,10 +54,10 @@ All endpoints below are relative to this base URL (e.g. `/api/patrol_requests_re
 |------|---------|
 | 200 | Success |
 | 400 | Invalid or missing fields |
-| 401 | Invalid or missing API key |
+| 401 | Unauthorized (admin-only actions / outbound reference receivers) |
 | 405 | Wrong HTTP method |
 | 500 | Server / database error |
-| 503 | API key not configured on server |
+| 503 | Outbound partner URL/key not configured |
 
 ---
 
@@ -86,13 +87,11 @@ Reference receive endpoints (for local testing) are included in this repo under 
 
 ## Environment Variables (.env)
 
+Inbound partner APIs on AlertaraQC are **public** (no keys). Configure outbound keys/URLs only:
+
 | Variable | Used for |
 |----------|----------|
-| `PATROL_REQUEST_API_KEY` | Group 6 & 8 → patrol request inbound |
-| `AWARENESS_EVENTS_API_KEY` | Group 6 → awareness events & post-event reports |
-| `CCTV_REQUEST_API_KEY` | Partner → CCTV request inbound |
-| `CRIME_ANALYTICS_API_KEY` | Crime Analytics → high-risk alerts (legacy: `GROUP5_API_KEY`) |
-| `INCIDENT_REPORTING_API_KEY` | Shared key for Incident Reporting tip + complaint APIs (legacy: `BLOTTER_API_KEY`) |
+| `INCIDENT_REPORTING_API_KEY` | Shared key when AlertaraQC calls Incident Reporting (legacy: `BLOTTER_API_KEY`) |
 | `INCIDENT_REPORTING_API_URL` | AlertaraQC → Incident Reporting complaint (legacy: `BLOTTER_API_URL`) |
 | `INCIDENT_REPORTING_TIP_API_URL` | AlertaraQC → Incident Reporting tip (legacy: `TIP_BLOTTER_API_URL`) |
 | `EMERGENCY_RESPONSE_API_KEY` | Emergency Response police backup (legacy: `GROUP3_API_KEY`) |
@@ -103,10 +102,6 @@ Reference receive endpoints (for local testing) are included in this repo under 
 ### Local testing example
 
 ```env
-PATROL_REQUEST_API_KEY=test-patrol-key
-AWARENESS_EVENTS_API_KEY=test-awareness-key
-CCTV_REQUEST_API_KEY=test-cctv-key
-
 INCIDENT_REPORTING_API_KEY=test-incident-reporting-key
 INCIDENT_REPORTING_API_URL=http://localhost/cpsqc-main/api/blotter_receive.php
 INCIDENT_REPORTING_TIP_API_URL=http://localhost/cpsqc-main/api/tip_incident_receive.php
@@ -119,6 +114,7 @@ EMERGENCY_RESPONSE_API_URL=http://localhost/cpsqc-main/api/coordination_receive.
 
 # Part A — Inbound APIs (Partners send TO AlertaraQC)
 
+> All Part A endpoints are **public** — send JSON with `Content-Type: application/json` only.
 ---
 
 ## A1. Patrol Request — Group 6 & Group 8
@@ -128,7 +124,7 @@ Submit an event patrol request from Awareness/Outreach (Group 6) or Community Ev
 | | |
 |---|---|
 | **Endpoint** | `POST /api/patrol_requests_receive.php` |
-| **API key** | `PATROL_REQUEST_API_KEY` |
+| **Auth** | Public (no API key) |
 | **Allowed source groups** | `group_6`, `group_8` |
 | **Generated ID format** | `PT-REQ-YYYY-###` (e.g. `PT-REQ-2026-001`) |
 
@@ -136,7 +132,6 @@ Submit an event patrol request from Awareness/Outreach (Group 6) or Community Ev
 
 ```
 Content-Type: application/json
-X-API-Key: {PATROL_REQUEST_API_KEY}
 ```
 
 ### Request body
@@ -202,7 +197,7 @@ Browse submitted patrol requests in the browser or via API client.
 | | |
 |---|---|
 | **Endpoint** | `GET /api/patrol_requests.php` |
-| **API key** | `PATROL_REQUEST_API_KEY` (header or `?api_key=` query for browser testing) |
+| **Auth** | Public (no API key) |
 | **Pretty print** | Compact JSON by default; use browser Pretty-print checkbox or `?pretty=1` |
 
 **Query parameters (all optional):**
@@ -213,13 +208,12 @@ Browse submitted patrol requests in the browser or via API client.
 | `status` | Filter by status (`Pending`, `Approved`, `Scheduled`, etc.) |
 | `source_group` | Filter by `group_6` or `group_8` |
 | `source_reference_id` | Filter by partner reference ID |
-| `api_key` | API key for browser access (GET only) |
 | `pretty` | `1` for server-side pretty-print (optional) |
 
 **Browser example:**
 
 ```
-http://localhost/cpsqc-main/api/patrol_requests.php?api_key=YOUR_KEY
+http://localhost/cpsqc-main/api/patrol_requests.php
 ```
 
 **Success response (HTTP 200):**
@@ -261,7 +255,6 @@ http://localhost/cpsqc-main/api/patrol_requests.php?api_key=YOUR_KEY
 ```bash
 curl -X POST "http://localhost/cpsqc-main/api/patrol_requests_receive.php" \
   -H "Content-Type: application/json" \
-  -H "X-API-Key: test-patrol-key" \
   -d '{
     "source_group": "group_8",
     "requesting_unit": "Community Events Office",
@@ -287,14 +280,13 @@ Submit a CCTV footage request from an external agency or partner system.
 | | |
 |---|---|
 | **Endpoint** | `POST /api/cctv_requests_receive.php` |
-| **API key** | `CCTV_REQUEST_API_KEY` |
+| **Auth** | Public (no API key) |
 | **Generated ID format** | `CCTV-REQ-YYYY-###` (e.g. `CCTV-REQ-2026-001`) |
 
 ### Request headers
 
 ```
 Content-Type: application/json
-X-API-Key: {CCTV_REQUEST_API_KEY}
 ```
 
 ### Request body
@@ -371,7 +363,7 @@ X-API-Key: {CCTV_REQUEST_API_KEY}
 | | |
 |---|---|
 | **Endpoint** | `GET /api/cctv_requests.php` |
-| **API key** | `CCTV_REQUEST_API_KEY` (header or `?api_key=` query for browser testing) |
+| **Auth** | Public (no API key) |
 | **Pretty print** | Compact JSON by default; use browser Pretty-print checkbox or `?pretty=1` |
 
 **Query parameters (all optional):**
@@ -382,13 +374,12 @@ X-API-Key: {CCTV_REQUEST_API_KEY}
 | `status` | Filter by status (`Pending`, `Approved`, `Fulfilled`, etc.) |
 | `source_reference_id` | Filter by partner reference ID |
 | `requesting_agency` | Partial match on agency name |
-| `api_key` | API key for browser access (GET only) |
 | `pretty` | `1` for server-side pretty-print (optional) |
 
 **Browser example:**
 
 ```
-http://localhost/cpsqc-main/api/cctv_requests.php?api_key=YOUR_KEY
+http://localhost/cpsqc-main/api/cctv_requests.php
 ```
 
 **Success response (HTTP 200):**
@@ -420,7 +411,6 @@ http://localhost/cpsqc-main/api/cctv_requests.php?api_key=YOUR_KEY
 ```bash
 curl -X POST "http://localhost/cpsqc-main/api/cctv_requests_receive.php" \
   -H "Content-Type: application/json" \
-  -H "X-API-Key: test-cctv-key" \
   -d '{
     "requesting_agency": "Barangay San Agustin Legal Office",
     "contact_person": "Atty. Rosa Dela Cruz",
@@ -521,7 +511,7 @@ Submit scheduled awareness/outreach events and post-event reports from Group 6 (
 | | |
 |---|---|
 | **Endpoint** | `POST /api/awareness_events_receive.php` |
-| **API key** | `AWARENESS_EVENTS_API_KEY` |
+| **Auth** | Public (no API key) |
 | **Allowed source groups** | `group_6` |
 | **Record types** | `event` (scheduled event) or `report` (post-event summary) |
 | **Generated ID formats** | `EVT-YYYY-###` (events), `EVT-RPT-YYYY-###` (reports) |
@@ -530,7 +520,6 @@ Submit scheduled awareness/outreach events and post-event reports from Group 6 (
 
 ```
 Content-Type: application/json
-X-API-Key: {AWARENESS_EVENTS_API_KEY}
 ```
 
 ### Submit scheduled event (`record_type: "event"`)
@@ -647,8 +636,7 @@ X-API-Key: {AWARENESS_EVENTS_API_KEY}
 | | |
 |---|---|
 | **Endpoint** | `GET /api/awareness_events.php` |
-| **API key** | `AWARENESS_EVENTS_API_KEY` (header or `?api_key=` for browser testing) |
-| **Admin session** | Logged-in BPSO admin can also browse without API key |
+| **Auth** | Public (no API key) |
 
 **Query parameters:**
 
@@ -659,14 +647,13 @@ X-API-Key: {AWARENESS_EVENTS_API_KEY}
 | `report_id` | Filter reports by `EVT-RPT-YYYY-###` |
 | `status` | Filter events by status |
 | `event_type` | Filter events by type |
-| `api_key` | API key for browser access (GET only) |
 | `pretty` | `1` for server-side pretty-print (optional) |
 
 **Browser examples:**
 
 ```
-http://localhost/cpsqc-main/api/awareness_events.php?record_type=event&api_key=YOUR_KEY
-http://localhost/cpsqc-main/api/awareness_events.php?record_type=report&api_key=YOUR_KEY
+http://localhost/cpsqc-main/api/awareness_events.php?record_type=event
+http://localhost/cpsqc-main/api/awareness_events.php?record_type=report
 ```
 
 ### cURL examples
@@ -675,7 +662,6 @@ http://localhost/cpsqc-main/api/awareness_events.php?record_type=report&api_key=
 # Submit scheduled event
 curl -X POST "http://localhost/cpsqc-main/api/awareness_events_receive.php" \
   -H "Content-Type: application/json" \
-  -H "X-API-Key: test-awareness-key" \
   -d '{
     "record_type": "event",
     "source_group": "group_6",
@@ -691,7 +677,6 @@ curl -X POST "http://localhost/cpsqc-main/api/awareness_events_receive.php" \
 # Submit post-event report
 curl -X POST "http://localhost/cpsqc-main/api/awareness_events_receive.php" \
   -H "Content-Type: application/json" \
-  -H "X-API-Key: test-awareness-key" \
   -d '{
     "record_type": "report",
     "source_group": "group_6",
@@ -905,18 +890,20 @@ Request police backup for a reviewed tip.
 
 | Group | Direction | Endpoint | API Key |
 |-------|-----------|----------|---------|
-| Group 6 & 8 | Partner → AlertaraQC | `POST /api/patrol_requests_receive.php` | `PATROL_REQUEST_API_KEY` |
-| Group 6 & 8 | Partner → AlertaraQC (list) | `GET /api/patrol_requests.php` | `PATROL_REQUEST_API_KEY` |
-| Group 6 | Partner → AlertaraQC | `POST /api/awareness_events_receive.php` | `AWARENESS_EVENTS_API_KEY` |
-| Group 6 | Partner → AlertaraQC (list) | `GET /api/awareness_events.php` | `AWARENESS_EVENTS_API_KEY` |
-| CCTV partner | Partner → AlertaraQC | `POST /api/cctv_requests_receive.php` | `CCTV_REQUEST_API_KEY` |
-| CCTV partner | Partner → AlertaraQC (list) | `GET /api/cctv_requests.php` | `CCTV_REQUEST_API_KEY` |
+| Group 6 & 8 | Partner → AlertaraQC | `POST /api/patrol_requests_receive.php` | Public |
+| Group 6 & 8 | Partner → AlertaraQC (list) | `GET /api/patrol_requests.php` | Public |
+| Group 6 | Partner → AlertaraQC | `POST /api/awareness_events_receive.php` | Public |
+| Group 6 | Partner → AlertaraQC (list) | `GET /api/awareness_events.php` | Public |
+| CCTV partner | Partner → AlertaraQC | `POST /api/cctv_requests_receive.php` | Public |
+| CCTV partner | Partner → AlertaraQC (list) | `GET /api/cctv_requests.php` | Public |
 | Incident Reporting (tips) | AlertaraQC → Partner | Partner hosts URL (`INCIDENT_REPORTING_TIP_API_URL`) | `INCIDENT_REPORTING_API_KEY` |
 | Incident Reporting (complaints) | AlertaraQC → Partner | Partner hosts URL (`INCIDENT_REPORTING_API_URL`) | `INCIDENT_REPORTING_API_KEY` |
 | Incident Reporting (CCTV evidence) | AlertaraQC → Partner | Partner hosts URL (`CCTV_EVIDENCE_API_URL` or `INCIDENT_REPORTING_API_URL`) | `INCIDENT_REPORTING_API_KEY` |
 | Incident Reporting (CCTV download) | Partner → AlertaraQC | `GET /api/cctv_evidence_download.php` | `INCIDENT_REPORTING_API_KEY` |
 | Emergency Response (backup) | AlertaraQC → Partner | Partner hosts URL (`EMERGENCY_RESPONSE_API_URL`) | `EMERGENCY_RESPONSE_API_KEY` |
-| Crime Analytics (alerts) | Partner → AlertaraQC | `POST /api/crime_analytics_alerts_receive.php` | `CRIME_ANALYTICS_API_KEY` |
+| Crime Analytics (alerts) | Partner → AlertaraQC | `POST /api/crime_analytics_alerts_receive.php` | Public |
+| Crime Analytics (list) | Partner → AlertaraQC | `GET /api/risk_alerts.php` | Public |
+| Incident Reporting (status) | Partner → AlertaraQC | `POST /api/complaints_status_receive.php` | Public |
 
 ---
 

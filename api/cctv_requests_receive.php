@@ -4,7 +4,7 @@
  * Inbound API for partner groups submitting CCTV footage requests.
  *
  * POST JSON — same fields as api/cctv_requests.php create action.
- * Headers: X-API-Key or Authorization: Bearer {CCTV_REQUEST_API_KEY}
+ * Public — no API key required.
  */
 
 header('Content-Type: application/json');
@@ -22,18 +22,6 @@ require_once __DIR__ . '/notifications_schema.php';
 if (!$pdo instanceof PDO) {
     http_response_code(500);
     echo json_encode(['success' => false, 'message' => 'Database connection unavailable.']);
-    exit;
-}
-
-if (!requireConfiguredCctvRequestApiKey()) {
-    $expectedKey = trim($_ENV['CCTV_REQUEST_API_KEY'] ?? '');
-    http_response_code($expectedKey === '' ? 503 : 401);
-    echo json_encode([
-        'success' => false,
-        'message' => $expectedKey === ''
-            ? 'CCTV request API is not configured. Set CCTV_REQUEST_API_KEY in .env.'
-            : 'Invalid or missing API key.',
-    ]);
     exit;
 }
 

@@ -95,12 +95,6 @@ if ($method === 'GET') {
 }
 
 if ($method === 'POST' && $action === 'create') {
-    if (!$isAdmin && !validatePatrolRequestApiKey()) {
-        http_response_code(401);
-        echo json_encode(['success' => false, 'message' => 'Invalid or missing API key.']);
-        exit;
-    }
-
     $data = normalizePatrolRequestInput($input);
     $error = validatePatrolRequestRequiredFields($data);
     if ($error !== null) {

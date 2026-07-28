@@ -3,13 +3,12 @@
 Live catalog: `/api/integration.php?pretty=1`  
 Full guide: `/api/API_INTEGRATION.md`
 
-Base URL (local): `http://localhost/cpsqc-main`
+Base URL (local): `http://localhost/cpsqc-main`  
+Production: `https://surveillance.alertaraqc.com`
 
-Auth header for all partner calls:
-```
-Content-Type: application/json
-X-API-Key: {key from .env}
-```
+**Inbound partner APIs are public** — only `Content-Type: application/json` is required. No API key.
+
+Outbound (AlertaraQC → partners) still uses keys configured in `.env` when calling partner receive URLs.
 
 Partner rename map (legacy names still accepted in code/env fallbacks):
 
@@ -28,8 +27,8 @@ Partners **send** footage requests into AlertaraQC.
 | | |
 |---|---|
 | Endpoint | `POST /api/cctv_requests_receive.php` |
-| API key | `CCTV_REQUEST_API_KEY` |
-| List | `GET /api/cctv_requests.php?api_key=...` |
+| Auth | Public (no API key) |
+| List | `GET /api/cctv_requests.php` |
 
 ### Sample body
 ```json
@@ -77,7 +76,7 @@ Fields sent: complainant name/address/contact, date & time, defendant name/addre
 | | |
 |---|---|
 | Endpoint | `POST /api/complaints_status_receive.php` |
-| API key | `INCIDENT_REPORTING_API_KEY` |
+| Auth | Public (no API key) |
 
 ```json
 {
@@ -96,8 +95,8 @@ Allowed status: `Pending`, `Processing`, `Resolved`, `Rejected`, `Forwarded to D
 | | |
 |---|---|
 | Endpoint | `POST /api/awareness_events_receive.php` |
-| API key | `AWARENESS_EVENTS_API_KEY` |
-| List | `GET /api/awareness_events.php?record_type=event&api_key=...` |
+| Auth | Public (no API key) |
+| List | `GET /api/awareness_events.php?record_type=event` |
 
 ```json
 {
@@ -124,8 +123,8 @@ Same endpoint as Event List with `record_type: "report"`.
 | | |
 |---|---|
 | Endpoint | `POST /api/awareness_events_receive.php` |
-| API key | `AWARENESS_EVENTS_API_KEY` |
-| List | `GET /api/awareness_events.php?record_type=report&api_key=...` |
+| Auth | Public (no API key) |
+| List | `GET /api/awareness_events.php?record_type=report` |
 
 ```json
 {
@@ -166,7 +165,7 @@ Police backup uses **Emergency Response**:
 ## Quick local test (PowerShell)
 
 ```powershell
-$headers = @{ "X-API-Key" = "test-cctv-key"; "Content-Type" = "application/json" }
+$headers = @{ "Content-Type" = "application/json" }
 $body = @{
   agency = "PNP"
   contact_number = "09171234567"

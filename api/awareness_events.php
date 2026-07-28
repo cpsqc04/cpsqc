@@ -114,10 +114,6 @@ if ($method === 'POST') {
     $action = $input['action'] ?? '';
 
     if ($action === 'create') {
-        if (!$isAdmin && !validateAwarenessEventApiKey()) {
-            jsonResponse(['success' => false, 'message' => 'Invalid or missing API key.'], 401, false);
-        }
-
         $recordType = strtolower(trim($input['record_type'] ?? 'event'));
         if ($recordType === 'report') {
             $data = normalizeAwarenessEventReportInput($input);
