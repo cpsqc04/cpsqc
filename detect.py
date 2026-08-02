@@ -141,7 +141,17 @@ MIN_RECORDING_DURATION = 120  # Discard fragments shorter than 2 minutes
 RECORDING_BUCKET_SECONDS = 300  # Align filenames to 5-minute windows
 RECORDING_CODEC = 'avc1'  # H.264 for browser playback (fallback: mp4v)
 RECORDING_EXTENSION = '.mp4'  # File extension for recordings
-RECORDING_RETENTION_DAYS = 30  # Auto-delete recordings older than 30 days
+RECORDING_RETENTION_DAYS = 7  # Auto-delete recordings older than N days
+# Idle / activity-aware recording (saves disk + CPU when nothing is happening)
+RECORD_ACTIVITY_HOLD_SECONDS = 45  # Full-rate record this long after motion/detection
+IDLE_RECORD_EVERY_N = 20  # When idle, write only every Nth frame (~1–2 fps at 30 fps)
+IDLE_CPU_SLEEP = 0.04  # Extra sleep per frame while idle (reduces PC load)
+MOTION_MEAN_DIFF_THRESHOLD = 12.0  # Mean abs grayscale frame-diff for "motion"
+MOTION_CHANGED_RATIO = 0.015  # Min share of pixels that changed
+# Stop detect.py when Open Surveillance stops sending heartbeats
+HEARTBEAT_FILE = "detection_heartbeat.json"
+IDLE_AUTO_STOP_SECONDS = 600  # Exit after 10 minutes without a viewer heartbeat
+IDLE_AUTO_STOP_ENABLED = True
 CONFIDENCE_THRESHOLD = 0.35
 PLANT_CONFIDENCE_THRESHOLD = 0.20  # Potted plants are often lower-confidence in YOLO
 PHONE_CONFIDENCE_THRESHOLD = 0.25  # Phones are small / often partially occluded
@@ -3250,6 +3260,66 @@ def remove_lock():
     except Exception:
         pass
 
+
+def write_detection_heartbeat(source="detect.py"):
+    """Touch heartbeat so idle auto-stop has a fresh start window."""
+    try:
+        payload = {
+            "updated_at": time.time(),
+            "source": source,
+            "pid": os.getpid(),
+        }
+        with open(HEARTBEAT_FILE, "w", encoding="utf-8") as f:
+            json.dump(payload, f)
+    except Exception:
+        pass
+
+
+def read_heartbeat_age_seconds():
+    """Return age of heartbeat file in seconds, or None if missing/unreadable."""
+    path = Path(HEARTBEAT_FILE)
+    if not path.exists():
+        return None
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        updated = float(data.get("updated_at") or 0)
+        if updated <= 0:
+            return time.time() - path.stat().st_mtime
+        return max(0.0, time.time() - updated)
+    except Exception:
+        try:
+            return max(0.0, time.time() - path.stat().st_mtime)
+        except Exception:
+            return None
+
+
+def should_idle_auto_stop():
+    """True when viewer heartbeat is stale (Open Surveillance closed / idle)."""
+    if not IDLE_AUTO_STOP_ENABLED:
+        return False
+    age = read_heartbeat_age_seconds()
+    if age is None:
+        return False
+    return age >= IDLE_AUTO_STOP_SECONDS
+
+
+def frame_has_motion(prev_gray, frame, threshold=MOTION_MEAN_DIFF_THRESHOLD, changed_ratio=MOTION_CHANGED_RATIO):
+    """Cheap motion check via grayscale frame difference."""
+    try:
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        gray = cv2.GaussianBlur(gray, (5, 5), 0)
+        if prev_gray is None or prev_gray.shape != gray.shape:
+            return False, gray
+        diff = cv2.absdiff(prev_gray, gray)
+        mean_diff = float(np.mean(diff))
+        changed = float(np.count_nonzero(diff > 25)) / float(diff.size)
+        moving = mean_diff >= threshold or changed >= changed_ratio
+        return moving, gray
+    except Exception:
+        return False, prev_gray
+
+
 def main():
     """Main detection loop with robust error handling and auto-reconnection"""
     global FRAME_WIDTH, FRAME_HEIGHT
@@ -3289,11 +3359,16 @@ def main():
             cleanup_old_recordings()
             print(f"✓ Recording policy: {RECORDING_CHUNK_DURATION // 60}-min segments, min {MIN_RECORDING_DURATION // 60} min kept")
             print(f"✓ Retention policy: auto-delete after {RECORDING_RETENTION_DAYS} days")
+            print(f"✓ Idle recording: full rate for {RECORD_ACTIVITY_HOLD_SECONDS}s after motion/detection; else 1/{IDLE_RECORD_EVERY_N} frames")
             print(f"  HTTP recording: {HTTP_RECORDING_FPS:.2f} fps (snapshot every {HTTP_SNAPSHOT_INTERVAL:.1f}s)")
             print(f"  RTSP recording: {RECORDING_FPS} fps")
         except Exception as e:
             print(f"Warning: Could not create recordings directory: {e}")
             print("Recording will be disabled")
+
+    write_detection_heartbeat(source="detect.py-start")
+    if IDLE_AUTO_STOP_ENABLED:
+        print(f"✓ Idle auto-stop: exit after {IDLE_AUTO_STOP_SECONDS // 60} min without Open Surveillance heartbeat")
     
     # Initialize video writer (will be created when stream connects)
     video_writer_info = None
@@ -3318,11 +3393,25 @@ def main():
     last_frame_time = time.time()
     last_overlay_detections = []
     consecutive_failures = 0
+    last_activity_at = time.time()
+    prev_motion_gray = None
+    last_heartbeat_check = 0.0
+    idle_recording = False
+    stop_requested = False
     
     http_snapshot_url = None
     http_mode = False
     
     while True:
+        if stop_requested or should_idle_auto_stop():
+            if not stop_requested:
+                print(f"\n⏹ Idle auto-stop: no viewer heartbeat for {IDLE_AUTO_STOP_SECONDS // 60} minutes.")
+                print("Open Surveillance again to restart detection.")
+            if video_writer_info is not None:
+                finalize_video_writer(video_writer_info, discard_short=True)
+                video_writer_info = None
+            break
+
         # Connect to stream
         cap = connect_to_stream(RTSP_URL)
         
@@ -3500,27 +3589,52 @@ def main():
                 
                 current_time = time.time()
 
+                # Viewer heartbeat: exit when Open Surveillance is closed / idle
+                if current_time - last_heartbeat_check >= 5.0:
+                    last_heartbeat_check = current_time
+                    if should_idle_auto_stop():
+                        print(f"\n⏹ Idle auto-stop: no viewer heartbeat for {IDLE_AUTO_STOP_SECONDS // 60} minutes.")
+                        print("Open Surveillance again to restart detection.")
+                        stop_requested = True
+                        break
+
+                # Motion check (cheap) — drives activity-aware recording
+                moving, prev_motion_gray = frame_has_motion(prev_motion_gray, frame)
+                if moving:
+                    last_activity_at = current_time
+
                 # Live web view: save immediately before detection/recording (lowest latency)
                 if save_live_frame(frame, frame_count):
                     last_frame_time = current_time
                 
-                # Write frame to video recording (before saving for display)
+                activity_active = (current_time - last_activity_at) <= RECORD_ACTIVITY_HOLD_SECONDS
+                was_idle = idle_recording
+                idle_recording = not activity_active
+                if idle_recording != was_idle:
+                    if idle_recording:
+                        print(f"[{datetime.now().strftime('%H:%M:%S')}] Idle recording mode (lower FPS)")
+                    else:
+                        print(f"[{datetime.now().strftime('%H:%M:%S')}] Activity recording mode (full FPS)")
+
+                # Write frame to video recording (full rate on activity; sparse when idle)
                 if ENABLE_RECORDING:
                     try:
-                        recording_fps = HTTP_RECORDING_FPS if http_mode else RECORDING_FPS
-                        if video_writer_info is None:
-                            video_writer_info = init_video_writer(FRAME_WIDTH, FRAME_HEIGHT, recording_fps)
+                        should_write = activity_active or (frame_count % IDLE_RECORD_EVERY_N == 0)
+                        if should_write:
+                            recording_fps = HTTP_RECORDING_FPS if http_mode else RECORDING_FPS
                             if video_writer_info is None:
-                                print("⚠ Warning: Video recording initialization failed, continuing without recording")
-                        if video_writer_info is not None:
-                            if should_rotate_video(video_writer_info, RECORDING_CHUNK_DURATION):
-                                video_writer_info = rotate_video_writer(
-                                    video_writer_info, FRAME_WIDTH, FRAME_HEIGHT, recording_fps
-                                )
-                            writer, filename, start_time, recorded_frames, write_fps = video_writer_info
-                            if writer is not None and writer.isOpened():
-                                writer.write(frame)
-                                video_writer_info = (writer, filename, start_time, recorded_frames + 1, write_fps)
+                                video_writer_info = init_video_writer(FRAME_WIDTH, FRAME_HEIGHT, recording_fps)
+                                if video_writer_info is None:
+                                    print("⚠ Warning: Video recording initialization failed, continuing without recording")
+                            if video_writer_info is not None:
+                                if should_rotate_video(video_writer_info, RECORDING_CHUNK_DURATION):
+                                    video_writer_info = rotate_video_writer(
+                                        video_writer_info, FRAME_WIDTH, FRAME_HEIGHT, recording_fps
+                                    )
+                                writer, filename, start_time, recorded_frames, write_fps = video_writer_info
+                                if writer is not None and writer.isOpened():
+                                    writer.write(frame)
+                                    video_writer_info = (writer, filename, start_time, recorded_frames + 1, write_fps)
                     except Exception as e:
                         if frame_count % 100 == 0:
                             print(f"⚠ Warning: Error writing to video: {e}")
@@ -3546,6 +3660,8 @@ def main():
                         detections = mark_suspicious_detections(detections)
                         detections = enrich_detections_for_display(detections)
                         last_overlay_detections = detections
+                        if detections:
+                            last_activity_at = current_time
                         # Always refresh detections.json so the UI stays in sync
                         if current_time - last_detection_save >= 0.5:
                             try:
@@ -3568,9 +3684,10 @@ def main():
 
                 frame_count += 1
                 
-                # No delay - process frames as fast as possible for lowest latency
-                # Only add minimal delay if processing is too fast (prevents CPU overload)
-                if FRAME_PROCESS_DELAY > 0:
+                # Reduce CPU when idle; keep snappy when there is activity
+                if not activity_active and IDLE_CPU_SLEEP > 0:
+                    time.sleep(IDLE_CPU_SLEEP)
+                elif FRAME_PROCESS_DELAY > 0:
                     time.sleep(FRAME_PROCESS_DELAY)
                 
                 # Periodic status update (don't reset frame_count - it's used for file alternation)

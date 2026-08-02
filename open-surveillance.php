@@ -530,10 +530,67 @@ $cctvNavActive = 'open-surveillance';
             updateDateTime();
             setInterval(updateDateTime, 1000);
             loadFeedCameraName();
+            ensureDetectionRunning();
             startCameraFeed();
-            setInterval(pollDetections, 500);
+            setInterval(pollDetections, 1000);
+            setInterval(sendDetectionHeartbeat, 30000);
             initFullscreen();
+            initDetectionLifecycle();
         });
+
+        async function detectionControl(action) {
+            const res = await fetch('api/detection_control.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: action }),
+                credentials: 'same-origin',
+                cache: 'no-store',
+            });
+            return res.json();
+        }
+
+        async function ensureDetectionRunning() {
+            try {
+                const result = await detectionControl('start');
+                if (result && result.message) {
+                    console.log('Detection:', result.message);
+                }
+                if (result && result.success === false) {
+                    showCameraError(result.message || 'Could not start CCTV detection.');
+                }
+            } catch (e) {
+                console.warn('Detection start failed', e);
+            }
+        }
+
+        async function sendDetectionHeartbeat() {
+            try {
+                await detectionControl('heartbeat');
+            } catch (e) {
+                /* ignore */
+            }
+        }
+
+        function initDetectionLifecycle() {
+            document.addEventListener('visibilitychange', function() {
+                if (document.visibilityState === 'visible') {
+                    ensureDetectionRunning();
+                    sendDetectionHeartbeat();
+                }
+            });
+
+            const stopOnLeave = function() {
+                try {
+                    if (navigator.sendBeacon) {
+                        const blob = new Blob([JSON.stringify({ action: 'stop' })], { type: 'application/json' });
+                        navigator.sendBeacon('api/detection_control.php', blob);
+                    }
+                } catch (e) {
+                    /* ignore */
+                }
+            };
+            window.addEventListener('pagehide', stopOnLeave);
+        }
 
         function initFullscreen() {
             const videoShell = document.getElementById('videoShell');

@@ -12,7 +12,7 @@ $frameFile = newestLiveFramePath();
 if ($frameFile === null) {
     http_response_code(404);
     header('Content-Type: application/json');
-    echo json_encode(['success' => false, 'message' => 'Camera frame not available. Run start_detection.bat']);
+    echo json_encode(['success' => false, 'message' => 'Camera frame not available. Open Surveillance starts detection automatically (or run start_detection.bat).']);
     exit;
 }
 

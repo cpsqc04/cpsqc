@@ -30,7 +30,7 @@ AlertaraQC supports BPSO patrol scheduling and monitoring, neighborhood watch co
 - **Frontend:** HTML, CSS, JavaScript
 - **Local stack:** XAMPP (Apache + MySQL)
 - **Email:** PHPMailer (Composer)
-- **CCTV detection (optional):** Python (`detect.py`)
+- **CCTV detection (optional):** Python (`detect.py`) — starts when admin opens **Open Surveillance**, stops on leave / after 10 minutes without heartbeat. Autostart is disabled.
 
 ---
 

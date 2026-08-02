@@ -37,6 +37,8 @@ detected_objects/
 current_frame*.jpg
 detect.lock
 detections.json
+detection_heartbeat.json
+detection_control.log
 
 # ML model weights (large; download separately)
 *.pt
