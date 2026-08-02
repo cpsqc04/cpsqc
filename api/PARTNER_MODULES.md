@@ -1,10 +1,13 @@
 # AlertaraQC — Five Partner Modules (API Cheat Sheet)
 
-Live catalog: `/api/integration.php?pretty=1`  
+Live catalog: `/api/partner-api.php`  
 Full guide: `/api/API_INTEGRATION.md`
 
 Base URL (local): `http://localhost/cpsqc-main`  
 Production: `https://surveillance.alertaraqc.com`
+
+**Share this link with partners:**
+`https://surveillance.alertaraqc.com/api/partner-api.php`
 
 **Inbound partner APIs are public** — only `Content-Type: application/json` is required. No API key.
 
@@ -17,6 +20,8 @@ Partner rename map (legacy names still accepted in code/env fallbacks):
 | **incident-reporting** | Group 1 |
 | **emergency-response** | Group 3 |
 | **crime-analytics** | Group 5 |
+| **campaign** | Group 6 |
+| **disaster-preparedness** | Group 8 |
 
 ---
 
@@ -101,7 +106,7 @@ Allowed status: `Pending`, `Processing`, `Resolved`, `Rejected`, `Forwarded to D
 ```json
 {
   "record_type": "event",
-  "source_group": "group_6",
+  "source_group": "campaign",
   "event_id": "EVT-2026-014",
   "event_name": "Community Safety Awareness",
   "date": "2026-07-25",
@@ -129,7 +134,7 @@ Same endpoint as Event List with `record_type: "report"`.
 ```json
 {
   "record_type": "report",
-  "source_group": "group_6",
+  "source_group": "campaign",
   "event_id": "EVT-2026-014",
   "attendance_count": 150,
   "survey_results": "85% Positive",

@@ -55,7 +55,7 @@ function ensurePatrolRequestsTable(PDO $pdo): void
 
     $additions = [
         'source' => "ALTER TABLE patrol_requests ADD COLUMN source VARCHAR(100) DEFAULT 'partner_api' AFTER request_id",
-        'source_group' => "ALTER TABLE patrol_requests ADD COLUMN source_group VARCHAR(50) NOT NULL DEFAULT 'group_6' AFTER source",
+        'source_group' => "ALTER TABLE patrol_requests ADD COLUMN source_group VARCHAR(50) NOT NULL DEFAULT 'campaign' AFTER source",
         'source_reference_id' => 'ALTER TABLE patrol_requests ADD COLUMN source_reference_id VARCHAR(100) DEFAULT NULL AFTER source_group',
         'requesting_unit' => 'ALTER TABLE patrol_requests ADD COLUMN requesting_unit VARCHAR(255) NOT NULL DEFAULT "" AFTER source_reference_id',
         'contact_person' => 'ALTER TABLE patrol_requests ADD COLUMN contact_person VARCHAR(255) NOT NULL DEFAULT "" AFTER requesting_unit',
@@ -86,6 +86,14 @@ function ensurePatrolRequestsTable(PDO $pdo): void
         if (!isset($columns[$column])) {
             $pdo->exec($sql);
         }
+    }
+
+    // Rename legacy partner codes to system names.
+    try {
+        $pdo->exec("UPDATE patrol_requests SET source_group = 'campaign' WHERE source_group IN ('group_6', 'group 6', 'Group 6')");
+        $pdo->exec("UPDATE patrol_requests SET source_group = 'disaster-preparedness' WHERE source_group IN ('group_8', 'group 8', 'Group 8')");
+    } catch (PDOException $e) {
+        // ignore
     }
 }
 
@@ -123,16 +131,31 @@ function generatePatrolRequestId(PDO $pdo): string
 
 function patrolRequestAllowedSourceGroups(): array
 {
-    return ['group_6', 'group_8'];
+    return ['campaign', 'disaster-preparedness'];
+}
+
+function normalizePatrolSourceGroup(string $sourceGroup): string
+{
+    $value = strtolower(trim($sourceGroup));
+    $value = str_replace([' ', '_'], '-', $value);
+
+    return match ($value) {
+        'group-6', 'group6', 'campaign' => 'campaign',
+        'group-8', 'group8', 'disaster-preparedness', 'disasterpreparedness' => 'disaster-preparedness',
+        default => $value,
+    };
 }
 
 function patrolRequestSourceGroupLabel(string $sourceGroup): string
 {
+    $normalized = normalizePatrolSourceGroup($sourceGroup);
     $map = [
-        'group_6' => 'Group 6',
-        'group_8' => 'Group 8',
+        'campaign' => 'Campaign',
+        'disaster-preparedness' => 'Disaster Preparedness',
+        'group_6' => 'Campaign',
+        'group_8' => 'Disaster Preparedness',
     ];
-    return $map[$sourceGroup] ?? $sourceGroup;
+    return $map[$normalized] ?? ($map[$sourceGroup] ?? $sourceGroup);
 }
 
 function validatePatrolRequestApiKey(): bool
@@ -166,13 +189,7 @@ function requireConfiguredPatrolRequestApiKey(): bool
 
 function normalizePatrolRequestInput(array $input): array
 {
-    $sourceGroup = strtolower(trim($input['source_group'] ?? $input['source'] ?? ''));
-    if ($sourceGroup === 'group 6') {
-        $sourceGroup = 'group_6';
-    }
-    if ($sourceGroup === 'group 8') {
-        $sourceGroup = 'group_8';
-    }
+    $sourceGroup = normalizePatrolSourceGroup((string) ($input['source_group'] ?? $input['source'] ?? ''));
 
     return [
         'source' => trim($input['source'] ?? 'partner_api'),
@@ -197,7 +214,7 @@ function normalizePatrolRequestInput(array $input): array
 function validatePatrolRequestRequiredFields(array $data): ?string
 {
     if (!in_array($data['source_group'], patrolRequestAllowedSourceGroups(), true)) {
-        return 'Source group must be group_6 or group_8.';
+        return 'Source group must be campaign or disaster-preparedness.';
     }
 
     $required = [

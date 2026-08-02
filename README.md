@@ -74,7 +74,7 @@ AlertaraQC supports BPSO patrol scheduling and monitoring, neighborhood watch co
 5. Open in the browser:
    - Resident portal: `http://localhost/cpsqc-main/resident-portal.php`
    - Admin login: `http://localhost/cpsqc-main/login.php`
-   - API catalog: `http://localhost/cpsqc-main/api/integration.php`
+   - Partner API: `http://localhost/cpsqc-main/api/partner-api.php`
 
 Tables are created/updated automatically by schema helpers when APIs are first used.
 
@@ -82,14 +82,15 @@ Tables are created/updated automatically by schema helpers when APIs are first u
 
 ## Partner API integrations
 
-Live JSON catalog: **`/api/integration.php`**  
+Live Partner API page: **`/api/partner-api.php`**  
+JSON catalog: **`/api/partner-api.php?format=json`**  
 Full guide: **[`api/API_INTEGRATION.md`](api/API_INTEGRATION.md)**
 
 | Direction | Partner | Endpoint / config |
 |-----------|---------|-------------------|
 | Inbound | Crime Analytics — high-risk alerts | `POST /api/crime_analytics_alerts_receive.php` (`CRIME_ANALYTICS_API_KEY`) |
-| Inbound | Group 6 / 8 — patrol requests | `POST /api/patrol_requests_receive.php` |
-| Inbound | Group 6 — awareness events | `POST /api/awareness_events_receive.php` |
+| Inbound | Campaign / Disaster Preparedness — patrol requests | `POST /api/patrol_requests_receive.php` |
+| Inbound | Campaign — awareness events | `POST /api/awareness_events_receive.php` |
 | Inbound | CCTV footage requests | `POST /api/cctv_requests_receive.php` |
 | Outbound | Incident Reporting — blotter / tips / CCTV evidence | `INCIDENT_REPORTING_API_URL`, `INCIDENT_REPORTING_TIP_API_URL`, `CCTV_EVIDENCE_API_URL` |
 | Outbound | Emergency Response — police backup | `EMERGENCY_RESPONSE_API_URL` |
@@ -117,7 +118,7 @@ Required fields: `rule_name`, `location` (or `area_name`), `severity` (`CRITICAL
 3. Keep a separate production `.env` on the server (never overwrite it with local secrets).
 4. Verify:
    - Site: `https://surveillance.alertaraqc.com`
-   - Catalog: `https://surveillance.alertaraqc.com/api/integration.php`
+   - Partner API: `https://surveillance.alertaraqc.com/api/partner-api.php`
 
 ---
 

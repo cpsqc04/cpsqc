@@ -47,16 +47,16 @@ if ($method === 'GET') {
             $params[':status'] = $status;
         }
 
-        $sourceGroup = strtolower(trim($_GET['source_group'] ?? ''));
-        if ($sourceGroup === 'group 6') {
-            $sourceGroup = 'group_6';
-        }
-        if ($sourceGroup === 'group 8') {
-            $sourceGroup = 'group_8';
-        }
+        $sourceGroup = normalizePatrolSourceGroup((string) ($_GET['source_group'] ?? ''));
         if ($sourceGroup !== '') {
-            $sql .= ' AND source_group = :source_group';
-            $params[':source_group'] = $sourceGroup;
+            if ($sourceGroup === 'campaign') {
+                $sql .= " AND source_group IN ('campaign', 'group_6', 'group 6')";
+            } elseif ($sourceGroup === 'disaster-preparedness') {
+                $sql .= " AND source_group IN ('disaster-preparedness', 'group_8', 'group 8')";
+            } else {
+                $sql .= ' AND source_group = :source_group';
+                $params[':source_group'] = $sourceGroup;
+            }
         }
 
         $sourceReferenceId = trim($_GET['source_reference_id'] ?? '');

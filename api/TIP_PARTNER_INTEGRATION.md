@@ -1,6 +1,6 @@
 # Tip Partner API Integration
 
-> **See also:** [`API_INTEGRATION.md`](./API_INTEGRATION.md) for the complete partner API guide including Patrol Request (Group 6/8), CCTV Request, Tips, Digital Blotter, and Emergency Response coordination.
+> **See also:** [`API_INTEGRATION.md`](./API_INTEGRATION.md) for the complete partner API guide including Patrol Request (Campaign / Disaster Preparedness), CCTV Request, Tips, Digital Blotter, and Emergency Response coordination.
 
 AlertaraQC forwards BPSO-reviewed community tips to partner systems via HTTP JSON APIs.
 

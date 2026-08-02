@@ -1,7 +1,7 @@
 <?php
 
 /**
- * Inbound API for Group 6 — Awareness and Outreach Event Tracking.
+ * Inbound API for Campaign — Awareness and Outreach Event Tracking.
  *
  * POST JSON with record_type: "event" or "report"
  * Public — no API key required.
@@ -103,7 +103,7 @@ try {
             $pdo,
             'awareness_event',
             'New Awareness Event',
-            'Event ' . $eventId . ' from Group 6 — ' . $data['event_name'],
+            'Event ' . $eventId . ' from Campaign — ' . $data['event_name'],
             'event-list.php?id=' . urlencode($eventId)
         );
 

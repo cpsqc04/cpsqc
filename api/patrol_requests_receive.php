@@ -1,7 +1,7 @@
 <?php
 
 /**
- * Inbound API for Group 6 and Group 8 event patrol requests.
+ * Inbound API for Campaign and Disaster Preparedness event patrol requests.
  *
  * POST JSON with patrol request fields.
  * Public — no API key required.

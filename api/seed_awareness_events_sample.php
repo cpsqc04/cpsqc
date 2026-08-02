@@ -1,6 +1,6 @@
 <?php
 /**
- * One-time sample data for awareness events (Group 6).
+ * One-time sample data for awareness events (Campaign).
  * Run: php api/seed_awareness_events_sample.php
  */
 
@@ -19,7 +19,7 @@ $events = [
     [
         'event_id' => 'EVT-2025-001',
         'source' => 'partner_api',
-        'source_group' => 'group_6',
+        'source_group' => 'campaign',
         'source_reference_id' => 'G6-EVT-2025-001',
         'event_name' => 'Community Safety Awareness',
         'event_date' => '2025-01-25',
@@ -34,7 +34,7 @@ $events = [
     [
         'event_id' => 'EVT-2025-002',
         'source' => 'partner_api',
-        'source_group' => 'group_6',
+        'source_group' => 'campaign',
         'source_reference_id' => 'G6-EVT-2025-002',
         'event_name' => 'Neighborhood Meeting',
         'event_date' => '2025-01-28',
@@ -49,7 +49,7 @@ $events = [
     [
         'event_id' => 'EVT-2025-003',
         'source' => 'partner_api',
-        'source_group' => 'group_6',
+        'source_group' => 'campaign',
         'source_reference_id' => 'G6-EVT-2025-003',
         'event_name' => 'Safety Training Workshop',
         'event_date' => '2025-02-01',
@@ -68,7 +68,7 @@ $reports = [
         'report_id' => 'EVT-RPT-2025-001',
         'event_id' => 'EVT-2025-001',
         'source' => 'partner_api',
-        'source_group' => 'group_6',
+        'source_group' => 'campaign',
         'source_reference_id' => 'G6-RPT-2025-001',
         'title' => 'Community Safety Awareness',
         'event_date' => '2025-01-15',
@@ -83,7 +83,7 @@ $reports = [
         'report_id' => 'EVT-RPT-2025-002',
         'event_id' => 'EVT-2025-002',
         'source' => 'partner_api',
-        'source_group' => 'group_6',
+        'source_group' => 'campaign',
         'source_reference_id' => 'G6-RPT-2025-002',
         'title' => 'Neighborhood Meeting',
         'event_date' => '2025-01-10',
@@ -98,7 +98,7 @@ $reports = [
         'report_id' => 'EVT-RPT-2025-003',
         'event_id' => 'EVT-2025-003',
         'source' => 'partner_api',
-        'source_group' => 'group_6',
+        'source_group' => 'campaign',
         'source_reference_id' => 'G6-RPT-2025-003',
         'title' => 'Safety Training Workshop',
         'event_date' => '2025-01-05',

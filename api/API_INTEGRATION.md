@@ -1,12 +1,13 @@
 # AlertaraQC — Partner API Integration Guide
 
-> **Live API catalog (JSON):** open [`/api/integration.php`](./integration.php) in your browser — check **Pretty-print** for readable formatting  
+> **Partner API (share this):** [`/api/partner-api.php`](./partner-api.php)  
+> **Live API catalog (JSON):** [`/api/partner-api.php?format=json`](./partner-api.php?format=json)  
 > **Five-module cheat sheet:** [`/api/PARTNER_MODULES.md`](./PARTNER_MODULES.md)  
-> Example: `http://localhost/cpsqc-main/api/integration.php`
+> Example: `https://surveillance.alertaraqc.com/api/partner-api.php`
 
 This document describes all HTTP JSON APIs used for integration between **AlertaraQC** (BPSO / Barangay San Agustin) and partner groups.
 
-Use this guide when implementing send or receive endpoints in Incident Reporting, Emergency Response, Group 6, Group 8, or other partner systems.
+Use this guide when implementing send or receive endpoints in Incident Reporting, Emergency Response, Campaign, Disaster Preparedness, or other partner systems.
 
 ---
 
@@ -68,7 +69,7 @@ All endpoints below are relative to this base URL (e.g. `/api/patrol_requests_re
 │                           AlertaraQC                                    │
 ├─────────────────────────────────────────────────────────────────────────┤
 │  INBOUND (partners → AlertaraQC)                                        │
-│    POST /api/patrol_requests_receive.php   ← Group 6, Group 8           │
+│    POST /api/patrol_requests_receive.php   ← Campaign, Disaster Preparedness           │
 │    POST /api/cctv_requests_receive.php     ← Footage Request            │
 │    POST /api/awareness_events_receive.php  ← Event List & Event Report  │
 │    POST /api/complaints_status_receive.php ← Track Complaint status     │
@@ -117,15 +118,15 @@ EMERGENCY_RESPONSE_API_URL=http://localhost/cpsqc-main/api/coordination_receive.
 > All Part A endpoints are **public** — send JSON with `Content-Type: application/json` only.
 ---
 
-## A1. Patrol Request — Group 6 & Group 8
+## A1. Patrol Request — Campaign & Disaster Preparedness
 
-Submit an event patrol request from Awareness/Outreach (Group 6) or Community Events (Group 8).
+Submit an event patrol request from Awareness/Outreach (Campaign) or Community Events (Disaster Preparedness).
 
 | | |
 |---|---|
 | **Endpoint** | `POST /api/patrol_requests_receive.php` |
 | **Auth** | Public (no API key) |
-| **Allowed source groups** | `group_6`, `group_8` |
+| **Allowed source groups** | `campaign`, `disaster-preparedness` |
 | **Generated ID format** | `PT-REQ-YYYY-###` (e.g. `PT-REQ-2026-001`) |
 
 ### Request headers
@@ -139,7 +140,7 @@ Content-Type: application/json
 ```json
 {
   "source": "partner_api",
-  "source_group": "group_6",
+  "source_group": "campaign",
   "source_reference_id": "EVT-G6-2026-014",
   "requesting_unit": "Awareness and Outreach Event Tracking",
   "contact_person": "Maria Clara Santos",
@@ -161,7 +162,7 @@ Content-Type: application/json
 
 | Field | Required | Notes |
 |-------|----------|-------|
-| `source_group` | Yes | `group_6` or `group_8` (also accepts `group 6` / `group 8`) |
+| `source_group` | Yes | `campaign` or `disaster-preparedness` (also accepts legacy `group_6` / `group_8`) |
 | `requesting_unit` | Yes | Organization or unit name |
 | `contact_person` | Yes | |
 | `contact_number` | Yes | |
@@ -206,7 +207,7 @@ Browse submitted patrol requests in the browser or via API client.
 |-----------|-------------|
 | `request_id` | Filter by request ID (e.g. `PT-REQ-2026-001`) |
 | `status` | Filter by status (`Pending`, `Approved`, `Scheduled`, etc.) |
-| `source_group` | Filter by `group_6` or `group_8` |
+| `source_group` | Filter by `campaign` or `disaster-preparedness` |
 | `source_reference_id` | Filter by partner reference ID |
 | `pretty` | `1` for server-side pretty-print (optional) |
 
@@ -226,8 +227,8 @@ http://localhost/cpsqc-main/api/patrol_requests.php
     {
       "id": 1,
       "request_id": "PT-REQ-2026-001",
-      "source_group": "group_6",
-      "source_group_label": "Group 6",
+      "source_group": "campaign",
+      "source_group_label": "Campaign",
       "event_name": "Barangay Safety & Disaster Preparedness Seminar",
       "event_date": "2026-07-18",
       "event_start_time": "08:00:00",
@@ -256,7 +257,7 @@ http://localhost/cpsqc-main/api/patrol_requests.php
 curl -X POST "http://localhost/cpsqc-main/api/patrol_requests_receive.php" \
   -H "Content-Type: application/json" \
   -d '{
-    "source_group": "group_8",
+    "source_group": "disaster-preparedness",
     "requesting_unit": "Community Events Office",
     "contact_person": "Juan Miguel Reyes",
     "contact_number": "09181234567",
@@ -504,15 +505,15 @@ CCTV_EVIDENCE_API_URL=http://localhost/cpsqc-main/api/cctv_evidence_receive.php
 
 ---
 
-## A3. Awareness Events & Reports — Group 6
+## A3. Awareness Events & Reports — Campaign
 
-Submit scheduled awareness/outreach events and post-event reports from Group 6 (Impact Monitoring and Evaluation / Awareness module). These appear in the BPSO Admin **Event List** and **Event Reports** pages.
+Submit scheduled awareness/outreach events and post-event reports from Campaign (Impact Monitoring and Evaluation / Awareness module). These appear in the BPSO Admin **Event List** and **Event Reports** pages.
 
 | | |
 |---|---|
 | **Endpoint** | `POST /api/awareness_events_receive.php` |
 | **Auth** | Public (no API key) |
-| **Allowed source groups** | `group_6` |
+| **Allowed source groups** | `campaign` |
 | **Record types** | `event` (scheduled event) or `report` (post-event summary) |
 | **Generated ID formats** | `EVT-YYYY-###` (events), `EVT-RPT-YYYY-###` (reports) |
 
@@ -528,7 +529,7 @@ Content-Type: application/json
 {
   "record_type": "event",
   "source": "partner_api",
-  "source_group": "group_6",
+  "source_group": "campaign",
   "source_reference_id": "G6-EVT-2026-014",
   "event_name": "Community Safety Awareness",
   "event_date": "2026-07-25",
@@ -549,7 +550,7 @@ Content-Type: application/json
 | Field | Required | Notes |
 |-------|----------|-------|
 | `record_type` | Yes | Must be `"event"` |
-| `source_group` | Yes | `group_6` |
+| `source_group` | Yes | `campaign` |
 | `event_name` | Yes | |
 | `event_date` | Yes | `YYYY-MM-DD` |
 | `event_time` | Yes | `HH:MM` or `HH:MM:SS` |
@@ -571,7 +572,7 @@ Content-Type: application/json
 {
   "record_type": "report",
   "source": "partner_api",
-  "source_group": "group_6",
+  "source_group": "campaign",
   "source_reference_id": "G6-RPT-2026-014",
   "event_id": "EVT-2026-001",
   "title": "Community Safety Awareness",
@@ -589,7 +590,7 @@ Content-Type: application/json
 | Field | Required | Notes |
 |-------|----------|-------|
 | `record_type` | Yes | Must be `"report"` |
-| `source_group` | Yes | `group_6` |
+| `source_group` | Yes | `campaign` |
 | `event_id` | Yes | Links to `EVT-YYYY-###` |
 | `title` | Yes | Event title |
 | `event_date` | Yes | Date event was held (`YYYY-MM-DD`) |
@@ -664,7 +665,7 @@ curl -X POST "http://localhost/cpsqc-main/api/awareness_events_receive.php" \
   -H "Content-Type: application/json" \
   -d '{
     "record_type": "event",
-    "source_group": "group_6",
+    "source_group": "campaign",
     "event_name": "Community Safety Awareness",
     "event_date": "2026-07-25",
     "event_time": "09:00",
@@ -679,7 +680,7 @@ curl -X POST "http://localhost/cpsqc-main/api/awareness_events_receive.php" \
   -H "Content-Type: application/json" \
   -d '{
     "record_type": "report",
-    "source_group": "group_6",
+    "source_group": "campaign",
     "event_id": "EVT-2026-001",
     "title": "Community Safety Awareness",
     "event_date": "2026-07-15",
@@ -890,10 +891,10 @@ Request police backup for a reviewed tip.
 
 | Group | Direction | Endpoint | API Key |
 |-------|-----------|----------|---------|
-| Group 6 & 8 | Partner → AlertaraQC | `POST /api/patrol_requests_receive.php` | Public |
-| Group 6 & 8 | Partner → AlertaraQC (list) | `GET /api/patrol_requests.php` | Public |
-| Group 6 | Partner → AlertaraQC | `POST /api/awareness_events_receive.php` | Public |
-| Group 6 | Partner → AlertaraQC (list) | `GET /api/awareness_events.php` | Public |
+| Campaign & Disaster Preparedness | Partner → AlertaraQC | `POST /api/patrol_requests_receive.php` | Public |
+| Campaign & Disaster Preparedness | Partner → AlertaraQC (list) | `GET /api/patrol_requests.php` | Public |
+| Campaign | Partner → AlertaraQC | `POST /api/awareness_events_receive.php` | Public |
+| Campaign | Partner → AlertaraQC (list) | `GET /api/awareness_events.php` | Public |
 | CCTV partner | Partner → AlertaraQC | `POST /api/cctv_requests_receive.php` | Public |
 | CCTV partner | Partner → AlertaraQC (list) | `GET /api/cctv_requests.php` | Public |
 | Incident Reporting (tips) | AlertaraQC → Partner | Partner hosts URL (`INCIDENT_REPORTING_TIP_API_URL`) | `INCIDENT_REPORTING_API_KEY` |
@@ -940,7 +941,7 @@ BPSO and NW portal APIs (`bpso_*`, `nw_*`) also require their respective portal 
 | File | Purpose |
 |------|---------|
 | `api/patrol_requests_receive.php` | Inbound patrol requests |
-| `api/awareness_events_receive.php` | Inbound Group 6 awareness events & reports |
+| `api/awareness_events_receive.php` | Inbound Campaign awareness events & reports |
 | `api/awareness_events.php` | List/manage awareness events & reports |
 | `api/cctv_requests_receive.php` | Inbound CCTV requests |
 | `api/cctv_evidence_receive.php` | Reference Incident Reporting CCTV evidence receiver |

@@ -1,6 +1,6 @@
 <?php
 /**
- * One-time sample data for patrol_requests (Group 6 & Group 8).
+ * One-time sample data for patrol_requests (Campaign & Disaster Preparedness).
  * Run: php api/seed_patrol_requests_sample.php
  */
 
@@ -18,7 +18,7 @@ $samples = [
     [
         'request_id' => 'PT-REQ-2026-001',
         'source' => 'partner_api',
-        'source_group' => 'group_6',
+        'source_group' => 'campaign',
         'source_reference_id' => 'EVT-G6-2026-014',
         'requesting_unit' => 'Awareness and Outreach Event Tracking',
         'contact_person' => 'Maria Clara Santos',
@@ -44,7 +44,7 @@ $samples = [
     [
         'request_id' => 'PT-REQ-2026-002',
         'source' => 'partner_api',
-        'source_group' => 'group_8',
+        'source_group' => 'disaster-preparedness',
         'source_reference_id' => 'EVT-G8-2026-007',
         'requesting_unit' => 'Community Events Office',
         'contact_person' => 'Juan Miguel Reyes',
@@ -70,7 +70,7 @@ $samples = [
     [
         'request_id' => 'PT-REQ-2026-003',
         'source' => 'partner_api',
-        'source_group' => 'group_6',
+        'source_group' => 'campaign',
         'source_reference_id' => 'EVT-G6-2026-021',
         'requesting_unit' => 'Impact Monitoring and Evaluation System',
         'contact_person' => 'Ana Patricia Lopez',
@@ -96,7 +96,7 @@ $samples = [
     [
         'request_id' => 'PT-REQ-2026-004',
         'source' => 'partner_api',
-        'source_group' => 'group_8',
+        'source_group' => 'disaster-preparedness',
         'source_reference_id' => 'EVT-G8-2026-011',
         'requesting_unit' => 'Community Events Office',
         'contact_person' => 'Roberto Dela Cruz',

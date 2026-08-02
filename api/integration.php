@@ -4,8 +4,8 @@
  * AlertaraQC — Full API catalog (browsable JSON).
  *
  * GET /api/integration.php
+ * Prefer sharing /api/partner-api.php with partners (cleaner entry page).
  * Returns a JSON catalog of every API endpoint in this system.
- * Share this URL with partner groups for integration reference.
  */
 
 require_once __DIR__ . '/../includes/json_response.php';
@@ -42,9 +42,10 @@ function getIntegrationCatalog(): array
         'generated_at' => date('c'),
         'base_url' => integrationBaseUrl(),
         'documentation' => [
+            'partner_api' => integrationBaseUrl() . '/api/partner-api.php',
             'markdown' => integrationBaseUrl() . '/api/API_INTEGRATION.md',
             'modules_cheat_sheet' => integrationBaseUrl() . '/api/PARTNER_MODULES.md',
-            'catalog' => integrationBaseUrl() . '/api/integration.php',
+            'catalog' => integrationBaseUrl() . '/api/partner-api.php?format=json',
         ],
         'conventions' => [
             'content_type' => 'application/json',
@@ -73,10 +74,10 @@ function getIntegrationCatalog(): array
                         'name' => 'Submit Patrol Request',
                         'methods' => ['POST'],
                         'auth' => 'public',
-                        'groups' => ['group_6', 'group_8'],
-                        'description' => 'Submit event patrol request from Group 6 or Group 8',
+                        'groups' => ['campaign', 'disaster-preparedness'],
+                        'description' => 'Submit event patrol request from Campaign or Disaster Preparedness',
                         'sample_request' => [
-                            'source_group' => 'group_6',
+                            'source_group' => 'campaign',
                             'requesting_unit' => 'Community Events Office',
                             'contact_person' => 'Juan Reyes',
                             'contact_number' => '09171234567',
@@ -100,7 +101,7 @@ function getIntegrationCatalog(): array
                         'query_params' => [
                             'request_id' => 'Filter by PT-REQ-YYYY-###',
                             'status' => 'Pending | Under Review | Approved | Scheduled | Rejected | Cancelled',
-                            'source_group' => 'group_6 | group_8',
+                            'source_group' => 'campaign | disaster-preparedness',
                             'source_reference_id' => 'Partner reference ID',
                             'pretty' => '1 for server-side pretty-print (optional)',
                         ],
@@ -162,11 +163,11 @@ function getIntegrationCatalog(): array
                         'name' => 'Submit Awareness Event or Report',
                         'methods' => ['POST'],
                         'auth' => 'public',
-                        'groups' => ['group_6'],
-                        'description' => 'Submit scheduled awareness event or post-event report from Group 6',
+                        'groups' => ['campaign'],
+                        'description' => 'Submit scheduled awareness event or post-event report from Campaign',
                         'sample_request_event' => [
                             'record_type' => 'event',
-                            'source_group' => 'group_6',
+                            'source_group' => 'campaign',
                             'source_reference_id' => 'G6-EVT-2026-014',
                             'event_name' => 'Community Safety Awareness',
                             'event_date' => '2026-07-25',
@@ -178,7 +179,7 @@ function getIntegrationCatalog(): array
                         ],
                         'sample_request_report' => [
                             'record_type' => 'report',
-                            'source_group' => 'group_6',
+                            'source_group' => 'campaign',
                             'event_id' => 'EVT-2026-001',
                             'title' => 'Community Safety Awareness',
                             'event_date' => '2026-07-15',
@@ -578,11 +579,12 @@ function getIntegrationCatalog(): array
             ],
         ],
         'quick_links' => [
-            'catalog' => integrationBaseUrl() . '/api/integration.php',
-            'patrol_list' => integrationBaseUrl() . '/api/patrol_requests.php?api_key={PATROL_REQUEST_API_KEY}',
-            'cctv_list' => integrationBaseUrl() . '/api/cctv_requests.php?api_key={CCTV_REQUEST_API_KEY}',
-            'awareness_events_list' => integrationBaseUrl() . '/api/awareness_events.php?record_type=event&api_key={AWARENESS_EVENTS_API_KEY}',
-            'awareness_reports_list' => integrationBaseUrl() . '/api/awareness_events.php?record_type=report&api_key={AWARENESS_EVENTS_API_KEY}',
+            'partner_api' => integrationBaseUrl() . '/api/partner-api.php',
+            'catalog' => integrationBaseUrl() . '/api/partner-api.php?format=json',
+            'patrol_list' => integrationBaseUrl() . '/api/patrol_requests.php',
+            'cctv_list' => integrationBaseUrl() . '/api/cctv_requests.php',
+            'awareness_events_list' => integrationBaseUrl() . '/api/awareness_events.php?record_type=event',
+            'awareness_reports_list' => integrationBaseUrl() . '/api/awareness_events.php?record_type=report',
             'markdown_docs' => integrationBaseUrl() . '/api/API_INTEGRATION.md',
         ],
     ];

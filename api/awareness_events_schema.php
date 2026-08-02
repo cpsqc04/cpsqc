@@ -19,7 +19,7 @@ function ensureAwarenessEventsTable(PDO $pdo): void
             id INT AUTO_INCREMENT PRIMARY KEY,
             event_id VARCHAR(50) NOT NULL UNIQUE,
             source VARCHAR(100) DEFAULT 'partner_api',
-            source_group VARCHAR(50) NOT NULL DEFAULT 'group_6',
+            source_group VARCHAR(50) NOT NULL DEFAULT 'campaign',
             source_reference_id VARCHAR(100) DEFAULT NULL,
             event_name VARCHAR(255) NOT NULL,
             event_date DATE NOT NULL,
@@ -43,7 +43,7 @@ function ensureAwarenessEventsTable(PDO $pdo): void
     } else {
         $additions = [
             'source' => "ALTER TABLE awareness_events ADD COLUMN source VARCHAR(100) DEFAULT 'partner_api' AFTER event_id",
-            'source_group' => "ALTER TABLE awareness_events ADD COLUMN source_group VARCHAR(50) NOT NULL DEFAULT 'group_6' AFTER source",
+            'source_group' => "ALTER TABLE awareness_events ADD COLUMN source_group VARCHAR(50) NOT NULL DEFAULT 'campaign' AFTER source",
             'source_reference_id' => 'ALTER TABLE awareness_events ADD COLUMN source_reference_id VARCHAR(100) DEFAULT NULL AFTER source_group',
             'contact_person' => 'ALTER TABLE awareness_events ADD COLUMN contact_person VARCHAR(255) DEFAULT NULL AFTER description',
             'contact_number' => 'ALTER TABLE awareness_events ADD COLUMN contact_number VARCHAR(50) DEFAULT NULL AFTER contact_person',
@@ -56,6 +56,12 @@ function ensureAwarenessEventsTable(PDO $pdo): void
                 $pdo->exec($sql);
             }
         }
+    }
+
+    try {
+        $pdo->exec("UPDATE awareness_events SET source_group = 'campaign' WHERE source_group IN ('group_6', 'group 6', 'Group 6')");
+    } catch (PDOException $e) {
+        // ignore
     }
 }
 
@@ -79,7 +85,7 @@ function ensureAwarenessEventReportsTable(PDO $pdo): void
             report_id VARCHAR(50) NOT NULL UNIQUE,
             event_id VARCHAR(50) NOT NULL,
             source VARCHAR(100) DEFAULT 'partner_api',
-            source_group VARCHAR(50) NOT NULL DEFAULT 'group_6',
+            source_group VARCHAR(50) NOT NULL DEFAULT 'campaign',
             source_reference_id VARCHAR(100) DEFAULT NULL,
             title VARCHAR(255) NOT NULL,
             event_date DATE NOT NULL,
@@ -101,7 +107,7 @@ function ensureAwarenessEventReportsTable(PDO $pdo): void
     } else {
         $additions = [
             'source' => "ALTER TABLE awareness_event_reports ADD COLUMN source VARCHAR(100) DEFAULT 'partner_api' AFTER event_id",
-            'source_group' => "ALTER TABLE awareness_event_reports ADD COLUMN source_group VARCHAR(50) NOT NULL DEFAULT 'group_6' AFTER source",
+            'source_group' => "ALTER TABLE awareness_event_reports ADD COLUMN source_group VARCHAR(50) NOT NULL DEFAULT 'campaign' AFTER source",
             'source_reference_id' => 'ALTER TABLE awareness_event_reports ADD COLUMN source_reference_id VARCHAR(100) DEFAULT NULL AFTER source_group',
             'evaluation_score' => 'ALTER TABLE awareness_event_reports ADD COLUMN evaluation_score VARCHAR(50) DEFAULT NULL AFTER survey_result',
             'event_outcome' => 'ALTER TABLE awareness_event_reports ADD COLUMN event_outcome TEXT DEFAULT NULL AFTER evaluation_score',
@@ -113,6 +119,12 @@ function ensureAwarenessEventReportsTable(PDO $pdo): void
                 $pdo->exec($sql);
             }
         }
+    }
+
+    try {
+        $pdo->exec("UPDATE awareness_event_reports SET source_group = 'campaign' WHERE source_group IN ('group_6', 'group 6', 'Group 6')");
+    } catch (PDOException $e) {
+        // ignore
     }
 }
 
@@ -143,15 +155,28 @@ function awarenessEventReportsSelectColumns(string $prefix = ''): string
 
 function awarenessEventAllowedSourceGroups(): array
 {
-    return ['group_6'];
+    return ['campaign'];
+}
+
+function normalizeAwarenessSourceGroup(string $sourceGroup): string
+{
+    $value = strtolower(trim($sourceGroup));
+    $value = str_replace([' ', '_'], '-', $value);
+
+    return match ($value) {
+        'group-6', 'group6', 'campaign' => 'campaign',
+        default => $value,
+    };
 }
 
 function awarenessEventSourceGroupLabel(string $sourceGroup): string
 {
+    $normalized = normalizeAwarenessSourceGroup($sourceGroup);
     $map = [
-        'group_6' => 'Group 6',
+        'campaign' => 'Campaign',
+        'group_6' => 'Campaign',
     ];
-    return $map[$sourceGroup] ?? $sourceGroup;
+    return $map[$normalized] ?? ($map[$sourceGroup] ?? $sourceGroup);
 }
 
 function validateAwarenessEventApiKey(): bool
@@ -219,10 +244,7 @@ function generateAwarenessEventReportId(PDO $pdo): string
 
 function normalizeAwarenessEventInput(array $input): array
 {
-    $sourceGroup = strtolower(trim($input['source_group'] ?? $input['source'] ?? 'group_6'));
-    if ($sourceGroup === 'group 6') {
-        $sourceGroup = 'group_6';
-    }
+    $sourceGroup = normalizeAwarenessSourceGroup((string) ($input['source_group'] ?? $input['source'] ?? 'campaign'));
 
     return [
         'source' => trim($input['source'] ?? 'partner_api'),
@@ -245,10 +267,7 @@ function normalizeAwarenessEventInput(array $input): array
 
 function normalizeAwarenessEventReportInput(array $input): array
 {
-    $sourceGroup = strtolower(trim($input['source_group'] ?? 'group_6'));
-    if ($sourceGroup === 'group 6') {
-        $sourceGroup = 'group_6';
-    }
+    $sourceGroup = normalizeAwarenessSourceGroup((string) ($input['source_group'] ?? 'campaign'));
 
     $survey = trim($input['survey_result'] ?? $input['survey_results'] ?? '');
     $evaluation = trim((string) ($input['evaluation_score'] ?? $input['evaluation'] ?? ''));
@@ -279,7 +298,7 @@ function normalizeAwarenessEventReportInput(array $input): array
 function validateAwarenessEventFields(array $data): ?string
 {
     if (!in_array($data['source_group'], awarenessEventAllowedSourceGroups(), true)) {
-        return 'Source group must be group_6.';
+        return 'Source group must be campaign.';
     }
 
     $required = [
@@ -307,7 +326,7 @@ function validateAwarenessEventFields(array $data): ?string
 function validateAwarenessEventReportFields(array $data): ?string
 {
     if (!in_array($data['source_group'], awarenessEventAllowedSourceGroups(), true)) {
-        return 'Source group must be group_6.';
+        return 'Source group must be campaign.';
     }
 
     $required = [
