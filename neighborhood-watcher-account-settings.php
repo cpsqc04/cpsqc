@@ -39,8 +39,9 @@ $nwActiveNav = 'account';
         .sidebar-logout-btn:hover { background: rgba(239, 68, 68, 0.2); color: #fff; }
         .main-wrapper { margin-left: 320px; flex: 1; display: flex; flex-direction: column; min-height: 100vh; transition: margin-left 0.3s ease; }
         body.sidebar-collapsed .main-wrapper { margin-left: 80px; }
-        .top-header { background: var(--header-bg); padding: 1.5rem 2rem 1rem; display: flex; justify-content: space-between; align-items: flex-end; position: sticky; top: 0; z-index: 100; border-bottom: 1px solid var(--border-color); }
+        .top-header { background: var(--header-bg); padding: 1.5rem 2rem 1rem; display: flex; justify-content: space-between; align-items: flex-end; position: sticky; top: 0; z-index: 1100; border-bottom: 1px solid var(--border-color); overflow: visible; }
         .top-header-content { flex: 1; display: flex; align-items: center; gap: 1rem; }
+        .user-info { display: flex; align-items: center; gap: 1rem; margin-left: 2rem; overflow: visible; position: relative; z-index: 1200; }
         .content-burger-btn { background: transparent; border: none; color: var(--tertiary-color); width: 40px; height: 40px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; }
         .content-burger-btn span { display: block; width: 22px; height: 1.5px; background: var(--tertiary-color); position: relative; }
         .content-burger-btn span::before, .content-burger-btn span::after { content: ''; position: absolute; width: 22px; height: 1.5px; background: var(--tertiary-color); }
@@ -110,9 +111,29 @@ $nwActiveNav = 'account';
                     <h1 class="page-title">Account Settings</h1>
                 </div>
             </div>
-            <div class="datetime-display">
-                <span class="date-part" id="currentDate"></span>
-                <span class="time-part" id="currentTime"></span>
+            <div class="user-info">
+                <div class="datetime-display">
+                    <span class="date-part" id="currentDate"></span>
+                    <span class="time-part" id="currentTime"></span>
+                </div>
+                <div class="notification-container">
+                    <button class="notification-bell" type="button" onclick="toggleNotifications(event)" aria-label="Notifications">
+                        <i class="fas fa-bell"></i>
+                        <span class="notification-badge" id="notificationBadge"></span>
+                    </button>
+                    <div class="notification-dropdown" id="notificationDropdown">
+                        <div class="notification-header">
+                            <h3>Notifications</h3>
+                            <button type="button" onclick="markAllNotificationsRead()">Mark all read</button>
+                        </div>
+                        <div class="notification-list" id="notificationList">
+                            <div class="notification-empty">
+                                <i class="fas fa-bell-slash"></i>
+                                <p>No notifications</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </header>
 
@@ -324,6 +345,7 @@ $nwActiveNav = 'account';
             loadProfile();
         });
     </script>
+    <?php require __DIR__ . '/includes/nw_notifications_script.php'; ?>
     <script src="js/mobile-shell.js"></script>
 </body>
 </html>

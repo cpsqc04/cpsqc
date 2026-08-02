@@ -6,6 +6,8 @@
 
     var API_URL = 'api/nw_notifications.php';
     var refreshTimer = null;
+    var outsideClickBound = false;
+    var suppressOutsideClose = false;
 
     function escapeHtml(text) {
         var div = document.createElement('div');
@@ -41,8 +43,12 @@
             return;
         }
         list.innerHTML = notifications.map(function (n) {
+            var icon = 'fa-bell';
+            if (n.type === 'bulletin_announcement') {
+                icon = 'fa-bullhorn';
+            }
             return '<div class="notification-item ' + (n.is_read ? '' : 'unread') + '" data-id="' + escapeHtml(String(n.id)) + '" data-link="' + escapeHtml(n.link || '') + '">' +
-                '<div class="notification-icon patrol"><i class="fas fa-bullhorn"></i></div>' +
+                '<div class="notification-icon event"><i class="fas ' + icon + '"></i></div>' +
                 '<div class="notification-content">' +
                     '<div class="notification-title">' + escapeHtml(n.title) + '</div>' +
                     '<div class="notification-message">' + escapeHtml(n.message) + '</div>' +
@@ -53,16 +59,25 @@
     }
 
     async function loadNotifications() {
+        var list = getEls().list;
         try {
-            await fetch(API_URL + '?action=sync', { credentials: 'same-origin' });
-            var res = await fetch(API_URL + '?action=list', { credentials: 'same-origin' });
-            if (!res.ok) return;
+            await fetch(API_URL + '?action=sync', { credentials: 'same-origin', cache: 'no-store' });
+            var res = await fetch(API_URL + '?action=list', { credentials: 'same-origin', cache: 'no-store' });
+            if (!res.ok) {
+                if (res.status === 401 && list) {
+                    list.innerHTML = '<div class="notification-empty"><i class="fas fa-exclamation-triangle"></i><p>Session expired. Please refresh.</p></div>';
+                }
+                return;
+            }
             var data = await res.json();
             if (!data.success) return;
             updateBadge(data.unread_count || 0);
             render(data.notifications || []);
         } catch (e) {
             console.error(e);
+            if (list) {
+                list.innerHTML = '<div class="notification-empty"><i class="fas fa-exclamation-triangle"></i><p>Failed to load notifications</p></div>';
+            }
         }
     }
 
@@ -73,18 +88,34 @@
         }
         var dropdown = getEls().dropdown;
         if (!dropdown) return;
+
+        var opening = !dropdown.classList.contains('show');
         dropdown.classList.toggle('show');
+
+        if (opening) {
+            suppressOutsideClose = true;
+            window.setTimeout(function () {
+                suppressOutsideClose = false;
+            }, 150);
+            loadNotifications();
+        }
     };
 
     window.markAllNotificationsRead = async function () {
-        await fetch(API_URL + '?action=mark_read', {
-            method: 'POST',
-            credentials: 'same-origin',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: 'action=mark_read'
-        });
-        loadNotifications();
+        try {
+            await fetch(API_URL + '?action=mark_read', {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: 'action=mark_read'
+            });
+            loadNotifications();
+        } catch (e) {
+            console.error(e);
+        }
     };
+
+    window.markAllAsRead = window.markAllNotificationsRead;
 
     function handleClick(id, link) {
         fetch(API_URL + '?action=mark_read', {
@@ -102,12 +133,13 @@
             var sectionId = parts[1] || 'bulletinSection';
             var postId = parseInt(parts[2], 10) || 0;
             if (typeof window.showPortalSection === 'function') {
-                window.showPortalSection(sectionId, true);
-            }
-            if (postId && window.DigitalBulletin && typeof window.DigitalBulletin.openDetailById === 'function') {
-                setTimeout(function () {
-                    window.DigitalBulletin.openDetailById(postId);
-                }, 350);
+                window.showPortalSection(sectionId, true, postId);
+            } else {
+                var dest = 'neighborhood-watcher-dashboard.php#' + encodeURIComponent(sectionId);
+                if (postId > 0) {
+                    dest += ':' + postId;
+                }
+                window.location.href = dest;
             }
         } else if (link) {
             window.location.href = link;
@@ -115,24 +147,33 @@
     }
 
     function init() {
-        var list = getEls().list;
-        if (!list) return;
+        var els = getEls();
+        if (!els.dropdown || !els.list) return;
 
-        list.addEventListener('click', function (e) {
-            var item = e.target.closest('.notification-item');
-            if (!item) return;
-            handleClick(parseInt(item.getAttribute('data-id'), 10), item.getAttribute('data-link') || '');
-        });
+        if (els.list.dataset.clickBound !== '1') {
+            els.list.dataset.clickBound = '1';
+            els.list.addEventListener('click', function (e) {
+                var item = e.target.closest('.notification-item');
+                if (!item) return;
+                handleClick(parseInt(item.getAttribute('data-id'), 10), item.getAttribute('data-link') || '');
+            });
+        }
 
-        document.addEventListener('click', function (e) {
-            var dropdown = getEls().dropdown;
-            if (dropdown && dropdown.classList.contains('show') && !e.target.closest('.notification-container')) {
-                dropdown.classList.remove('show');
-            }
-        });
+        if (!outsideClickBound) {
+            outsideClickBound = true;
+            document.addEventListener('click', function (e) {
+                if (suppressOutsideClose) return;
+                var dropdown = getEls().dropdown;
+                if (dropdown && dropdown.classList.contains('show') && !e.target.closest('.notification-container')) {
+                    dropdown.classList.remove('show');
+                }
+            });
+        }
 
         loadNotifications();
-        refreshTimer = setInterval(loadNotifications, 30000);
+        if (!refreshTimer) {
+            refreshTimer = setInterval(loadNotifications, 30000);
+        }
     }
 
     if (document.readyState === 'loading') {

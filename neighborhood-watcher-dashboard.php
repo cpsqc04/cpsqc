@@ -49,15 +49,9 @@ $nwActiveNav = 'bulletin';
         .sidebar.collapsed .sidebar-logout-btn { justify-content: center; }
         .main-wrapper { margin-left: 320px; flex: 1; display: flex; flex-direction: column; min-height: 100vh; transition: margin-left 0.3s ease; }
         body.sidebar-collapsed .main-wrapper { margin-left: 80px; }
-        .top-header { background: var(--header-bg); padding: 1.5rem 2rem 1rem; display: flex; justify-content: space-between; align-items: flex-end; position: sticky; top: 0; z-index: 100; border-bottom: 1px solid var(--border-color); }
-        .top-header-content { flex: 1; display: flex; align-items: center; gap: 1rem; }
-        .content-burger-btn { background: transparent; border: none; color: var(--tertiary-color); width: 40px; height: 40px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; }
-        .content-burger-btn span { display: block; width: 22px; height: 1.5px; background: var(--tertiary-color); position: relative; }
-        .content-burger-btn span::before, .content-burger-btn span::after { content: ''; position: absolute; width: 22px; height: 1.5px; background: var(--tertiary-color); }
-        .content-burger-btn span::before { top: -7px; }
-        .content-burger-btn span::after { bottom: -7px; }
+        .top-header { background: var(--header-bg); padding: 1.5rem 2rem 1rem; display: flex; justify-content: space-between; align-items: flex-end; position: sticky; top: 0; z-index: 1100; border-bottom: 1px solid var(--border-color); overflow: visible; }
         .page-title { font-size: 2rem; font-weight: 700; color: var(--tertiary-color); margin: 0; }
-        .user-info { display: flex; align-items: center; gap: 1rem; margin-left: 2rem; }
+        .user-info { display: flex; align-items: center; gap: 1rem; margin-left: 2rem; overflow: visible; position: relative; z-index: 1200; }
         .datetime-display { display: flex; align-items: center; gap: 0.75rem; color: var(--text-color); font-size: 0.9rem; font-weight: 500; }
         .datetime-display .date-part { color: var(--text-secondary); }
         .datetime-display .time-part { color: var(--text-color); font-weight: 600; }
@@ -313,7 +307,11 @@ $nwActiveNav = 'bulletin';
             if (pageContent) pageContent.classList.toggle('bulletin-fullscreen', isBulletin);
 
             if (updateHash !== false) {
-                const nextHash = '#' + targetId;
+                let nextHash = '#' + targetId;
+                const postId = parseInt(openPostId, 10) || 0;
+                if (postId > 0) {
+                    nextHash += ':' + postId;
+                }
                 if (window.location.hash !== nextHash) {
                     history.replaceState(null, '', nextHash);
                 }
@@ -554,16 +552,28 @@ $nwActiveNav = 'bulletin';
                 });
             });
 
+            function parseSectionHash(rawHash) {
+                const hash = String(rawHash || '').replace(/^#/, '');
+                if (!hash) {
+                    return { sectionId: 'bulletinSection', openPostId: 0 };
+                }
+                const parts = hash.split(':');
+                return {
+                    sectionId: parts[0] || 'bulletinSection',
+                    openPostId: parseInt(parts[1], 10) || 0
+                };
+            }
+
             window.addEventListener('hashchange', function() {
-                const hash = window.location.hash.replace('#', '');
-                showPortalSection(hash || 'bulletinSection', false);
+                const parsed = parseSectionHash(window.location.hash);
+                showPortalSection(parsed.sectionId, false, parsed.openPostId);
             });
 
-            const initialHash = window.location.hash.replace('#', '');
-            showPortalSection(initialHash || 'bulletinSection', false);
+            const initial = parseSectionHash(window.location.hash);
+            showPortalSection(initial.sectionId || 'bulletinSection', false, initial.openPostId);
         });
     </script>
-    <script src="js/nw-notifications.js"></script>
+    <?php require __DIR__ . '/includes/nw_notifications_script.php'; ?>
     <script src="js/mobile-shell.js"></script>
 </body>
 </html>

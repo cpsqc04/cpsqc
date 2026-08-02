@@ -106,8 +106,8 @@
         var list = getElements().list;
 
         try {
-            await fetch(API_URL + '?action=sync', { credentials: 'same-origin' });
-            var response = await fetch(API_URL + '?action=list', { credentials: 'same-origin' });
+            await fetch(API_URL + '?action=sync', { credentials: 'same-origin', cache: 'no-store' });
+            var response = await fetch(API_URL + '?action=list', { credentials: 'same-origin', cache: 'no-store' });
 
             if (!response.ok) {
                 if (response.status === 401 && list) {

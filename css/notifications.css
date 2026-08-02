@@ -4,6 +4,10 @@
     overflow: visible !important;
 }
 
+.top-header {
+    z-index: 1100;
+}
+
 .notification-container {
     position: relative;
     z-index: 1200;
@@ -47,27 +51,27 @@
 }
 
 .notification-badge.show {
-    display: block;
+    display: block !important;
 }
 
 .notification-dropdown {
     position: absolute;
     top: calc(100% + 10px);
     right: 0;
-    width: 380px;
+    width: min(380px, calc(100vw - 1.5rem));
     max-height: 500px;
     background: #fff;
     border-radius: 12px;
     box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
     display: none;
     flex-direction: column;
-    z-index: 1201;
+    z-index: 1300;
     overflow: hidden;
     border: 1px solid var(--border-color);
 }
 
 .notification-dropdown.show {
-    display: flex;
+    display: flex !important;
 }
 
 .notification-header {

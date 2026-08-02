@@ -17,6 +17,7 @@ $personnelCode = htmlspecialchars(getBpsoPersonnelCode());
     <link rel="stylesheet" href="css/theme.css">
     <link rel="stylesheet" href="css/admin-sidebar.css">
     <link rel="stylesheet" href="css/digital-bulletin.css">
+    <link rel="stylesheet" href="css/notifications.css">
     <style>
         body { margin: 0; padding: 0; font-family: var(--font-family); background-color: var(--bg-color); display: flex; min-height: 100vh; }
         .sidebar { width: 320px; background: var(--tertiary-color); color: #fff; position: fixed; left: 0; top: 0; height: 100vh; overflow: hidden; box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1); z-index: 1000; transition: width 0.3s ease; display: flex; flex-direction: column; }
@@ -180,14 +181,14 @@ $personnelCode = htmlspecialchars(getBpsoPersonnelCode());
         .personnel-status-chip.assigned { background: rgba(59,130,246,0.2); color: #bfdbfe; }
         .personnel-status-chip.off-duty { background: rgba(239,68,68,0.2); color: #fecaca; }
         .personnel-status-chip.at-hall { background: rgba(16,185,129,0.25); color: #a7f3d0; }
-        .user-info { display: flex; align-items: center; gap: 1rem; margin-left: 2rem; }
-        .notification-container { position: relative; display: flex; align-items: center; }
+        .user-info { display: flex; align-items: center; gap: 1rem; margin-left: 2rem; overflow: visible; position: relative; z-index: 1200; }
+        .notification-container { position: relative; display: flex; align-items: center; z-index: 1200; }
         .notification-bell { position: relative; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; background: transparent; border: none; color: var(--text-color); font-size: 1.25rem; cursor: pointer; border-radius: 8px; transition: all 0.2s ease; }
         .notification-bell:hover { background: rgba(28, 37, 65, 0.05); color: var(--primary-color); }
-        .notification-badge { position: absolute; top: 4px; right: 4px; background: #ef4444; color: white; font-size: 0.7rem; font-weight: 600; padding: 2px 6px; border-radius: 10px; min-width: 18px; text-align: center; display: none; }
-        .notification-badge.show { display: block; }
-        .notification-dropdown { position: absolute; top: calc(100% + 10px); right: 0; width: 380px; max-height: 500px; background: white; border-radius: 12px; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15); display: none; flex-direction: column; z-index: 1000; overflow: hidden; }
-        .notification-dropdown.show { display: flex; }
+        .notification-badge { position: absolute; top: 4px; right: 4px; background: #ef4444; color: white; font-size: 0.7rem; font-weight: 600; padding: 2px 6px; border-radius: 10px; min-width: 18px; text-align: center; display: none; line-height: 1.2; }
+        .notification-badge.show { display: block !important; }
+        .notification-dropdown { position: absolute; top: calc(100% + 10px); right: 0; width: min(380px, calc(100vw - 1.5rem)); max-height: 500px; background: white; border-radius: 12px; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15); display: none; flex-direction: column; z-index: 1300; overflow: hidden; border: 1px solid var(--border-color); }
+        .notification-dropdown.show { display: flex !important; }
         .notification-header { padding: 1.25rem; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; background: var(--header-bg); }
         .notification-header h3 { margin: 0; font-size: 1.1rem; font-weight: 600; color: var(--text-color); }
         .notification-header button { background: transparent; border: none; color: var(--primary-color); font-size: 0.85rem; cursor: pointer; padding: 0.25rem 0.5rem; border-radius: 4px; transition: background 0.2s ease; }
@@ -341,7 +342,7 @@ $personnelCode = htmlspecialchars(getBpsoPersonnelCode());
         .sidebar-logout-btn:hover { background: rgba(239, 68, 68, 0.2); color: #fff; }
         .main-wrapper { margin-left: 320px; flex: 1; display: flex; flex-direction: column; min-height: 100vh; transition: margin-left 0.3s ease; }
         body.sidebar-collapsed .main-wrapper { margin-left: 80px; }
-        .top-header { background: var(--header-bg); padding: 1.5rem 2rem 1rem; display: flex; justify-content: space-between; align-items: flex-end; position: sticky; top: 0; z-index: 100; border-bottom: 1px solid var(--border-color); }
+        .top-header { background: var(--header-bg); padding: 1.5rem 2rem 1rem; display: flex; justify-content: space-between; align-items: flex-end; position: sticky; top: 0; z-index: 1100; border-bottom: 1px solid var(--border-color); overflow: visible; }
         .top-header-content { flex: 1; display: flex; align-items: center; gap: 1rem; }
         .content-burger-btn { background: transparent; border: none; color: var(--tertiary-color); width: 40px; height: 40px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; }
         .content-burger-btn span { display: block; width: 22px; height: 1.5px; background: var(--tertiary-color); position: relative; }
@@ -1085,6 +1086,7 @@ $personnelCode = htmlspecialchars(getBpsoPersonnelCode());
                 switchSection(btn, tab, btn.dataset.title);
             }
         }
+        window.goToTab = goToTab;
 
         function setNavBadge(id, count) {
             const el = document.getElementById(id);
