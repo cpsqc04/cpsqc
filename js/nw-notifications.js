@@ -54,6 +54,7 @@
 
     async function loadNotifications() {
         try {
+            await fetch(API_URL + '?action=sync', { credentials: 'same-origin' });
             var res = await fetch(API_URL + '?action=list', { credentials: 'same-origin' });
             if (!res.ok) return;
             var data = await res.json();

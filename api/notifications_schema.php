@@ -216,15 +216,17 @@ function notifyBulletinAudiences(PDO $pdo, array $post): void
         ? (strlen($body) > 160 ? substr($body, 0, 157) . '...' : $body)
         : 'A new announcement was posted on the Digital Bulletin.';
     $notifTitle = 'New Announcement';
+    $message = $title . ' — ' . $snippet;
     $linkPatrol = 'tab:bulletin:' . $postId;
     $linkWatcher = 'section:bulletinSection:' . $postId;
+    $createdAt = $post['publish_at'] ?: ($post['created_at'] ?? null);
 
     $notifyPatrol = in_array($audience, ['all', 'patrol'], true);
     $notifyWatcher = in_array($audience, ['all', 'watcher'], true);
 
     if ($notifyPatrol) {
         try {
-            $patrolStmt = $pdo->query("SELECT id FROM patrols");
+            $patrolStmt = $pdo->query('SELECT id FROM patrols ORDER BY id ASC');
             $patrolIds = $patrolStmt ? $patrolStmt->fetchAll(PDO::FETCH_COLUMN) : [];
             foreach ($patrolIds as $patrolId) {
                 createPatrolNotification(
@@ -232,8 +234,9 @@ function notifyBulletinAudiences(PDO $pdo, array $post): void
                     (int) $patrolId,
                     'bulletin_announcement',
                     $notifTitle,
-                    $title . ' — ' . $snippet,
-                    $linkPatrol
+                    $message,
+                    $linkPatrol,
+                    is_string($createdAt) && $createdAt !== '' ? $createdAt : null
                 );
             }
         } catch (PDOException $e) {
@@ -254,12 +257,130 @@ function notifyBulletinAudiences(PDO $pdo, array $post): void
                     (int) $nwId,
                     'bulletin_announcement',
                     $notifTitle,
-                    $title . ' — ' . $snippet,
-                    $linkWatcher
+                    $message,
+                    $linkWatcher,
+                    is_string($createdAt) && $createdAt !== '' ? $createdAt : null
                 );
             }
         } catch (PDOException $e) {
             error_log('Bulletin watcher notify failed: ' . $e->getMessage());
         }
     }
+}
+
+/**
+ * Sync active bulletin announcements into a patrol member's notification feed.
+ * Covers missed creates, new patrol accounts, and deferred publish_at times.
+ */
+function syncBulletinNotificationsForPatrol(PDO $pdo, int $patrolId): int
+{
+    if ($patrolId <= 0) {
+        return 0;
+    }
+
+    ensureNotificationsTable($pdo);
+    require_once __DIR__ . '/bulletin_board_schema.php';
+    ensureBulletinBoardTable($pdo);
+    archiveExpiredBulletinPosts($pdo);
+
+    $synced = 0;
+    try {
+        $stmt = $pdo->query("
+            SELECT id, title, body, target_audience, status, publish_at, created_at
+            FROM bulletin_posts
+            WHERE status = 'active'
+              AND (target_audience = 'all' OR target_audience = 'patrol')
+              AND (publish_at IS NULL OR publish_at <= NOW())
+              AND (expires_at IS NULL OR expires_at > NOW())
+              AND COALESCE(publish_at, created_at) >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+            ORDER BY COALESCE(publish_at, created_at) DESC, id DESC
+            LIMIT 50
+        ");
+        $rows = $stmt ? $stmt->fetchAll(PDO::FETCH_ASSOC) : [];
+        foreach ($rows as $row) {
+            $postId = (int) ($row['id'] ?? 0);
+            if ($postId <= 0) {
+                continue;
+            }
+            $title = trim((string) ($row['title'] ?? 'New Announcement'));
+            $body = trim((string) ($row['body'] ?? ''));
+            $snippet = $body !== ''
+                ? (strlen($body) > 160 ? substr($body, 0, 157) . '...' : $body)
+                : 'A new announcement was posted on the Digital Bulletin.';
+            $createdAt = $row['publish_at'] ?: ($row['created_at'] ?? null);
+            if (createPatrolNotification(
+                $pdo,
+                $patrolId,
+                'bulletin_announcement',
+                'New Announcement',
+                $title . ' — ' . $snippet,
+                'tab:bulletin:' . $postId,
+                is_string($createdAt) && $createdAt !== '' ? $createdAt : null
+            )) {
+                $synced++;
+            }
+        }
+    } catch (PDOException $e) {
+        error_log('Bulletin patrol sync failed: ' . $e->getMessage());
+    }
+
+    return $synced;
+}
+
+/**
+ * Sync active bulletin announcements into a Neighborhood Watch member feed.
+ */
+function syncBulletinNotificationsForNwMember(PDO $pdo, int $nwMemberId): int
+{
+    if ($nwMemberId <= 0) {
+        return 0;
+    }
+
+    ensureNotificationsTable($pdo);
+    require_once __DIR__ . '/bulletin_board_schema.php';
+    ensureBulletinBoardTable($pdo);
+    archiveExpiredBulletinPosts($pdo);
+
+    $synced = 0;
+    try {
+        $stmt = $pdo->query("
+            SELECT id, title, body, target_audience, status, publish_at, created_at
+            FROM bulletin_posts
+            WHERE status = 'active'
+              AND (target_audience = 'all' OR target_audience = 'watcher')
+              AND (publish_at IS NULL OR publish_at <= NOW())
+              AND (expires_at IS NULL OR expires_at > NOW())
+              AND COALESCE(publish_at, created_at) >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+            ORDER BY COALESCE(publish_at, created_at) DESC, id DESC
+            LIMIT 50
+        ");
+        $rows = $stmt ? $stmt->fetchAll(PDO::FETCH_ASSOC) : [];
+        foreach ($rows as $row) {
+            $postId = (int) ($row['id'] ?? 0);
+            if ($postId <= 0) {
+                continue;
+            }
+            $title = trim((string) ($row['title'] ?? 'New Announcement'));
+            $body = trim((string) ($row['body'] ?? ''));
+            $snippet = $body !== ''
+                ? (strlen($body) > 160 ? substr($body, 0, 157) . '...' : $body)
+                : 'A new announcement was posted on the Digital Bulletin.';
+            $createdAt = $row['publish_at'] ?: ($row['created_at'] ?? null);
+            if (createNwMemberNotification(
+                $pdo,
+                $nwMemberId,
+                'bulletin_announcement',
+                'New Announcement',
+                $title . ' — ' . $snippet,
+                'section:bulletinSection:' . $postId,
+                is_string($createdAt) && $createdAt !== '' ? $createdAt : null
+            )) {
+                $synced++;
+            }
+        }
+    } catch (PDOException $e) {
+        error_log('Bulletin watcher sync failed: ' . $e->getMessage());
+    }
+
+    return $synced;
 }

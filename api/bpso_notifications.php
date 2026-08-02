@@ -236,6 +236,12 @@ if ($action === 'sync') {
         // continue
     }
 
+    try {
+        $synced += syncBulletinNotificationsForPatrol($pdo, (int) $patrolId);
+    } catch (Throwable $e) {
+        // continue
+    }
+
     echo json_encode(['success' => true, 'synced' => $synced]);
     exit;
 }

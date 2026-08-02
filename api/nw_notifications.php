@@ -66,6 +66,12 @@ try {
 }
 
 try {
+    if ($action === 'sync' && $method === 'GET') {
+        $synced = syncBulletinNotificationsForNwMember($pdo, (int) $nwMemberId);
+        echo json_encode(['success' => true, 'synced' => $synced]);
+        exit;
+    }
+
     if ($action === 'list' && $method === 'GET') {
         $stmt = $pdo->prepare('SELECT id, type, title, message, link, is_read, created_at
             FROM notifications
