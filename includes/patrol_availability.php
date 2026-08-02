@@ -102,6 +102,12 @@ function resolvePatrolAvailabilityStatus(PDO $pdo, int $patrolId, ?string $store
         return 'Unavailable';
     }
 
+    // Partner simulation lifecycle sets On Patrol while a drill is ongoing.
+    // Preserve it — do not let scheduled routes / stale cleanup overwrite it.
+    if ($stored === 'On Patrol') {
+        return 'On Patrol';
+    }
+
     if ($stored === 'Assigned to Simulation') {
         return 'Assigned to Simulation';
     }
@@ -156,8 +162,8 @@ function resolvePatrolAvailabilityStatus(PDO $pdo, int $patrolId, ?string $store
         // ignore
     }
 
-    if ($stored === 'Assigned' || $stored === 'On Patrol') {
-        // Stale Assigned/On Patrol with no live work → Available
+    if ($stored === 'Assigned') {
+        // Stale Assigned with no live work → Available
         return 'Available';
     }
 
