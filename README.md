@@ -82,8 +82,7 @@ Tables are created/updated automatically by schema helpers when APIs are first u
 
 ## Partner API integrations
 
-Live Partner API page: **`/api/partner-api.php`**  
-JSON catalog: **`/api/partner-api.php?format=json`**  
+Live Partner API catalog: **`/api/partner-api.php`**  
 Full guide: **[`api/API_INTEGRATION.md`](api/API_INTEGRATION.md)**
 
 | Direction | Partner | Endpoint / config |

@@ -4,7 +4,7 @@
  * AlertaraQC — Full API catalog (browsable JSON).
  *
  * GET /api/integration.php
- * Prefer sharing /api/partner-api.php with partners (cleaner entry page).
+ * Prefer sharing /api/partner-api.php with partners (pretty JSON catalog).
  * Returns a JSON catalog of every API endpoint in this system.
  */
 
@@ -45,7 +45,7 @@ function getIntegrationCatalog(): array
             'partner_api' => integrationBaseUrl() . '/api/partner-api.php',
             'markdown' => integrationBaseUrl() . '/api/API_INTEGRATION.md',
             'modules_cheat_sheet' => integrationBaseUrl() . '/api/PARTNER_MODULES.md',
-            'catalog' => integrationBaseUrl() . '/api/partner-api.php?format=json',
+            'catalog' => integrationBaseUrl() . '/api/partner-api.php',
         ],
         'conventions' => [
             'content_type' => 'application/json',
@@ -580,7 +580,7 @@ function getIntegrationCatalog(): array
         ],
         'quick_links' => [
             'partner_api' => integrationBaseUrl() . '/api/partner-api.php',
-            'catalog' => integrationBaseUrl() . '/api/partner-api.php?format=json',
+            'catalog' => integrationBaseUrl() . '/api/partner-api.php',
             'patrol_list' => integrationBaseUrl() . '/api/patrol_requests.php',
             'cctv_list' => integrationBaseUrl() . '/api/cctv_requests.php',
             'awareness_events_list' => integrationBaseUrl() . '/api/awareness_events.php?record_type=event',

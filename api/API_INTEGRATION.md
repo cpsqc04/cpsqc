@@ -1,7 +1,6 @@
 # AlertaraQC — Partner API Integration Guide
 
-> **Partner API (share this):** [`/api/partner-api.php`](./partner-api.php)  
-> **Live API catalog (JSON):** [`/api/partner-api.php?format=json`](./partner-api.php?format=json)  
+> **Partner API catalog (share this):** [`/api/partner-api.php`](./partner-api.php)  
 > **Five-module cheat sheet:** [`/api/PARTNER_MODULES.md`](./PARTNER_MODULES.md)  
 > Example: `https://surveillance.alertaraqc.com/api/partner-api.php`
 
