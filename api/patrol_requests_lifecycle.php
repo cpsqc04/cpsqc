@@ -12,7 +12,9 @@
  * }
  *
  * start_simulation  → assigned personnel status = On Patrol
- * complete_simulation → assigned personnel status = Available, request status = Completed
+ * complete_simulation → assigned personnel status = Available, request status = Completed,
+ *                       and linked patrol_schedules for the request are Completed
+ *                       (so Patrol List does not snap status back to Assigned)
  *
  * Auth: PATROL_REQUEST_API_KEY via X-API-Key or Bearer token.
  */
@@ -156,6 +158,39 @@ try {
                  WHERE id = :id"
             );
             $update->execute([':id' => (int) $row['id']]);
+
+            // Assigning a request creates a patrol_schedules row (notes: "Patrol request: PT-REQ-...").
+            // Complete those too, or Patrol List resolve() keeps forcing status back to Assigned.
+            if ($requestCode !== '') {
+                try {
+                    $completeSchedules = $pdo->prepare(
+                        "UPDATE patrol_schedules
+                         SET status = 'Completed'
+                         WHERE status IN ('Scheduled', 'In Progress')
+                           AND (
+                             notes LIKE :notes_exact
+                             OR notes LIKE :notes_prefix
+                           )"
+                    );
+                    $completeSchedules->execute([
+                        ':notes_exact' => 'Patrol request: ' . $requestCode . '%',
+                        ':notes_prefix' => '%Patrol request: ' . $requestCode . '%',
+                    ]);
+                } catch (PDOException $e) {
+                    // Table may differ; personnel Available is still set above.
+                }
+            }
+
+            // Re-resolve after schedule cleanup so leftover real assignments stay Assigned.
+            foreach ($assignedIds as $patrolId) {
+                $fresh = refreshPatrolAvailabilityStatus($pdo, (int) $patrolId);
+                foreach ($updatedPersonnel as $idx => $person) {
+                    if ((int) ($person['id'] ?? 0) === (int) $patrolId
+                        && ($person['request_id'] ?? '') === $requestCode) {
+                        $updatedPersonnel[$idx]['status'] = $fresh;
+                    }
+                }
+            }
         }
 
         $updatedRequests[] = [
