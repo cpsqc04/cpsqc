@@ -699,6 +699,7 @@ if (!isAdminUser()) {
         .status-assigned { background: #cfe2ff; color: #084298; }
         .status-simulation { background: #ffe5d0; color: #9a3412; }
         .status-on-patrol { background: #fff3cd; color: #856404; }
+        .status-on-reporting { background: #e9d5ff; color: #6b21a8; }
         .status-unavailable { background: #f8d7da; color: #842029; }
         
         .btn-action {
@@ -1421,6 +1422,7 @@ if (!isAdminUser()) {
                 'Assigned': 'Assigned',
                 'Assigned to Simulation': 'Assigned to Simulation',
                 'On Patrol': 'On Patrol',
+                'On Reporting': 'On Reporting',
                 'Unavailable': 'Unavailable',
                 'Off Duty': 'Unavailable',
                 'Off-Duty': 'Unavailable'
@@ -1434,6 +1436,7 @@ if (!isAdminUser()) {
                 case 'Assigned': return 'status-assigned';
                 case 'Assigned to Simulation': return 'status-simulation';
                 case 'On Patrol': return 'status-on-patrol';
+                case 'On Reporting': return 'status-on-reporting';
                 case 'Unavailable': return 'status-unavailable';
                 default: return 'status-available';
             }

@@ -354,6 +354,7 @@ require_once __DIR__ . '/db.php';
         .status-assigned { background: #cfe2ff; color: #084298; }
         .status-simulation { background: #ffe5d0; color: #9a3412; }
         .status-on-patrol { background: #fff3cd; color: #856404; }
+        .status-on-reporting { background: #e9d5ff; color: #6b21a8; }
         .status-unavailable { background: #f8d7da; color: #842029; }
         .status-off-duty { background: #f8d7da; color: #842029; }
         .btn-view { padding: 0.5rem 1rem; background: var(--primary-color); color: #fff; border: none; border-radius: 6px; font-size: 0.85rem; cursor: pointer; transition: all 0.2s ease; }
@@ -631,6 +632,7 @@ require_once __DIR__ . '/db.php';
                         <option value="Assigned">Assigned</option>
                         <option value="Assigned to Simulation">Assigned to Simulation</option>
                         <option value="On Patrol">On Patrol</option>
+                        <option value="On Reporting">On Reporting</option>
                         <option value="Unavailable">Unavailable</option>
                     </select>
                 </div>
@@ -706,6 +708,7 @@ require_once __DIR__ . '/db.php';
                         <option value="Assigned">Assigned</option>
                         <option value="Assigned to Simulation">Assigned to Simulation</option>
                         <option value="On Patrol">On Patrol</option>
+                        <option value="On Reporting">On Reporting</option>
                         <option value="Unavailable">Unavailable</option>
                     </select>
                 </div>
@@ -869,6 +872,7 @@ require_once __DIR__ . '/db.php';
                 'Assigned': 'Assigned',
                 'Assigned to Simulation': 'Assigned to Simulation',
                 'On Patrol': 'On Patrol',
+                'On Reporting': 'On Reporting',
                 'Unavailable': 'Unavailable',
                 'Off Duty': 'Unavailable',
                 'Off-Duty': 'Unavailable',
@@ -883,6 +887,7 @@ require_once __DIR__ . '/db.php';
                 case 'Assigned': return 'status-assigned';
                 case 'Assigned to Simulation': return 'status-simulation';
                 case 'On Patrol': return 'status-on-patrol';
+                case 'On Reporting': return 'status-on-reporting';
                 case 'Unavailable': return 'status-unavailable';
                 default: return 'status-available';
             }

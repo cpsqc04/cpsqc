@@ -12,9 +12,9 @@
  * }
  *
  * start_simulation  → assigned personnel status = On Patrol
- * complete_simulation → assigned personnel status = Available, request status = Completed,
+ * complete_simulation → assigned personnel status = On Reporting, request status = Completed,
  *                       and linked patrol_schedules for the request are Completed
- *                       (so Patrol List does not snap status back to Assigned)
+ *                       (officer becomes Available only after submitting their patrol report)
  *
  * Auth: PATROL_REQUEST_API_KEY via X-API-Key or Bearer token.
  */
@@ -111,7 +111,7 @@ try {
         exit;
     }
 
-    $personnelStatus = $action === 'start_simulation' ? 'On Patrol' : 'Available';
+    $personnelStatus = $action === 'start_simulation' ? 'On Patrol' : 'On Reporting';
     $updatedRequests = [];
     $updatedPersonnel = [];
 
@@ -141,9 +141,9 @@ try {
                     $pdo,
                     (int) $patrolId,
                     'patrol_request_simulation_complete',
-                    'Simulation completed',
-                    'Request ' . $requestCode . ' is complete. You are Available again.',
-                    'tab:schedule'
+                    'Simulation completed — submit report',
+                    'Request ' . $requestCode . ' is complete. Status is On Reporting until you submit your patrol report.',
+                    'tab:report'
                 );
             }
         }
@@ -177,11 +177,11 @@ try {
                         ':notes_prefix' => '%Patrol request: ' . $requestCode . '%',
                     ]);
                 } catch (PDOException $e) {
-                    // Table may differ; personnel Available is still set above.
+                    // Table may differ; personnel On Reporting is still set above.
                 }
             }
 
-            // Re-resolve after schedule cleanup so leftover real assignments stay Assigned.
+            // Re-resolve after schedule cleanup. On Reporting is preserved until report submit.
             foreach ($assignedIds as $patrolId) {
                 $fresh = refreshPatrolAvailabilityStatus($pdo, (int) $patrolId);
                 foreach ($updatedPersonnel as $idx => $person) {
@@ -205,7 +205,7 @@ try {
         'success' => true,
         'message' => $action === 'start_simulation'
             ? 'Assigned personnel marked On Patrol for simulation.'
-            : 'Simulation completed. Assigned personnel marked Available.',
+            : 'Simulation completed. Assigned personnel marked On Reporting until they submit reports.',
         'action' => $action,
         'data' => [
             'requests' => $updatedRequests,

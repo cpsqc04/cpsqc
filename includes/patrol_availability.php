@@ -8,6 +8,7 @@
  * - Assigned (blue)
  * - Assigned to Simulation (orange)
  * - On Patrol (yellow)
+ * - On Reporting (purple) — post-simulation, awaiting patrol report
  * - Unavailable (red)
  */
 
@@ -18,6 +19,7 @@ function patrolAvailabilityStatuses(): array
         'Assigned',
         'Assigned to Simulation',
         'On Patrol',
+        'On Reporting',
         'Unavailable',
     ];
 }
@@ -34,6 +36,9 @@ function normalizePatrolAvailabilityStatus(?string $status): string
         'simulation' => 'Assigned to Simulation',
         'on patrol' => 'On Patrol',
         'on-patrol' => 'On Patrol',
+        'on reporting' => 'On Reporting',
+        'on-reporting' => 'On Reporting',
+        'reporting' => 'On Reporting',
         'unavailable' => 'Unavailable',
         'off duty' => 'Unavailable',
         'off-duty' => 'Unavailable',
@@ -68,7 +73,7 @@ function setPatrolAvailabilityStatus(PDO $pdo, int $patrolId, string $status): v
 
 /**
  * Resolve live availability for a patrol officer.
- * Priority: On Patrol > Unavailable > Assigned to Simulation > Assigned > Available
+ * Priority: On Patrol > On Reporting > Unavailable > Assigned to Simulation > Assigned > Available
  */
 function resolvePatrolAvailabilityStatus(PDO $pdo, int $patrolId, ?string $storedStatus = null): string
 {
@@ -106,6 +111,11 @@ function resolvePatrolAvailabilityStatus(PDO $pdo, int $patrolId, ?string $store
     // Preserve it — do not let scheduled routes / stale cleanup overwrite it.
     if ($stored === 'On Patrol') {
         return 'On Patrol';
+    }
+
+    // After simulation complete: stay On Reporting until this officer submits a report.
+    if ($stored === 'On Reporting') {
+        return 'On Reporting';
     }
 
     if ($stored === 'Assigned to Simulation') {
@@ -180,6 +190,27 @@ function refreshPatrolAvailabilityStatus(PDO $pdo, int $patrolId): string
     return $status;
 }
 
+/**
+ * After a patrol report is submitted, leave On Reporting then re-resolve
+ * (may become Available, or Assigned if other live work remains).
+ */
+function clearOnReportingAfterPatrolReport(PDO $pdo, int $patrolId): string
+{
+    if ($patrolId <= 0) {
+        return 'Available';
+    }
+
+    $stmt = $pdo->prepare('SELECT status FROM patrols WHERE id = :id LIMIT 1');
+    $stmt->execute([':id' => $patrolId]);
+    $stored = normalizePatrolAvailabilityStatus((string) ($stmt->fetchColumn() ?: 'Available'));
+
+    if ($stored === 'On Reporting') {
+        setPatrolAvailabilityStatus($pdo, $patrolId, 'Available');
+    }
+
+    return refreshPatrolAvailabilityStatus($pdo, $patrolId);
+}
+
 function patrolAvailabilityStatusCssClass(string $status): string
 {
     switch (normalizePatrolAvailabilityStatus($status)) {
@@ -191,6 +222,8 @@ function patrolAvailabilityStatusCssClass(string $status): string
             return 'status-simulation';
         case 'On Patrol':
             return 'status-on-patrol';
+        case 'On Reporting':
+            return 'status-on-reporting';
         case 'Unavailable':
             return 'status-unavailable';
         default:

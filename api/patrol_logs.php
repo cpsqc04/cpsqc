@@ -219,7 +219,7 @@ if ($method === 'POST' && $action === 'submit_report') {
                 ':patrol_id' => $patrolId,
             ]);
 
-            refreshPatrolAvailabilityStatus($pdo, $patrolId);
+            clearOnReportingAfterPatrolReport($pdo, $patrolId);
 
             $reportLogId = $placeholderId > 0 ? $placeholderId : (int) $pdo->lastInsertId();
             require_once __DIR__ . '/notifications_schema.php';
@@ -258,6 +258,7 @@ if ($method === 'POST' && $action === 'submit_report') {
 
         require_once __DIR__ . '/notifications_schema.php';
         $newLogId = (int) $pdo->lastInsertId();
+        clearOnReportingAfterPatrolReport($pdo, $patrolId);
         notifyAdminActorActivity(
             $pdo,
             'patrol',
