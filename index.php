@@ -19,6 +19,7 @@ require_once __DIR__ . '/db.php';
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="css/theme.css">
     <link rel="stylesheet" href="css/admin-sidebar.css">
+    <link rel="stylesheet" href="css/notifications.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <style>
         body {
@@ -606,8 +607,9 @@ require_once __DIR__ . '/db.php';
             align-items: flex-end;
             position: sticky;
             top: 0;
-            z-index: 100;
+            z-index: 1100;
             border-bottom: 1px solid var(--border-color);
+            overflow: visible;
         }
         
         .top-header-content {
@@ -621,6 +623,9 @@ require_once __DIR__ . '/db.php';
             gap: 1rem;
             padding-bottom: 0;
             margin-left: 2rem;
+            overflow: visible;
+            position: relative;
+            z-index: 1200;
         }
         
         .user-info span {
@@ -672,26 +677,27 @@ require_once __DIR__ . '/db.php';
         }
         
         .notification-badge.show {
-            display: block;
+            display: block !important;
         }
         
         .notification-dropdown {
             position: absolute;
             top: calc(100% + 10px);
             right: 0;
-            width: 380px;
+            width: min(380px, calc(100vw - 1.5rem));
             max-height: 500px;
             background: white;
             border-radius: 12px;
             box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
             display: none;
             flex-direction: column;
-            z-index: 1000;
+            z-index: 1300;
             overflow: hidden;
+            border: 1px solid var(--border-color);
         }
         
         .notification-dropdown.show {
-            display: flex;
+            display: flex !important;
         }
         
         .notification-header {

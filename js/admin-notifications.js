@@ -92,6 +92,9 @@
             } else if (notif.type === 'portal_activity' || notif.type === 'nw_incident') {
                 iconClass = 'volunteer';
                 icon = 'fa-user-check';
+            } else if (notif.type === 'patrol' || notif.type === 'patrol_schedule') {
+                iconClass = 'patrol_request';
+                icon = 'fa-walking';
             } else {
                 iconClass = 'event';
                 icon = 'fa-bullhorn';
@@ -120,9 +123,9 @@
         var list = getElements().list;
 
         try {
-            await fetch(API_URL + '?action=sync', { credentials: 'same-origin' });
+            await fetch(API_URL + '?action=sync', { credentials: 'same-origin', cache: 'no-store' });
 
-            var response = await fetch(API_URL + '?action=list', { credentials: 'same-origin' });
+            var response = await fetch(API_URL + '?action=list', { credentials: 'same-origin', cache: 'no-store' });
             if (!response.ok) {
                 console.error('Failed to load notifications:', response.status, response.statusText);
                 if (response.status === 401) {
@@ -260,7 +263,15 @@
         });
 
         if (link) {
-            window.location.href = link;
+            if (link.indexOf('missed-report:') === 0) {
+                window.location.href = 'patrol-logs.php';
+                return;
+            }
+            // Strip synthetic activity= query used only for notification dedupe.
+            var cleanLink = link.replace(/([?&])activity=[^&]*/g, function (match, sep) {
+                return sep === '?' ? '?' : '';
+            }).replace(/\?&/, '?').replace(/[?&]$/, '');
+            window.location.href = cleanLink || link;
         }
     };
 

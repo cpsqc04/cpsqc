@@ -10,6 +10,7 @@ if (file_exists($autoloadPath)) {
     require_once $autoloadPath;
 }
 require_once __DIR__ . '/includes/login_otp.php';
+require_once __DIR__ . '/includes/admin_credentials.php';
 
 /**
  * Ensure the admins table exists and has required columns.
@@ -55,13 +56,16 @@ function ensureAdminsTable(PDO $pdo): void
     if (!isset($columns['role'])) {
         $pdo->exec('ALTER TABLE admins ADD COLUMN role VARCHAR(50) DEFAULT "Admin"');
     }
+    if (!isset($columns['must_change_password'])) {
+        $pdo->exec('ALTER TABLE admins ADD COLUMN must_change_password TINYINT(1) NOT NULL DEFAULT 0 AFTER password_hash');
+    }
 
     // Create default admin account if none exists
     $stmt = $pdo->query('SELECT COUNT(*) AS cnt FROM admins');
     $count = (int)$stmt->fetch()['cnt'];
     if ($count === 0) {
         $hash = password_hash('admin123', PASSWORD_DEFAULT);
-        $stmt = $pdo->prepare('INSERT INTO admins (username, password_hash, email, full_name, status, role) VALUES (:u, :p, :e, :f, "Active", "Admin")');
+        $stmt = $pdo->prepare('INSERT INTO admins (username, password_hash, must_change_password, email, full_name, status, role) VALUES (:u, :p, 0, :e, :f, "Active", "Admin")');
         $stmt->execute([
             ':u' => 'admin',
             ':p' => $hash,
@@ -455,9 +459,18 @@ function getClientIP() {
 $attemptsRemaining = null;
 $otpPrompt = null;
 $showOtpForm = false;
+$showSetPasswordModal = false;
 $otpEmailMasked = null;
 $otpExpiresAtText = null;
 $otpResendCooldown = 0;
+
+if ($pdo instanceof PDO) {
+    try {
+        ensureAdminMustChangePasswordColumn($pdo);
+    } catch (Throwable $e) {
+        // Non-fatal; create/login still work without the column until migration succeeds.
+    }
+}
 
 if (isset($_GET['cancel_otp'])) {
     unset($_SESSION['pending_login']);
@@ -481,6 +494,11 @@ if (isset($_SESSION['pending_login'])) {
         $otpResendCooldown = getOtpResendCooldownSeconds($pendingLoginSession);
         $otpPrompt = buildOtpPromptMessage(false, $pendingLoginSession['email'] ?? null, true);
     }
+}
+
+if (!empty($_SESSION['admin_logged_in']) && !empty($_SESSION['admin_must_change_password'])) {
+    $showSetPasswordModal = true;
+    $showOtpForm = false;
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -564,8 +582,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_SESSION['admin_logged_in'] = true;
             $_SESSION['username'] = $pendingLogin['username'] ?? ($pendingLogin['display_name'] ?? 'Admin');
             $_SESSION['full_name'] = $pendingLogin['display_name'] ?: ($pendingLogin['username'] ?? 'Admin');
-            $_SESSION['user_role'] = $pendingLogin['role'] ?? 'Admin';
+            $loginRole = trim((string) ($pendingLogin['role'] ?? 'Admin'));
+            $_SESSION['user_role'] = ($loginRole === '' || strcasecmp($loginRole, 'Admin') === 0) ? 'Admin' : $loginRole;
             $_SESSION['user_id'] = $pendingLogin['user_id'];
+            $_SESSION['admin_must_change_password'] = !empty($pendingLogin['must_change_password']);
 
             $ipAddress = $pendingLogin['ip_address'] ?? getClientIP();
             logLoginHistory($pdo, $pendingLogin['user_id'], $pendingLogin['username'], 'Success', $ipAddress);
@@ -577,8 +597,48 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
 
             unset($_SESSION['pending_login']);
-            header('Location: index.php');
-            exit;
+
+            if (!empty($_SESSION['admin_must_change_password'])) {
+                $showSetPasswordModal = true;
+                $showOtpForm = false;
+                $otpPrompt = null;
+            } else {
+                header('Location: index.php');
+                exit;
+            }
+        }
+    } elseif (isset($_POST['set_admin_password'])) {
+        if (empty($_SESSION['admin_logged_in']) || empty($_SESSION['admin_must_change_password'])) {
+            $error = 'Please sign in again to set your password.';
+        } else {
+            $newPassword = (string) ($_POST['new_password'] ?? '');
+            $confirmPassword = (string) ($_POST['confirm_password'] ?? '');
+            if ($newPassword === '' || $confirmPassword === '') {
+                $error = 'Please fill in all password fields.';
+                $showSetPasswordModal = true;
+            } elseif ($newPassword !== $confirmPassword) {
+                $error = 'Passwords do not match.';
+                $showSetPasswordModal = true;
+            } elseif (!isValidAdminAccountPassword($newPassword)) {
+                $error = adminAccountPasswordMessage();
+                $showSetPasswordModal = true;
+            } else {
+                try {
+                    ensureAdminMustChangePasswordColumn($pdo);
+                    $passwordHash = password_hash($newPassword, PASSWORD_DEFAULT);
+                    $update = $pdo->prepare('UPDATE admins SET password_hash = :password_hash, must_change_password = 0 WHERE id = :id');
+                    $update->execute([
+                        ':password_hash' => $passwordHash,
+                        ':id' => (int) ($_SESSION['user_id'] ?? 0),
+                    ]);
+                    $_SESSION['admin_must_change_password'] = false;
+                    header('Location: index.php?password_set=1');
+                    exit;
+                } catch (PDOException $e) {
+                    $error = 'System error. Please try again later.';
+                    $showSetPasswordModal = true;
+                }
+            }
         }
     } elseif (!isset($_POST['resend_login_otp']) && !isset($error)) {
         $email = trim($_POST['email'] ?? '');
@@ -589,7 +649,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             // Start a fresh login flow
             unset($_SESSION['pending_login']);
-            $stmt = $pdo->prepare('SELECT id, username, password_hash, full_name, status, email, role, failed_attempts, last_failed_at, locked_until FROM admins WHERE email = :e LIMIT 1');
+            $stmt = $pdo->prepare('SELECT id, username, password_hash, full_name, status, email, role, must_change_password, failed_attempts, last_failed_at, locked_until FROM admins WHERE email = :e LIMIT 1');
             $stmt->execute([':e' => $email]);
             $admin = $stmt->fetch();
         
@@ -682,6 +742,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 'display_name' => $admin['full_name'] ?: $admin['username'],
                                 'role' => $admin['role'] ?? 'Admin',
                                 'email' => $admin['email'],
+                                'must_change_password' => (int) ($admin['must_change_password'] ?? 0),
                                 'otp' => $otp,
                                 'expires_at' => $expiresAt,
                                 'attempts' => 0,
@@ -776,13 +837,19 @@ if (!isset($attemptsRemaining) && isset($_POST['email'])) {
     }
 }
 
-// Check if already logged in, redirect to index.php
+// Check if already logged in, redirect to index.php (unless password change is required)
 if (isset($_SESSION['admin_logged_in']) && $_SESSION['admin_logged_in'] === true) {
-    header('Location: index.php');
-    exit;
+    if (!empty($_SESSION['admin_must_change_password'])) {
+        $showSetPasswordModal = true;
+        $showOtpForm = false;
+    } else {
+        header('Location: index.php');
+        exit;
+    }
 }
 
-$autoOpenLogin = !empty($showOtpForm) || isset($error) || isset($_SESSION['registration_success']);
+$autoOpenLogin = (!empty($showOtpForm) || isset($error) || isset($_SESSION['registration_success'])) && empty($showSetPasswordModal);
+$autoOpenSetPassword = !empty($showSetPasswordModal);
 ?>
 <!doctype html>
 <html lang="en">
@@ -1942,31 +2009,31 @@ $autoOpenLogin = !empty($showOtpForm) || isset($error) || isset($_SESSION['regis
                 </div>
                 <?php unset($_SESSION['registration_success'], $_SESSION['registered_username']); ?>
             <?php endif; ?>
-            <?php if (isset($error)): ?>
+            <?php if (isset($error) && empty($showSetPasswordModal)): ?>
                 <div class="alert alert-error"><?php echo htmlspecialchars($error); ?></div>
             <?php endif; ?>
-            <?php if (!empty($otpPrompt)): ?>
+            <?php if (!empty($otpPrompt) && empty($showSetPasswordModal)): ?>
                 <div class="alert alert-success"><?php echo htmlspecialchars($otpPrompt); ?></div>
             <?php endif; ?>
-            <?php if (!$showOtpForm && isset($attemptsRemaining) && $attemptsRemaining > 0 && $attemptsRemaining < 3): ?>
+            <?php if (!$showOtpForm && empty($showSetPasswordModal) && isset($attemptsRemaining) && $attemptsRemaining > 0 && $attemptsRemaining < 3): ?>
                 <div class="alert alert-warn">
                     <i class="fas fa-exclamation-triangle"></i>
                     <strong>Warning:</strong> You have <?php echo $attemptsRemaining; ?> more <?php echo $attemptsRemaining === 1 ? 'attempt' : 'attempts'; ?> remaining before your account is locked for 30 minutes.
                 </div>
-            <?php elseif (!$showOtpForm && isset($_POST['email']) && isset($attemptsRemaining) && $attemptsRemaining === 0): ?>
+            <?php elseif (!$showOtpForm && empty($showSetPasswordModal) && isset($_POST['email']) && isset($attemptsRemaining) && $attemptsRemaining === 0): ?>
                 <div class="alert alert-error">
                     <i class="fas fa-lock"></i>
                     <strong>Account Locked:</strong> Your account has been locked due to multiple failed login attempts. Please wait 30 minutes or contact an administrator.
                 </div>
             <?php endif; ?>
-            <?php if ($showOtpForm): ?>
+            <?php if ($showOtpForm && empty($showSetPasswordModal)): ?>
                 <?php renderLoginOtpForm(
                     'login.php?cancel_otp=1',
                     $otpEmailMasked,
                     $otpExpiresAtText,
                     (int) $otpResendCooldown
                 ); ?>
-            <?php else: ?>
+            <?php elseif (empty($showSetPasswordModal)): ?>
                 <form method="POST" action="">
                     <div class="field">
                         <label for="email">Email</label>
@@ -1983,7 +2050,37 @@ $autoOpenLogin = !empty($showOtpForm) || isset($error) || isset($_SESSION['regis
                         <button class="btn" type="submit" style="width:100%; border-radius:12px;">Sign in</button>
                     </div>
                 </form>
+            <?php else: ?>
+                <p style="color:rgba(255,255,255,0.85); margin-bottom:1rem;">Please set a new password to continue.</p>
             <?php endif; ?>
+        </div>
+    </div>
+
+    <div class="modal-overlay<?php echo !empty($autoOpenSetPassword) ? ' open' : ''; ?>" id="setPasswordModal" role="dialog" aria-modal="true" aria-labelledby="set-password-title" style="z-index:3200;">
+        <div class="modal-panel">
+            <div class="modal-header">
+                <h2 id="set-password-title">Set Your Password</h2>
+            </div>
+            <?php if (isset($error) && !empty($showSetPasswordModal)): ?>
+                <div class="alert alert-error"><?php echo htmlspecialchars($error); ?></div>
+            <?php endif; ?>
+            <p style="color:rgba(255,255,255,0.85); margin-bottom:1.25rem; font-size:0.95rem; line-height:1.5;">
+                Create a new password before accessing the Admin Portal. It must be at least 8 characters and include an uppercase letter, a lowercase letter, and a number or special character (e.g. @, #, _).
+            </p>
+            <form method="POST" action="">
+                <input type="hidden" name="set_admin_password" value="1">
+                <div class="field">
+                    <label for="new_password">New Password *</label>
+                    <input id="new_password" name="new_password" type="password" minlength="8" autocomplete="new-password" required>
+                </div>
+                <div class="field">
+                    <label for="confirm_password">Confirm Password *</label>
+                    <input id="confirm_password" name="confirm_password" type="password" minlength="8" autocomplete="new-password" required>
+                </div>
+                <div class="button-group">
+                    <button class="btn" type="submit" style="width:100%; border-radius:12px;">Save Password</button>
+                </div>
+            </form>
         </div>
     </div>
 

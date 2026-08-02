@@ -221,13 +221,14 @@ if ($method === 'POST' && $action === 'submit_report') {
 
             refreshPatrolAvailabilityStatus($pdo, $patrolId);
 
+            $reportLogId = $placeholderId > 0 ? $placeholderId : (int) $pdo->lastInsertId();
             require_once __DIR__ . '/notifications_schema.php';
             notifyAdminActorActivity(
                 $pdo,
                 'patrol',
                 $personnelName !== '' ? $personnelName : 'Patrol personnel',
                 'submitted a patrol report for route ' . $route . '.',
-                'patrol-logs.php'
+                'patrol-logs.php?activity=report_' . $reportLogId
             );
 
             echo json_encode([
@@ -256,12 +257,13 @@ if ($method === 'POST' && $action === 'submit_report') {
         ]);
 
         require_once __DIR__ . '/notifications_schema.php';
+        $newLogId = (int) $pdo->lastInsertId();
         notifyAdminActorActivity(
             $pdo,
             'patrol',
             $personnelName !== '' ? $personnelName : 'Patrol personnel',
             'submitted a patrol report for route ' . $route . '.',
-            'patrol-logs.php'
+            'patrol-logs.php?activity=report_' . $newLogId
         );
 
         echo json_encode(['success' => true, 'message' => 'Patrol report submitted successfully.']);
@@ -349,7 +351,7 @@ if ($method === 'POST' && $action === 'update_report') {
             'patrol',
             getBpsoPersonnelName() !== '' ? getBpsoPersonnelName() : 'Patrol personnel',
             'updated a patrol report for route ' . $route . '.',
-            'patrol-logs.php'
+            'patrol-logs.php?activity=update_' . $reportId . '_' . time()
         );
 
         echo json_encode(['success' => true, 'message' => 'Patrol report updated successfully.']);

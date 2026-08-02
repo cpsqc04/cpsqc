@@ -220,12 +220,12 @@ if ($action === 'sync') {
                     $synced++;
                 }
 
-                $adminLink = 'missed-report:' . $row['id'];
+                $adminLink = 'patrol-logs.php?activity=missed_' . $row['id'];
                 if (createAdminNotification(
                     $pdo,
                     'missed_patrol_report',
                     'Missed Patrol Report',
-                    $personnelName,
+                    $personnelName . ' missed submitting a report for shift on ' . $scheduleDate . ' (' . $shift . ').',
                     $adminLink
                 )) {
                     $synced++;
@@ -253,7 +253,7 @@ if ($action === 'list') {
             FROM notifications
             WHERE patrol_id = :patrol_id
             ORDER BY created_at DESC
-            LIMIT 20
+            LIMIT 50
         ");
         $stmt->execute([':patrol_id' => $patrolId]);
 

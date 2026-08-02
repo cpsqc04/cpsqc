@@ -12,15 +12,14 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
     exit;
 }
 
-// Check if user is admin
-if (!isset($_SESSION['user_role']) || $_SESSION['user_role'] !== 'Admin') {
+require_once __DIR__ . '/../db.php';
+
+if (!isAdminUser()) {
     ob_clean();
     http_response_code(403);
     echo json_encode(['success' => false, 'error' => 'Forbidden']);
     exit;
 }
-
-require_once __DIR__ . '/../db.php';
 
 // Display all login/logout times in Philippines timezone.
 // login/logout values are written using MySQL NOW() with db.php setting session time_zone='+08:00'.

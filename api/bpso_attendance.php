@@ -252,12 +252,13 @@ if ($method === 'POST') {
             ]);
 
             require_once __DIR__ . '/notifications_schema.php';
+            $attendanceId = (int) $pdo->lastInsertId();
             notifyAdminActorActivity(
                 $pdo,
                 'patrol',
                 (string) $personnel['personnel_name'],
                 'clocked on.',
-                'bpso-attendance.php'
+                'bpso-attendance.php?activity=clock_in_' . $attendanceId
             );
 
             echo json_encode([
@@ -315,7 +316,7 @@ if ($method === 'POST') {
                 'patrol',
                 (string) ($nameRow['personnel_name'] ?? getBpsoPersonnelName()),
                 'clocked out.',
-                'bpso-attendance.php'
+                'bpso-attendance.php?activity=clock_out_' . (int) $open['id']
             );
 
             echo json_encode([

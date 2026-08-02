@@ -101,7 +101,7 @@ try {
             'complaint',
             'Complaint Status Updated',
             $complaintId . ' is now ' . $status . ' (partner update).',
-            'track-complaint.php?id=' . urlencode($complaintId)
+            'track-complaint.php?id=' . urlencode($complaintId) . '&activity=status_' . strtolower($status)
         );
     }
 

@@ -46,6 +46,10 @@
             var icon = 'fa-bell';
             if (n.type === 'bulletin_announcement') {
                 icon = 'fa-bullhorn';
+            } else if (n.type === 'incident_update') {
+                icon = 'fa-shield-alt';
+            } else if (n.type === 'application_status') {
+                icon = 'fa-user-check';
             }
             return '<div class="notification-item ' + (n.is_read ? '' : 'unread') + '" data-id="' + escapeHtml(String(n.id)) + '" data-link="' + escapeHtml(n.link || '') + '">' +
                 '<div class="notification-icon event"><i class="fas ' + icon + '"></i></div>' +

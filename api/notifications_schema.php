@@ -153,13 +153,16 @@ function createNwMemberNotification(PDO $pdo, int $nwMemberId, string $type, str
 
 /**
  * Notify admin of a named patrol or watcher portal activity.
+ * Pass a stable link containing "activity=" (or portal-activity:) so create-time
+ * and sync backfill share the same dedupe key.
  */
 function notifyAdminActorActivity(
     PDO $pdo,
     string $actorRole,
     string $actorName,
     string $activity,
-    ?string $link = null
+    ?string $link = null,
+    ?string $createdAt = null
 ): bool {
     ensureNotificationsTable($pdo);
 
@@ -177,14 +180,150 @@ function notifyAdminActorActivity(
     $title = $roleLabel . ' Activity';
     $message = $actorName . ' ' . ltrim($activity);
 
-    $uniqueLink = $link;
-    if ($uniqueLink === null || trim($uniqueLink) === '') {
+    $uniqueLink = $link !== null ? trim($link) : '';
+    $hasStableKey = $uniqueLink !== '' && (
+        str_contains($uniqueLink, 'activity=')
+        || str_starts_with($uniqueLink, 'portal-activity:')
+    );
+    if ($uniqueLink === '') {
         $uniqueLink = 'portal-activity:' . $actorRole . ':' . time() . ':' . bin2hex(random_bytes(4));
-    } else {
+    } elseif (!$hasStableKey) {
         $uniqueLink .= (str_contains($uniqueLink, '?') ? '&' : '?') . 'activity=' . rawurlencode(time() . '_' . bin2hex(random_bytes(3)));
     }
 
-    return createAdminNotification($pdo, 'portal_activity', $title, $message, $uniqueLink);
+    return createAdminNotification(
+        $pdo,
+        'portal_activity',
+        $title,
+        $message,
+        $uniqueLink,
+        null,
+        $createdAt
+    );
+}
+
+/**
+ * Backfill admin notifications from recent patrol / NW / resident portal activity.
+ */
+function syncPortalActivitiesForAdmin(PDO $pdo): int
+{
+    ensureNotificationsTable($pdo);
+    $synced = 0;
+
+    try {
+        require_once __DIR__ . '/bpso_attendance_schema.php';
+        ensureBpsoAttendanceTable($pdo);
+        $stmt = $pdo->query("
+            SELECT id, personnel_name, time_in, time_out
+            FROM bpso_attendance
+            WHERE time_in >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+            ORDER BY id DESC
+            LIMIT 100
+        ");
+        $rows = $stmt ? $stmt->fetchAll(PDO::FETCH_ASSOC) : [];
+        foreach ($rows as $row) {
+            $id = (int) ($row['id'] ?? 0);
+            $name = trim((string) ($row['personnel_name'] ?? 'Patrol personnel'));
+            if ($id <= 0) {
+                continue;
+            }
+            if (notifyAdminActorActivity(
+                $pdo,
+                'patrol',
+                $name,
+                'clocked on.',
+                'bpso-attendance.php?activity=clock_in_' . $id,
+                $row['time_in'] ?? null
+            )) {
+                $synced++;
+            }
+            if (!empty($row['time_out']) && notifyAdminActorActivity(
+                $pdo,
+                'patrol',
+                $name,
+                'clocked out.',
+                'bpso-attendance.php?activity=clock_out_' . $id,
+                $row['time_out']
+            )) {
+                $synced++;
+            }
+        }
+    } catch (Throwable $e) {
+        error_log('Admin attendance sync failed: ' . $e->getMessage());
+    }
+
+    try {
+        require_once __DIR__ . '/patrol_logs_schema.php';
+        ensurePatrolLogsTable($pdo);
+        $stmt = $pdo->query("
+            SELECT id, personnel_name, route, status, created_at
+            FROM patrol_logs
+            WHERE created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+              AND status <> 'Scheduled'
+            ORDER BY id DESC
+            LIMIT 100
+        ");
+        $rows = $stmt ? $stmt->fetchAll(PDO::FETCH_ASSOC) : [];
+        foreach ($rows as $row) {
+            $id = (int) ($row['id'] ?? 0);
+            if ($id <= 0) {
+                continue;
+            }
+            $name = trim((string) ($row['personnel_name'] ?? 'Patrol personnel'));
+            $route = trim((string) ($row['route'] ?? 'a patrol route'));
+            if (notifyAdminActorActivity(
+                $pdo,
+                'patrol',
+                $name,
+                'submitted a patrol report for route ' . $route . '.',
+                'patrol-logs.php?activity=report_' . $id,
+                $row['created_at'] ?? null
+            )) {
+                $synced++;
+            }
+        }
+    } catch (Throwable $e) {
+        error_log('Admin patrol report sync failed: ' . $e->getMessage());
+    }
+
+    try {
+        require_once __DIR__ . '/neighborhood-watcher-incidents-schema.php';
+        ensureNwIncidentReportsTable($pdo);
+        $stmt = $pdo->query("
+            SELECT id, report_id, member_name, location, created_at
+            FROM nw_incident_reports
+            WHERE created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+            ORDER BY id DESC
+            LIMIT 100
+        ");
+        $rows = $stmt ? $stmt->fetchAll(PDO::FETCH_ASSOC) : [];
+        foreach ($rows as $row) {
+            $reportId = trim((string) ($row['report_id'] ?? ''));
+            $id = (int) ($row['id'] ?? 0);
+            if ($reportId === '' && $id > 0) {
+                $reportId = (string) $id;
+            }
+            if ($reportId === '') {
+                continue;
+            }
+            $name = trim((string) ($row['member_name'] ?? 'Neighborhood Watch member'));
+            $location = trim((string) ($row['location'] ?? 'an unknown location'));
+            if (notifyAdminActorActivity(
+                $pdo,
+                'watcher',
+                $name,
+                'submitted a Neighborhood Watch incident report (' . $reportId . ') at ' . $location . '.',
+                'review-neighborhood-watcher-incidents.php?id=' . rawurlencode($reportId) . '&activity=submit_' . $id,
+                $row['created_at'] ?? null
+            )) {
+                $synced++;
+            }
+        }
+    } catch (Throwable $e) {
+        error_log('Admin NW incident sync failed: ' . $e->getMessage());
+    }
+
+    return $synced;
 }
 
 /**

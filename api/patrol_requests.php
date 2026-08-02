@@ -265,7 +265,7 @@ if ($method === 'POST' && $action === 'manage') {
                     'patrol_request_assignment',
                     'Assigned for Patrolling',
                     'You have been assigned to patrol request ' . $requestCode . ' (' . $detailText . '). Open My Schedule to view your assignment.',
-                    'tab:schedule'
+                    'tab:schedule:request:' . $id . ':' . (int) $assignedPatrolId
                 );
             }
         }

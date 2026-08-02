@@ -735,10 +735,12 @@ if (!isAdminUser()) {
             top: 0;
             width: 100%;
             height: 100%;
-            background: transparent;
+            background: rgba(11, 19, 43, 0.55);
+            backdrop-filter: blur(4px);
             align-items: center;
             justify-content: center;
-            pointer-events: none;
+            padding: 1rem;
+            box-sizing: border-box;
         }
         
         .modal.active {
@@ -746,146 +748,234 @@ if (!isAdminUser()) {
         }
         
         .modal-content {
-            background: linear-gradient(145deg, var(--tertiary-color), var(--secondary-color));
-            border: 1px solid rgba(255, 255, 255, 0.08);
-            border-radius: var(--radius);
-            box-shadow: 0 20px 50px -25px rgba(0, 0, 0, 0.5);
-            padding: 2.5rem;
-            max-width: 600px;
-            width: 90%;
+            background: linear-gradient(160deg, #243356 0%, var(--tertiary-color) 48%, #152038 100%);
+            border: 1px solid rgba(76, 138, 137, 0.35);
+            border-radius: 16px;
+            box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+            padding: 0;
+            max-width: 520px;
+            width: min(520px, 94vw);
             max-height: 90vh;
-            overflow-y: auto;
-            pointer-events: auto;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
             position: relative;
-            margin: 2rem auto;
+        }
+
+        .modal-content::before {
+            content: '';
+            position: absolute;
+            inset: 0 0 auto 0;
+            height: 4px;
+            background: linear-gradient(90deg, var(--primary-color), #7ec8c6, var(--primary-color));
         }
         
         .modal-header {
             display: flex;
             justify-content: space-between;
-            align-items: center;
-            margin-bottom: 1.75rem;
-            padding-bottom: 1rem;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.16);
+            align-items: flex-start;
+            gap: 1rem;
+            padding: 1.5rem 1.75rem 1rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
         }
         
         .modal-header h2 {
             margin: 0;
             color: #f8fafc;
-            font-size: 1.75rem;
-            font-weight: 600;
+            font-size: 1.35rem;
+            font-weight: 700;
+            letter-spacing: 0.01em;
+        }
+
+        .modal-subtitle {
+            margin: 0.35rem 0 0;
+            color: rgba(255, 255, 255, 0.65);
+            font-size: 0.88rem;
+            line-height: 1.4;
+            font-weight: 400;
+        }
+
+        .modal-body {
+            padding: 1.25rem 1.75rem 0.5rem;
+            overflow-y: auto;
+            flex: 1;
         }
         
         .close {
             color: rgba(255, 255, 255, 0.8);
-            font-size: 1.75rem;
+            font-size: 1.5rem;
             cursor: pointer;
             width: 36px;
             height: 36px;
             display: flex;
             align-items: center;
             justify-content: center;
-            border-radius: 6px;
+            border-radius: 10px;
             transition: all 0.2s ease;
+            flex-shrink: 0;
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            line-height: 1;
         }
         
         .close:hover {
             color: #fff;
-            background: rgba(255, 255, 255, 0.1);
+            background: rgba(239, 68, 68, 0.25);
+            border-color: rgba(239, 68, 68, 0.35);
         }
         
         .field {
-            margin-bottom: 1.5rem;
+            margin-bottom: 1.15rem;
         }
         
         .field label {
             display: block;
-            margin-bottom: 0.5rem;
-            color: rgba(255, 255, 255, 0.8);
-            font-weight: 500;
+            margin-bottom: 0.45rem;
+            color: rgba(255, 255, 255, 0.82);
+            font-weight: 600;
+            font-size: 0.9rem;
         }
         
-        .field input {
+        .field input,
+        .field select,
+        #editRoleLocked {
             width: 100%;
-            padding: 0.875rem 1rem;
-            border: 1px solid rgba(255, 255, 255, 0.16);
-            border-radius: var(--radius);
+            padding: 0.8rem 0.95rem;
+            border: 1px solid rgba(255, 255, 255, 0.14);
+            border-radius: 10px;
             font: inherit;
-            font-size: 1rem;
+            font-size: 0.95rem;
             color: #f8fafc;
-            background: rgba(255, 255, 255, 0.08);
+            background: rgba(255, 255, 255, 0.07);
             box-sizing: border-box;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+        }
+
+        .field input[readonly],
+        #editRoleLocked {
+            background: rgba(255, 255, 255, 0.04);
+            color: rgba(255, 255, 255, 0.72);
+            cursor: not-allowed;
         }
         
         .field select {
-            width: 100%;
-            padding: 0.875rem 1rem;
             padding-right: 2.5rem;
-            border: 1px solid rgba(255, 255, 255, 0.16);
-            border-radius: var(--radius);
-            font: inherit;
-            font-size: 1rem;
-            color: #f8fafc;
-            background: rgba(255, 255, 255, 0.08);
             background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23f8fafc' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
             background-repeat: no-repeat;
             background-position: right 1rem center;
             background-size: 12px;
-            box-sizing: border-box;
             appearance: none;
             -webkit-appearance: none;
             -moz-appearance: none;
             cursor: pointer;
         }
         
-        /* Style for select options - note: limited browser support */
         .field select option {
             background: #1c2541;
             color: #f8fafc;
             padding: 0.75rem 1rem;
         }
         
-        /* Ensure select dropdown is visible on all browsers */
         .field select::-ms-expand {
             display: none;
-        }
-        
-        /* For Firefox */
-        .field select {
-            text-indent: 0.01px;
-            text-overflow: '';
         }
         
         .field input:focus,
         .field select:focus {
             outline: none;
             border-color: var(--primary-color);
-            box-shadow: 0 0 0 3px rgba(76, 138, 137, 0.25);
-            background-color: rgba(255, 255, 255, 0.12);
-        }
-        
-        .field select:focus {
-            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%234c8a89' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
+            box-shadow: 0 0 0 3px rgba(76, 138, 137, 0.28);
+            background-color: rgba(255, 255, 255, 0.1);
         }
         
         .field select:hover {
-            background-color: rgba(255, 255, 255, 0.12);
-            border-color: rgba(255, 255, 255, 0.24);
+            background-color: rgba(255, 255, 255, 0.1);
+            border-color: rgba(255, 255, 255, 0.22);
         }
-        
+
+        .field-hint {
+            margin: 0.45rem 0 0;
+            font-size: 0.8rem;
+            line-height: 1.4;
+            color: rgba(215, 236, 235, 0.72);
+        }
+
+        .toast-popup {
+            position: fixed;
+            top: 1.25rem;
+            right: 1.25rem;
+            z-index: 4000;
+            display: none;
+            align-items: flex-start;
+            gap: 0.75rem;
+            max-width: min(420px, calc(100vw - 2rem));
+            padding: 0.95rem 1.1rem;
+            border-radius: 12px;
+            background: #1c2541;
+            border: 1px solid rgba(76, 138, 137, 0.45);
+            box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35);
+            color: #f8fafc;
+            font-size: 0.9rem;
+            line-height: 1.45;
+        }
+
+        .toast-popup.show {
+            display: flex;
+            animation: toastIn 0.25s ease;
+        }
+
+        .toast-popup i {
+            color: #7ec8c6;
+            margin-top: 0.15rem;
+            flex-shrink: 0;
+        }
+
+        @keyframes toastIn {
+            from { opacity: 0; transform: translateY(-8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .reset-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            margin-top: 0.65rem;
+            color: #7ec8c6;
+            font-size: 0.9rem;
+            font-weight: 600;
+            text-decoration: underline;
+            text-underline-offset: 3px;
+            cursor: pointer;
+            background: none;
+            border: none;
+            padding: 0;
+            font-family: inherit;
+        }
+
+        .reset-link:hover:not(:disabled) {
+            color: #a8e4e2;
+        }
+
+        .reset-link:disabled {
+            opacity: 0.65;
+            cursor: wait;
+        }
+
         .button-group {
             display: flex;
-            gap: 1rem;
-            margin-top: 1.5rem;
+            gap: 0.85rem;
+            padding: 1rem 1.75rem 1.5rem;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            background: rgba(0, 0, 0, 0.12);
         }
         
         .button-group .btn {
             flex: 1;
-            padding: 0.875rem 1.5rem;
+            padding: 0.85rem 1.25rem;
             border: none;
-            border-radius: var(--radius);
-            font-size: 1rem;
-            font-weight: 500;
+            border-radius: 10px;
+            font-size: 0.95rem;
+            font-weight: 600;
             cursor: pointer;
             transition: all 0.2s ease;
         }
@@ -893,16 +983,18 @@ if (!isAdminUser()) {
         .button-group .btn-primary {
             background: var(--primary-color);
             color: #fff;
+            box-shadow: 0 8px 18px rgba(76, 138, 137, 0.28);
         }
         
         .button-group .btn-primary:hover {
             background: #4ca8a6;
+            transform: translateY(-1px);
         }
         
         .button-group .btn-secondary {
             background: transparent;
             color: rgba(255, 255, 255, 0.9);
-            border: 1px solid rgba(255, 255, 255, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.28);
         }
         
         .button-group .btn-secondary:hover {
@@ -910,8 +1002,8 @@ if (!isAdminUser()) {
         }
         
         .error-message {
-            color: #ef4444;
-            font-size: 0.875rem;
+            color: #fecaca;
+            font-size: 0.85rem;
             margin-top: 0.5rem;
             display: none;
         }
@@ -1122,78 +1214,88 @@ if (!isAdminUser()) {
     <div id="addUserModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h2>Add User</h2>
-                <span class="close" onclick="closeAddUserModal()">&times;</span>
+                <div>
+                    <h2>Add User</h2>
+                    <p class="modal-subtitle">Create an Admin account with emailed temporary access.</p>
+                </div>
+                <span class="close" onclick="closeAddUserModal()" aria-label="Close">&times;</span>
             </div>
             <form id="addUserForm" onsubmit="saveUser(event)">
-                <div class="field">
-                    <label for="fullName">Full Name *</label>
-                    <input type="text" id="fullName" name="full_name" required>
+                <div class="modal-body">
+                    <div class="field">
+                        <label for="fullName">Full Name *</label>
+                        <input type="text" id="fullName" name="full_name" required>
+                    </div>
+                    <div class="field">
+                        <label for="username">Username *</label>
+                        <input type="text" id="username" name="username" required>
+                    </div>
+                    <div class="field">
+                        <label for="email">Email Address *</label>
+                        <input type="email" id="email" name="email" required>
+                    </div>
+                    <div class="field">
+                        <label for="role">Role *</label>
+                        <select id="role" name="role" required>
+                            <option value="Admin" selected>Admin</option>
+                        </select>
+                    </div>
+                    <div class="error-message" id="formError"></div>
                 </div>
-                <div class="field">
-                    <label for="username">Username *</label>
-                    <input type="text" id="username" name="username" required>
-                </div>
-                <div class="field">
-                    <label for="email">Email Address *</label>
-                    <input type="email" id="email" name="email" required>
-                </div>
-                <div class="field">
-                    <label for="password">Password *</label>
-                    <input type="password" id="password" name="password" required>
-                    <div class="error-message" id="passwordError">Password must contain at least one capital letter and one number or special character</div>
-                </div>
-                <div class="field">
-                    <label for="role">Role *</label>
-                    <select id="role" name="role" required>
-                        <option value="">Select role</option>
-                        <option value="Admin">Admin</option>
-                    </select>
-                </div>
-                <div class="error-message" id="formError"></div>
                 <div class="button-group">
                     <button type="button" class="btn btn-secondary" onclick="closeAddUserModal()">Cancel</button>
-                    <button type="submit" class="btn btn-primary">Add User</button>
+                    <button type="submit" class="btn btn-primary">Add as Admin</button>
                 </div>
             </form>
         </div>
+    </div>
+
+    <div id="userToast" class="toast-popup" role="status" aria-live="polite">
+        <i class="fas fa-envelope"></i>
+        <div id="userToastMessage"></div>
     </div>
     
     <!-- Edit User Modal -->
     <div id="editUserModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h2>Edit User</h2>
-                <span class="close" onclick="closeEditUserModal()">&times;</span>
+                <div>
+                    <h2>Edit User</h2>
+                    <p class="modal-subtitle">Update account details and manage password access.</p>
+                </div>
+                <span class="close" onclick="closeEditUserModal()" aria-label="Close">&times;</span>
             </div>
             <form id="editUserForm" onsubmit="saveEditUser(event)">
                 <input type="hidden" id="editUserId" name="user_id">
-                <div class="field">
-                    <label for="editFullName">Full Name *</label>
-                    <input type="text" id="editFullName" name="full_name" required>
+                <div class="modal-body">
+                    <div class="field">
+                        <label for="editFullName">Full Name *</label>
+                        <input type="text" id="editFullName" name="full_name" required>
+                    </div>
+                    <div class="field">
+                        <label for="editUsername">Username *</label>
+                        <input type="text" id="editUsername" name="username" required>
+                    </div>
+                    <div class="field">
+                        <label for="editEmail">Email Address *</label>
+                        <input type="email" id="editEmail" name="email" required>
+                    </div>
+                    <div class="field">
+                        <label for="editRole">Role *</label>
+                        <select id="editRole" name="role">
+                            <option value="Admin">Admin</option>
+                        </select>
+                        <input type="text" id="editRoleLocked" readonly style="display: none;">
+                        <div class="field-hint" id="editRoleHint" style="display: none;">
+                            This account was registered as patrol/BPSO or Neighborhood Watcher. Role cannot be changed.
+                        </div>
+                        <button type="button" class="reset-link" id="sendResetLinkBtn" onclick="sendPasswordResetLink()">
+                            Send Password Reset Link
+                        </button>
+                        <p class="field-hint" id="resetLinkHint"></p>
+                    </div>
+                    <div class="error-message" id="editFormError"></div>
                 </div>
-                <div class="field">
-                    <label for="editUsername">Username *</label>
-                    <input type="text" id="editUsername" name="username" required>
-                </div>
-                <div class="field">
-                    <label for="editEmail">Email Address *</label>
-                    <input type="email" id="editEmail" name="email" required>
-                </div>
-                <div class="field">
-                    <label for="editPassword">Password (leave blank to keep current password)</label>
-                    <input type="password" id="editPassword" name="password">
-                    <div class="error-message" id="editPasswordError">Password must contain at least one capital letter and one number or special character</div>
-                </div>
-                <div class="field">
-                    <label for="editRole">Role *</label>
-                    <select id="editRole" name="role" required>
-                        <option value="">Select role</option>
-                        <option value="Admin">Admin</option>
-                        <option value="BPSO Personnel">BPSO Personnel</option>
-                    </select>
-                </div>
-                <div class="error-message" id="editFormError"></div>
                 <div class="button-group">
                     <button type="button" class="btn btn-secondary" onclick="closeEditUserModal()">Cancel</button>
                     <button type="submit" class="btn btn-primary">Update User</button>
@@ -1304,6 +1406,14 @@ if (!isAdminUser()) {
             return user.account_type === 'bpso' || formatRoleLabel(user.role) === 'BPSO Personnel';
         }
 
+        function isNwAccount(user) {
+            return user.account_type === 'nw' || formatRoleLabel(user.role) === 'Neighborhood Watcher';
+        }
+
+        function isRoleLockedAccount(user) {
+            return !!(user.role_locked || isBpsoAccount(user) || isNwAccount(user));
+        }
+
         function normalizeBpsoStatus(status) {
             const raw = String(status || 'Available').trim();
             const map = {
@@ -1344,6 +1454,8 @@ if (!isAdminUser()) {
                 const tr = document.createElement('tr');
                 const isActive = isAccountActive(user);
                 const isBpso = isBpsoAccount(user);
+                const isNw = isNwAccount(user);
+                const accountType = user.account_type || (isBpso ? 'bpso' : (isNw ? 'nw' : 'admin'));
                 const roleLabel = formatRoleLabel(user.role);
                 const statusLabel = isBpso ? normalizeBpsoStatus(user.status) : (user.status || 'Active');
                 const statusClass = isBpso
@@ -1365,7 +1477,7 @@ if (!isAdminUser()) {
                     <td>
                         <div class="action-cell">
                             <label class="status-toggle">
-                                <input type="checkbox" ${isActive ? 'checked' : ''} onchange="toggleUserStatus('${user.id}', this.checked, '${user.account_type || 'admin'}')">
+                                <input type="checkbox" ${isActive ? 'checked' : ''} onchange="toggleUserStatus('${user.id}', this.checked, '${accountType}')">
                                 <span class="status-toggle-slider"></span>
                             </label>
                             <button class="btn-action btn-edit" onclick="editUser('${user.id}')">Edit</button>
@@ -1411,18 +1523,31 @@ if (!isAdminUser()) {
             }
         }
         
+        let toastTimer = null;
+
+        function showUserToast(message) {
+            const toast = document.getElementById('userToast');
+            const text = document.getElementById('userToastMessage');
+            if (!toast || !text) return;
+            text.textContent = message;
+            toast.classList.add('show');
+            if (toastTimer) clearTimeout(toastTimer);
+            toastTimer = setTimeout(function () {
+                toast.classList.remove('show');
+            }, 4500);
+        }
+
         function openAddUserModal() {
             document.getElementById('addUserModal').classList.add('active');
             document.getElementById('addUserForm').reset();
+            document.getElementById('role').value = 'Admin';
             document.getElementById('formError').style.display = 'none';
-            document.getElementById('passwordError').style.display = 'none';
         }
         
         function closeAddUserModal() {
             document.getElementById('addUserModal').classList.remove('active');
             document.getElementById('addUserForm').reset();
             document.getElementById('formError').style.display = 'none';
-            document.getElementById('passwordError').style.display = 'none';
         }
         
         async function saveUser(event) {
@@ -1430,20 +1555,19 @@ if (!isAdminUser()) {
             
             const form = document.getElementById('addUserForm');
             const formData = new FormData(form);
+            const submitBtn = form.querySelector('button[type="submit"]');
             
             const data = {
                 full_name: formData.get('full_name'),
                 username: formData.get('username'),
                 email: formData.get('email'),
-                password: formData.get('password'),
-                role: formData.get('role')
+                role: formData.get('role') || 'Admin'
             };
-            
-            // Validate password
-            const password = data.password;
-            if (!/[A-Z]/.test(password) || !/[0-9!@#$%^&*(),.?":{}|<>]/.test(password)) {
-                document.getElementById('passwordError').style.display = 'block';
-                return;
+
+            document.getElementById('formError').style.display = 'none';
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.textContent = 'Adding...';
             }
             
             try {
@@ -1458,6 +1582,11 @@ if (!isAdminUser()) {
                 if (result.success) {
                     closeAddUserModal();
                     loadUsers();
+                    showUserToast(
+                        result.email_sent === false
+                            ? (result.message || 'Admin account created, but the welcome email could not be sent.')
+                            : 'A temporary password will be sent to the registered email. The new admin must change it before accessing the portal.'
+                    );
                 } else {
                     document.getElementById('formError').textContent = result.error || 'Failed to create user';
                     document.getElementById('formError').style.display = 'block';
@@ -1466,6 +1595,11 @@ if (!isAdminUser()) {
                 console.error('Error creating user:', error);
                 document.getElementById('formError').textContent = 'Network error. Please try again.';
                 document.getElementById('formError').style.display = 'block';
+            } finally {
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Add as Admin';
+                }
             }
         }
         
@@ -1476,18 +1610,38 @@ if (!isAdminUser()) {
 
                 if (result.success && result.user) {
                     const user = result.user;
-                    const isBpso = user.account_type === 'bpso';
+                    const roleLocked = isRoleLockedAccount(user);
+                    const roleLabel = formatRoleLabel(user.role);
+                    const roleSelect = document.getElementById('editRole');
+                    const roleLockedInput = document.getElementById('editRoleLocked');
+                    const roleHint = document.getElementById('editRoleHint');
 
                     document.getElementById('editUserId').value = user.id;
                     document.getElementById('editFullName').value = user.full_name || '';
                     document.getElementById('editUsername').value = user.username || '';
                     document.getElementById('editEmail').value = user.email || '';
-                    document.getElementById('editPassword').value = '';
-                    document.getElementById('editRole').value = isBpso ? 'BPSO Personnel' : (user.role || 'Admin');
-                    document.getElementById('editRole').disabled = isBpso;
-                    document.getElementById('editUsername').disabled = isBpso;
+                    document.getElementById('editUsername').disabled = roleLocked;
                     document.getElementById('editFormError').style.display = 'none';
-                    document.getElementById('editPasswordError').style.display = 'none';
+                    document.getElementById('resetLinkHint').textContent = '';
+                    document.getElementById('sendResetLinkBtn').disabled = false;
+
+                    if (roleLocked) {
+                        roleSelect.style.display = 'none';
+                        roleSelect.disabled = true;
+                        roleSelect.removeAttribute('required');
+                        roleLockedInput.style.display = 'block';
+                        roleLockedInput.value = roleLabel;
+                        roleHint.style.display = 'block';
+                    } else {
+                        roleSelect.style.display = 'block';
+                        roleSelect.disabled = false;
+                        roleSelect.setAttribute('required', 'required');
+                        roleSelect.innerHTML = '<option value="Admin">Admin</option>';
+                        roleSelect.value = 'Admin';
+                        roleLockedInput.style.display = 'none';
+                        roleHint.style.display = 'none';
+                    }
+
                     document.getElementById('editUserModal').classList.add('active');
                 } else {
                     alert('Failed to load user data: ' + (result.error || 'Unknown error'));
@@ -1501,10 +1655,52 @@ if (!isAdminUser()) {
         function closeEditUserModal() {
             document.getElementById('editUserModal').classList.remove('active');
             document.getElementById('editUserForm').reset();
-            document.getElementById('editRole').disabled = false;
+            const roleSelect = document.getElementById('editRole');
+            const roleLockedInput = document.getElementById('editRoleLocked');
+            roleSelect.disabled = false;
+            roleSelect.style.display = 'block';
+            roleSelect.setAttribute('required', 'required');
+            roleSelect.innerHTML = '<option value="Admin">Admin</option>';
+            roleLockedInput.style.display = 'none';
             document.getElementById('editUsername').disabled = false;
+            document.getElementById('editRoleHint').style.display = 'none';
             document.getElementById('editFormError').style.display = 'none';
-            document.getElementById('editPasswordError').style.display = 'none';
+            document.getElementById('resetLinkHint').textContent = '';
+            document.getElementById('sendResetLinkBtn').disabled = false;
+        }
+
+        async function sendPasswordResetLink() {
+            const userId = document.getElementById('editUserId').value;
+            const btn = document.getElementById('sendResetLinkBtn');
+            const hint = document.getElementById('resetLinkHint');
+            if (!userId) {
+                return;
+            }
+
+            btn.disabled = true;
+            hint.textContent = 'Sending reset link...';
+
+            try {
+                const response = await fetch('api/users.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'send_reset_link', id: userId })
+                });
+                const result = await response.json();
+                if (result.success) {
+                    hint.textContent = result.message || 'Reset link sent.';
+                    if (typeof showUserToast === 'function') {
+                        showUserToast(result.message || 'Password reset link sent to the user\'s email.');
+                    }
+                } else {
+                    hint.textContent = result.error || 'Failed to send reset link.';
+                }
+            } catch (error) {
+                console.error('Error sending reset link:', error);
+                hint.textContent = 'Network error. Please try again.';
+            } finally {
+                btn.disabled = false;
+            }
         }
 
         async function saveEditUser(event) {
@@ -1512,22 +1708,19 @@ if (!isAdminUser()) {
 
             const form = document.getElementById('editUserForm');
             const formData = new FormData(form);
+            const roleSelect = document.getElementById('editRole');
+            const roleLockedInput = document.getElementById('editRoleLocked');
+            const roleValue = roleSelect.style.display === 'none'
+                ? roleLockedInput.value
+                : (formData.get('role') || 'Admin');
+
             const data = {
                 id: formData.get('user_id'),
                 full_name: formData.get('full_name'),
                 username: formData.get('username'),
                 email: formData.get('email'),
-                role: formData.get('role')
+                role: roleValue
             };
-
-            const password = formData.get('password');
-            if (password && password.trim() !== '') {
-                if (!/[A-Z]/.test(password) || !/[0-9!@#$%^&*(),.?":{}|<>]/.test(password)) {
-                    document.getElementById('editPasswordError').style.display = 'block';
-                    return;
-                }
-                data.password = password;
-            }
 
             try {
                 const response = await fetch('api/users.php', {

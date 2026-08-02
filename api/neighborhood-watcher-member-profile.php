@@ -119,7 +119,7 @@ if ($method === 'POST' && $action === 'update_profile') {
             'watcher',
             $name,
             'updated their personal information (registered email: ' . $email . ').',
-            'neighborhood-watch-application.php'
+            'neighborhood-watch-application.php?id=' . $memberId . '&activity=profile_' . time()
         );
 
         $member = fetchMemberProfile($pdo, $memberId);
@@ -186,7 +186,7 @@ if ($method === 'POST' && $action === 'change_password') {
             'watcher',
             $actorName !== '' ? $actorName : 'Neighborhood Watch member',
             'changed their account password.',
-            'neighborhood-watch-application.php'
+            'neighborhood-watch-application.php?id=' . $memberId . '&activity=password_' . time()
         );
 
         echo json_encode(['success' => true, 'message' => 'Password updated successfully.']);

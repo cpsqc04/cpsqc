@@ -121,5 +121,7 @@ try {
 require_once __DIR__ . '/includes/admin_auth.php';
 
 if ($pdo instanceof PDO && session_status() === PHP_SESSION_ACTIVE) {
+    ensureAdminRolesNormalized($pdo);
     syncAdminSessionRole($pdo);
+    enforceAdminPasswordChangeGate();
 }

@@ -13,6 +13,11 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
 }
 
 require_once __DIR__ . '/../db.php';
+require_once __DIR__ . '/neighborhood-watcher-members-schema.php';
+require_once __DIR__ . '/../includes/password_reset_tokens.php';
+require_once __DIR__ . '/../includes/login_otp.php';
+require_once __DIR__ . '/../includes/app_url.php';
+require_once __DIR__ . '/../includes/admin_credentials.php';
 
 if (!isAdminUser()) {
     ob_clean();
@@ -59,6 +64,10 @@ function ensureUsersTable(PDO $pdo): void
         $pdo->exec('ALTER TABLE admins ADD COLUMN status VARCHAR(20) DEFAULT "Active"');
     }
 
+    if (!isset($adminColumns['must_change_password'])) {
+        $pdo->exec('ALTER TABLE admins ADD COLUMN must_change_password TINYINT(1) NOT NULL DEFAULT 0 AFTER password_hash');
+    }
+
     // Cross-check email uniqueness against BPSO accounts — ensure that table/column exists too.
     $patrolColumns = [];
     $patrolsExist = false;
@@ -76,6 +85,7 @@ function ensureUsersTable(PDO $pdo): void
     }
 
     $pdo->exec("UPDATE admins SET role = 'BPSO Personnel' WHERE role = 'User'");
+    ensureAdminRolesNormalized($pdo);
 }
 
 /**
@@ -110,6 +120,26 @@ function emailExistsOnAccountTables(PDO $pdo, string $email, ?string $excludeTyp
         }
     }
 
+    if (tableHasColumn($pdo, 'nw_members', 'email') || tableHasColumn($pdo, 'volunteers', 'email')) {
+        try {
+            require_once __DIR__ . '/neighborhood-watcher-members-schema.php';
+            ensureNwMembersTable($pdo);
+            $table = nwMembersTableName();
+            if ($excludeType === 'nw' && $excludeId) {
+                $stmt = $pdo->prepare("SELECT id FROM {$table} WHERE email = :email AND id != :id LIMIT 1");
+                $stmt->execute([':email' => $email, ':id' => $excludeId]);
+            } else {
+                $stmt = $pdo->prepare("SELECT id FROM {$table} WHERE email = :email LIMIT 1");
+                $stmt->execute([':email' => $email]);
+            }
+            if ($stmt->fetch()) {
+                return true;
+            }
+        } catch (PDOException $e) {
+            // NW table may be unavailable.
+        }
+    }
+
     return false;
 }
 
@@ -122,21 +152,6 @@ function formatCreatedAt(?string $createdAt): ?string
     return date('Y-m-d H:i:s', strtotime($createdAt));
 }
 
-function mapAdminUser(array $row): array
-{
-    return [
-        'id' => 'admin-' . $row['id'],
-        'numeric_id' => (int) $row['id'],
-        'account_type' => 'admin',
-        'full_name' => $row['full_name'],
-        'username' => $row['username'],
-        'email' => $row['email'],
-        'role' => formatUserRoleLabel($row['role'] ?? 'Admin'),
-        'status' => $row['status'] ?? 'Active',
-        'created_at' => formatCreatedAt($row['created_at'] ?? null),
-    ];
-}
-
 function mapBpsoUser(array $row): array
 {
     return [
@@ -147,7 +162,40 @@ function mapBpsoUser(array $row): array
         'username' => $row['bpso_personnel_id'],
         'email' => $row['email'],
         'role' => 'BPSO Personnel',
+        'role_locked' => true,
         'status' => $row['status'] ?? 'Available',
+        'created_at' => formatCreatedAt($row['created_at'] ?? null),
+    ];
+}
+
+function mapNwUser(array $row): array
+{
+    return [
+        'id' => 'nw-' . $row['id'],
+        'numeric_id' => (int) $row['id'],
+        'account_type' => 'nw',
+        'full_name' => $row['name'] ?? '',
+        'username' => $row['member_code'] ?? ('NW-' . $row['id']),
+        'email' => $row['email'] ?? '',
+        'role' => 'Neighborhood Watcher',
+        'role_locked' => true,
+        'status' => $row['status'] ?? 'Pending',
+        'created_at' => formatCreatedAt($row['created_at'] ?? null),
+    ];
+}
+
+function mapAdminUser(array $row): array
+{
+    return [
+        'id' => 'admin-' . $row['id'],
+        'numeric_id' => (int) $row['id'],
+        'account_type' => 'admin',
+        'full_name' => $row['full_name'],
+        'username' => $row['username'],
+        'email' => $row['email'],
+        'role' => 'Admin',
+        'role_locked' => false,
+        'status' => $row['status'] ?? 'Active',
         'created_at' => formatCreatedAt($row['created_at'] ?? null),
     ];
 }
@@ -173,6 +221,17 @@ function fetchAllManagedUsers(PDO $pdo): array
         // Patrol table may not exist yet on older installs.
     }
 
+    try {
+        ensureNwMembersTable($pdo);
+        $table = nwMembersTableName();
+        $stmt = $pdo->query("SELECT id, name, email, member_code, status, created_at FROM {$table} WHERE status = 'Active' ORDER BY created_at DESC");
+        foreach ($stmt->fetchAll() as $row) {
+            $users[] = mapNwUser($row);
+        }
+    } catch (PDOException $e) {
+        // NW table may not exist yet.
+    }
+
     return $users;
 }
 
@@ -186,6 +245,10 @@ function parseManagedUserId($rawId): array
 
     if (preg_match('/^bpso-(\d+)$/', $rawId, $matches)) {
         return ['type' => 'bpso', 'id' => (int) $matches[1]];
+    }
+
+    if (preg_match('/^nw-(\d+)$/', $rawId, $matches)) {
+        return ['type' => 'nw', 'id' => (int) $matches[1]];
     }
 
     if (ctype_digit($rawId)) {
@@ -207,6 +270,19 @@ function fetchManagedUser(PDO $pdo, string $rawId): ?array
         $stmt->execute([':id' => $parsed['id']]);
         $row = $stmt->fetch();
         return $row ? mapBpsoUser($row) : null;
+    }
+
+    if ($parsed['type'] === 'nw') {
+        try {
+            ensureNwMembersTable($pdo);
+            $table = nwMembersTableName();
+            $stmt = $pdo->prepare("SELECT id, name, email, member_code, status, created_at FROM {$table} WHERE id = :id");
+            $stmt->execute([':id' => $parsed['id']]);
+            $row = $stmt->fetch();
+            return $row ? mapNwUser($row) : null;
+        } catch (PDOException $e) {
+            return null;
+        }
     }
 
     $stmt = $pdo->prepare('SELECT id, full_name, username, email, role, status, created_at FROM admins WHERE id = :id');
@@ -256,12 +332,64 @@ if ($method === 'GET') {
         echo json_encode(['success' => false, 'error' => 'Failed to fetch users: ' . $e->getMessage()]);
     }
 } elseif ($method === 'POST') {
-    $data = json_decode(file_get_contents('php://input'), true);
+    $data = json_decode(file_get_contents('php://input'), true) ?? [];
+    $action = trim((string) ($data['action'] ?? ''));
+
+    if ($action === 'send_reset_link') {
+        $parsed = parseManagedUserId($data['id'] ?? '');
+        if ($parsed['id'] <= 0 || $parsed['type'] === '') {
+            ob_clean();
+            http_response_code(400);
+            echo json_encode(['success' => false, 'error' => 'Invalid user ID']);
+            exit;
+        }
+
+        $user = fetchManagedUser($pdo, (string) ($data['id'] ?? ''));
+        if (!$user) {
+            ob_clean();
+            http_response_code(404);
+            echo json_encode(['success' => false, 'error' => 'User not found']);
+            exit;
+        }
+
+        $email = trim((string) ($user['email'] ?? ''));
+        if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            ob_clean();
+            http_response_code(400);
+            echo json_encode(['success' => false, 'error' => 'This account has no valid email address. Add an email first.']);
+            exit;
+        }
+
+        try {
+            $rawToken = createPasswordResetToken($pdo, $parsed['type'], $parsed['id'], $email, 60);
+            $resetUrl = buildPasswordResetUrl($rawToken);
+            $portal = $parsed['type'] === 'bpso' ? 'bpso' : ($parsed['type'] === 'nw' ? 'nw' : 'admin');
+            if (!sendPasswordResetLinkEmail($email, $resetUrl, $portal, (string) ($user['full_name'] ?? ''))) {
+                ob_clean();
+                http_response_code(500);
+                echo json_encode(['success' => false, 'error' => 'Failed to send reset email. Check mail configuration.']);
+                exit;
+            }
+
+            $atPos = strpos($email, '@');
+            $masked = substr($email, 0, 3) . '***' . ($atPos !== false ? substr($email, $atPos) : '');
+            ob_clean();
+            echo json_encode([
+                'success' => true,
+                'message' => 'Password reset link sent to ' . $masked . '.',
+            ]);
+        } catch (Throwable $e) {
+            error_log('send_reset_link failed: ' . $e->getMessage());
+            ob_clean();
+            http_response_code(500);
+            echo json_encode(['success' => false, 'error' => 'Failed to create reset link.']);
+        }
+        exit;
+    }
 
     $fullName = trim($data['full_name'] ?? '');
     $username = trim($data['username'] ?? '');
     $email = trim($data['email'] ?? '');
-    $password = $data['password'] ?? '';
     $role = normalizeUserRole(trim($data['role'] ?? 'Admin'));
 
     if ($role !== 'Admin') {
@@ -271,21 +399,23 @@ if ($method === 'GET') {
         exit;
     }
 
-    if ($fullName === '' || $username === '' || $email === '' || $password === '') {
+    if ($fullName === '' || $username === '' || $email === '') {
         ob_clean();
         http_response_code(400);
-        echo json_encode(['success' => false, 'error' => 'All fields are required']);
+        echo json_encode(['success' => false, 'error' => 'Full name, username, and email are required']);
         exit;
     }
 
-    if (!validatePassword($password)) {
+    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
         ob_clean();
         http_response_code(400);
-        echo json_encode(['success' => false, 'error' => 'Password must contain at least one capital letter and one number or special character']);
+        echo json_encode(['success' => false, 'error' => 'Invalid email address']);
         exit;
     }
 
     try {
+        ensureAdminMustChangePasswordColumn($pdo);
+
         $stmt = $pdo->prepare('SELECT id FROM admins WHERE username = :username');
         $stmt->execute([':username' => $username]);
         if ($stmt->fetch()) {
@@ -302,9 +432,10 @@ if ($method === 'GET') {
             exit;
         }
 
-        $passwordHash = password_hash($password, PASSWORD_DEFAULT);
+        $tempPassword = generateAdminTempPassword();
+        $passwordHash = password_hash($tempPassword, PASSWORD_DEFAULT);
 
-        $stmt = $pdo->prepare('INSERT INTO admins (full_name, username, email, password_hash, role, status, created_at) VALUES (:full_name, :username, :email, :password_hash, :role, "Active", NOW())');
+        $stmt = $pdo->prepare('INSERT INTO admins (full_name, username, email, password_hash, must_change_password, role, status, created_at) VALUES (:full_name, :username, :email, :password_hash, 1, :role, "Active", NOW())');
         $stmt->execute([
             ':full_name' => $fullName,
             ':username' => $username,
@@ -313,10 +444,20 @@ if ($method === 'GET') {
             ':role' => 'Admin',
         ]);
 
-        $user = fetchManagedUser($pdo, 'admin-' . $pdo->lastInsertId());
+        $newId = (int) $pdo->lastInsertId();
+        $mailResult = sendAdminWelcomeCredentialsEmail($email, $fullName, $username, $tempPassword);
+        $user = fetchManagedUser($pdo, 'admin-' . $newId);
 
         ob_clean();
-        echo json_encode(['success' => true, 'user' => $user]);
+        echo json_encode([
+            'success' => true,
+            'user' => $user,
+            'email_sent' => !empty($mailResult['success']),
+            'message' => !empty($mailResult['success'])
+                ? 'Admin account created. Temporary password emailed to ' . $email . '.'
+                : 'Admin account created, but the welcome email failed to send. Use Send Password Reset Link from Edit User.',
+            'email_error' => $mailResult['error'] ?? null,
+        ]);
     } catch (PDOException $e) {
         ob_clean();
         http_response_code(500);
@@ -357,6 +498,17 @@ if ($method === 'GET') {
                 }
 
                 $stmt = $pdo->prepare('UPDATE patrols SET status = :status WHERE id = :id');
+                $stmt->execute([':status' => $status, ':id' => $parsed['id']]);
+            } elseif ($parsed['type'] === 'nw') {
+                if (!in_array($status, ['Active', 'Inactive'], true)) {
+                    ob_clean();
+                    http_response_code(400);
+                    echo json_encode(['success' => false, 'error' => 'Invalid status']);
+                    exit;
+                }
+                ensureNwMembersTable($pdo);
+                $table = nwMembersTableName();
+                $stmt = $pdo->prepare("UPDATE {$table} SET status = :status WHERE id = :id");
                 $stmt->execute([':status' => $status, ':id' => $parsed['id']]);
             } else {
                 if (!in_array($status, ['Active', 'Inactive'], true)) {
@@ -413,6 +565,7 @@ if ($method === 'GET') {
                     exit;
                 }
 
+                // Role is fixed for BPSO / patrol accounts — ignore any role payload.
                 $updateFields = ['personnel_name = :full_name', 'email = :email'];
                 $params = [
                     ':full_name' => $fullName,
@@ -432,6 +585,45 @@ if ($method === 'GET') {
                 }
 
                 $sql = 'UPDATE patrols SET ' . implode(', ', $updateFields) . ' WHERE id = :id';
+                $stmt = $pdo->prepare($sql);
+                $stmt->execute($params);
+            } elseif ($parsed['type'] === 'nw') {
+                if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                    ob_clean();
+                    http_response_code(400);
+                    echo json_encode(['success' => false, 'error' => 'Invalid email address']);
+                    exit;
+                }
+
+                if (emailExistsOnAccountTables($pdo, $email, 'nw', $parsed['id'])) {
+                    ob_clean();
+                    http_response_code(400);
+                    echo json_encode(['success' => false, 'error' => 'Email already exists']);
+                    exit;
+                }
+
+                ensureNwMembersTable($pdo);
+                $table = nwMembersTableName();
+                $updateFields = ['name = :full_name', 'email = :email'];
+                $params = [
+                    ':full_name' => $fullName,
+                    ':email' => $email,
+                    ':id' => $parsed['id'],
+                ];
+
+                if ($password !== '') {
+                    if (!validatePassword($password)) {
+                        ob_clean();
+                        http_response_code(400);
+                        echo json_encode(['success' => false, 'error' => 'Password must contain at least one capital letter and one number or special character']);
+                        exit;
+                    }
+                    $updateFields[] = 'password_hash = :password_hash';
+                    $updateFields[] = 'must_change_password = 0';
+                    $params[':password_hash'] = password_hash($password, PASSWORD_DEFAULT);
+                }
+
+                $sql = "UPDATE {$table} SET " . implode(', ', $updateFields) . ' WHERE id = :id';
                 $stmt = $pdo->prepare($sql);
                 $stmt->execute($params);
             } else {
@@ -482,6 +674,7 @@ if ($method === 'GET') {
                         exit;
                     }
                     $updateFields[] = 'password_hash = :password_hash';
+                    $updateFields[] = 'must_change_password = 0';
                     $params[':password_hash'] = password_hash($password, PASSWORD_DEFAULT);
                 }
 
@@ -503,18 +696,33 @@ if ($method === 'GET') {
                     }
                 }
 
-                $sql = 'UPDATE admins SET ' . implode(', ', $updateFields) . ' WHERE id = :id';
-                $stmt = $pdo->prepare($sql);
-                $stmt->execute($params);
+                try {
+                    $sql = 'UPDATE admins SET ' . implode(', ', $updateFields) . ' WHERE id = :id';
+                    $stmt = $pdo->prepare($sql);
+                    $stmt->execute($params);
+                } catch (PDOException $e) {
+                    // Older installs may not have must_change_password yet.
+                    if (str_contains($e->getMessage(), 'must_change_password')) {
+                        $updateFields = array_values(array_filter($updateFields, static fn ($f) => !str_contains($f, 'must_change_password')));
+                        $sql = 'UPDATE admins SET ' . implode(', ', $updateFields) . ' WHERE id = :id';
+                        $stmt = $pdo->prepare($sql);
+                        $stmt->execute($params);
+                    } else {
+                        throw $e;
+                    }
+                }
 
                 if (!empty($_SESSION['user_id']) && (int) $_SESSION['user_id'] === (int) $parsed['id']) {
                     $_SESSION['username'] = $username;
                     $_SESSION['full_name'] = $fullName;
                     $_SESSION['user_role'] = 'Admin';
+                    if ($password !== '') {
+                        $_SESSION['admin_must_change_password'] = false;
+                    }
                 }
             }
 
-            $user = fetchManagedUser($pdo, ($parsed['type'] === 'bpso' ? 'bpso-' : 'admin-') . $parsed['id']);
+            $user = fetchManagedUser($pdo, ($parsed['type'] === 'bpso' ? 'bpso-' : ($parsed['type'] === 'nw' ? 'nw-' : 'admin-')) . $parsed['id']);
 
             ob_clean();
             echo json_encode(['success' => true, 'user' => $user, 'message' => 'User updated successfully']);

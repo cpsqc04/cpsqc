@@ -414,6 +414,15 @@ if ($method === 'POST') {
 
             $pdo->commit();
 
+            require_once __DIR__ . '/notifications_schema.php';
+            createAdminNotification(
+                $pdo,
+                'volunteer',
+                'New Neighborhood Watch Application',
+                $name . ' submitted a neighborhood watch membership application (Status: ' . $status . ')',
+                'neighborhood-watch-application.php?id=' . $id
+            );
+
             echo json_encode([
                 'success' => true,
                 'data' => [
@@ -670,6 +679,16 @@ if ($method === 'POST') {
                 );
                 $emailSent = !empty($mailResult['success']);
                 $emailError = $mailResult['error'] ?? null;
+
+                require_once __DIR__ . '/notifications_schema.php';
+                createNwMemberNotification(
+                    $pdo,
+                    $id,
+                    'application_status',
+                    'Application Approved',
+                    'Your Neighborhood Watch application was approved. You can now sign in to the member portal.',
+                    'section:bulletinSection'
+                );
             } elseif ($status === 'Rejected' && $rejectionReason !== '' && ($previousStatus !== 'Rejected' || $forceResendRejection)) {
                 $mailResult = sendVolunteerApplicationStatusEmail(
                     $recipientEmail,
@@ -688,6 +707,18 @@ if ($method === 'POST') {
                 $emailError = $mailResult['error'] ?? null;
                 if (!$emailSent) {
                     error_log('NW rejection email failed for member #' . $id . ' to ' . $recipientEmail . ': ' . ($emailError ?: 'unknown error'));
+                }
+
+                if ($previousStatus !== 'Rejected') {
+                    require_once __DIR__ . '/notifications_schema.php';
+                    createNwMemberNotification(
+                        $pdo,
+                        $id,
+                        'application_status',
+                        'Application Update',
+                        'Your Neighborhood Watch application was rejected. Reason: ' . $rejectionReason,
+                        'section:bulletinSection'
+                    );
                 }
             }
 

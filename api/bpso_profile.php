@@ -103,7 +103,7 @@ try {
             'patrol',
             $personnelName !== '' ? $personnelName : 'Patrol personnel',
             'updated their registered email address to ' . $email . '.',
-            'bpso-attendance.php'
+            'patrol-attendance.php?activity=email_' . $patrolId . '_' . time()
         );
 
         $updated = fetchPatrolAccount($pdo, $patrolId);
@@ -156,7 +156,7 @@ try {
             'patrol',
             $personnelName !== '' ? $personnelName : 'Patrol personnel',
             'changed their account password.',
-            'bpso-attendance.php'
+            'patrol-attendance.php?activity=password_' . $patrolId . '_' . time()
         );
 
         echo json_encode(['success' => true, 'message' => 'Password updated successfully.']);

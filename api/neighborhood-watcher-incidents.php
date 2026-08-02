@@ -119,7 +119,7 @@ if ($method === 'POST') {
                 'watcher',
                 (string) $member['name'],
                 'submitted a Neighborhood Watch incident report (' . $reportId . ') at ' . $location . '.',
-                'review-neighborhood-watcher-incidents.php?id=' . urlencode($reportId)
+                'review-neighborhood-watcher-incidents.php?id=' . rawurlencode($reportId) . '&activity=submit_' . $id
             );
 
             echo json_encode([
@@ -247,6 +247,19 @@ if ($method === 'POST') {
                 'tab:nw-incidents:' . $id,
                 $timestamp
             );
+
+            $nwMemberId = (int) ($report['volunteer_id'] ?? 0);
+            if ($nwMemberId > 0) {
+                createNwMemberNotification(
+                    $pdo,
+                    $nwMemberId,
+                    'incident_update',
+                    'Incident Assigned to Patrol',
+                    'Your report ' . ($report['report_id'] ?? ('#' . $id)) . ' was assigned to patrol for response.',
+                    'section:reportsSection:' . $id,
+                    $timestamp
+                );
+            }
 
             echo json_encode([
                 'success' => true,

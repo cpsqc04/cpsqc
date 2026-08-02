@@ -111,7 +111,7 @@ try {
                     FROM notifications 
                     WHERE {$adminScope}
                     ORDER BY created_at DESC 
-                    LIMIT 20
+                    LIMIT 50
                 ");
                 $stmt->execute([':user_id' => $userId]);
                 
@@ -162,7 +162,7 @@ try {
                         FROM notifications 
                         WHERE user_id = :user_id 
                         ORDER BY created_at DESC 
-                        LIMIT 20
+                        LIMIT 50
                     ");
                     $stmt->execute([':user_id' => $userId]);
                     
@@ -525,14 +525,20 @@ try {
                     $pdo,
                     'missed_patrol_report',
                     'Missed Patrol Report',
-                    $personnelName,
-                    'missed-report:' . $row['id']
+                    $personnelName . ' missed submitting a report for shift on ' . $scheduleDate . ' (' . $shift . ').',
+                    'patrol-logs.php?activity=missed_' . (int) $row['id']
                 )) {
                     $synced++;
                 }
             }
         } catch (PDOException $e) {
             // skip if schedules/logs unavailable
+        }
+
+        try {
+            $synced += syncPortalActivitiesForAdmin($pdo);
+        } catch (Throwable $e) {
+            error_log('Portal activity sync failed: ' . $e->getMessage());
         }
 
         // Note: Login/logout notifications are created directly in login.php and logout.php

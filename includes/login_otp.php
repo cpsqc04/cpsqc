@@ -446,3 +446,73 @@ function sendPasswordResetOTPEmail(string $email, string $otp, string $portal = 
     error_log('Password reset OTP email failed: PHPMailer is not available.');
     return false;
 }
+
+/**
+ * Email a one-time password reset link (admin-triggered or self-service link flow).
+ */
+function sendPasswordResetLinkEmail(string $email, string $resetUrl, string $portal = 'admin', string $displayName = ''): bool
+{
+    $email = trim($email);
+    $resetUrl = trim($resetUrl);
+    if ($email === '' || $resetUrl === '') {
+        return false;
+    }
+
+    $portalLabel = match ($portal) {
+        'bpso' => 'BPSO Personnel / Patrol Portal',
+        'nw', 'nw_member' => 'Neighborhood Watch Member Portal',
+        default => 'Admin Portal',
+    };
+    $subject = match ($portal) {
+        'bpso' => 'AlerTara QC - Reset Your Patrol Password',
+        'nw', 'nw_member' => 'AlerTara QC - Reset Your Neighborhood Watch Password',
+        default => 'AlerTara QC - Reset Your Admin Password',
+    };
+
+    $safeName = htmlspecialchars(trim($displayName) !== '' ? trim($displayName) : 'there', ENT_QUOTES, 'UTF-8');
+    $safeUrl = htmlspecialchars($resetUrl, ENT_QUOTES, 'UTF-8');
+
+    $body = "
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset='UTF-8'>
+        <style>
+            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; }
+            .email-container { max-width: 600px; margin: 0 auto; background: #ffffff; }
+            .header { background: linear-gradient(135deg, #4c8a89 0%, #2a5a59 100%); color: white; padding: 30px 20px; text-align: center; }
+            .header h1 { margin: 0; font-size: 24px; font-weight: 600; }
+            .header p { margin: 10px 0 0 0; font-size: 16px; opacity: 0.95; }
+            .body-content { padding: 30px 20px; background: #ffffff; }
+            .body-content p { margin: 0 0 15px 0; color: #333; font-size: 14px; }
+            .cta { text-align: center; margin: 28px 0; }
+            .cta a { display: inline-block; background: #4c8a89; color: #fff !important; text-decoration: none; padding: 12px 22px; border-radius: 8px; font-weight: 600; }
+            .disclaimer { color: #666; font-size: 12px; margin-top: 20px; padding-top: 20px; border-top: 1px solid #e0e0e0; }
+            .footer { background: #f5f5f5; padding: 15px 20px; text-align: center; color: #999; font-size: 11px; }
+        </style>
+    </head>
+    <body>
+        <div class='email-container'>
+            <div class='header'>
+                <h1>AlerTara QC</h1>
+                <p>{$portalLabel} Password Reset</p>
+            </div>
+            <div class='body-content'>
+                <p>Hello {$safeName},</p>
+                <p>An administrator requested a password reset for your account. Click the button below to choose a new password:</p>
+                <div class='cta'><a href='{$safeUrl}'>Reset Password</a></div>
+                <p>This link expires in 60 minutes and can be used only once.</p>
+                <p class='disclaimer'>If you did not expect this email, please contact your barangay administrator.</p>
+            </div>
+            <div class='footer'>
+                <p>This is an automated message. Please do not reply to this email.</p>
+            </div>
+        </div>
+    </body>
+    </html>
+    ";
+
+    $result = sendSmtpHtmlMail($email, $subject, $body);
+    return !empty($result['success']);
+}
+

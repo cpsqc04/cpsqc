@@ -106,7 +106,7 @@ if ($method === 'POST' && $action === 'submit_resolution') {
             $status === 'Resolved'
                 ? 'resolved community complaint ' . $complaintLabel . '.'
                 : 'updated progress on community complaint ' . $complaintLabel . '.',
-            'track-complaint.php'
+            'track-complaint.php?id=' . rawurlencode($complaintLabel) . '&activity=' . strtolower($status) . '_' . $complaintDbId
         );
 
         echo json_encode(['success' => true, 'message' => $status === 'Resolved' ? 'Complaint marked as resolved.' : 'Progress report saved.']);

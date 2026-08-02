@@ -102,8 +102,20 @@ if ($method === 'POST' && $action === 'submit_resolution') {
             $status === 'Resolved'
                 ? 'resolved Neighborhood Watch incident ' . $reportLabel . '.'
                 : 'updated progress on Neighborhood Watch incident ' . $reportLabel . '.',
-            'review-neighborhood-watcher-incidents.php?id=' . urlencode($reportLabel)
+            'review-neighborhood-watcher-incidents.php?id=' . rawurlencode($reportLabel) . '&activity=' . strtolower($status) . '_' . $reportDbId
         );
+
+        $nwMemberId = (int) ($report['volunteer_id'] ?? 0);
+        if ($nwMemberId > 0 && $status === 'Resolved') {
+            createNwMemberNotification(
+                $pdo,
+                $nwMemberId,
+                'incident_update',
+                'Incident Resolved',
+                'Your report ' . $reportLabel . ' was marked resolved by patrol.',
+                'section:reportsSection:' . $reportDbId
+            );
+        }
 
         echo json_encode(['success' => true, 'message' => $status === 'Resolved' ? 'Incident report marked as resolved.' : 'Progress report saved.']);
     } catch (PDOException $e) {
