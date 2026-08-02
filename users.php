@@ -1287,9 +1287,6 @@ if (!isAdminUser()) {
                             <option value="Admin">Admin</option>
                         </select>
                         <input type="text" id="editRoleLocked" readonly style="display: none;">
-                        <div class="field-hint" id="editRoleHint" style="display: none;">
-                            This account was registered as patrol/BPSO or Neighborhood Watcher. Role cannot be changed.
-                        </div>
                         <button type="button" class="reset-link" id="sendResetLinkBtn" onclick="sendPasswordResetLink()">
                             Send Password Reset Link
                         </button>
@@ -1617,7 +1614,6 @@ if (!isAdminUser()) {
                     const roleLabel = formatRoleLabel(user.role);
                     const roleSelect = document.getElementById('editRole');
                     const roleLockedInput = document.getElementById('editRoleLocked');
-                    const roleHint = document.getElementById('editRoleHint');
 
                     document.getElementById('editUserId').value = user.id;
                     document.getElementById('editFullName').value = user.full_name || '';
@@ -1634,7 +1630,6 @@ if (!isAdminUser()) {
                         roleSelect.removeAttribute('required');
                         roleLockedInput.style.display = 'block';
                         roleLockedInput.value = roleLabel;
-                        roleHint.style.display = 'block';
                     } else {
                         roleSelect.style.display = 'block';
                         roleSelect.disabled = false;
@@ -1642,7 +1637,6 @@ if (!isAdminUser()) {
                         roleSelect.innerHTML = '<option value="Admin">Admin</option>';
                         roleSelect.value = 'Admin';
                         roleLockedInput.style.display = 'none';
-                        roleHint.style.display = 'none';
                     }
 
                     document.getElementById('editUserModal').classList.add('active');
@@ -1666,7 +1660,6 @@ if (!isAdminUser()) {
             roleSelect.innerHTML = '<option value="Admin">Admin</option>';
             roleLockedInput.style.display = 'none';
             document.getElementById('editUsername').disabled = false;
-            document.getElementById('editRoleHint').style.display = 'none';
             document.getElementById('editFormError').style.display = 'none';
             document.getElementById('resetLinkHint').textContent = '';
             document.getElementById('sendResetLinkBtn').disabled = false;
