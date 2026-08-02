@@ -171,7 +171,7 @@ if (!$isAdmin) {
 if ($method === 'POST' && $action === 'manage') {
     $id = (int) ($input['id'] ?? 0);
     $status = trim($input['status'] ?? '');
-    $allowedStatuses = ['Pending', 'Under Review', 'Approved', 'Scheduled', 'Rejected', 'Cancelled'];
+    $allowedStatuses = ['Pending', 'Under Review', 'Approved', 'Scheduled', 'Completed', 'Rejected', 'Cancelled'];
 
     if ($id <= 0 || $status === '' || !in_array($status, $allowedStatuses, true)) {
         http_response_code(400);

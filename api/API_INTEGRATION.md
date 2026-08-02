@@ -957,3 +957,29 @@ BPSO and NW portal APIs (`bpso_*`, `nw_*`) also require their respective portal 
 ---
 
 *Last updated: July 2026 — AlertaraQC / CPSQC*
+
+## A1b. Patrol Request Lifecycle — Disaster Preparedness / Campaign
+
+Partners call this when a linked simulation **starts** or **completes**.
+
+| Item | Value |
+|------|-------|
+| **URL** | `POST /api/patrol_requests_lifecycle.php` |
+| **Auth** | `X-API-Key` / Bearer = `PATROL_REQUEST_API_KEY` |
+
+### Actions
+
+| action | Effect |
+|--------|--------|
+| `start_simulation` | Assigned personnel → **On Patrol** |
+| `complete_simulation` | Assigned personnel → **Available**; request → **Completed** |
+
+### Example
+
+```json
+{
+  "action": "complete_simulation",
+  "source_reference_id": "simulation-event:4",
+  "source_group": "disaster-preparedness"
+}
+```
