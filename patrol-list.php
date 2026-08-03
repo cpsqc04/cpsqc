@@ -633,7 +633,6 @@ require_once __DIR__ . '/db.php';
                         <option value="Assigned to Simulation">Assigned to Simulation</option>
                         <option value="On Patrol">On Patrol</option>
                         <option value="On Reporting">On Reporting</option>
-                        <option value="Unavailable">Unavailable</option>
                     </select>
                 </div>
                 <div class="form-actions">
@@ -709,7 +708,6 @@ require_once __DIR__ . '/db.php';
                         <option value="Assigned to Simulation">Assigned to Simulation</option>
                         <option value="On Patrol">On Patrol</option>
                         <option value="On Reporting">On Reporting</option>
-                        <option value="Unavailable">Unavailable</option>
                     </select>
                 </div>
                 <div class="form-actions">

@@ -6,6 +6,7 @@ header('Content-Type: application/json');
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 
 require_once __DIR__ . '/live_frame_helpers.php';
+require_once __DIR__ . '/../includes/detection_env.php';
 
 $maxAgeSeconds = 5;
 $frameFile = newestLiveFramePath();
@@ -31,4 +32,6 @@ echo json_encode([
     'age_seconds' => $age,
     'updated_at' => date('c', $mtime),
     'frame_file' => basename($frameFile),
+    'feed_mode' => getCctvFeedMode(),
+    'local_detection_enabled' => isLocalDetectionEnabled(),
 ]);

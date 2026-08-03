@@ -1,0 +1,18 @@
+[
+    {
+        "id": "1",
+        "cameraId": "CAM-001",
+        "name": "Main Entrance Camera",
+        "location": "Barangay San Agustin, Quezon City",
+        "ipAddress": "192.168.1.100",
+        "port": "554",
+        "username": "admin",
+        "password": "your-camera-password",
+        "streamType": "sub",
+        "rtspUrl": "rtsp://admin:your-camera-password@192.168.1.100:554/Preview_01_sub",
+        "status": "Online",
+        "description": "Configure IP and credentials in Camera Management after deploy.",
+        "createdAt": "2026-01-01 00:00:00",
+        "updatedAt": "2026-01-01 00:00:00"
+    }
+]

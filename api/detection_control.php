@@ -8,6 +8,8 @@
 session_start();
 header('Content-Type: application/json; charset=utf-8');
 
+require_once __DIR__ . '/../includes/detection_env.php';
+
 if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
     http_response_code(401);
     echo json_encode(['success' => false, 'message' => 'Unauthorized']);
@@ -131,6 +133,8 @@ if ($action === 'status') {
         'running' => $running,
         'pid' => $pid,
         'heartbeat_file' => is_file($heartbeatFile),
+        'local_detection_enabled' => isLocalDetectionEnabled(),
+        'feed_mode' => getCctvFeedMode(),
     ]);
     exit;
 }
@@ -148,6 +152,20 @@ if ($action === 'stop') {
 
 if ($action === 'start') {
     writeDetectionHeartbeat($heartbeatFile);
+
+    if (!isLocalDetectionEnabled()) {
+        echo json_encode([
+            'success' => true,
+            'action' => 'start',
+            'already_running' => false,
+            'running' => false,
+            'pid' => null,
+            'local_detection_enabled' => false,
+            'feed_mode' => 'remote',
+            'message' => 'Remote feed mode: detection runs on the on-site PC and uploads frames to this server.',
+        ]);
+        exit;
+    }
 
     if ($running) {
         echo json_encode([

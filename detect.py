@@ -118,6 +118,14 @@ RTSP_FLUSH_GRABS = 5  # Drop buffered frames when reading RTSP (reduces lag)
 MAX_DECODE_FAILURES_BEFORE_RECONNECT = 8
 CAMERAS_FILE = "cameras.json"
 ACTIVE_CAMERA = None
+CAMERAS_CONFIG_FINGERPRINT = None
+CCTV_FRAME_UPLOAD_URL = ""
+CCTV_FRAME_UPLOAD_KEY = ""
+CCTV_CAMERAS_CONFIG_URL = ""
+CCTV_UPLOAD_MIN_INTERVAL = 0.4
+_last_cctv_upload_at = 0.0
+_last_cameras_sync_at = 0.0
+CAMERAS_SYNC_INTERVAL = 15
 DETECTIONS_FILE = "detections.json"
 FRAME_FILE = "current_frame.jpg"  # Frame saved for web display
 FRAME_FILE_ALT = "current_frame_alt.jpg"  # Alternate file to avoid locks
@@ -333,6 +341,145 @@ def get_active_camera_credentials():
         ACTIVE_CAMERA.get("username", ""),
         ACTIVE_CAMERA.get("password", ""),
     )
+
+
+def load_project_env():
+    """Load KEY=VALUE pairs from project .env (simple parser, no extra deps)."""
+    env = {}
+    env_path = Path(".env")
+    if not env_path.exists():
+        return env
+    try:
+        for line in env_path.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, value = line.split("=", 1)
+            key = key.strip()
+            value = value.strip().strip('"').strip("'")
+            env[key] = value
+    except Exception:
+        pass
+    return env
+
+
+def init_cctv_upload_from_env():
+    """Enable optional upload of live frames to Hostinger (on-site PC only)."""
+    global CCTV_FRAME_UPLOAD_URL, CCTV_FRAME_UPLOAD_KEY, CCTV_CAMERAS_CONFIG_URL
+    env = load_project_env()
+    CCTV_FRAME_UPLOAD_URL = (
+        env.get("CCTV_FRAME_UPLOAD_URL", "") or os.environ.get("CCTV_FRAME_UPLOAD_URL", "")
+    ).strip()
+    CCTV_FRAME_UPLOAD_KEY = (
+        env.get("CCTV_FRAME_UPLOAD_KEY", "") or os.environ.get("CCTV_FRAME_UPLOAD_KEY", "")
+    ).strip()
+    CCTV_CAMERAS_CONFIG_URL = (
+        env.get("CCTV_CAMERAS_CONFIG_URL", "") or os.environ.get("CCTV_CAMERAS_CONFIG_URL", "")
+    ).strip()
+    if CCTV_FRAME_UPLOAD_URL:
+        print(f"✓ Remote frame upload enabled → {CCTV_FRAME_UPLOAD_URL}")
+    if CCTV_CAMERAS_CONFIG_URL:
+        print(f"✓ Remote camera config sync enabled → {CCTV_CAMERAS_CONFIG_URL}")
+
+
+def sync_cameras_json_from_server(force=False):
+    """Pull cameras.json from Hostinger so Camera Management changes apply on-site."""
+    global _last_cameras_sync_at
+    if not CCTV_CAMERAS_CONFIG_URL or not CCTV_FRAME_UPLOAD_KEY or not REQUESTS_AVAILABLE:
+        return False
+    now = time.time()
+    if not force and now - _last_cameras_sync_at < CAMERAS_SYNC_INTERVAL:
+        return False
+    _last_cameras_sync_at = now
+    try:
+        headers = {"X-CCTV-Upload-Key": CCTV_FRAME_UPLOAD_KEY}
+        resp = requests.get(CCTV_CAMERAS_CONFIG_URL, headers=headers, timeout=10)
+        if resp.status_code != 200:
+            return False
+        payload = resp.json()
+        cameras = payload.get("cameras") if isinstance(payload, dict) else None
+        if not isinstance(cameras, list):
+            return False
+        Path(CAMERAS_FILE).write_text(
+            json.dumps(cameras, indent=4, ensure_ascii=False) + "\n",
+            encoding="utf-8",
+        )
+        return True
+    except Exception:
+        return False
+
+
+def get_camera_config_fingerprint():
+    """Fingerprint active camera settings for hot-reload."""
+    cfg = load_active_camera_config()
+    if not cfg:
+        return None
+    return (
+        cfg.get("rtsp_url", ""),
+        cfg.get("ipAddress", ""),
+        cfg.get("port", ""),
+        cfg.get("username", ""),
+        cfg.get("password", ""),
+        cfg.get("stream_type", ""),
+    )
+
+
+def init_camera_config_fingerprint():
+    global CAMERAS_CONFIG_FINGERPRINT
+    CAMERAS_CONFIG_FINGERPRINT = get_camera_config_fingerprint()
+
+
+def reload_camera_source_if_changed():
+    """Return True when cameras.json changed and RTSP source was refreshed."""
+    global CAMERAS_CONFIG_FINGERPRINT
+    fp = get_camera_config_fingerprint()
+    if fp is None:
+        return False
+    if CAMERAS_CONFIG_FINGERPRINT is None:
+        CAMERAS_CONFIG_FINGERPRINT = fp
+        return False
+    if fp == CAMERAS_CONFIG_FINGERPRINT:
+        return False
+    CAMERAS_CONFIG_FINGERPRINT = fp
+    configure_camera_source()
+    return True
+
+
+def maybe_upload_frame_file(frame_path):
+    """Upload JPEG to production server (lightweight; rate-limited)."""
+    global _last_cctv_upload_at
+    if not CCTV_FRAME_UPLOAD_URL or not CCTV_FRAME_UPLOAD_KEY or not REQUESTS_AVAILABLE:
+        return
+    now = time.time()
+    if now - _last_cctv_upload_at < CCTV_UPLOAD_MIN_INTERVAL:
+        return
+    path = Path(frame_path)
+    if not path.is_file():
+        return
+    try:
+        frame_bytes = path.read_bytes()
+        if len(frame_bytes) < 500:
+            return
+        files = {"frame": ("frame.jpg", frame_bytes, "image/jpeg")}
+        data = {}
+        det_path = Path(DETECTIONS_FILE)
+        if det_path.is_file():
+            try:
+                data["detections"] = det_path.read_text(encoding="utf-8")
+            except Exception:
+                pass
+        headers = {"X-CCTV-Upload-Key": CCTV_FRAME_UPLOAD_KEY}
+        resp = requests.post(
+            CCTV_FRAME_UPLOAD_URL,
+            files=files,
+            data=data,
+            headers=headers,
+            timeout=8,
+        )
+        if resp.status_code == 200:
+            _last_cctv_upload_at = now
+    except Exception:
+        pass
 
 def load_yolo_model():
     """Load YOLO model - works offline after first download"""
@@ -2269,11 +2416,18 @@ def save_live_frame(frame, frame_count):
 
     try:
         if cv2.imwrite(target, frame, params):
+            maybe_upload_frame_file(target)
             return True
-        return cv2.imwrite(fallback, frame, params)
+        if cv2.imwrite(fallback, frame, params):
+            maybe_upload_frame_file(fallback)
+            return True
+        return False
     except Exception:
         try:
-            return cv2.imwrite(fallback, frame, params)
+            if cv2.imwrite(fallback, frame, params):
+                maybe_upload_frame_file(fallback)
+                return True
+            return False
         except Exception:
             return False
 
@@ -3335,7 +3489,11 @@ def main():
     atexit.register(remove_lock)
     
     print("Initializing...")
+    init_cctv_upload_from_env()
+    if sync_cameras_json_from_server(force=True):
+        print("✓ Loaded camera config from server")
     configure_camera_source()
+    init_camera_config_fingerprint()
     
     # Load model (offline after first download)
     model = load_yolo_model()
@@ -3592,6 +3750,11 @@ def main():
                 # Viewer heartbeat: exit when Open Surveillance is closed / idle
                 if current_time - last_heartbeat_check >= 5.0:
                     last_heartbeat_check = current_time
+                    if sync_cameras_json_from_server():
+                        print("↻ Camera config synced from server.")
+                    if reload_camera_source_if_changed():
+                        print("\n↻ cameras.json changed — reconnecting with updated camera settings...")
+                        break
                     if should_idle_auto_stop():
                         print(f"\n⏹ Idle auto-stop: no viewer heartbeat for {IDLE_AUTO_STOP_SECONDS // 60} minutes.")
                         print("Open Surveillance again to restart detection.")

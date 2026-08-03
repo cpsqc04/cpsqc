@@ -32,6 +32,7 @@ __pycache__/
 *.pyc
 
 # CCTV / detection generated artifacts (keep local, don't commit)
+cameras.json
 recordings/
 detected_objects/
 current_frame*.jpg

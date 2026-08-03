@@ -606,7 +606,7 @@ $cctvNavActive = 'camera-management';
                 if (!result.success) throw new Error(result.error || 'Save failed');
                 closeCameraModal();
                 loadCameras();
-                alert('Camera saved. Restart start_detection.bat to apply stream changes.');
+                alert('Camera saved. Detection will reconnect automatically within a few seconds (on-site PC). On Hostinger, update the on-site PC if the IP changed.');
             } catch (e) {
                 alert(e.message || 'Failed to save camera.');
             }

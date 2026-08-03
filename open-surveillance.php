@@ -7,8 +7,11 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
 }
 require_once __DIR__ . '/includes/admin_auth.php';
 require_once __DIR__ . '/db.php';
+require_once __DIR__ . '/includes/detection_env.php';
 
 $cctvNavActive = 'open-surveillance';
+$localDetectionEnabled = isLocalDetectionEnabled();
+$cctvFeedMode = getCctvFeedMode();
 
 ?>
 <!doctype html>
@@ -509,7 +512,13 @@ $cctvNavActive = 'open-surveillance';
                                 <div class="video-placeholder" id="cameraPlaceholder">
                                     <i class="fas fa-camera"></i>
                                     <p>Loading IP camera feed...</p>
-                                    <p style="font-size:0.9rem;margin-top:0.5rem;">Run <strong>start_detection.bat</strong> or install <strong>install_detection_autostart.bat</strong>.</p>
+                                    <p id="cameraPlaceholderHint" style="font-size:0.9rem;margin-top:0.5rem;">
+                                        <?php if ($localDetectionEnabled): ?>
+                                            Run <strong>start_detection.bat</strong> on this PC, or open this page to start detection automatically.
+                                        <?php else: ?>
+                                            Live feed is uploaded from the <strong>on-site detection PC</strong>. Ensure <strong>start_detection.bat</strong> runs there with upload settings in <strong>.env</strong>.
+                                        <?php endif; ?>
+                                    </p>
                                 </div>
                             </div>
                         </div>
@@ -520,6 +529,9 @@ $cctvNavActive = 'open-surveillance';
     </div>
 
     <script>
+        const LOCAL_DETECTION_ENABLED = <?php echo $localDetectionEnabled ? 'true' : 'false'; ?>;
+        const CCTV_FEED_MODE = <?php echo json_encode($cctvFeedMode); ?>;
+
         document.addEventListener('DOMContentLoaded', function() {
             const sidebar = document.getElementById('sidebar');
             const savedState = localStorage.getItem('sidebarCollapsed');
@@ -550,6 +562,10 @@ $cctvNavActive = 'open-surveillance';
         }
 
         async function ensureDetectionRunning() {
+            if (!LOCAL_DETECTION_ENABLED) {
+                console.log('Detection: remote feed mode (Hostinger — no local Python).');
+                return;
+            }
             try {
                 const result = await detectionControl('start');
                 if (result && result.message) {
@@ -563,6 +579,16 @@ $cctvNavActive = 'open-surveillance';
             }
         }
 
+        function getOfflineFeedMessage(status) {
+            if (LOCAL_DETECTION_ENABLED) {
+                return 'Camera feed not available. Run start_detection.bat on this PC or open Camera Management to verify the camera IP.';
+            }
+            if (status && status.feed_mode === 'remote') {
+                return 'Waiting for frames from the on-site detection PC. Run start_detection.bat there and set CCTV_FRAME_UPLOAD_URL in its .env file.';
+            }
+            return 'Camera feed not available. Check Camera Management and the on-site detection PC.';
+        }
+
         async function sendDetectionHeartbeat() {
             try {
                 await detectionControl('heartbeat');
@@ -574,12 +600,17 @@ $cctvNavActive = 'open-surveillance';
         function initDetectionLifecycle() {
             document.addEventListener('visibilitychange', function() {
                 if (document.visibilityState === 'visible') {
-                    ensureDetectionRunning();
+                    if (LOCAL_DETECTION_ENABLED) {
+                        ensureDetectionRunning();
+                    }
                     sendDetectionHeartbeat();
                 }
             });
 
             const stopOnLeave = function() {
+                if (!LOCAL_DETECTION_ENABLED) {
+                    return;
+                }
                 try {
                     if (navigator.sendBeacon) {
                         const blob = new Blob([JSON.stringify({ action: 'stop' })], { type: 'application/json' });
@@ -698,7 +729,7 @@ $cctvNavActive = 'open-surveillance';
                             setCameraUiState(false);
                         }
                         if (status.age_seconds > 5) {
-                            showCameraError('Camera feed not available. Run start_detection.bat or install_detection_autostart.bat.');
+                            showCameraError(getOfflineFeedMessage(status));
                         }
                         schedulePoll(1000);
                         return;
