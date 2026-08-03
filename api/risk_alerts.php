@@ -3,7 +3,10 @@
 /**
  * List high-risk alerts from Crime Analytics for admin patrol scheduling.
  *
- * GET — public (no API key). Query: status=active (default) | all, severity=CRITICAL|HIGH|...
+ * GET — public (no API key). Query:
+ *   status=active (default) | all
+ *   severity=CRITICAL|HIGH|MEDIUM|LOW
+ *   sync=1 (default) | 0 — pull latest from Crime Analytics active-data feed first
  */
 
 session_start();
@@ -11,6 +14,7 @@ header('Content-Type: application/json; charset=utf-8');
 
 require_once __DIR__ . '/../db.php';
 require_once __DIR__ . '/risk_alerts_schema.php';
+require_once __DIR__ . '/../includes/api_key_auth.php';
 
 if (!$pdo instanceof PDO) {
     http_response_code(500);
@@ -30,6 +34,21 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'GET') {
     http_response_code(405);
     echo json_encode(['success' => false, 'message' => 'Method not allowed. Use GET.']);
     exit;
+}
+
+$syncFlag = strtolower(trim((string) ($_GET['sync'] ?? '1')));
+$shouldSync = !in_array($syncFlag, ['0', 'false', 'no', 'off'], true);
+$syncResult = null;
+
+if ($shouldSync) {
+    try {
+        $syncResult = syncCrimeAnalyticsActiveAlerts($pdo);
+    } catch (Throwable $e) {
+        $syncResult = [
+            'success' => false,
+            'message' => 'Crime Analytics sync failed: ' . $e->getMessage(),
+        ];
+    }
 }
 
 $statusFilter = strtolower(trim($_GET['status'] ?? 'active'));
@@ -59,11 +78,16 @@ try {
     $stmt->execute($params);
     $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-    echo json_encode([
+    $payload = [
         'success' => true,
         'count' => count($rows),
         'data' => $rows,
-    ]);
+    ];
+    if (is_array($syncResult)) {
+        $payload['sync'] = $syncResult;
+    }
+
+    echo json_encode($payload);
 } catch (PDOException $e) {
     http_response_code(500);
     echo json_encode(['success' => false, 'message' => 'Failed to load risk alerts: ' . $e->getMessage()]);

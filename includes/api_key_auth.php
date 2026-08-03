@@ -106,7 +106,14 @@ function getEmergencyResponseApiConfig(): array
 function getCrimeAnalyticsApiConfig(): array
 {
     return [
+        // Public active alerts feed (AlertaraQC pulls this when listing High-Risk Areas).
+        'active_data_url' => envFirst(
+            'CRIME_ANALYTICS_ACTIVE_DATA_URL',
+            'CRIME_ANALYTICS_API_URL',
+            'GROUP5_API_URL'
+        ) ?: 'https://crime-analytics.alertaraqc.com/alerts/api/active-data',
         'api_key' => envFirst('CRIME_ANALYTICS_API_KEY', 'GROUP5_API_KEY'),
+        'timeout' => max(5, (int) (envFirst('CRIME_ANALYTICS_API_TIMEOUT', 'GROUP5_API_TIMEOUT') ?: '30')),
     ];
 }
 

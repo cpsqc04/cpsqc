@@ -217,3 +217,200 @@ function riskAlertsSelectColumns(string $prefix = ''): string
         'triggered_at', 'expires_at', 'received_at', 'updated_at',
     ]));
 }
+
+/**
+ * Insert or update one risk alert row from normalized data.
+ */
+function upsertRiskAlert(PDO $pdo, array $data): string
+{
+    $alertId = $data['alert_id'] !== '' ? $data['alert_id'] : generateRiskAlertId($pdo);
+    $existing = $pdo->prepare('SELECT id FROM risk_alerts WHERE alert_id = :alert_id LIMIT 1');
+    $existing->execute([':alert_id' => $alertId]);
+    $isUpdate = (bool) $existing->fetch();
+
+    if ($isUpdate) {
+        $stmt = $pdo->prepare('UPDATE risk_alerts SET
+            source_group = :source_group,
+            source_reference_id = :source_reference_id,
+            rule_name = :rule_name,
+            rule_type = :rule_type,
+            severity = :severity,
+            condition_text = :condition_text,
+            area_name = :area_name,
+            location = :location,
+            route_suggestion = :route_suggestion,
+            incident_count = :incident_count,
+            time_window = :time_window,
+            latitude = :latitude,
+            longitude = :longitude,
+            status = :status,
+            triggered_at = :triggered_at,
+            expires_at = :expires_at
+            WHERE alert_id = :alert_id');
+    } else {
+        $stmt = $pdo->prepare('INSERT INTO risk_alerts (
+            alert_id, source_group, source_reference_id, rule_name, rule_type, severity,
+            condition_text, area_name, location, route_suggestion, incident_count, time_window,
+            latitude, longitude, status, triggered_at, expires_at
+        ) VALUES (
+            :alert_id, :source_group, :source_reference_id, :rule_name, :rule_type, :severity,
+            :condition_text, :area_name, :location, :route_suggestion, :incident_count, :time_window,
+            :latitude, :longitude, :status, :triggered_at, :expires_at
+        )');
+    }
+
+    $stmt->execute([
+        ':alert_id' => $alertId,
+        ':source_group' => $data['source_group'],
+        ':source_reference_id' => $data['source_reference_id'] !== '' ? $data['source_reference_id'] : null,
+        ':rule_name' => $data['rule_name'],
+        ':rule_type' => $data['rule_type'],
+        ':severity' => $data['severity'],
+        ':condition_text' => $data['condition_text'] !== '' ? $data['condition_text'] : null,
+        ':area_name' => $data['area_name'] !== '' ? $data['area_name'] : null,
+        ':location' => $data['location'],
+        ':route_suggestion' => $data['route_suggestion'] !== '' ? $data['route_suggestion'] : null,
+        ':incident_count' => $data['incident_count'],
+        ':time_window' => $data['time_window'] !== '' ? $data['time_window'] : null,
+        ':latitude' => $data['latitude'],
+        ':longitude' => $data['longitude'],
+        ':status' => $data['status'],
+        ':triggered_at' => $data['triggered_at'],
+        ':expires_at' => $data['expires_at'] !== '' ? $data['expires_at'] : null,
+    ]);
+
+    return $alertId;
+}
+
+/**
+ * Pull active alerts from Crime Analytics public feed and upsert into risk_alerts.
+ *
+ * @return array{success:bool,message:string,synced?:int,resolved?:int,http_code?:int}
+ */
+function syncCrimeAnalyticsActiveAlerts(PDO $pdo): array
+{
+    require_once __DIR__ . '/../includes/api_key_auth.php';
+
+    if (!function_exists('curl_init')) {
+        return ['success' => false, 'message' => 'cURL extension is required to sync Crime Analytics alerts.'];
+    }
+
+    $config = getCrimeAnalyticsApiConfig();
+    $url = trim((string) ($config['active_data_url'] ?? ''));
+    if ($url === '') {
+        return ['success' => false, 'message' => 'Crime Analytics active-data URL is not configured.'];
+    }
+
+    $headers = ['Accept: application/json'];
+    if (!empty($config['api_key'])) {
+        $headers[] = 'X-API-Key: ' . $config['api_key'];
+        $headers[] = 'Authorization: Bearer ' . $config['api_key'];
+    }
+
+    $ch = curl_init($url);
+    curl_setopt_array($ch, [
+        CURLOPT_HTTPGET => true,
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT => (int) ($config['timeout'] ?? 20),
+        CURLOPT_HTTPHEADER => $headers,
+        CURLOPT_FOLLOWLOCATION => true,
+    ]);
+
+    $responseBody = curl_exec($ch);
+    $curlError = curl_error($ch);
+    $httpCode = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+
+    if ($responseBody === false) {
+        return [
+            'success' => false,
+            'message' => 'Failed to reach Crime Analytics API: ' . ($curlError ?: 'Unknown error'),
+            'http_code' => $httpCode,
+        ];
+    }
+
+    $decoded = json_decode($responseBody, true);
+    if (!is_array($decoded)) {
+        return [
+            'success' => false,
+            'message' => 'Crime Analytics API returned invalid JSON (HTTP ' . $httpCode . ').',
+            'http_code' => $httpCode,
+        ];
+    }
+
+    if ($httpCode < 200 || $httpCode >= 300) {
+        $message = trim((string) ($decoded['message'] ?? $decoded['error'] ?? 'Crime Analytics API request failed.'));
+        return [
+            'success' => false,
+            'message' => $message . ' (HTTP ' . $httpCode . ')',
+            'http_code' => $httpCode,
+        ];
+    }
+
+    $alerts = $decoded['alerts'] ?? $decoded['data'] ?? $decoded['items'] ?? null;
+    if (!is_array($alerts)) {
+        return [
+            'success' => false,
+            'message' => 'Crime Analytics response missing alerts list.',
+            'http_code' => $httpCode,
+        ];
+    }
+
+    $syncedIds = [];
+    $synced = 0;
+    $skipped = 0;
+
+    foreach ($alerts as $alert) {
+        if (!is_array($alert)) {
+            $skipped++;
+            continue;
+        }
+
+        $data = normalizeRiskAlertInput($alert);
+        if ($data['status'] !== 'active') {
+            // Active feed should only contain active items, but keep non-active in sync if present.
+        }
+
+        $error = validateRiskAlertRequiredFields($data);
+        if ($error !== null) {
+            $skipped++;
+            continue;
+        }
+
+        $alertId = upsertRiskAlert($pdo, $data);
+        $syncedIds[] = $alertId;
+        $synced++;
+    }
+
+    $resolved = 0;
+    if ($syncedIds !== []) {
+        $placeholders = implode(',', array_fill(0, count($syncedIds), '?'));
+        $params = $syncedIds;
+        $sql = "UPDATE risk_alerts
+                SET status = 'resolved'
+                WHERE status = 'active'
+                  AND LOWER(source_group) IN ('crime_analytics', 'group_5', 'group5', 'group 5')
+                  AND alert_id NOT IN ($placeholders)";
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($params);
+        $resolved = $stmt->rowCount();
+    } elseif (count($alerts) === 0) {
+        // Empty active feed: resolve all Crime Analytics actives.
+        $stmt = $pdo->prepare("UPDATE risk_alerts
+            SET status = 'resolved'
+            WHERE status = 'active'
+              AND LOWER(source_group) IN ('crime_analytics', 'group_5', 'group5', 'group 5')");
+        $stmt->execute();
+        $resolved = $stmt->rowCount();
+    }
+
+    return [
+        'success' => true,
+        'message' => 'Crime Analytics alerts synced.',
+        'synced' => $synced,
+        'skipped' => $skipped,
+        'resolved' => $resolved,
+        'http_code' => $httpCode,
+        'stats' => is_array($decoded['stats'] ?? null) ? $decoded['stats'] : null,
+    ];
+}

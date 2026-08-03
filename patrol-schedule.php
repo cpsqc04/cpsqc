@@ -781,9 +781,14 @@ require_once __DIR__ . '/db.php';
 
                 riskAlertData = {};
                 const rows = result.data || [];
+                const sync = result.sync || null;
 
                 if (rows.length === 0) {
-                    listEl.innerHTML = '<div class="risk-alerts-empty">No active high-risk alerts right now.</div>';
+                    let emptyMsg = 'No active high-risk alerts right now.';
+                    if (sync && sync.success === false) {
+                        emptyMsg = 'Could not sync Crime Analytics alerts: ' + (sync.message || 'Unknown error');
+                    }
+                    listEl.innerHTML = `<div class="risk-alerts-empty">${escapeHtml(emptyMsg)}</div>`;
                     return;
                 }
 

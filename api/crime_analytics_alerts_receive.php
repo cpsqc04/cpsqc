@@ -42,70 +42,19 @@ if ($error !== null) {
     exit;
 }
 
-$alertId = $data['alert_id'] !== '' ? $data['alert_id'] : generateRiskAlertId($pdo);
-$isUpdate = false;
-
 try {
+    $existing = null;
     if ($data['alert_id'] !== '') {
-        $existing = $pdo->prepare('SELECT id FROM risk_alerts WHERE alert_id = :alert_id LIMIT 1');
-        $existing->execute([':alert_id' => $alertId]);
-        $isUpdate = (bool) $existing->fetch();
+        $check = $pdo->prepare('SELECT id FROM risk_alerts WHERE alert_id = :alert_id LIMIT 1');
+        $check->execute([':alert_id' => $data['alert_id']]);
+        $existing = $check->fetch();
     }
 
-    if ($isUpdate) {
-        $stmt = $pdo->prepare('UPDATE risk_alerts SET
-            source_group = :source_group,
-            source_reference_id = :source_reference_id,
-            rule_name = :rule_name,
-            rule_type = :rule_type,
-            severity = :severity,
-            condition_text = :condition_text,
-            area_name = :area_name,
-            location = :location,
-            route_suggestion = :route_suggestion,
-            incident_count = :incident_count,
-            time_window = :time_window,
-            latitude = :latitude,
-            longitude = :longitude,
-            status = :status,
-            triggered_at = :triggered_at,
-            expires_at = :expires_at
-            WHERE alert_id = :alert_id');
-    } else {
-        $stmt = $pdo->prepare('INSERT INTO risk_alerts (
-            alert_id, source_group, source_reference_id, rule_name, rule_type, severity,
-            condition_text, area_name, location, route_suggestion, incident_count, time_window,
-            latitude, longitude, status, triggered_at, expires_at
-        ) VALUES (
-            :alert_id, :source_group, :source_reference_id, :rule_name, :rule_type, :severity,
-            :condition_text, :area_name, :location, :route_suggestion, :incident_count, :time_window,
-            :latitude, :longitude, :status, :triggered_at, :expires_at
-        )');
-    }
-
-    $stmt->execute([
-        ':alert_id' => $alertId,
-        ':source_group' => $data['source_group'],
-        ':source_reference_id' => $data['source_reference_id'] !== '' ? $data['source_reference_id'] : null,
-        ':rule_name' => $data['rule_name'],
-        ':rule_type' => $data['rule_type'],
-        ':severity' => $data['severity'],
-        ':condition_text' => $data['condition_text'] !== '' ? $data['condition_text'] : null,
-        ':area_name' => $data['area_name'] !== '' ? $data['area_name'] : null,
-        ':location' => $data['location'],
-        ':route_suggestion' => $data['route_suggestion'] !== '' ? $data['route_suggestion'] : null,
-        ':incident_count' => $data['incident_count'],
-        ':time_window' => $data['time_window'] !== '' ? $data['time_window'] : null,
-        ':latitude' => $data['latitude'],
-        ':longitude' => $data['longitude'],
-        ':status' => $data['status'],
-        ':triggered_at' => $data['triggered_at'],
-        ':expires_at' => $data['expires_at'] !== '' ? $data['expires_at'] : null,
-    ]);
+    $alertId = upsertRiskAlert($pdo, $data);
 
     echo json_encode([
         'success' => true,
-        'message' => $isUpdate ? 'Risk alert updated.' : 'Risk alert received.',
+        'message' => $existing ? 'Risk alert updated.' : 'Risk alert received.',
         'data' => [
             'alert_id' => $alertId,
             'status' => $data['status'],
