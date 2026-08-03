@@ -25,7 +25,7 @@ $action = $_GET['action'] ?? $_POST['action'] ?? '';
 $input = json_decode(file_get_contents('php://input'), true) ?? [];
 
 if ($action === 'request') {
-    $email = trim($input['email'] ?? '');
+    $email = normalizeNwMemberEmail((string) ($input['email'] ?? ''));
 
     if ($email === '') {
         echo json_encode(['success' => false, 'message' => 'Email is required.']);
@@ -33,9 +33,7 @@ if ($action === 'request') {
     }
 
     try {
-        $stmt = $pdo->prepare('SELECT id, name, email, password_hash, status FROM nw_members WHERE email = :email LIMIT 1');
-        $stmt->execute([':email' => $email]);
-        $member = $stmt->fetch(PDO::FETCH_ASSOC);
+        $member = findNwMemberForLogin($pdo, $email);
 
         if (!$member || ($member['status'] ?? '') !== 'Active' || empty($member['password_hash']) || empty($member['email'])) {
             echo json_encode([

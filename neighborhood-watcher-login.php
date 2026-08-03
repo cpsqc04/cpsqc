@@ -263,8 +263,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             exit;
         }
     } elseif (!isset($_POST['resend_login_otp']) && !isset($_POST['set_nw_password']) && !isset($_POST['verify_password_change_otp']) && $error === null) {
-        $email = trim($_POST['email'] ?? '');
-        $password = $_POST['password'] ?? '';
+        $email = normalizeNwMemberEmail((string) ($_POST['email'] ?? ''));
+        // Trim copy/paste whitespace from email clients; temp passwords are alphanumeric.
+        $password = trim((string) ($_POST['password'] ?? ''));
 
         unset($_SESSION['pending_nw_member_login']);
         $showOtpForm = false;
@@ -274,11 +275,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             try {
                 ensureNwMembersTable($pdo);
-                $stmt = $pdo->prepare('SELECT id, name, email, member_code, password_hash, must_change_password, status FROM nw_members WHERE email = :email LIMIT 1');
-                $stmt->execute([':email' => $email]);
-                $member = $stmt->fetch(PDO::FETCH_ASSOC);
+                $member = findNwMemberForLogin($pdo, $email);
 
-                if (!$member || ($member['status'] ?? '') !== 'Active') {
+                if (!$member) {
+                    $error = 'Invalid email or password.';
+                } elseif (($member['status'] ?? '') === 'Pending') {
+                    $error = 'Your application is still pending approval. Please wait for the barangay to approve it.';
+                } elseif (($member['status'] ?? '') === 'Rejected') {
+                    $error = 'This application was not approved. Please contact the barangay hall for assistance.';
+                } elseif (($member['status'] ?? '') !== 'Active') {
                     $error = 'Invalid email or password.';
                 } elseif (empty($member['password_hash']) || !password_verify($password, $member['password_hash'])) {
                     $error = 'Invalid email or password.';
@@ -292,7 +297,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         'volunteer_id' => (int) $member['id'],
                         'member_name' => $member['name'],
                         'member_code' => $member['member_code'] ?? '',
-                        'email' => $member['email'],
+                        'email' => normalizeNwMemberEmail((string) $member['email']),
                         'must_change_password' => (int) ($member['must_change_password'] ?? 0),
                         'otp' => $otp,
                         'expires_at' => $expiresAt,

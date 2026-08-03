@@ -68,6 +68,44 @@ function generateNwMemberCode(PDO $pdo, int $volunteerId): string
 }
 
 /**
+ * Normalize email for storage and login matching.
+ */
+function normalizeNwMemberEmail(string $email): string
+{
+    return strtolower(trim($email));
+}
+
+/**
+ * Find the best matching member row for portal login.
+ * Prefers Active accounts that already have a password hash.
+ */
+function findNwMemberForLogin(PDO $pdo, string $email): ?array
+{
+    $email = normalizeNwMemberEmail($email);
+    if ($email === '') {
+        return null;
+    }
+
+    $stmt = $pdo->prepare(
+        "SELECT id, name, email, member_code, password_hash, must_change_password, status
+         FROM nw_members
+         WHERE LOWER(TRIM(email)) = :email
+         ORDER BY
+            CASE
+                WHEN status = 'Active' AND password_hash IS NOT NULL AND password_hash <> '' THEN 0
+                WHEN status = 'Active' THEN 1
+                ELSE 2
+            END,
+            id DESC
+         LIMIT 1"
+    );
+    $stmt->execute([':email' => $email]);
+    $member = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    return $member ?: null;
+}
+
+/**
  * @return array{member_code: string, temp_password: string, password_hash: string}
  */
 function provisionNwMemberCredentials(PDO $pdo, int $volunteerId): array

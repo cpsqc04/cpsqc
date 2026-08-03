@@ -202,7 +202,7 @@ if ($method === 'POST') {
         $addressParts = nwNormalizeAddressParts($input);
         $address = $addressParts['address'];
         $contact = trim($input['contact'] ?? '');
-        $email = trim($input['email'] ?? '');
+        $email = normalizeNwMemberEmail((string) ($input['email'] ?? ''));
         $birthday = trim($input['birthday'] ?? '');
         $idNumber = trim($input['id_number'] ?? '');
         $category = trim($input['category'] ?? '');
@@ -480,7 +480,7 @@ if ($method === 'POST') {
         $maritalStatus = array_key_exists('marital_status', $input) ? nwNormalizeMaritalStatus($input['marital_status'] ?? null) : null;
         $addressParts = nwNormalizeAddressParts($input);
         $contact = trim($input['contact'] ?? '');
-        $email = trim($input['email'] ?? '');
+        $email = normalizeNwMemberEmail((string) ($input['email'] ?? ''));
         $address = $addressParts['address'] !== '' ? $addressParts['address'] : trim($input['address'] ?? '');
         $birthday = trim($input['birthday'] ?? '');
         $idNumber = trim($input['id_number'] ?? '');
@@ -567,9 +567,12 @@ if ($method === 'POST') {
             }
 
             $previousStatus = trim((string) ($current['status'] ?? ''));
-            $recipientEmail = trim((string) ($current['email'] ?? ''));
+            $email = normalizeNwMemberEmail($email);
+            $recipientEmail = $email !== '' ? $email : normalizeNwMemberEmail((string) ($current['email'] ?? ''));
             if ($recipientEmail === '' || !filter_var($recipientEmail, FILTER_VALIDATE_EMAIL)) {
-                $recipientEmail = $email;
+                http_response_code(400);
+                echo json_encode(['success' => false, 'message' => 'A valid applicant email is required to approve or update this member.']);
+                exit;
             }
             if ($firstName === null) {
                 $firstName = $current['first_name'] ?? null;
@@ -659,15 +662,18 @@ if ($method === 'POST') {
             $tempPassword = null;
             $memberCode = $current['member_code'] ?? null;
             $forceResendRejection = !empty($input['resend_rejection_email']);
+            $forceResendCredentials = !empty($input['resend_credentials']);
+            $needsCredentials = ($previousStatus !== $status && $status === 'Active')
+                || ($status === 'Active' && (empty($current['password_hash']) || $forceResendCredentials));
 
-            if ($previousStatus !== $status && $status === 'Active') {
+            if ($needsCredentials) {
                 $credentials = provisionNwMemberCredentials($pdo, $id);
                 $tempPassword = $credentials['temp_password'];
                 $memberCode = $credentials['member_code'];
                 $mailResult = sendVolunteerApplicationStatusEmail(
                     $recipientEmail,
                     $recipientName,
-                    $status,
+                    'Active',
                     $tempPassword,
                     getNwMemberPortalUrl(),
                     $memberCode,
@@ -680,15 +686,17 @@ if ($method === 'POST') {
                 $emailSent = !empty($mailResult['success']);
                 $emailError = $mailResult['error'] ?? null;
 
-                require_once __DIR__ . '/notifications_schema.php';
-                createNwMemberNotification(
-                    $pdo,
-                    $id,
-                    'application_status',
-                    'Application Approved',
-                    'Your Neighborhood Watch application was approved. You can now sign in to the member portal.',
-                    'section:bulletinSection'
-                );
+                if ($previousStatus !== $status && $status === 'Active') {
+                    require_once __DIR__ . '/notifications_schema.php';
+                    createNwMemberNotification(
+                        $pdo,
+                        $id,
+                        'application_status',
+                        'Application Approved',
+                        'Your Neighborhood Watch application was approved. You can now sign in to the member portal.',
+                        'section:bulletinSection'
+                    );
+                }
             } elseif ($status === 'Rejected' && $rejectionReason !== '' && ($previousStatus !== 'Rejected' || $forceResendRejection)) {
                 $mailResult = sendVolunteerApplicationStatusEmail(
                     $recipientEmail,

@@ -877,6 +877,11 @@ $nwSearchPlaceholder = $nwIsMemberList
                         <i class="fas fa-envelope"></i> Resend Rejection Email
                     </button>
                 </div>
+                <div id="activeCredentialActions" style="display: none; gap: 1rem; justify-content: flex-end; width: 100%;">
+                    <button type="button" class="btn-approve" style="background:#4c8a89;" onclick="resendLoginCredentials()">
+                        <i class="fas fa-key"></i> Resend Login Credentials
+                    </button>
+                </div>
             </div>
         </div>
     </div>
@@ -1503,19 +1508,26 @@ $nwSearchPlaceholder = $nwIsMemberList
                 </div>
             `;
 
-            reviewActions.style.display = (member.status === 'Pending' || member.status === 'Rejected') ? 'flex' : 'none';
+            reviewActions.style.display = (member.status === 'Pending' || member.status === 'Rejected' || member.status === 'Active') ? 'flex' : 'none';
             const decisionButtons = document.getElementById('reviewDecisionButtons');
             const rejectedActions = document.getElementById('rejectedEmailActions');
+            const activeCredentialActions = document.getElementById('activeCredentialActions');
             if (member.status === 'Pending') {
                 if (decisionButtons) decisionButtons.style.display = 'flex';
                 if (rejectedActions) rejectedActions.style.display = 'none';
+                if (activeCredentialActions) activeCredentialActions.style.display = 'none';
             } else if (member.status === 'Rejected') {
                 if (decisionButtons) decisionButtons.style.display = 'none';
                 if (rejectedActions) rejectedActions.style.display = 'flex';
+                if (activeCredentialActions) activeCredentialActions.style.display = 'none';
                 const reason = document.getElementById('rejectionReason');
                 const notes = document.getElementById('rejectionNotes');
                 if (reason && member.rejection_reason) reason.value = member.rejection_reason;
                 if (notes) notes.value = member.notes || '';
+            } else if (member.status === 'Active') {
+                if (decisionButtons) decisionButtons.style.display = 'none';
+                if (rejectedActions) rejectedActions.style.display = 'none';
+                if (activeCredentialActions) activeCredentialActions.style.display = 'flex';
             }
             modal.classList.add('active');
         }
@@ -1562,25 +1574,78 @@ $nwSearchPlaceholder = $nwIsMemberList
                 return;
             }
 
-            let reason = member.rejection_reason || '';
-            const reasonInput = document.getElementById('rejectionReason');
-            if (reasonInput && reasonInput.value) {
-                reason = reasonInput.value;
-            }
+            const reason = (document.getElementById('rejectionReason') || {}).value || member.rejection_reason || '';
+            const notes = (document.getElementById('rejectionNotes') || {}).value || member.notes || '';
             if (!reason) {
-                alert('No rejection reason found. Please select a reason and confirm reject again.');
+                alert('Please select a reason of rejection before resending.');
                 showRejectForm();
                 return;
             }
-
-            const notesInput = document.getElementById('rejectionNotes');
-            const notes = notesInput ? notesInput.value : (member.notes || '');
-
             if (!confirm('Resend the rejection email to ' + (member.email || 'the applicant') + '?')) {
                 return;
             }
-
             reviewDecision('reject', reason, notes, true);
+        }
+
+        function resendLoginCredentials() {
+            const id = currentReviewMemberId;
+            const member = id ? memberData[id] : null;
+            if (!member) {
+                alert('Member not found!');
+                return;
+            }
+            if ((member.status || '') !== 'Active') {
+                alert('Login credentials can only be resent for Active members.');
+                return;
+            }
+            if (!confirm('Generate a new temporary password and email it to ' + (member.email || 'the applicant') + '? The old temporary password will stop working.')) {
+                return;
+            }
+
+            const payload = {
+                action: 'update',
+                id: parseInt(id, 10),
+                name: member.name,
+                first_name: member.first_name || '',
+                middle_name: member.middle_name || '',
+                last_name: member.last_name || '',
+                gender: member.gender || '',
+                marital_status: member.marital_status || '',
+                contact: member.contact,
+                email: member.email || '',
+                address: member.address || '',
+                birthday: member.birthday || '',
+                id_number: member.id_number || '',
+                status: 'Active',
+                photo_id: null,
+                emergency_contact_name: member.emergency_contact_name || '',
+                emergency_contact_number: member.emergency_contact_number || '',
+                notes: member.notes || '',
+                resend_credentials: true
+            };
+
+            fetch('api/neighborhood-watcher-members.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            })
+            .then(res => res.json())
+            .then(result => {
+                if (!result.success) {
+                    alert(result.message || 'Failed to resend login credentials.');
+                    return;
+                }
+                loadMembers();
+                if (result.email_sent === true) {
+                    alert('New temporary password emailed to ' + (result.email_to || member.email || 'the applicant') + '.');
+                } else {
+                    alert('Credentials were reset, but the email could not be sent.' + (result.email_error ? (' Reason: ' + result.email_error) : ''));
+                }
+            })
+            .catch(err => {
+                console.error('Error resending credentials:', err);
+                alert('Error resending login credentials. Please try again.');
+            });
         }
 
         function reviewDecision(decision, rejectionReason, rejectionNotes, resendRejectionEmailFlag) {
