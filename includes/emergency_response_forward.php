@@ -1,7 +1,9 @@
 <?php
 
 /**
- * Forward BPSO tips to Emergency Response (police backup / coordination).
+ * Forward BPSO tips to Emergency Response (anonymous tip / police backup).
+ *
+ * Their receive API (anonymous_tip.php) expects tip fields including tip_id.
  *
  * Configure in .env (preferred + legacy):
  *   EMERGENCY_RESPONSE_API_URL=
@@ -25,23 +27,64 @@ function buildEmergencyResponseBackupPayload(array $tip, string $backupReason = 
         $reason = 'Police backup requested from BPSO admin review of community tip.';
     }
 
-    $submittedAt = $tip['submitted_at'] ?? null;
-    if ($submittedAt) {
-        try {
-            $submittedAt = (new DateTime($submittedAt))->format('c');
-        } catch (Exception $e) {
-            $submittedAt = (string) $submittedAt;
-        }
+    $description = trim($tip['description'] ?? '');
+    if ($description === '') {
+        $description = $reason;
+    } elseif ($reason !== '' && strcasecmp($reason, $description) !== 0) {
+        $description = $description . "\n\n[Police backup] " . $reason;
     }
 
+    $submittedAt = $tip['submitted_at'] ?? null;
+    $tipDatetime = '';
+    if ($submittedAt) {
+        try {
+            $dt = new DateTime($submittedAt);
+            $submittedAt = $dt->format('c');
+            $tipDatetime = $dt->format('Y-m-d H:i:s');
+        } catch (Exception $e) {
+            $submittedAt = (string) $submittedAt;
+            $tipDatetime = $submittedAt;
+        }
+    }
+    if ($tipDatetime === '') {
+        $tipDatetime = date('Y-m-d H:i:s');
+    }
+
+    $hasPhoto = !empty($tip['photo_data']);
+    $photoData = $hasPhoto ? (string) $tip['photo_data'] : '';
+    if ($photoData !== '' && strlen($photoData) > 2_500_000) {
+        $photoData = '';
+        $hasPhoto = false;
+    }
+
+    $tipId = trim((string) ($tip['tip_id'] ?? ''));
+    $location = trim((string) ($tip['location'] ?? ''));
+    $status = trim((string) ($tip['status'] ?? 'new'));
+    if ($status === '' || strcasecmp($status, 'Under Review') === 0) {
+        $status = 'new';
+    }
+    $outcome = trim((string) ($tip['outcome'] ?? ''));
+
+    // Flat fields match Emergency Response anonymous_tip.php contract.
+    // Nested/legacy fields kept for compatibility with older coordination endpoints.
     return [
+        'tip_id' => $tipId,
+        'tip_datetime' => $tipDatetime,
+        'location' => $location,
+        'tip_description' => $description,
+        'photo_of_evidence' => $photoData,
+        'status' => $status,
+        'outcome' => $outcome,
+        'source_system' => 'alertaraqc',
         'source' => 'alertaraqc',
+        'record_type' => 'tip',
         'request_type' => 'police_backup',
-        'source_tip_id' => $tip['tip_id'] ?? '',
+        'source_tip_id' => $tipId,
         'requesting_agency' => 'BPSO - Quezon City',
+        'date_time' => $submittedAt,
         'incident' => [
-            'location' => $tip['location'] ?? '',
-            'description' => $tip['description'] ?? '',
+            'location' => $location,
+            'description' => $description,
             'submitted_at' => $submittedAt,
         ],
         'backup' => [
@@ -51,15 +94,17 @@ function buildEmergencyResponseBackupPayload(array $tip, string $backupReason = 
         ],
         'review' => [
             'status' => $tip['status'] ?? 'Under Review',
+            'outcome' => $tip['outcome'] ?? 'No Outcome Yet',
         ],
         'contact' => [
             'contact_number' => $tip['contact_number'] ?? null,
         ],
-        'has_photo' => !empty($tip['photo_data']),
+        'has_photo' => $hasPhoto,
         'metadata' => [
             'internal_id' => (int) ($tip['id'] ?? 0),
             'forwarded_by' => 'alertaraqc_bpso_admin',
             'forwarded_at' => date('c'),
+            'police_backup' => true,
         ],
     ];
 }
@@ -78,9 +123,20 @@ function forwardTipToEmergencyResponse(array $tip, string $backupReason = ''): a
         ];
     }
 
+    $tipId = trim((string) ($tip['tip_id'] ?? ''));
+    if ($tipId === '') {
+        return ['success' => false, 'message' => 'tip_id is missing on this tip record.'];
+    }
+
     $payload = json_encode(buildEmergencyResponseBackupPayload($tip, $backupReason), JSON_UNESCAPED_UNICODE);
     if ($payload === false) {
-        return ['success' => false, 'message' => 'Failed to encode coordination payload.'];
+        return ['success' => false, 'message' => 'Failed to encode tip payload.'];
+    }
+
+    $url = $config['url'];
+    // Some Emergency Response endpoints accept api_key in the query string.
+    if ($config['api_key'] !== '' && stripos($url, 'api_key=') === false) {
+        $url .= (strpos($url, '?') === false ? '?' : '&') . 'api_key=' . rawurlencode($config['api_key']);
     }
 
     $headers = [
@@ -92,7 +148,7 @@ function forwardTipToEmergencyResponse(array $tip, string $backupReason = ''): a
         $headers[] = 'Authorization: Bearer ' . $config['api_key'];
     }
 
-    $ch = curl_init($config['url']);
+    $ch = curl_init($url);
     curl_setopt_array($ch, [
         CURLOPT_POST => true,
         CURLOPT_POSTFIELDS => $payload,
@@ -131,7 +187,7 @@ function forwardTipToEmergencyResponse(array $tip, string $backupReason = ''): a
         ];
     }
 
-    if (empty($decoded['success'])) {
+    if (array_key_exists('success', $decoded) && empty($decoded['success'])) {
         return [
             'success' => false,
             'message' => trim($decoded['message'] ?? $decoded['error'] ?? 'Emergency Response API rejected the request.'),
@@ -140,12 +196,21 @@ function forwardTipToEmergencyResponse(array $tip, string $backupReason = ''): a
     }
 
     $referenceId = trim(
-        (string) ($decoded['coordination_reference_id'] ?? $decoded['reference_id'] ?? $decoded['id'] ?? '')
+        (string) (
+            $decoded['coordination_reference_id']
+            ?? $decoded['tip_id']
+            ?? $decoded['reference_id']
+            ?? $decoded['id']
+            ?? ''
+        )
     );
+    if ($referenceId === '') {
+        $referenceId = $tipId;
+    }
 
     return [
         'success' => true,
-        'message' => trim($decoded['message'] ?? 'Police backup request sent to Emergency Response.'),
+        'message' => trim($decoded['message'] ?? 'Tip sent to Emergency Response for police backup.'),
         'emergency_response_reference_id' => $referenceId,
         'http_code' => $httpCode,
     ];
