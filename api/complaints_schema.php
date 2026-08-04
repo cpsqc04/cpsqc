@@ -18,6 +18,7 @@ function ensureComplaintsTable(PDO $pdo): void
     }
 
     if (!$tableExists) {
+        // TEXT/BLOB columns must not use DEFAULT '' on MySQL/MariaDB (error 1101).
         $pdo->exec("CREATE TABLE complaints (
             id INT AUTO_INCREMENT PRIMARY KEY,
             complaint_id VARCHAR(50) NOT NULL UNIQUE,
@@ -27,20 +28,20 @@ function ensureComplaintsTable(PDO $pdo): void
             incident_date DATE NOT NULL,
             incident_time TIME DEFAULT NULL,
             defendant_name VARCHAR(255) NOT NULL DEFAULT '',
-            defendant_address TEXT NOT NULL DEFAULT '',
+            defendant_address TEXT NOT NULL,
             defendant_contact_number VARCHAR(50) NOT NULL DEFAULT '',
             complaint_type VARCHAR(100) NOT NULL,
             complaint_type_other VARCHAR(255) DEFAULT NULL,
-            location TEXT NOT NULL DEFAULT '',
+            location TEXT NOT NULL,
             description TEXT NOT NULL,
             priority VARCHAR(20) NOT NULL,
             status VARCHAR(50) NOT NULL DEFAULT 'Pending',
             assigned_to VARCHAR(255) DEFAULT 'Pending Assignment',
             assigned_patrol_id INT NULL,
-            resolution_report TEXT DEFAULT NULL,
+            resolution_report TEXT NULL,
             assigned_at DATETIME DEFAULT NULL,
             resolved_at DATETIME DEFAULT NULL,
-            notes TEXT DEFAULT NULL,
+            notes TEXT NULL,
             submitted_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             forwarded_at DATETIME DEFAULT NULL,
             blotter_reference_id VARCHAR(100) DEFAULT NULL,
@@ -55,24 +56,24 @@ function ensureComplaintsTable(PDO $pdo): void
         'complaint_id' => 'ALTER TABLE complaints ADD COLUMN complaint_id VARCHAR(50) NOT NULL UNIQUE AFTER id',
         'complainant_name' => 'ALTER TABLE complaints ADD COLUMN complainant_name VARCHAR(255) NOT NULL DEFAULT "" AFTER complaint_id',
         'contact_number' => 'ALTER TABLE complaints ADD COLUMN contact_number VARCHAR(50) NOT NULL DEFAULT "" AFTER complainant_name',
-        'address' => 'ALTER TABLE complaints ADD COLUMN address TEXT NOT NULL DEFAULT "" AFTER contact_number',
-        'incident_date' => 'ALTER TABLE complaints ADD COLUMN incident_date DATE NOT NULL DEFAULT "1970-01-01" AFTER address',
+        'address' => 'ALTER TABLE complaints ADD COLUMN address TEXT NULL AFTER contact_number',
+        'incident_date' => 'ALTER TABLE complaints ADD COLUMN incident_date DATE NULL AFTER address',
         'incident_time' => 'ALTER TABLE complaints ADD COLUMN incident_time TIME DEFAULT NULL AFTER incident_date',
         'defendant_name' => 'ALTER TABLE complaints ADD COLUMN defendant_name VARCHAR(255) NOT NULL DEFAULT "" AFTER incident_time',
-        'defendant_address' => 'ALTER TABLE complaints ADD COLUMN defendant_address TEXT NOT NULL DEFAULT "" AFTER defendant_name',
+        'defendant_address' => 'ALTER TABLE complaints ADD COLUMN defendant_address TEXT NULL AFTER defendant_name',
         'defendant_contact_number' => 'ALTER TABLE complaints ADD COLUMN defendant_contact_number VARCHAR(50) NOT NULL DEFAULT "" AFTER defendant_address',
         'complaint_type' => 'ALTER TABLE complaints ADD COLUMN complaint_type VARCHAR(100) NOT NULL DEFAULT "" AFTER defendant_contact_number',
         'complaint_type_other' => 'ALTER TABLE complaints ADD COLUMN complaint_type_other VARCHAR(255) DEFAULT NULL AFTER complaint_type',
-        'location' => 'ALTER TABLE complaints ADD COLUMN location TEXT NOT NULL DEFAULT "" AFTER complaint_type',
-        'description' => 'ALTER TABLE complaints ADD COLUMN description TEXT NOT NULL DEFAULT "" AFTER location',
+        'location' => 'ALTER TABLE complaints ADD COLUMN location TEXT NULL AFTER complaint_type',
+        'description' => 'ALTER TABLE complaints ADD COLUMN description TEXT NULL AFTER location',
         'priority' => 'ALTER TABLE complaints ADD COLUMN priority VARCHAR(20) NOT NULL DEFAULT "Low" AFTER description',
         'status' => 'ALTER TABLE complaints ADD COLUMN status VARCHAR(50) NOT NULL DEFAULT "Pending" AFTER priority',
         'assigned_to' => 'ALTER TABLE complaints ADD COLUMN assigned_to VARCHAR(255) DEFAULT "Pending Assignment" AFTER status',
         'assigned_patrol_id' => 'ALTER TABLE complaints ADD COLUMN assigned_patrol_id INT NULL AFTER assigned_to',
-        'resolution_report' => 'ALTER TABLE complaints ADD COLUMN resolution_report TEXT DEFAULT NULL AFTER assigned_patrol_id',
+        'resolution_report' => 'ALTER TABLE complaints ADD COLUMN resolution_report TEXT NULL AFTER assigned_patrol_id',
         'assigned_at' => 'ALTER TABLE complaints ADD COLUMN assigned_at DATETIME DEFAULT NULL AFTER resolution_report',
         'resolved_at' => 'ALTER TABLE complaints ADD COLUMN resolved_at DATETIME DEFAULT NULL AFTER assigned_at',
-        'notes' => 'ALTER TABLE complaints ADD COLUMN notes TEXT DEFAULT NULL AFTER resolved_at',
+        'notes' => 'ALTER TABLE complaints ADD COLUMN notes TEXT NULL AFTER resolved_at',
         'submitted_at' => 'ALTER TABLE complaints ADD COLUMN submitted_at DATETIME DEFAULT CURRENT_TIMESTAMP AFTER notes',
         'forwarded_at' => 'ALTER TABLE complaints ADD COLUMN forwarded_at DATETIME DEFAULT NULL AFTER submitted_at',
         'blotter_reference_id' => 'ALTER TABLE complaints ADD COLUMN blotter_reference_id VARCHAR(100) DEFAULT NULL AFTER forwarded_at',
@@ -81,7 +82,19 @@ function ensureComplaintsTable(PDO $pdo): void
 
     foreach ($additions as $column => $sql) {
         if (!isset($columns[$column])) {
-            $pdo->exec($sql);
+            try {
+                $pdo->exec($sql);
+            } catch (PDOException $e) {
+                // Retry TEXT columns without illegal DEFAULT '' if an older migration SQL is cached somehow.
+                if (stripos($e->getMessage(), "can't have a default value") !== false) {
+                    $retrySql = preg_replace('/\s+DEFAULT\s+(""|\'\')/i', '', $sql);
+                    if (is_string($retrySql) && $retrySql !== $sql) {
+                        $pdo->exec($retrySql);
+                        continue;
+                    }
+                }
+                throw $e;
+            }
         }
     }
 }
