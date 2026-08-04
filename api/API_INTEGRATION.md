@@ -894,6 +894,7 @@ Request police backup for a reviewed tip.
 | Campaign & Disaster Preparedness | Partner → AlertaraQC (list) | `GET /api/patrol_requests.php` | Public |
 | Campaign | Partner → AlertaraQC | `POST /api/awareness_events_receive.php` | Public |
 | Campaign | Partner → AlertaraQC (list) | `GET /api/awareness_events.php` | Public |
+| Campaign (recommendations) | AlertaraQC → Partner | Partner hosts URL (`CAMPAIGN_RECOMMENDATION_API_URL`) | `CAMPAIGN_API_KEY` (optional) |
 | CCTV partner | Partner → AlertaraQC | `POST /api/cctv_requests_receive.php` | Public |
 | CCTV partner | Partner → AlertaraQC (list) | `GET /api/cctv_requests.php` | Public |
 | Incident Reporting (tips) | AlertaraQC → Partner | Partner hosts URL (`INCIDENT_REPORTING_TIP_API_URL`) | `INCIDENT_REPORTING_API_KEY` |
@@ -915,6 +916,7 @@ These endpoints require an **admin login session** (cookie-based). Do not share 
 |----------|--------|
 | `GET/POST /api/patrol_requests.php` | Patrol Request (admin manage) |
 | `GET/POST /api/awareness_events.php` | Awareness Events & Reports |
+| `POST /api/send_to_campaign.php` | Forward youth patrol reports → Campaign recommendation |
 | `GET/POST /api/cctv_requests.php` | CCTV Request (admin manage) |
 | `GET/POST /api/complaints.php` | Complaints |
 | `GET/POST /api/tips.php` | Anonymous Tips |

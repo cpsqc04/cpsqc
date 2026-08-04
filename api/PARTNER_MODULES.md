@@ -137,14 +137,28 @@ Same endpoint as Event List with `record_type: "report"`.
   "source_group": "campaign",
   "event_id": "EVT-2026-014",
   "attendance_count": 150,
-  "survey_results": "85% Positive",
-  "evaluation_score": "4.6",
-  "event_outcome": "Successful community turnout",
-  "event_date": "2026-07-25",
   "organizer": "Maria Santos",
-  "title": "Community Safety Awareness"
+  "title": "Community Safety Awareness",
+  "event_date": "2026-07-15",
+  "location": "Barangay San Agustin Hall"
 }
 ```
+
+---
+
+## 4b) Campaign Recommendation — OUTBOUND (AlertaraQC → Campaign)
+
+Night-shift patrol reports about youth loitering / curfew are packaged with the bulletin ordinance basis and sent so Campaign can create youth, sports, and cultural development programs.
+
+| | |
+|---|---|
+| Admin UI | Patrol Logs → select reports → **Send to Campaign** |
+| Admin API | `POST /api/send_to_campaign.php` (admin session) |
+| Partner URL env | `CAMPAIGN_RECOMMENDATION_API_URL` |
+| API key | `CAMPAIGN_API_KEY` (optional) |
+| Local stub | `POST /api/campaign_recommendation_receive.php` |
+
+Payload includes: `request_type: "campaign_recommendation"`, themes (`youth`/`sports`/`cultural`), policy_basis (curfew 10pm–8am, age ≤17), linked `patrol_reports`, target zones, rationale.
 
 ---
 

@@ -356,6 +356,40 @@ require_once __DIR__ . '/db.php';
         .btn-view:hover { background: #4ca8a6; }
         .btn-export { padding: 0.5rem 1rem; background: #28a745; color: #fff; border: none; border-radius: 6px; font-size: 0.85rem; cursor: pointer; transition: all 0.2s ease; }
         .btn-export:hover { background: #218838; }
+        .logs-toolbar { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; margin-bottom: 1rem; }
+        .btn-campaign { padding: 0.55rem 1rem; background: #0f766e; color: #fff; border: none; border-radius: 8px; font-size: 0.9rem; font-weight: 600; cursor: pointer; }
+        .btn-campaign:hover { background: #0d9488; }
+        .btn-campaign:disabled { opacity: 0.55; cursor: not-allowed; }
+        .btn-suggest { padding: 0.55rem 1rem; background: #e2e8f0; color: #0f172a; border: none; border-radius: 8px; font-size: 0.9rem; font-weight: 600; cursor: pointer; }
+        .btn-suggest:hover { background: #cbd5e1; }
+        .youth-hint { font-size: 0.85rem; color: var(--text-secondary); }
+        .badge-youth { display: inline-block; margin-left: 0.35rem; padding: 0.1rem 0.45rem; border-radius: 999px; background: #fef3c7; color: #92400e; font-size: 0.7rem; font-weight: 700; }
+        .badge-sent { display: inline-block; margin-left: 0.35rem; padding: 0.1rem 0.45rem; border-radius: 999px; background: #d1fae5; color: #065f46; font-size: 0.7rem; font-weight: 700; }
+        .campaign-field { margin-bottom: 1rem; }
+        .campaign-field label { display: block; font-weight: 600; margin-bottom: 0.4rem; color: var(--text-color); }
+        .campaign-field select, .campaign-field textarea, .campaign-field input[type="text"] {
+            width: 100%; padding: 0.7rem; border: 1px solid var(--border-color); border-radius: 8px; font: inherit; box-sizing: border-box;
+        }
+        .campaign-field textarea { min-height: 90px; resize: vertical; }
+        .theme-checks { display: flex; flex-wrap: wrap; gap: 0.75rem 1.25rem; }
+        .theme-checks label { font-weight: 500; display: flex; align-items: center; gap: 0.4rem; }
+        .selected-report-list { max-height: 160px; overflow: auto; border: 1px solid var(--border-color); border-radius: 8px; padding: 0.75rem; background: #f8fafc; font-size: 0.9rem; }
+        #logsTable th:first-child, #logsTable td:first-child { width: 42px; text-align: center; }
+        .log-photo {
+            max-width: 280px;
+            max-height: 200px;
+            width: auto;
+            height: auto;
+            object-fit: contain;
+            border-radius: 8px;
+            margin-top: 0.5rem;
+            display: block;
+            border: 1px solid var(--border-color);
+            background: #f8f9fa;
+            cursor: pointer;
+        }
+        .log-photo:hover { opacity: 0.92; }
+        .log-photo-missing { color: var(--text-secondary); font-style: italic; }
         .action-buttons { display: flex; gap: 0.5rem; align-items: center; }
         .status-in-progress { background: #cfe2ff; color: #084298; }
         .status-completed { background: #d1e7dd; color: #0f5132; }
@@ -537,10 +571,16 @@ require_once __DIR__ . '/db.php';
                 <div class="search-box">
                     <input type="text" id="searchInput" placeholder="Search patrol logs by date, BPSO personnel, or incident..." onkeyup="filterLogs()">
                 </div>
+                <div class="logs-toolbar">
+                    <button type="button" class="btn-suggest" onclick="selectYouthSuggested()">Select youth / curfew suggested</button>
+                    <button type="button" class="btn-campaign" id="btnOpenCampaignForward" onclick="openCampaignForwardModal()" disabled>Send to Campaign</button>
+                    <span class="youth-hint">Link night patrol youth/loitering reports + curfew ordinance → Campaign creates youth / sports / cultural programs.</span>
+                </div>
                 <div class="table-container">
                     <table id="logsTable">
                         <thead>
                             <tr>
+                                <th><input type="checkbox" id="selectAllLogs" title="Select all" onchange="toggleSelectAll(this)"></th>
                                 <th>Date & Time</th>
                                 <th>BPSO Personnel</th>
                                 <th>Route</th>
@@ -550,7 +590,7 @@ require_once __DIR__ . '/db.php';
                             </tr>
                         </thead>
                         <tbody id="logsTableBody">
-                            <tr><td colspan="6" style="text-align:center;padding:2rem;color:#666;">Loading patrol logs...</td></tr>
+                            <tr><td colspan="7" style="text-align:center;padding:2rem;color:#666;">Loading patrol logs...</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -569,7 +609,51 @@ require_once __DIR__ . '/db.php';
                 <!-- Content will be populated by JavaScript -->
             </div>
             <div class="form-actions">
+                <button type="button" class="btn-campaign" id="btnViewSendCampaign" onclick="forwardSingleFromView()">Send to Campaign</button>
                 <button type="button" class="btn-cancel" onclick="closeViewLogModal()">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Forward to Campaign Modal -->
+    <div id="campaignForwardModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Send Youth Campaign Recommendation</h2>
+                <span class="close" onclick="closeCampaignForwardModal()">&times;</span>
+            </div>
+            <p style="margin-top:0;color:var(--text-secondary);line-height:1.5;">
+                Selected patrol reports will be packaged with the youth curfew ordinance (17 below, 10pm–8am) and sent to Campaign so they can create youth, sports, and cultural development programs.
+            </p>
+            <div class="campaign-field">
+                <label>Selected patrol reports</label>
+                <div id="campaignSelectedList" class="selected-report-list"></div>
+            </div>
+            <div class="campaign-field">
+                <label>Themes</label>
+                <div class="theme-checks">
+                    <label><input type="checkbox" class="theme-check" value="youth" checked> Youth</label>
+                    <label><input type="checkbox" class="theme-check" value="sports" checked> Sports</label>
+                    <label><input type="checkbox" class="theme-check" value="cultural" checked> Cultural</label>
+                </div>
+            </div>
+            <div class="campaign-field">
+                <label for="campaignBulletinSelect">Bulletin ordinance (optional)</label>
+                <select id="campaignBulletinSelect">
+                    <option value="">Use default curfew summary (no bulletin link)</option>
+                </select>
+            </div>
+            <div class="campaign-field">
+                <label for="campaignTitle">Title (optional)</label>
+                <input type="text" id="campaignTitle" placeholder="Youth Sports & Cultural Development Recommendation">
+            </div>
+            <div class="campaign-field">
+                <label for="campaignRationale">Additional notes (optional)</label>
+                <textarea id="campaignRationale" placeholder="Extra context for Campaign..."></textarea>
+            </div>
+            <div class="form-actions">
+                <button type="button" class="btn-cancel" onclick="closeCampaignForwardModal()">Cancel</button>
+                <button type="button" class="btn-campaign" id="btnConfirmCampaignForward" onclick="confirmCampaignForward()">Forward to Campaign</button>
             </div>
         </div>
     </div>
@@ -633,11 +717,85 @@ require_once __DIR__ . '/db.php';
         }
         // Patrol log data loaded from database
         let patrolLogData = {};
+        let pendingCampaignIds = [];
+        let viewingLogId = null;
 
         function statusClass(status) {
             if (status === 'Completed') return 'status-completed';
             if (status === 'In Progress') return 'status-in-progress';
             return 'status-scheduled';
+        }
+
+        function looksYouthRelated(log) {
+            const haystack = [
+                log.incidents || '',
+                log.details || '',
+                log.location || '',
+                log.route || ''
+            ].join(' ').toLowerCase();
+            const keywords = ['youth', 'minor', 'minors', 'loiter', 'loitering', 'curfew', '17 below', 'under 18', 'underage', 'bata', 'kabataan', 'estudyante', 'student', 'teenager', 'teen'];
+            return keywords.some(function(k) { return haystack.indexOf(k) !== -1; });
+        }
+
+        function inCurfewWindow(timeRaw) {
+            if (!timeRaw) return false;
+            const raw = String(timeRaw).trim();
+            let hours = null;
+            let minutes = 0;
+            const ampm = raw.match(/^(\d{1,2}):(\d{2})(?::\d{2})?\s*(AM|PM)$/i);
+            const h24 = raw.match(/^(\d{1,2}):(\d{2})(?::\d{2})?$/);
+            if (ampm) {
+                hours = parseInt(ampm[1], 10) % 12;
+                if (String(ampm[3]).toUpperCase() === 'PM') hours += 12;
+                minutes = parseInt(ampm[2], 10);
+            } else if (h24) {
+                hours = parseInt(h24[1], 10);
+                minutes = parseInt(h24[2], 10);
+            }
+            if (hours === null || Number.isNaN(hours)) return false;
+            const total = hours * 60 + minutes;
+            return total >= (22 * 60) || total < (8 * 60);
+        }
+
+        function updateCampaignButtonState() {
+            const checked = document.querySelectorAll('.log-select:checked:not(:disabled)');
+            const btn = document.getElementById('btnOpenCampaignForward');
+            if (btn) {
+                btn.disabled = checked.length === 0;
+            }
+        }
+
+        function toggleSelectAll(master) {
+            document.querySelectorAll('.log-select:not(:disabled)').forEach(function(cb) {
+                cb.checked = master.checked;
+            });
+            updateCampaignButtonState();
+        }
+
+        function getSelectedLogIds() {
+            return Array.from(document.querySelectorAll('.log-select:checked:not(:disabled)'))
+                .map(function(cb) { return Number(cb.value); })
+                .filter(function(id) { return id > 0; });
+        }
+
+        function selectYouthSuggested() {
+            let count = 0;
+            document.querySelectorAll('.log-select').forEach(function(cb) {
+                const log = patrolLogData[cb.value];
+                if (!log || cb.disabled) {
+                    cb.checked = false;
+                    return;
+                }
+                const suggest = looksYouthRelated(log) || inCurfewWindow(log.time);
+                cb.checked = suggest;
+                if (suggest) count += 1;
+            });
+            const master = document.getElementById('selectAllLogs');
+            if (master) master.checked = false;
+            updateCampaignButtonState();
+            if (count === 0) {
+                alert('No youth/curfew-related patrol reports found. Select reports manually, or ensure incidents/details mention youth, loitering, or curfew.');
+            }
         }
 
         async function loadPatrolLogs() {
@@ -647,7 +805,7 @@ require_once __DIR__ . '/db.php';
                 const result = await response.json();
 
                 if (!result.success) {
-                    tableBody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:2rem;color:#666;">Failed to load patrol logs.</td></tr>';
+                    tableBody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:2rem;color:#666;">Failed to load patrol logs.</td></tr>';
                     return;
                 }
 
@@ -655,7 +813,8 @@ require_once __DIR__ . '/db.php';
                 const rows = result.data || [];
 
                 if (rows.length === 0) {
-                    tableBody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:2rem;color:#666;">No patrol logs yet.</td></tr>';
+                    tableBody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:2rem;color:#666;">No patrol logs yet.</td></tr>';
+                    updateCampaignButtonState();
                     return;
                 }
 
@@ -669,11 +828,20 @@ require_once __DIR__ . '/db.php';
                         status: row.status,
                         incidents: row.incidents || 'None',
                         details: row.details || '',
-                        location: row.location || ''
+                        location: row.location || '',
+                        documentation_photo: row.documentation_photo || '',
+                        campaign_forwarded_at: row.campaign_forwarded_at || null,
+                        campaign_reference_id: row.campaign_reference_id || ''
                     };
                     const dateTime = `${row.date}${row.time ? ' ' + row.time : ''}`;
+                    const youth = looksYouthRelated(patrolLogData[row.id]) || inCurfewWindow(row.time);
+                    const alreadySent = !!row.campaign_forwarded_at;
+                    const badges = (youth ? '<span class="badge-youth">Youth/Curfew</span>' : '')
+                        + (alreadySent ? '<span class="badge-sent">Sent to Campaign</span>' : '');
+                    const disabledAttr = alreadySent ? ' disabled' : '';
                     return `<tr data-log-id="${row.id}">
-                        <td>${escapeHtml(dateTime)}</td>
+                        <td><input type="checkbox" class="log-select" value="${row.id}" onchange="updateCampaignButtonState()"${disabledAttr}></td>
+                        <td>${escapeHtml(dateTime)}${badges}</td>
                         <td>${escapeHtml(row.personnel_name)}</td>
                         <td>${escapeHtml(row.route)}</td>
                         <td>${escapeHtml(row.incidents || 'None')}</td>
@@ -686,9 +854,10 @@ require_once __DIR__ . '/db.php';
                         </td>
                     </tr>`;
                 }).join('');
+                updateCampaignButtonState();
             } catch (e) {
                 console.error('Error loading patrol logs:', e);
-                tableBody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:2rem;color:#666;">Error loading patrol logs.</td></tr>';
+                tableBody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:2rem;color:#666;">Error loading patrol logs.</td></tr>';
             }
         }
 
@@ -698,15 +867,73 @@ require_once __DIR__ . '/db.php';
             return div.innerHTML;
         }
 
+        function viewPatrolPhoto(logId) {
+            const log = patrolLogData[logId];
+            const photoSrc = log && log.documentation_photo ? String(log.documentation_photo) : '';
+            if (!photoSrc || photoSrc.indexOf('data:image/') !== 0) {
+                alert('No documentation photo available for this report.');
+                return;
+            }
+
+            const existing = document.getElementById('patrol-photo-lightbox');
+            if (existing) existing.remove();
+
+            const modal = document.createElement('div');
+            modal.id = 'patrol-photo-lightbox';
+            modal.style.cssText = 'position:fixed;z-index:4000;inset:0;background:rgba(0,0,0,0.92);display:flex;align-items:center;justify-content:center;padding:1rem;';
+
+            const img = document.createElement('img');
+            img.src = photoSrc;
+            img.alt = 'Documentation photo';
+            img.style.cssText = 'max-width:95%;max-height:95%;border-radius:8px;object-fit:contain;box-shadow:0 10px 40px rgba(0,0,0,0.45);';
+            img.onclick = function(e) { e.stopPropagation(); };
+
+            const closeBtn = document.createElement('button');
+            closeBtn.type = 'button';
+            closeBtn.innerHTML = '&times;';
+            closeBtn.setAttribute('aria-label', 'Close photo');
+            closeBtn.style.cssText = 'position:absolute;top:16px;right:20px;width:44px;height:44px;border:none;border-radius:50%;background:rgba(255,255,255,0.2);color:#fff;font-size:2rem;line-height:1;cursor:pointer;';
+
+            const closeLightbox = function() {
+                if (modal.parentNode) modal.parentNode.removeChild(modal);
+                document.removeEventListener('keydown', onKeyDown);
+            };
+            const onKeyDown = function(e) {
+                if (e.key === 'Escape') closeLightbox();
+            };
+
+            modal.onclick = closeLightbox;
+            closeBtn.onclick = function(e) {
+                e.stopPropagation();
+                closeLightbox();
+            };
+            document.addEventListener('keydown', onKeyDown);
+            modal.appendChild(closeBtn);
+            modal.appendChild(img);
+            document.body.appendChild(modal);
+        }
+
         function viewLog(id) {
             const log = patrolLogData[id];
             if (!log) {
                 alert('Log not found');
                 return;
             }
-            
+
+            viewingLogId = id;
             const statusClassName = statusClass(log.status);
-            
+            const sentNote = log.campaign_forwarded_at
+                ? `<p><strong>Campaign:</strong> Sent ${escapeHtml(new Date(log.campaign_forwarded_at).toLocaleString())}${log.campaign_reference_id ? ' — Ref: ' + escapeHtml(log.campaign_reference_id) : ''}</p>`
+                : '';
+
+            let photoHtml = '<p><strong>Documentation Photo:</strong><br><span class="log-photo-missing">No photo uploaded</span></p>';
+            const photoSrc = String(log.documentation_photo || '');
+            if (photoSrc.indexOf('data:image/') === 0) {
+                photoHtml = '<p><strong>Documentation Photo:</strong><br>'
+                    + '<img src="' + photoSrc + '" alt="Documentation photo" class="log-photo" '
+                    + 'onclick="viewPatrolPhoto(\'' + String(id).replace(/'/g, '') + '\')" title="Click to view full size"></p>';
+            }
+
             const content = `
                 <p><strong>Date:</strong> ${escapeHtml(log.date)}</p>
                 <p><strong>Time:</strong> ${escapeHtml(log.time)}</p>
@@ -716,14 +943,148 @@ require_once __DIR__ . '/db.php';
                 <p><strong>Status:</strong> <span class="status-badge ${statusClassName}">${escapeHtml(log.status)}</span></p>
                 <p><strong>Incidents:</strong> ${escapeHtml(log.incidents)}</p>
                 <p><strong>Details:</strong><br>${escapeHtml(log.details)}</p>
+                ${photoHtml}
+                ${sentNote}
             `;
-            
+
             document.getElementById('viewLogContent').innerHTML = content;
+            const sendBtn = document.getElementById('btnViewSendCampaign');
+            if (sendBtn) {
+                sendBtn.disabled = !!log.campaign_forwarded_at;
+                sendBtn.textContent = log.campaign_forwarded_at ? 'Already Sent' : 'Send to Campaign';
+            }
             document.getElementById('viewLogModal').style.display = 'block';
         }
 
         function closeViewLogModal() {
             document.getElementById('viewLogModal').style.display = 'none';
+            viewingLogId = null;
+        }
+
+        function forwardSingleFromView() {
+            if (!viewingLogId) return;
+            const log = patrolLogData[viewingLogId];
+            if (!log) return;
+            if (log.campaign_forwarded_at) {
+                alert('This report was already forwarded to Campaign.');
+                return;
+            }
+            pendingCampaignIds = [Number(viewingLogId)];
+            closeViewLogModal();
+            openCampaignForwardModal(pendingCampaignIds);
+        }
+
+        async function loadBulletinOptions() {
+            const select = document.getElementById('campaignBulletinSelect');
+            if (!select) return;
+            select.innerHTML = '<option value="">Use default curfew summary (no bulletin link)</option>';
+            try {
+                const res = await fetch('api/bulletin_board.php?status=active');
+                const result = await res.json();
+                const posts = result.data || result.posts || [];
+                if (!Array.isArray(posts)) return;
+                posts.forEach(function(post) {
+                    const title = String(post.title || 'Untitled');
+                    const hay = (title + ' ' + (post.body || '')).toLowerCase();
+                    const likelyOrdinance = /curfew|youth|ordinance|loiter|17|kabataan/.test(hay);
+                    const opt = document.createElement('option');
+                    opt.value = String(post.id);
+                    opt.textContent = (likelyOrdinance ? '★ ' : '') + title;
+                    if (likelyOrdinance) {
+                        select.appendChild(opt);
+                        if (!select.dataset.autoSelected) {
+                            select.value = String(post.id);
+                            select.dataset.autoSelected = '1';
+                        }
+                    } else {
+                        select.appendChild(opt);
+                    }
+                });
+            } catch (e) {
+                console.warn('Could not load bulletin posts', e);
+            }
+        }
+
+        function openCampaignForwardModal(ids) {
+            pendingCampaignIds = Array.isArray(ids) && ids.length ? ids : getSelectedLogIds();
+            if (!pendingCampaignIds.length) {
+                alert('Select at least one patrol report.');
+                return;
+            }
+
+            const list = document.getElementById('campaignSelectedList');
+            list.innerHTML = pendingCampaignIds.map(function(id) {
+                const log = patrolLogData[id];
+                if (!log) return '';
+                return '<div>#' + escapeHtml(String(id)) + ' — ' + escapeHtml(log.date + (log.time ? ' ' + log.time : ''))
+                    + ' / ' + escapeHtml(log.personnel_name)
+                    + ' — ' + escapeHtml(log.incidents || 'No incident note') + '</div>';
+            }).join('');
+
+            document.getElementById('campaignTitle').value = '';
+            document.getElementById('campaignRationale').value = '';
+            document.querySelectorAll('.theme-check').forEach(function(cb) { cb.checked = true; });
+            const select = document.getElementById('campaignBulletinSelect');
+            if (select) {
+                delete select.dataset.autoSelected;
+            }
+            loadBulletinOptions();
+            document.getElementById('campaignForwardModal').style.display = 'block';
+        }
+
+        function closeCampaignForwardModal() {
+            document.getElementById('campaignForwardModal').style.display = 'none';
+            pendingCampaignIds = [];
+        }
+
+        async function confirmCampaignForward() {
+            if (!pendingCampaignIds.length) {
+                alert('No patrol reports selected.');
+                return;
+            }
+
+            const themes = Array.from(document.querySelectorAll('.theme-check:checked')).map(function(cb) { return cb.value; });
+            if (!themes.length) {
+                alert('Select at least one theme (Youth, Sports, or Cultural).');
+                return;
+            }
+
+            const btn = document.getElementById('btnConfirmCampaignForward');
+            btn.disabled = true;
+            btn.textContent = 'Sending...';
+
+            try {
+                const payload = {
+                    patrol_log_ids: pendingCampaignIds,
+                    themes: themes,
+                    bulletin_post_id: Number(document.getElementById('campaignBulletinSelect').value || 0) || null,
+                    title: document.getElementById('campaignTitle').value.trim(),
+                    rationale: document.getElementById('campaignRationale').value.trim(),
+                    priority: 'medium'
+                };
+
+                const res = await fetch('api/send_to_campaign.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const result = await res.json();
+                if (!result.success) {
+                    alert(result.message || 'Failed to forward to Campaign.');
+                    return;
+                }
+
+                const ref = result.data && result.data.campaign_reference_id ? ('\nReference: ' + result.data.campaign_reference_id) : '';
+                alert((result.message || 'Forwarded to Campaign.') + ref);
+                closeCampaignForwardModal();
+                await loadPatrolLogs();
+            } catch (e) {
+                console.error(e);
+                alert('Network error while forwarding to Campaign.');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Forward to Campaign';
+            }
         }
 
         // Close modal when clicking outside
@@ -731,6 +1092,10 @@ require_once __DIR__ . '/db.php';
             const modal = document.getElementById('viewLogModal');
             if (event.target === modal) {
                 closeViewLogModal();
+            }
+            const campaignModal = document.getElementById('campaignForwardModal');
+            if (event.target === campaignModal) {
+                closeCampaignForwardModal();
             }
         }
 

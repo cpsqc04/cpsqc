@@ -31,6 +31,8 @@ function ensurePatrolLogsTable(PDO $pdo): void
             details TEXT DEFAULT NULL,
             location TEXT DEFAULT NULL,
             documentation_photo LONGTEXT DEFAULT NULL,
+            campaign_forwarded_at DATETIME DEFAULT NULL,
+            campaign_reference_id VARCHAR(100) DEFAULT NULL,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             INDEX idx_patrol_id (patrol_id),
             INDEX idx_schedule_id (schedule_id)
@@ -76,6 +78,12 @@ function ensurePatrolLogsTable(PDO $pdo): void
     }
     if (!isset($columns['documentation_photo'])) {
         $pdo->exec('ALTER TABLE patrol_logs ADD COLUMN documentation_photo LONGTEXT DEFAULT NULL AFTER location');
+    }
+    if (!isset($columns['campaign_forwarded_at'])) {
+        $pdo->exec('ALTER TABLE patrol_logs ADD COLUMN campaign_forwarded_at DATETIME DEFAULT NULL AFTER documentation_photo');
+    }
+    if (!isset($columns['campaign_reference_id'])) {
+        $pdo->exec('ALTER TABLE patrol_logs ADD COLUMN campaign_reference_id VARCHAR(100) DEFAULT NULL AFTER campaign_forwarded_at');
     }
     if (!isset($columns['created_at'])) {
         $pdo->exec('ALTER TABLE patrol_logs ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP');

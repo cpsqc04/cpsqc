@@ -47,10 +47,10 @@ if ($method === 'GET') {
 
     try {
         if (isBpsoLoggedIn()) {
-            $stmt = $pdo->prepare('SELECT id, patrol_id, schedule_id, personnel_name, route, date, time, status, incidents, details, location, documentation_photo, created_at FROM patrol_logs WHERE patrol_id = :patrol_id ORDER BY date DESC, id DESC');
+            $stmt = $pdo->prepare('SELECT id, patrol_id, schedule_id, personnel_name, route, date, time, status, incidents, details, location, documentation_photo, campaign_forwarded_at, campaign_reference_id, created_at FROM patrol_logs WHERE patrol_id = :patrol_id ORDER BY date DESC, id DESC');
             $stmt->execute([':patrol_id' => getBpsoPatrolId()]);
         } else {
-            $stmt = $pdo->query('SELECT id, patrol_id, schedule_id, personnel_name, route, date, time, status, incidents, details, location, documentation_photo, created_at FROM patrol_logs ORDER BY date DESC, id DESC');
+            $stmt = $pdo->query('SELECT id, patrol_id, schedule_id, personnel_name, route, date, time, status, incidents, details, location, documentation_photo, campaign_forwarded_at, campaign_reference_id, created_at FROM patrol_logs ORDER BY date DESC, id DESC');
         }
 
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
