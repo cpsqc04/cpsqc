@@ -1978,12 +1978,10 @@ require_once __DIR__ . '/db.php';
                 </div>
                 ` : ''}
                 
-                ${complaint.resolution_report ? `
                 <div class="detail-row">
-                    <span class="detail-label">Resolution Report:</span>
-                    <div class="detail-value description">${complaint.resolution_report}</div>
+                    <span class="detail-label">BPSO Resolution:</span>
+                    <div class="detail-value description">${complaint.resolution_report || 'No BPSO resolution report yet.'}</div>
                 </div>
-                ` : ''}
                 
                 ${complaint.resolved_at ? `
                 <div class="detail-row">
@@ -2009,11 +2007,6 @@ require_once __DIR__ . '/db.php';
                 <div class="detail-row">
                     <span class="detail-label">Last Updated:</span>
                     <span class="detail-value">${lastUpdated}</span>
-                </div>
-                
-                <div class="detail-row">
-                    <span class="detail-label">BPSO Resolution:</span>
-                    <div class="detail-value description">${complaint.notes || complaint.resolution_report || 'No BPSO resolution report yet.'}</div>
                 </div>
             `;
             

@@ -68,7 +68,8 @@ if ($method === 'POST' && $action === 'submit_resolution') {
 
         $timestamp = date('Y-m-d H:i:s');
         $personnelName = getBpsoPersonnelName();
-        $noteEntry = "[{$timestamp}] {$personnelName}: " . ($status === 'Resolved' ? 'Marked as resolved. ' : 'Updated progress. ') . $resolutionReport;
+        // Keep notes as a short activity log; full report lives in resolution_report only.
+        $noteEntry = "[{$timestamp}] {$personnelName}: " . ($status === 'Resolved' ? 'Marked as resolved.' : 'Updated progress.');
         $updatedNotes = trim(($complaint['notes'] ?? '') . "\n\n" . $noteEntry);
 
         if ($status === 'Resolved') {
