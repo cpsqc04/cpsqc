@@ -42,12 +42,13 @@ if ($providedKey === '' || !hash_equals($expectedKey, $providedKey)) {
     exit;
 }
 
-// Simple rate limit: max ~3 uploads/sec per server process
+// Hostinger-safe rate limit: ~3 uploads/sec max (client should stay >= 0.30s)
 $rateFile = dirname(__DIR__) . DIRECTORY_SEPARATOR . 'cctv_upload_rate.tmp';
 $now = microtime(true);
+$minInterval = 0.32;
 if (is_file($rateFile)) {
     $last = (float) @file_get_contents($rateFile);
-    if ($last > 0 && ($now - $last) < 0.25) {
+    if ($last > 0 && ($now - $last) < $minInterval) {
         http_response_code(429);
         echo json_encode(['success' => false, 'message' => 'Rate limit exceeded']);
         exit;
@@ -69,7 +70,8 @@ if (($upload['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
 }
 
 $size = (int) ($upload['size'] ?? 0);
-if ($size < 500 || $size > 8 * 1024 * 1024) {
+// Keep payload small on shared hosting (prefer downscaled live frames from detect.py).
+if ($size < 500 || $size > 1_500_000) {
     http_response_code(400);
     echo json_encode(['success' => false, 'message' => 'Invalid frame size']);
     exit;

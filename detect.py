@@ -122,10 +122,15 @@ CAMERAS_CONFIG_FINGERPRINT = None
 CCTV_FRAME_UPLOAD_URL = ""
 CCTV_FRAME_UPLOAD_KEY = ""
 CCTV_CAMERAS_CONFIG_URL = ""
-CCTV_UPLOAD_MIN_INTERVAL = 0.4
+# Hostinger-safe live relay: modest rate + small JPEG (lower latency without spiking shared CPU).
+CCTV_UPLOAD_MIN_INTERVAL = 0.35  # ~2.8 uploads/sec max; server also rate-limits
+CCTV_UPLOAD_JPEG_QUALITY = 68    # smaller payload than local preview quality
+CCTV_UPLOAD_MAX_WIDTH = 960      # downscale before upload (CPU cost is on-site PC, not Hostinger)
 _last_cctv_upload_at = 0.0
 _last_cameras_sync_at = 0.0
+_last_detections_upload_at = 0.0
 CAMERAS_SYNC_INTERVAL = 15
+DETECTIONS_UPLOAD_INTERVAL = 1.5  # don't POST detections JSON on every frame
 DETECTIONS_FILE = "detections.json"
 FRAME_FILE = "current_frame.jpg"  # Frame saved for web display
 FRAME_FILE_ALT = "current_frame_alt.jpg"  # Alternate file to avoid locks
@@ -140,19 +145,19 @@ FRAME_WIDTH = 1280   # Updated from first frame; used for placeholders/recording
 FRAME_HEIGHT = 720
 # Video recording settings
 ENABLE_RECORDING = True  # Set to False to disable recording
-RECORDING_FPS = 30  # FPS for RTSP recorded video
+RECORDING_FPS = 10  # Declared MP4 FPS — must match actual write pacing for correct duration
 HTTP_SNAPSHOT_INTERVAL = 0.35  # Seconds between HTTP snapshots (fallback mode)
 HTTP_RECORDING_FPS = 1.0 / HTTP_SNAPSHOT_INTERVAL  # Match snapshot rate for recording duration
-LIVE_JPEG_QUALITY = 92  # Higher quality for sharper live web view
+LIVE_JPEG_QUALITY = 80  # Local preview file (upload uses CCTV_UPLOAD_JPEG_QUALITY)
 RECORDING_CHUNK_DURATION = 300  # Record in 5-minute chunks (seconds)
-MIN_RECORDING_DURATION = 120  # Discard fragments shorter than 2 minutes
+MIN_RECORDING_DURATION = 60  # Keep clips of at least 1 minute (discard shorter fragments)
 RECORDING_BUCKET_SECONDS = 300  # Align filenames to 5-minute windows
 RECORDING_CODEC = 'avc1'  # H.264 for browser playback (fallback: mp4v)
 RECORDING_EXTENSION = '.mp4'  # File extension for recordings
-RECORDING_RETENTION_DAYS = 7  # Auto-delete recordings older than N days
+RECORDING_RETENTION_DAYS = 30  # Auto-delete recordings older than N days
 # Idle / activity-aware recording (saves disk + CPU when nothing is happening)
 RECORD_ACTIVITY_HOLD_SECONDS = 45  # Full-rate record this long after motion/detection
-IDLE_RECORD_EVERY_N = 20  # When idle, write only every Nth frame (~1–2 fps at 30 fps)
+IDLE_RECORD_EVERY_N = 5  # legacy; recording now uses wall-clock pacing at RECORDING_FPS
 IDLE_CPU_SLEEP = 0.04  # Extra sleep per frame while idle (reduces PC load)
 MOTION_MEAN_DIFF_THRESHOLD = 12.0  # Mean abs grayscale frame-diff for "motion"
 MOTION_CHANGED_RATIO = 0.015  # Min share of pixels that changed
@@ -366,6 +371,7 @@ def load_project_env():
 def init_cctv_upload_from_env():
     """Enable optional upload of live frames to Hostinger (on-site PC only)."""
     global CCTV_FRAME_UPLOAD_URL, CCTV_FRAME_UPLOAD_KEY, CCTV_CAMERAS_CONFIG_URL
+    global CCTV_UPLOAD_MIN_INTERVAL, CCTV_UPLOAD_JPEG_QUALITY, CCTV_UPLOAD_MAX_WIDTH
     env = load_project_env()
     CCTV_FRAME_UPLOAD_URL = (
         env.get("CCTV_FRAME_UPLOAD_URL", "") or os.environ.get("CCTV_FRAME_UPLOAD_URL", "")
@@ -376,8 +382,32 @@ def init_cctv_upload_from_env():
     CCTV_CAMERAS_CONFIG_URL = (
         env.get("CCTV_CAMERAS_CONFIG_URL", "") or os.environ.get("CCTV_CAMERAS_CONFIG_URL", "")
     ).strip()
+    try:
+        CCTV_UPLOAD_MIN_INTERVAL = max(
+            0.3,
+            float(env.get("CCTV_UPLOAD_MIN_INTERVAL", "") or os.environ.get("CCTV_UPLOAD_MIN_INTERVAL", "") or CCTV_UPLOAD_MIN_INTERVAL),
+        )
+    except ValueError:
+        pass
+    try:
+        CCTV_UPLOAD_JPEG_QUALITY = max(
+            40,
+            min(85, int(env.get("CCTV_UPLOAD_JPEG_QUALITY", "") or os.environ.get("CCTV_UPLOAD_JPEG_QUALITY", "") or CCTV_UPLOAD_JPEG_QUALITY)),
+        )
+    except ValueError:
+        pass
+    try:
+        CCTV_UPLOAD_MAX_WIDTH = max(
+            480,
+            min(1280, int(env.get("CCTV_UPLOAD_MAX_WIDTH", "") or os.environ.get("CCTV_UPLOAD_MAX_WIDTH", "") or CCTV_UPLOAD_MAX_WIDTH)),
+        )
+    except ValueError:
+        pass
     if CCTV_FRAME_UPLOAD_URL:
-        print(f"✓ Remote frame upload enabled → {CCTV_FRAME_UPLOAD_URL}")
+        print(
+            f"✓ Remote frame upload enabled → {CCTV_FRAME_UPLOAD_URL} "
+            f"(interval>={CCTV_UPLOAD_MIN_INTERVAL:.2f}s, max_w={CCTV_UPLOAD_MAX_WIDTH}, q={CCTV_UPLOAD_JPEG_QUALITY})"
+        )
     if CCTV_CAMERAS_CONFIG_URL:
         print(f"✓ Remote camera config sync enabled → {CCTV_CAMERAS_CONFIG_URL}")
 
@@ -415,18 +445,14 @@ def get_camera_config_fingerprint():
     if not cfg:
         return None
     return (
-        cfg.get("rtsp_url", ""),
-        cfg.get("ipAddress", ""),
-        cfg.get("port", ""),
-        cfg.get("username", ""),
-        cfg.get("password", ""),
-        cfg.get("stream_type", ""),
+        cfg.get("cameraId"),
+        cfg.get("ipAddress"),
+        cfg.get("port"),
+        cfg.get("username"),
+        cfg.get("password"),
+        cfg.get("streamType"),
+        cfg.get("rtspUrl"),
     )
-
-
-def init_camera_config_fingerprint():
-    global CAMERAS_CONFIG_FINGERPRINT
-    CAMERAS_CONFIG_FINGERPRINT = get_camera_config_fingerprint()
 
 
 def reload_camera_source_if_changed():
@@ -445,8 +471,80 @@ def reload_camera_source_if_changed():
     return True
 
 
+def _encode_upload_jpeg(frame):
+    """Downscale + compress a frame for Hostinger-safe upload (work stays on-site PC)."""
+    if frame is None or getattr(frame, "size", 0) == 0:
+        return None
+    upload_frame = frame
+    try:
+        height, width = frame.shape[:2]
+        max_w = max(480, int(CCTV_UPLOAD_MAX_WIDTH))
+        if width > max_w:
+            scale = max_w / float(width)
+            new_w = max_w
+            new_h = max(1, int(round(height * scale)))
+            upload_frame = cv2.resize(frame, (new_w, new_h), interpolation=cv2.INTER_AREA)
+    except Exception:
+        upload_frame = frame
+    try:
+        ok, buf = cv2.imencode(
+            ".jpg",
+            upload_frame,
+            [cv2.IMWRITE_JPEG_QUALITY, int(CCTV_UPLOAD_JPEG_QUALITY)],
+        )
+        if not ok:
+            return None
+        data = buf.tobytes()
+        if len(data) < 500:
+            return None
+        return data
+    except Exception:
+        return None
+
+
+def maybe_upload_live_frame(frame):
+    """Upload a compact JPEG to production (rate-limited; Hostinger-safe payload)."""
+    global _last_cctv_upload_at, _last_detections_upload_at
+    if not CCTV_FRAME_UPLOAD_URL or not CCTV_FRAME_UPLOAD_KEY or not REQUESTS_AVAILABLE:
+        return
+    now = time.time()
+    if now - _last_cctv_upload_at < CCTV_UPLOAD_MIN_INTERVAL:
+        return
+    frame_bytes = _encode_upload_jpeg(frame)
+    if not frame_bytes:
+        return
+    try:
+        files = {"frame": ("frame.jpg", frame_bytes, "image/jpeg")}
+        data = {}
+        # Attach detections less often to keep PHP work light on shared hosting.
+        if now - _last_detections_upload_at >= DETECTIONS_UPLOAD_INTERVAL:
+            det_path = Path(DETECTIONS_FILE)
+            if det_path.is_file():
+                try:
+                    data["detections"] = det_path.read_text(encoding="utf-8")
+                except Exception:
+                    pass
+        headers = {"X-CCTV-Upload-Key": CCTV_FRAME_UPLOAD_KEY}
+        resp = requests.post(
+            CCTV_FRAME_UPLOAD_URL,
+            files=files,
+            data=data,
+            headers=headers,
+            timeout=6,
+        )
+        if resp.status_code == 200:
+            _last_cctv_upload_at = now
+            if "detections" in data:
+                _last_detections_upload_at = now
+        elif resp.status_code == 429:
+            # Back off briefly when Hostinger rate-limits us.
+            _last_cctv_upload_at = now
+    except Exception:
+        pass
+
+
 def maybe_upload_frame_file(frame_path):
-    """Upload JPEG to production server (lightweight; rate-limited)."""
+    """Legacy helper: upload an existing JPEG file (still rate-limited)."""
     global _last_cctv_upload_at
     if not CCTV_FRAME_UPLOAD_URL or not CCTV_FRAME_UPLOAD_KEY or not REQUESTS_AVAILABLE:
         return
@@ -460,26 +558,27 @@ def maybe_upload_frame_file(frame_path):
         frame_bytes = path.read_bytes()
         if len(frame_bytes) < 500:
             return
+        # Skip oversized local preview files; prefer maybe_upload_live_frame instead.
+        if len(frame_bytes) > 900_000:
+            return
         files = {"frame": ("frame.jpg", frame_bytes, "image/jpeg")}
-        data = {}
-        det_path = Path(DETECTIONS_FILE)
-        if det_path.is_file():
-            try:
-                data["detections"] = det_path.read_text(encoding="utf-8")
-            except Exception:
-                pass
         headers = {"X-CCTV-Upload-Key": CCTV_FRAME_UPLOAD_KEY}
         resp = requests.post(
             CCTV_FRAME_UPLOAD_URL,
             files=files,
-            data=data,
             headers=headers,
-            timeout=8,
+            timeout=6,
         )
         if resp.status_code == 200:
             _last_cctv_upload_at = now
     except Exception:
         pass
+
+
+def init_camera_config_fingerprint():
+    global CAMERAS_CONFIG_FINGERPRINT
+    CAMERAS_CONFIG_FINGERPRINT = get_camera_config_fingerprint()
+
 
 def load_yolo_model():
     """Load YOLO model - works offline after first download"""
@@ -2415,17 +2514,18 @@ def save_live_frame(frame, frame_count):
     params = [cv2.IMWRITE_JPEG_QUALITY, LIVE_JPEG_QUALITY]
 
     try:
+        saved = False
         if cv2.imwrite(target, frame, params):
-            maybe_upload_frame_file(target)
-            return True
-        if cv2.imwrite(fallback, frame, params):
-            maybe_upload_frame_file(fallback)
-            return True
-        return False
+            saved = True
+        elif cv2.imwrite(fallback, frame, params):
+            saved = True
+        # Compact Hostinger upload (downscaled) — separate from local preview file.
+        maybe_upload_live_frame(frame)
+        return saved
     except Exception:
         try:
             if cv2.imwrite(fallback, frame, params):
-                maybe_upload_frame_file(fallback)
+                maybe_upload_live_frame(frame)
                 return True
             return False
         except Exception:
@@ -2666,30 +2766,54 @@ def estimate_recording_duration(filepath, frame_count=0, start_time=None, fps=No
     return 0.0
 
 
-def remux_recording_faststart(filepath):
-    """Rewrite MP4 with moov at front for browser playback (requires ffmpeg)."""
+def remux_recording_faststart(filepath, wall_duration=0.0, frame_count=0):
+    """Rewrite MP4 for browser playback with correct duration (requires ffmpeg)."""
     ffmpeg = shutil.which('ffmpeg')
     if not ffmpeg or not os.path.isfile(filepath):
         return False
 
     tmp_path = filepath + '.faststart.mp4'
     try:
-        result = subprocess.run(
-            [
-                ffmpeg, '-y', '-i', filepath,
-                '-c', 'copy', '-movflags', '+faststart',
+        # Prefer copy+faststart when timestamps already look sane.
+        cmds = []
+        corrected_fps = None
+        if wall_duration and wall_duration >= 1 and frame_count and frame_count > 0:
+            corrected_fps = max(0.5, min(30.0, float(frame_count) / float(wall_duration)))
+
+        if corrected_fps:
+            # Rebuild container timestamps so HTML5 players show real length (not 0:00).
+            cmds.append([
+                ffmpeg, '-y', '-r', f'{corrected_fps:.4f}', '-i', filepath,
+                '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '28',
+                '-pix_fmt', 'yuv420p', '-an',
+                '-movflags', '+faststart',
                 tmp_path,
-            ],
-            capture_output=True,
-            text=True,
-            timeout=120,
-        )
-        if result.returncode != 0 or not os.path.isfile(tmp_path) or os.path.getsize(tmp_path) < 1024:
+            ])
+        cmds.append([
+            ffmpeg, '-y', '-i', filepath,
+            '-c', 'copy', '-movflags', '+faststart',
+            tmp_path,
+        ])
+
+        for cmd in cmds:
             if os.path.exists(tmp_path):
-                os.remove(tmp_path)
-            return False
-        os.replace(tmp_path, filepath)
-        return True
+                try:
+                    os.remove(tmp_path)
+                except OSError:
+                    pass
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=180,
+            )
+            if result.returncode == 0 and os.path.isfile(tmp_path) and os.path.getsize(tmp_path) >= 1024:
+                os.replace(tmp_path, filepath)
+                return True
+
+        if os.path.exists(tmp_path):
+            os.remove(tmp_path)
+        return False
     except Exception as e:
         if os.path.exists(tmp_path):
             try:
@@ -2720,7 +2844,7 @@ def finalize_video_writer(writer_info, discard_short=True):
     if writer_info is None:
         return
 
-    writer, filename, start_time, frame_count, write_fps = writer_info
+    writer, filename, start_time, frame_count, write_fps = writer_info[:5]
     try:
         if writer is not None:
             writer.release()
@@ -2750,10 +2874,10 @@ def finalize_video_writer(writer_info, discard_short=True):
             print(f"✗ Error removing short recording: {e}")
         return
 
-    if remux_recording_faststart(filename):
-        print(f"✓ Faststart remux done: {os.path.basename(filename)}")
+    if remux_recording_faststart(filename, wall_duration=duration, frame_count=frame_count):
+        print(f"✓ Playback remux done: {os.path.basename(filename)} (~{duration:.0f}s)")
     elif not recording_has_moov(filename):
-        print(f"⚠ Warning: {os.path.basename(filename)} may not play in browsers (missing moov)")
+        print(f"⚠ Warning: {os.path.basename(filename)} may not play in browsers (missing moov / 0:00 duration)")
 
     print(f"✓ Completed recording: {filename} ({duration:.0f}s wall-clock, {frame_count} frames @ {write_fps:.2f} fps)")
 
@@ -3530,6 +3654,7 @@ def main():
     
     # Initialize video writer (will be created when stream connects)
     video_writer_info = None
+    last_recording_write_at = 0.0
     
     # Create initial placeholder frames (ensure they exist for web interface)
     placeholder = np.zeros((FRAME_HEIGHT, FRAME_WIDTH, 3), dtype=np.uint8)
@@ -3779,25 +3904,29 @@ def main():
                     else:
                         print(f"[{datetime.now().strftime('%H:%M:%S')}] Activity recording mode (full FPS)")
 
-                # Write frame to video recording (full rate on activity; sparse when idle)
+                # Write frame to video recording using wall-clock pacing so MP4 duration is real
+                # (avoids browser showing 0:00 when frames were written sparsely into a high FPS container).
                 if ENABLE_RECORDING:
                     try:
-                        should_write = activity_active or (frame_count % IDLE_RECORD_EVERY_N == 0)
-                        if should_write:
-                            recording_fps = HTTP_RECORDING_FPS if http_mode else RECORDING_FPS
+                        recording_fps = HTTP_RECORDING_FPS if http_mode else RECORDING_FPS
+                        write_interval = 1.0 / max(1.0, float(recording_fps))
+                        if video_writer_info is None:
+                            video_writer_info = init_video_writer(FRAME_WIDTH, FRAME_HEIGHT, recording_fps)
+                            last_recording_write_at = 0.0
                             if video_writer_info is None:
-                                video_writer_info = init_video_writer(FRAME_WIDTH, FRAME_HEIGHT, recording_fps)
-                                if video_writer_info is None:
-                                    print("⚠ Warning: Video recording initialization failed, continuing without recording")
-                            if video_writer_info is not None:
-                                if should_rotate_video(video_writer_info, RECORDING_CHUNK_DURATION):
-                                    video_writer_info = rotate_video_writer(
-                                        video_writer_info, FRAME_WIDTH, FRAME_HEIGHT, recording_fps
-                                    )
-                                writer, filename, start_time, recorded_frames, write_fps = video_writer_info
-                                if writer is not None and writer.isOpened():
-                                    writer.write(frame)
-                                    video_writer_info = (writer, filename, start_time, recorded_frames + 1, write_fps)
+                                print("⚠ Warning: Video recording initialization failed, continuing without recording")
+                        if video_writer_info is not None:
+                            if should_rotate_video(video_writer_info, RECORDING_CHUNK_DURATION):
+                                video_writer_info = rotate_video_writer(
+                                    video_writer_info, FRAME_WIDTH, FRAME_HEIGHT, recording_fps
+                                )
+                                last_recording_write_at = 0.0
+                            writer, filename, start_time, recorded_frames, write_fps = video_writer_info[:5]
+                            due = (current_time - last_recording_write_at) >= (1.0 / max(1.0, float(write_fps or recording_fps)))
+                            if writer is not None and writer.isOpened() and due:
+                                writer.write(frame)
+                                last_recording_write_at = current_time
+                                video_writer_info = (writer, filename, start_time, recorded_frames + 1, write_fps)
                     except Exception as e:
                         if frame_count % 100 == 0:
                             print(f"⚠ Warning: Error writing to video: {e}")

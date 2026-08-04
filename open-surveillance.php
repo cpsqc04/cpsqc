@@ -731,12 +731,14 @@ $cctvFeedMode = getCctvFeedMode();
                         if (status.age_seconds > 5) {
                             showCameraError(getOfflineFeedMessage(status));
                         }
-                        schedulePoll(1000);
+                        // Offline: poll slowly to protect Hostinger CPU
+                        schedulePoll(1500);
                         return;
                     }
 
                     if (frameLoading || status.updated_at === lastFrameUpdatedAt) {
-                        schedulePoll(50);
+                        // No new frame yet — avoid hammering camera_status.php
+                        schedulePoll(300);
                         return;
                     }
 
@@ -748,12 +750,12 @@ $cctvFeedMode = getCctvFeedMode();
                         clearCameraError();
                         hasShownFrame = true;
                         setCameraUiState(true);
-                        schedulePoll(50);
+                        schedulePoll(250);
                     };
                     feed.onerror = function() {
                         frameLoading = false;
                         feedErrors += 1;
-                        schedulePoll(250);
+                        schedulePoll(500);
                     };
                     feed.src = 'api/current_frame.php?t=' + Date.now();
                 } catch (e) {

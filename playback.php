@@ -657,8 +657,20 @@ $cctvNavActive = 'playback';
             video.classList.add('active');
             placeholder.classList.add('hidden');
 
-            video.onloadeddata = function() {
+            video.onloadedmetadata = function() {
+                // 0:00 usually means incomplete MP4 (still recording / missing moov) or bad timestamps.
+                if (!isFinite(video.duration) || video.duration < 1) {
+                    video.classList.remove('active');
+                    placeholder.classList.remove('hidden');
+                    showPlaybackError('This clip has no playable duration (shows 0:00). Wait for the chunk to finish recording, or restart detection so new clips are remuxed for playback.');
+                    return;
+                }
                 video.play().catch(function() {});
+            };
+            video.onloadeddata = function() {
+                if (isFinite(video.duration) && video.duration >= 1) {
+                    video.play().catch(function() {});
+                }
             };
             video.onerror = function() {
                 video.classList.remove('active');
