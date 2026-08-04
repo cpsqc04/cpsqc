@@ -164,6 +164,12 @@ if ($method === 'POST') {
                 exit;
             }
 
+            if (strcasecmp(trim((string) ($report['status'] ?? '')), 'Resolved') === 0) {
+                http_response_code(409);
+                echo json_encode(['success' => false, 'message' => 'Resolved reports cannot be reassigned.']);
+                exit;
+            }
+
             $previousPatrolId = (int) ($report['assigned_patrol_id'] ?? 0);
 
             if ($patrolId <= 0) {

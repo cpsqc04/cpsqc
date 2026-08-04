@@ -369,10 +369,69 @@ define('NW_PAGE_MODE', 'incidents');
             return escapeHtml(date.toLocaleString());
         }
 
+        function viewIncidentPhoto(reportId) {
+            const report = reports.find(function(r) { return Number(r.id) === Number(reportId); });
+            const photoSrc = report && report.photo_data ? String(report.photo_data) : '';
+            if (!photoSrc) {
+                alert('No photo available for this report.');
+                return;
+            }
+
+            const existing = document.getElementById('incident-photo-lightbox');
+            if (existing) {
+                existing.remove();
+            }
+
+            const modal = document.createElement('div');
+            modal.id = 'incident-photo-lightbox';
+            modal.style.cssText = 'position:fixed;z-index:4000;inset:0;background:rgba(0,0,0,0.92);display:flex;align-items:center;justify-content:center;padding:1rem;';
+
+            const img = document.createElement('img');
+            img.src = photoSrc;
+            img.alt = 'Incident photo';
+            img.style.cssText = 'max-width:95%;max-height:95%;border-radius:8px;object-fit:contain;box-shadow:0 10px 40px rgba(0,0,0,0.45);';
+            img.onclick = function(e) { e.stopPropagation(); };
+            img.onerror = function() {
+                alert('Failed to load photo.');
+                closeLightbox();
+            };
+
+            const closeBtn = document.createElement('button');
+            closeBtn.type = 'button';
+            closeBtn.innerHTML = '&times;';
+            closeBtn.setAttribute('aria-label', 'Close photo');
+            closeBtn.style.cssText = 'position:absolute;top:16px;right:20px;width:44px;height:44px;border:none;border-radius:50%;background:rgba(255,255,255,0.2);color:#fff;font-size:2rem;line-height:1;cursor:pointer;';
+
+            const closeLightbox = function() {
+                if (modal.parentNode) {
+                    modal.parentNode.removeChild(modal);
+                }
+                document.removeEventListener('keydown', onKeyDown);
+            };
+            const onKeyDown = function(e) {
+                if (e.key === 'Escape') {
+                    closeLightbox();
+                }
+            };
+
+            modal.onclick = closeLightbox;
+            closeBtn.onclick = function(e) {
+                e.stopPropagation();
+                closeLightbox();
+            };
+            document.addEventListener('keydown', onKeyDown);
+
+            modal.appendChild(closeBtn);
+            modal.appendChild(img);
+            document.body.appendChild(modal);
+        }
+
         function buildReportDetailsHtml(report) {
             let photoHtml = '';
             if (report.photo_data) {
-                photoHtml = '<div class="detail-row"><div class="detail-label">Photo</div><img src="' + report.photo_data + '" alt="Incident photo" class="incident-photo" onclick="window.open(this.src, \'_blank\')" title="Click to view full size"></div>';
+                photoHtml = '<div class="detail-row"><div class="detail-label">Photo</div>'
+                    + '<img src="' + report.photo_data + '" alt="Incident photo" class="incident-photo" '
+                    + 'onclick="viewIncidentPhoto(' + Number(report.id) + ')" title="Click to view full size"></div>';
             }
 
             return ''
@@ -402,6 +461,7 @@ define('NW_PAGE_MODE', 'incidents');
 
             data.forEach(function(report) {
                 const date = report.created_at ? new Date(report.created_at).toLocaleString() : '-';
+                const isResolved = String(report.status || '').toLowerCase() === 'resolved';
                 html += '<tr>'
                     + '<td>' + escapeHtml(report.report_id) + '</td>'
                     + '<td>' + escapeHtml(report.member_name) + '</td>'
@@ -411,7 +471,7 @@ define('NW_PAGE_MODE', 'incidents');
                     + '<td>' + escapeHtml(date) + '</td>'
                     + '<td><div class="action-buttons">'
                     + '<button type="button" class="btn-view" onclick="viewReport(' + report.id + ')">View</button>'
-                    + '<button type="button" class="btn-manage" onclick="manageReport(' + report.id + ')">Assign</button>'
+                    + (isResolved ? '' : '<button type="button" class="btn-manage" onclick="manageReport(' + report.id + ')">Assign</button>')
                     + '</div></td>'
                     + '</tr>';
             });
@@ -458,6 +518,10 @@ define('NW_PAGE_MODE', 'incidents');
         function manageReport(id) {
             selectedReport = reports.find(function(r) { return Number(r.id) === Number(id); });
             if (!selectedReport) return;
+            if (String(selectedReport.status || '').toLowerCase() === 'resolved') {
+                alert('Resolved reports cannot be reassigned.');
+                return;
+            }
 
             document.getElementById('manageReportId').value = selectedReport.id;
             document.getElementById('manageReportRef').textContent = 'Report ID: ' + selectedReport.report_id;
