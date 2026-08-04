@@ -235,9 +235,11 @@
 
         container.innerHTML =
             '<div class="digital-bulletin-carousel" data-count="' + slides.length + '">' +
+            '<div class="db-slide-track">' +
             '<button type="button" class="db-arrow prev" aria-label="Previous image"><i class="fas fa-chevron-left"></i></button>' +
-            '<div class="db-slide-track">' + slidesHtml + '</div>' +
+            slidesHtml +
             '<button type="button" class="db-arrow next" aria-label="Next image"><i class="fas fa-chevron-right"></i></button>' +
+            '</div>' +
             (slides.length > 1 ? '<div class="db-dots">' + dotsHtml + '</div>' : '') +
             '</div>';
 

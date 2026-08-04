@@ -1112,25 +1112,12 @@ require_once __DIR__ . '/db.php';
             }
 
             try {
-                // Check if JSZip is available
                 if (typeof JSZip === 'undefined') {
                     alert('Export library not loaded. Please refresh the page.');
                     return;
                 }
 
-                // Create DOCX file structure using JSZip
                 const zip = new JSZip();
-
-                // Create [Content_Types].xml
-                const contentTypes = '<' + '?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' +
-'<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">\n' +
-'    <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>\n' +
-'    <Default Extension="xml" ContentType="application/xml"/>\n' +
-'    <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>\n' +
-'    <Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>\n' +
-'</Types>';
-
-                // Create word/document.xml with the actual content
                 const escapeXml = (text) => {
                     if (!text) return '';
                     return String(text)
@@ -1141,8 +1128,123 @@ require_once __DIR__ . '/db.php';
                         .replace(/'/g, '&apos;');
                 };
 
+                const photoSrc = String(log.documentation_photo || '');
+                let photoPart = null;
+                if (photoSrc.indexOf('data:image/') === 0) {
+                    const match = photoSrc.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/i);
+                    if (match) {
+                        const mime = match[1].toLowerCase();
+                        const binary = atob(match[2]);
+                        const bytes = new Uint8Array(binary.length);
+                        for (let i = 0; i < binary.length; i++) {
+                            bytes[i] = binary.charCodeAt(i);
+                        }
+                        let ext = 'jpg';
+                        if (mime.indexOf('png') !== -1) ext = 'png';
+                        else if (mime.indexOf('gif') !== -1) ext = 'gif';
+                        else if (mime.indexOf('webp') !== -1) ext = 'webp';
+                        else if (mime.indexOf('jpeg') !== -1 || mime.indexOf('jpg') !== -1) ext = 'jpg';
+
+                        let widthPx = 800;
+                        let heightPx = 600;
+                        try {
+                            const dims = await new Promise(function(resolve, reject) {
+                                const img = new Image();
+                                img.onload = function() {
+                                    resolve({
+                                        width: img.naturalWidth || 800,
+                                        height: img.naturalHeight || 600
+                                    });
+                                };
+                                img.onerror = reject;
+                                img.src = photoSrc;
+                            });
+                            widthPx = dims.width;
+                            heightPx = dims.height;
+                        } catch (e) {
+                            // keep defaults
+                        }
+
+                        const maxWidthEmu = 5486400; // 6 inches
+                        const ratio = heightPx / Math.max(widthPx, 1);
+                        const cx = maxWidthEmu;
+                        const cy = Math.max(914400, Math.round(maxWidthEmu * ratio));
+
+                        photoPart = {
+                            mime: mime,
+                            ext: ext,
+                            bytes: bytes,
+                            cx: cx,
+                            cy: cy
+                        };
+                    }
+                }
+
+                let contentTypes = '<' + '?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' +
+'<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">\n' +
+'    <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>\n' +
+'    <Default Extension="xml" ContentType="application/xml"/>\n';
+                if (photoPart) {
+                    contentTypes += '    <Default Extension="' + photoPart.ext + '" ContentType="' + photoPart.mime + '"/>\n';
+                }
+                contentTypes +=
+'    <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>\n' +
+'    <Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>\n' +
+'</Types>';
+
+                let photoXml = '';
+                if (photoPart) {
+                    photoXml =
+'        <w:p>\n' +
+'            <w:pPr><w:spacing w:before="400"/></w:pPr>\n' +
+'            <w:r><w:rPr><w:b/></w:rPr><w:t>Documentation Photo:</w:t></w:r>\n' +
+'        </w:p>\n' +
+'        <w:p>\n' +
+'            <w:r>\n' +
+'                <w:drawing>\n' +
+'                    <wp:inline distT="0" distB="0" distL="0" distR="0">\n' +
+'                        <wp:extent cx="' + photoPart.cx + '" cy="' + photoPart.cy + '"/>\n' +
+'                        <wp:docPr id="1" name="DocumentationPhoto"/>\n' +
+'                        <a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">\n' +
+'                            <a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">\n' +
+'                                <pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture">\n' +
+'                                    <pic:nvPicPr>\n' +
+'                                        <pic:cNvPr id="0" name="documentation.' + photoPart.ext + '"/>\n' +
+'                                        <pic:cNvPicPr/>\n' +
+'                                    </pic:nvPicPr>\n' +
+'                                    <pic:blipFill>\n' +
+'                                        <a:blip r:embed="rIdPhoto"/>\n' +
+'                                        <a:stretch><a:fillRect/></a:stretch>\n' +
+'                                    </pic:blipFill>\n' +
+'                                    <pic:spPr>\n' +
+'                                        <a:xfrm>\n' +
+'                                            <a:off x="0" y="0"/>\n' +
+'                                            <a:ext cx="' + photoPart.cx + '" cy="' + photoPart.cy + '"/>\n' +
+'                                        </a:xfrm>\n' +
+'                                        <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>\n' +
+'                                    </pic:spPr>\n' +
+'                                </pic:pic>\n' +
+'                            </a:graphicData>\n' +
+'                        </a:graphic>\n' +
+'                    </wp:inline>\n' +
+'                </w:drawing>\n' +
+'            </w:r>\n' +
+'        </w:p>\n';
+                } else {
+                    photoXml =
+'        <w:p>\n' +
+'            <w:pPr><w:spacing w:before="400"/></w:pPr>\n' +
+'            <w:r><w:rPr><w:b/></w:rPr><w:t>Documentation Photo:</w:t></w:r>\n' +
+'        </w:p>\n' +
+'        <w:p>\n' +
+'            <w:r><w:t>No photo uploaded</w:t></w:r>\n' +
+'        </w:p>\n';
+                }
+
                 const documentXml = '<' + '?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' +
-'<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">\n' +
+'<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"\n' +
+'            xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"\n' +
+'            xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing">\n' +
 '    <w:body>\n' +
 '        <w:p>\n' +
 '            <w:pPr>\n' +
@@ -1243,6 +1345,7 @@ require_once __DIR__ . '/db.php';
 '                <w:t>' + escapeXml(log.details) + '</w:t>\n' +
 '            </w:r>\n' +
 '        </w:p>\n' +
+photoXml +
 '        <w:p>\n' +
 '            <w:pPr>\n' +
 '                <w:jc w:val="right"/>\n' +
@@ -1255,7 +1358,6 @@ require_once __DIR__ . '/db.php';
 '    </w:body>\n' +
 '</w:document>';
 
-                // Create word/styles.xml
                 const stylesXml = '<' + '?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' +
 '<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">\n' +
 '    <w:style w:type="paragraph" w:styleId="Normal">\n' +
@@ -1264,38 +1366,43 @@ require_once __DIR__ . '/db.php';
 '    </w:style>\n' +
 '</w:styles>';
 
-                // Create _rels/.rels
                 const rels = '<' + '?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' +
 '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">\n' +
 '    <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>\n' +
 '</Relationships>';
 
-                // Create word/_rels/document.xml.rels
-                const wordRels = '<' + '?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' +
+                let wordRels = '<' + '?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' +
 '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">\n' +
-'    <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>\n' +
-'</Relationships>';
+'    <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>\n';
+                if (photoPart) {
+                    wordRels += '    <Relationship Id="rIdPhoto" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/documentation.' + photoPart.ext + '"/>\n';
+                }
+                wordRels += '</Relationships>';
 
-                // Add files to zip
-                zip.file("[Content_Types].xml", contentTypes);
-                zip.file("word/document.xml", documentXml);
-                zip.file("word/styles.xml", stylesXml);
-                zip.file("_rels/.rels", rels);
-                zip.file("word/_rels/document.xml.rels", wordRels);
+                zip.file('[Content_Types].xml', contentTypes);
+                zip.file('word/document.xml', documentXml);
+                zip.file('word/styles.xml', stylesXml);
+                zip.file('_rels/.rels', rels);
+                zip.file('word/_rels/document.xml.rels', wordRels);
+                if (photoPart) {
+                    zip.file('word/media/documentation.' + photoPart.ext, photoPart.bytes);
+                }
 
-                // Generate the DOCX file
-                const blob = await zip.generateAsync({ type: "blob", mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" });
-                const fileName = `patrol_log_${log.personnel_name.replace(/\s+/g, '_')}_${log.date}.docx`;
-                
-                const link = document.createElement("a");
+                const blob = await zip.generateAsync({
+                    type: 'blob',
+                    mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+                });
+                const fileName = 'patrol_log_' + log.personnel_name.replace(/\s+/g, '_') + '_' + log.date + '.docx';
+
+                const link = document.createElement('a');
                 link.href = URL.createObjectURL(blob);
                 link.download = fileName;
                 document.body.appendChild(link);
                 link.click();
                 document.body.removeChild(link);
                 URL.revokeObjectURL(link.href);
-                
-                alert(`Patrol log exported successfully as ${fileName}!`);
+
+                alert('Patrol log exported successfully as ' + fileName + '!');
             } catch (error) {
                 console.error('Error generating DOCX:', error);
                 alert('Error generating DOCX file. Please try again.');
