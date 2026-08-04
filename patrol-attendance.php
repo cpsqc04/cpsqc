@@ -577,6 +577,11 @@ $personnelCode = htmlspecialchars(getBpsoPersonnelCode());
                         <span class="nav-submodule-text">Neighborhood Watch Incidents</span>
                         <span class="nav-badge" id="badge-nw-incidents">0</span>
                     </button>
+                    <button type="button" class="nav-submodule" data-tab="tips" data-title="Assigned Tips" data-tooltip="Assigned Tips" onclick="switchSection(this, 'tips', 'Assigned Tips')">
+                        <span class="nav-submodule-icon"><i class="fas fa-comment-dots"></i></span>
+                        <span class="nav-submodule-text">Assigned Tips</span>
+                        <span class="nav-badge" id="badge-tips">0</span>
+                    </button>
                 </div>
             </div>
             <button type="button" class="nav-submodule nav-submodule-dashboard" data-tab="account" data-title="Account Settings" data-tooltip="Account Settings" onclick="switchSection(this, 'account', 'Account Settings')">
@@ -828,13 +833,12 @@ $personnelCode = htmlspecialchars(getBpsoPersonnelCode());
                                     <th>Complaint ID</th>
                                     <th>Complainant</th>
                                     <th>Type</th>
-                                    <th>Priority</th>
                                     <th>Status</th>
                                     <th>Actions</th>
                                 </tr>
                             </thead>
                             <tbody id="complaintsTableBody">
-                                <tr><td colspan="6" class="empty-state">Loading complaints...</td></tr>
+                                <tr><td colspan="5" class="empty-state">Loading complaints...</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -861,6 +865,32 @@ $personnelCode = htmlspecialchars(getBpsoPersonnelCode());
                             </thead>
                             <tbody id="nwIncidentsTableBody">
                                 <tr><td colspan="5" class="empty-state">Loading neighborhood watch incidents...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <section id="panel-tips" class="portal-panel">
+                    <h2 class="section-heading">Assigned Tips</h2>
+                    <div id="tipsAlert"></div>
+                    <div class="filter-tabs">
+                        <button type="button" class="filter-tab active" data-filter="all" onclick="setTipFilter('all', this)">All</button>
+                        <button type="button" class="filter-tab" data-filter="assigned" onclick="setTipFilter('assigned', this)">Assigned</button>
+                        <button type="button" class="filter-tab" data-filter="resolved" onclick="setTipFilter('resolved', this)">Resolved</button>
+                    </div>
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Tip ID</th>
+                                    <th>Location</th>
+                                    <th>Outcome</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tipsTableBody">
+                                <tr><td colspan="5" class="empty-state">Loading tips...</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -959,6 +989,37 @@ $personnelCode = htmlspecialchars(getBpsoPersonnelCode());
         </div>
     </div>
 
+    <div id="tipResolutionModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Tip Response Report</h2>
+                <button type="button" class="close-modal" onclick="closeTipModal()">&times;</button>
+            </div>
+            <div id="tipDetailContent"></div>
+            <form id="tipResolutionForm" class="form-grid" style="margin-top:1.5rem;">
+                <input type="hidden" id="resolutionTipId">
+                <div class="form-group">
+                    <label for="tipResolutionReport">What actions did you take? *</label>
+                    <textarea id="tipResolutionReport" required placeholder="Describe how you responded to the tip, actions taken, and findings..."></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="tipOutcomeSelect">Outcome *</label>
+                    <select id="tipOutcomeSelect" required>
+                        <option value="Under Investigation">Under Investigation</option>
+                        <option value="Investigation Successful">Investigation Successful (No Arrest)</option>
+                        <option value="Arrest Made">Arrest Made</option>
+                        <option value="Unfounded / No Action">Unfounded / No Action</option>
+                    </select>
+                    <p class="field-hint">Final outcome is set by your report. Police backup (if requested) is assistance only.</p>
+                </div>
+                <div style="display:flex;gap:0.75rem;flex-wrap:wrap;">
+                    <button type="button" id="saveTipProgressBtn" class="btn-submit" style="background:#2563eb;" onclick="submitTipResolution('Assigned')">Save Progress</button>
+                    <button type="submit" id="resolveTipBtn" class="btn-submit">Mark as Resolved</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <div id="reportDetailModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
@@ -975,15 +1036,18 @@ $personnelCode = htmlspecialchars(getBpsoPersonnelCode());
         let scheduleData = {};
         let complaintData = {};
         let nwIncidentData = {};
+        let tipData = {};
         let portalSchedules = [];
         let portalComplaints = [];
         let portalNwIncidents = [];
+        let portalTips = [];
         let portalReports = [];
         let reportsPage = 1;
         let reportsSearchQuery = '';
         const REPORTS_PER_PAGE = 10;
         let complaintFilter = 'all';
         let nwIncidentFilter = 'all';
+        let tipFilter = 'all';
         let scheduleFilter = 'all';
         let refreshTimer = null;
         let initialSectionSet = false;
@@ -1104,6 +1168,7 @@ $personnelCode = htmlspecialchars(getBpsoPersonnelCode());
             const needingReport = getAssignmentsNeedingReport();
             const openComplaints = portalComplaints.filter(c => c.status === 'Processing');
             const openNwIncidents = portalNwIncidents.filter(r => r.status === 'In Progress');
+            const openTips = portalTips.filter(t => t.status === 'Assigned');
 
             const unseenSchedules = openSchedules.filter(s => !seenScheduleBadgeIds.has(String(s.id)));
             const unseenReports = needingReport.filter(s => !seenReportBadgeIds.has(String(s.id)));
@@ -1112,6 +1177,7 @@ $personnelCode = htmlspecialchars(getBpsoPersonnelCode());
             setNavBadge('badge-report', unseenReports.length);
             setNavBadge('badge-complaints', openComplaints.length);
             setNavBadge('badge-nw-incidents', openNwIncidents.length);
+            setNavBadge('badge-tips', openTips.length);
         }
 
         function getTodayDateString() {
@@ -2175,7 +2241,7 @@ $personnelCode = htmlspecialchars(getBpsoPersonnelCode());
             }
 
             if (rows.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="6" class="empty-state"><i class="fas fa-inbox"></i>No complaints in this view.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="5" class="empty-state"><i class="fas fa-inbox"></i>No complaints in this view.</td></tr>';
                 return;
             }
 
@@ -2186,7 +2252,6 @@ $personnelCode = htmlspecialchars(getBpsoPersonnelCode());
                     <td>${escapeHtml(row.complaint_id)}</td>
                     <td>${escapeHtml(row.complainant_name)}</td>
                     <td>${escapeHtml(row.complaint_type)}</td>
-                    <td><span class="priority-badge ${priorityClass(row.priority)}">${escapeHtml(row.priority)}</span></td>
                     <td><span class="status-badge ${complaintStatusClass(row.status)}">${escapeHtml(row.status)}</span></td>
                     <td>${canResolve ? `<button type="button" class="btn-view" onclick="openComplaintModal(${row.id})">Report / Resolve</button>` : `<button type="button" class="btn-view" onclick="openComplaintModal(${row.id})">View</button>`}</td>
                 </tr>`;
@@ -2199,7 +2264,7 @@ $personnelCode = htmlspecialchars(getBpsoPersonnelCode());
                 const res = await fetch('api/bpso_complaints.php');
                 const result = await res.json();
                 if (!result.success) {
-                    tbody.innerHTML = '<tr><td colspan="6" class="empty-state">Failed to load complaints.</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="5" class="empty-state">Failed to load complaints.</td></tr>';
                     portalComplaints = [];
                     updateNavBadges();
                     return;
@@ -2208,7 +2273,7 @@ $personnelCode = htmlspecialchars(getBpsoPersonnelCode());
                 complaintData = {};
                 portalComplaints = result.data || [];
                 if (portalComplaints.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="6" class="empty-state"><i class="fas fa-inbox"></i>No complaints assigned to you yet.</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="5" class="empty-state"><i class="fas fa-inbox"></i>No complaints assigned to you yet.</td></tr>';
                     updateNavBadges();
                     setInitialSectionIfNeeded();
                     return;
@@ -2218,7 +2283,7 @@ $personnelCode = htmlspecialchars(getBpsoPersonnelCode());
                 updateNavBadges();
                 setInitialSectionIfNeeded();
             } catch (e) {
-                tbody.innerHTML = '<tr><td colspan="6" class="empty-state">Error loading complaints.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="5" class="empty-state">Error loading complaints.</td></tr>';
                 portalComplaints = [];
                 updateNavBadges();
             }
@@ -2479,17 +2544,163 @@ $personnelCode = htmlspecialchars(getBpsoPersonnelCode());
             submitNwIncidentResolution('Resolved');
         });
 
+        function tipStatusClass(status) {
+            const s = (status || '').toLowerCase();
+            if (s === 'resolved') return 'status-resolved';
+            if (s === 'assigned') return 'status-processing';
+            return 'status-pending';
+        }
+
+        function setTipFilter(filter, button) {
+            tipFilter = filter;
+            document.querySelectorAll('#panel-tips .filter-tab').forEach(tab => tab.classList.remove('active'));
+            button.classList.add('active');
+            renderTipsTable();
+        }
+
+        function renderTipsTable() {
+            const tbody = document.getElementById('tipsTableBody');
+            tipData = {};
+            let rows = portalTips;
+            if (tipFilter === 'assigned') rows = rows.filter(r => r.status === 'Assigned');
+            if (tipFilter === 'resolved') rows = rows.filter(r => r.status === 'Resolved');
+
+            if (!rows.length) {
+                tbody.innerHTML = '<tr><td colspan="5" class="empty-state"><i class="fas fa-inbox"></i>No tips in this filter.</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = rows.map(row => {
+                tipData[row.id] = row;
+                const canResolve = row.status === 'Assigned';
+                return `<tr>
+                    <td>${escapeHtml(row.tip_id)}</td>
+                    <td>${escapeHtml(row.location)}</td>
+                    <td>${escapeHtml(row.outcome || 'No Outcome Yet')}</td>
+                    <td><span class="status-badge ${tipStatusClass(row.status)}">${escapeHtml(row.status)}</span></td>
+                    <td>${canResolve
+                        ? `<button type="button" class="btn-view" onclick="openTipModal(${row.id})">Report / Resolve</button>`
+                        : `<button type="button" class="btn-view" onclick="openTipModal(${row.id})">View</button>`}</td>
+                </tr>`;
+            }).join('');
+        }
+
+        async function loadTips() {
+            const tbody = document.getElementById('tipsTableBody');
+            try {
+                const res = await fetch('api/bpso_tips.php');
+                const result = await res.json();
+                if (!result.success) {
+                    tbody.innerHTML = '<tr><td colspan="5" class="empty-state">Failed to load tips.</td></tr>';
+                    portalTips = [];
+                    updateNavBadges();
+                    return;
+                }
+                portalTips = result.data || [];
+                if (!portalTips.length) {
+                    tbody.innerHTML = '<tr><td colspan="5" class="empty-state"><i class="fas fa-inbox"></i>No tips assigned to you yet.</td></tr>';
+                    updateNavBadges();
+                    return;
+                }
+                renderTipsTable();
+                updateNavBadges();
+            } catch (e) {
+                tbody.innerHTML = '<tr><td colspan="5" class="empty-state">Error loading tips.</td></tr>';
+                portalTips = [];
+                updateNavBadges();
+            }
+        }
+
+        function openTipModal(id) {
+            const tip = tipData[id];
+            if (!tip) return;
+            document.getElementById('resolutionTipId').value = id;
+            document.getElementById('tipResolutionReport').value = tip.resolution_report || '';
+            const outcomeSelect = document.getElementById('tipOutcomeSelect');
+            const currentOutcome = tip.outcome && tip.outcome !== 'No Outcome Yet' ? tip.outcome : 'Under Investigation';
+            outcomeSelect.value = currentOutcome;
+            document.getElementById('tipDetailContent').innerHTML = `
+                <div class="complaint-detail"><strong>Tip ID:</strong> ${escapeHtml(tip.tip_id)}</div>
+                <div class="complaint-detail"><strong>Location:</strong> ${escapeHtml(tip.location)}</div>
+                <div class="complaint-detail"><strong>Description:</strong><br>${escapeHtml(tip.description)}</div>
+                <div class="complaint-detail"><strong>Status:</strong> <span class="status-badge ${tipStatusClass(tip.status)}">${escapeHtml(tip.status)}</span></div>
+                ${tip.backup_requested_at ? '<div class="complaint-detail"><strong>Police backup:</strong> Requested (assistance only — you still submit the final report)</div>' : ''}
+            `;
+            const isResolved = tip.status === 'Resolved';
+            document.getElementById('tipResolutionReport').readOnly = isResolved;
+            outcomeSelect.disabled = isResolved;
+            document.getElementById('saveTipProgressBtn').style.display = isResolved ? 'none' : '';
+            document.getElementById('resolveTipBtn').style.display = isResolved ? 'none' : '';
+            document.getElementById('tipResolutionModal').classList.add('active');
+        }
+
+        function closeTipModal() {
+            document.getElementById('tipResolutionModal').classList.remove('active');
+            document.getElementById('tipResolutionReport').readOnly = false;
+            document.getElementById('tipOutcomeSelect').disabled = false;
+            document.getElementById('saveTipProgressBtn').style.display = '';
+            document.getElementById('resolveTipBtn').style.display = '';
+        }
+
+        async function submitTipResolution(status) {
+            const id = parseInt(document.getElementById('resolutionTipId').value, 10);
+            const resolutionReport = document.getElementById('tipResolutionReport').value.trim();
+            const outcome = document.getElementById('tipOutcomeSelect').value;
+            const alertEl = document.getElementById('tipsAlert');
+
+            if (!id || !resolutionReport) {
+                alert('Please enter your tip response report.');
+                return;
+            }
+            if (status === 'Resolved' && (!outcome || outcome === 'No Outcome Yet' || outcome === 'Under Investigation')) {
+                alert('Please select a final outcome before marking the tip as resolved.');
+                return;
+            }
+
+            try {
+                const res = await fetch('api/bpso_tips.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        action: 'submit_resolution',
+                        id,
+                        resolution_report: resolutionReport,
+                        outcome,
+                        status
+                    })
+                });
+                const result = await res.json();
+                if (result.success) {
+                    alertEl.innerHTML = `<div class="alert alert-success">${escapeHtml(result.message || 'Report saved.')}</div>`;
+                    closeTipModal();
+                    await loadTips();
+                    await loadProfile();
+                } else {
+                    alert(result.message || 'Failed to submit tip report.');
+                }
+            } catch (e) {
+                alert('Network error. Please try again.');
+            }
+        }
+
+        document.getElementById('tipResolutionForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            submitTipResolution('Resolved');
+        });
+
         window.onclick = function(event) {
             const complaintModal = document.getElementById('complaintResolutionModal');
             const nwIncidentModal = document.getElementById('nwIncidentResolutionModal');
+            const tipModal = document.getElementById('tipResolutionModal');
             const reportModal = document.getElementById('reportDetailModal');
             if (event.target === complaintModal) closeComplaintModal();
             if (event.target === nwIncidentModal) closeNwIncidentModal();
+            if (event.target === tipModal) closeTipModal();
             if (event.target === reportModal) closeReportModal();
         };
 
         async function refreshAllData() {
-            await Promise.all([loadProfile(), loadComplaints(), loadNwIncidents()]);
+            await Promise.all([loadProfile(), loadComplaints(), loadNwIncidents(), loadTips()]);
             await loadReports();
             await loadSchedules();
         }

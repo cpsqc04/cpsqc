@@ -1539,8 +1539,8 @@ require_once __DIR__ . '/db.php';
                 </div>
 
                 <div class="form-group">
-                    <label for="manageNotes">Admin Notes (internal)</label>
-                    <textarea id="manageNotes" name="notes" placeholder="Internal notes visible to admins only"></textarea>
+                    <label for="manageNotes">BPSO Resolution</label>
+                    <textarea id="manageNotes" name="notes" placeholder="Resolution report and updates from the assigned BPSO patrol"></textarea>
                 </div>
 
                 <div class="form-actions">
@@ -1863,7 +1863,9 @@ require_once __DIR__ . '/db.php';
                         <td>
                             <div class="action-buttons">
                                 <button class="btn-view" onclick="viewComplaint('${c.complaint_id}')">View</button>
-                                <button class="btn-manage" onclick="manageComplaint('${c.complaint_id}')">Manage</button>
+                                ${String(c.status || '').toLowerCase() !== 'resolved'
+                                    ? `<button class="btn-manage" onclick="manageComplaint('${c.complaint_id}')">Manage</button>`
+                                    : ''}
                             </div>
                         </td>
                     `;
@@ -2010,8 +2012,8 @@ require_once __DIR__ . '/db.php';
                 </div>
                 
                 <div class="detail-row">
-                    <span class="detail-label">Notes:</span>
-                    <div class="detail-value description">${complaint.notes || 'No notes available.'}</div>
+                    <span class="detail-label">BPSO Resolution:</span>
+                    <div class="detail-value description">${complaint.notes || complaint.resolution_report || 'No BPSO resolution report yet.'}</div>
                 </div>
             `;
             
@@ -2027,6 +2029,10 @@ require_once __DIR__ . '/db.php';
             const complaint = complaintData[complaintId];
             if (!complaint) {
                 alert('Complaint details not found for: ' + complaintId);
+                return;
+            }
+            if (String(complaint.status || '').toLowerCase() === 'resolved') {
+                alert('This complaint is already resolved. Use View to see the BPSO resolution.');
                 return;
             }
 

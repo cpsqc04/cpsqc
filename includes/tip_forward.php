@@ -56,8 +56,9 @@ function buildTipIncidentPayload(array $tip): array
             'anonymous' => empty($tip['contact_number']),
         ],
         'review' => [
-            'status' => $tip['status'] ?? 'Under Review',
+            'status' => $tip['status'] ?? 'New',
             'outcome' => $tip['outcome'] ?? 'No Outcome Yet',
+            'assigned_to' => $tip['assigned_to'] ?? null,
         ],
         'has_photo' => $hasPhoto,
         'attached_evidence' => [
@@ -70,8 +71,9 @@ function buildTipIncidentPayload(array $tip): array
         'date_time' => $submittedAt,
         'location' => $tip['location'] ?? '',
         'tip_description' => $tip['description'] ?? '',
-        'status' => $tip['status'] ?? 'Under Review',
+        'status' => $tip['status'] ?? 'New',
         'outcome' => $tip['outcome'] ?? 'No Outcome Yet',
+        'assigned_to' => $tip['assigned_to'] ?? null,
         'metadata' => [
             'internal_id' => (int) ($tip['id'] ?? 0),
             'forwarded_by' => 'alertaraqc_bpso_admin',

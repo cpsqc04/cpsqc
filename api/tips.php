@@ -5,10 +5,13 @@ header('Content-Type: application/json');
 
 require_once __DIR__ . '/../db.php';
 require_once __DIR__ . '/tips_schema.php';
+require_once __DIR__ . '/bpso_attendance_schema.php';
 require_once __DIR__ . '/notifications_schema.php';
+require_once __DIR__ . '/../includes/patrol_availability.php';
 
 try {
     ensureTipsTable($pdo);
+    ensureBpsoAttendanceTable($pdo);
 } catch (PDOException $e) {
     http_response_code(500);
     echo json_encode(['success' => false, 'message' => 'Failed to prepare tips table: ' . $e->getMessage()]);
@@ -30,6 +33,10 @@ if ($method === 'GET') {
         $cols = tipsSelectColumns();
         $stmt = $pdo->query("SELECT {$cols} FROM tips ORDER BY id DESC");
         $tips = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        foreach ($tips as &$tip) {
+            $tip['status'] = normalizeTipStatus($tip['status'] ?? 'New');
+        }
+        unset($tip);
 
         echo json_encode([
             'success' => true,
@@ -67,7 +74,7 @@ if ($method === 'POST') {
                 ':location' => $location,
                 ':description' => $description,
                 ':photo_data' => $photoData,
-                ':status' => 'Under Review',
+                ':status' => 'New',
                 ':outcome' => 'No Outcome Yet',
             ]);
 
@@ -89,7 +96,7 @@ if ($method === 'POST') {
                     'tip_id' => $tipId,
                     'location' => $location,
                     'description' => $description,
-                    'status' => 'Under Review',
+                    'status' => 'New',
                     'outcome' => 'No Outcome Yet',
                 ],
             ]);
@@ -100,38 +107,10 @@ if ($method === 'POST') {
         exit;
     }
 
-    if ($action === 'update') {
+    if ($action === 'assign') {
         $id = (int) ($input['id'] ?? 0);
-        $status = trim($input['status'] ?? '');
-        $outcome = trim($input['outcome'] ?? 'No Outcome Yet');
+        $patrolId = (int) ($input['assigned_patrol_id'] ?? 0);
 
-        if ($id <= 0 || $status === '') {
-            http_response_code(400);
-            echo json_encode(['success' => false, 'message' => 'Missing required fields.']);
-            exit;
-        }
-
-        try {
-            $stmt = $pdo->prepare('UPDATE tips SET status = :status, outcome = :outcome WHERE id = :id');
-            $stmt->execute([
-                ':status' => $status,
-                ':outcome' => $outcome,
-                ':id' => $id,
-            ]);
-
-            echo json_encode([
-                'success' => true,
-                'message' => 'Tip updated successfully!',
-            ]);
-        } catch (PDOException $e) {
-            http_response_code(500);
-            echo json_encode(['success' => false, 'message' => 'Failed to update tip: ' . $e->getMessage()]);
-        }
-        exit;
-    }
-
-    if ($action === 'save') {
-        $id = (int) ($input['id'] ?? 0);
         if ($id <= 0) {
             http_response_code(400);
             echo json_encode(['success' => false, 'message' => 'Invalid tip ID.']);
@@ -139,45 +118,103 @@ if ($method === 'POST') {
         }
 
         try {
-            $check = $pdo->prepare('SELECT id, status, saved_at FROM tips WHERE id = :id LIMIT 1');
-            $check->execute([':id' => $id]);
-            $tip = $check->fetch(PDO::FETCH_ASSOC);
+            $tip = fetchTipById($pdo, $id);
             if (!$tip) {
                 http_response_code(404);
                 echo json_encode(['success' => false, 'message' => 'Tip not found.']);
                 exit;
             }
 
-            if (!empty($tip['saved_at'])) {
-                echo json_encode([
-                    'success' => true,
-                    'message' => 'Tip was already saved.',
-                    'data' => ['saved_at' => $tip['saved_at']],
+            if ($patrolId <= 0) {
+                $previousPatrolId = (int) ($tip['assigned_patrol_id'] ?? 0);
+                $stmt = $pdo->prepare('UPDATE tips SET assigned_patrol_id = NULL, assigned_to = NULL, assigned_at = NULL, resolution_report = NULL, resolved_at = NULL, status = :status, outcome = :outcome WHERE id = :id');
+                $stmt->execute([
+                    ':status' => 'New',
+                    ':outcome' => 'No Outcome Yet',
+                    ':id' => $id,
                 ]);
+                if ($previousPatrolId > 0) {
+                    refreshPatrolAvailabilityStatus($pdo, $previousPatrolId);
+                }
+                echo json_encode(['success' => true, 'message' => 'Assignment cleared.', 'data' => ['status' => 'New', 'assigned_to' => null]]);
                 exit;
             }
 
-            $stmt = $pdo->prepare('UPDATE tips SET status = :status, saved_at = NOW() WHERE id = :id');
+            $personnelStmt = $pdo->prepare('SELECT id, personnel_name, bpso_personnel_id, status FROM patrols WHERE id = :id');
+            $personnelStmt->execute([':id' => $patrolId]);
+            $personnel = $personnelStmt->fetch(PDO::FETCH_ASSOC);
+
+            if (!$personnel) {
+                http_response_code(404);
+                echo json_encode(['success' => false, 'message' => 'BPSO personnel not found.']);
+                exit;
+            }
+
+            $availability = resolvePatrolAvailabilityStatus(
+                $pdo,
+                $patrolId,
+                isset($personnel['status']) ? (string) $personnel['status'] : null
+            );
+            if ($availability !== 'Available') {
+                http_response_code(400);
+                echo json_encode(['success' => false, 'message' => 'Selected personnel is currently "' . $availability . '". Only Available personnel can be assigned.']);
+                exit;
+            }
+
+            if (!isPatrolAtHall($pdo, $patrolId)) {
+                http_response_code(400);
+                echo json_encode(['success' => false, 'message' => 'Selected personnel is not at the barangay hall. Only personnel who have timed in today can be assigned.']);
+                exit;
+            }
+
+            $previousPatrolId = (int) ($tip['assigned_patrol_id'] ?? 0);
+            $assignedLabel = $personnel['personnel_name'] . ' (' . $personnel['bpso_personnel_id'] . ')';
+            $timestamp = date('Y-m-d H:i:s');
+
+            // Outcome stays "No Outcome Yet" until the assigned patrol submits their report.
+            $stmt = $pdo->prepare('UPDATE tips SET assigned_patrol_id = :assigned_patrol_id, assigned_to = :assigned_to, assigned_at = :assigned_at, status = :status, outcome = :outcome, resolution_report = NULL, resolved_at = NULL WHERE id = :id');
             $stmt->execute([
-                ':status' => 'Reviewed',
+                ':assigned_patrol_id' => $patrolId,
+                ':assigned_to' => $assignedLabel,
+                ':assigned_at' => $timestamp,
+                ':status' => 'Assigned',
+                ':outcome' => 'No Outcome Yet',
                 ':id' => $id,
             ]);
 
-            $savedStmt = $pdo->prepare('SELECT saved_at FROM tips WHERE id = :id LIMIT 1');
-            $savedStmt->execute([':id' => $id]);
-            $savedAt = $savedStmt->fetchColumn();
+            $pdo->prepare('UPDATE patrols SET status = :status WHERE id = :id')->execute([
+                ':status' => 'Assigned',
+                ':id' => $patrolId,
+            ]);
+            refreshPatrolAvailabilityStatus($pdo, $patrolId);
+            if ($previousPatrolId > 0 && $previousPatrolId !== $patrolId) {
+                refreshPatrolAvailabilityStatus($pdo, $previousPatrolId);
+            }
+
+            $tipLabel = (string) ($tip['tip_id'] ?? ('#' . $id));
+            createPatrolNotification(
+                $pdo,
+                $patrolId,
+                'tip_assignment',
+                'Tip Assigned',
+                'Tip #' . $tipLabel . ' has been assigned to you for response.',
+                'tab:tips:' . $id,
+                $timestamp
+            );
 
             echo json_encode([
                 'success' => true,
-                'message' => 'Tip saved successfully. No forward was sent.',
+                'message' => 'Tip assigned successfully.',
                 'data' => [
-                    'status' => 'Reviewed',
-                    'saved_at' => $savedAt,
+                    'assigned_to' => $assignedLabel,
+                    'assigned_patrol_id' => $patrolId,
+                    'status' => 'Assigned',
+                    'outcome' => 'No Outcome Yet',
                 ],
             ]);
         } catch (PDOException $e) {
             http_response_code(500);
-            echo json_encode(['success' => false, 'message' => 'Failed to save tip: ' . $e->getMessage()]);
+            echo json_encode(['success' => false, 'message' => 'Failed to assign tip: ' . $e->getMessage()]);
         }
         exit;
     }

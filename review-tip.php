@@ -342,10 +342,38 @@ require_once __DIR__ . '/db.php';
         .content-burger-btn span::after { bottom: -7px; }
         .page-title { font-size: 2rem; font-weight: 700; color: var(--tertiary-color); margin: 0; }
         .page-content { background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 12px; padding: 2rem; box-shadow: 0 2px 8px var(--shadow); margin-top: 1.5rem; }
-        .search-box { margin-bottom: 1.5rem; position: relative; }
-        .search-box input { width: 100%; padding: 0.75rem 1rem 0.75rem 2.5rem; border: 1px solid var(--border-color); border-radius: 8px; font-size: 0.95rem; transition: all 0.2s ease; }
+        .tips-toolbar { display: flex; gap: 0.75rem; margin-bottom: 1.5rem; align-items: center; flex-wrap: wrap; }
+        .search-box { flex: 1; min-width: 220px; position: relative; margin-bottom: 0; }
+        .search-box input { width: 100%; padding: 0.75rem 1rem 0.75rem 2.5rem; border: 1px solid var(--border-color); border-radius: 8px; font-size: 0.95rem; transition: all 0.2s ease; box-sizing: border-box; }
         .search-box input:focus { outline: none; border-color: var(--primary-color); box-shadow: 0 0 0 3px rgba(76, 138, 137, 0.1); }
         .search-box::before { content: "🔍"; position: absolute; left: 0.75rem; top: 50%; transform: translateY(-50%); font-size: 1rem; }
+        .btn-export-tips, .btn-cancel-export {
+            padding: 0.75rem 1.25rem;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            white-space: nowrap;
+            flex-shrink: 0;
+            transition: background 0.2s ease;
+            color: #fff;
+        }
+        .btn-export-tips { background: var(--primary-color); }
+        .btn-export-tips:hover:not(:disabled) { background: #4ca8a6; }
+        .btn-export-tips:disabled { opacity: 0.55; cursor: not-allowed; }
+        .btn-cancel-export { background: #6c757d; }
+        .btn-cancel-export:hover { background: #5a6268; }
+        .col-select { width: 44px; text-align: center; }
+        .col-select input { width: 16px; height: 16px; cursor: pointer; accent-color: var(--primary-color); }
+        body:not(.tip-export-select-mode) #tipsTable .col-select { display: none; }
+        body:not(.tip-export-select-mode) .tip-export-select-only { display: none !important; }
+        body.tip-export-select-mode .tip-export-enter-only { display: none !important; }
+        body.tip-export-select-mode #tipsTable tbody tr:hover { background: #f8fafc; }
         .table-container { overflow-x: auto; border-radius: 8px; border: 1px solid var(--border-color); }
         table { width: 100%; border-collapse: collapse; background: var(--card-bg); }
         thead { background: var(--tertiary-color); color: #fff; }
@@ -354,20 +382,60 @@ require_once __DIR__ . '/db.php';
         tbody tr:hover { background: #f9f9f9; }
         tbody tr:last-child td { border-bottom: none; }
         .status-badge { padding: 0.25rem 0.75rem; border-radius: 12px; font-size: 0.85rem; font-weight: 500; display: inline-block; }
-        .status-pending { background: #fff3cd; color: #856404; }
-        .status-reviewed { background: #d1e7dd; color: #0f5132; }
-        .status-under-review { background: #cfe2ff; color: #084298; }
-        .btn-action { padding: 0.5rem 1rem; background: #28a745; color: #fff; border: none; border-radius: 6px; font-size: 0.85rem; cursor: pointer; transition: all 0.2s ease; }
-        .btn-action:hover { background: #218838; }
-        .btn-export { padding: 0.5rem 1rem; background: #007bff; color: #fff; border: none; border-radius: 6px; font-size: 0.85rem; cursor: pointer; transition: all 0.2s ease; }
-        .btn-export:hover { background: #0056b3; }
-        label:hover { background: rgba(0, 0, 0, 0.02); }
-        input[type="checkbox"] { accent-color: var(--primary-color); }
-        .btn-view { padding: 0.5rem 1rem; background: var(--primary-color); color: #fff; border: none; border-radius: 6px; font-size: 0.85rem; cursor: pointer; transition: all 0.2s ease; margin-right: 0.5rem; }
+        .status-new { background: #e0f2fe; color: #075985; }
+        .status-assigned { background: #fef3c7; color: #92400e; }
+        .status-resolved { background: #d1e7dd; color: #0f5132; }
+        .outcome-badge { padding: 0.25rem 0.75rem; border-radius: 12px; font-size: 0.82rem; font-weight: 500; display: inline-block; }
+        .outcome-none { background: #f3f4f6; color: #4b5563; }
+        .outcome-investigating { background: #dbeafe; color: #1e40af; }
+        .outcome-success { background: #d1fae5; color: #065f46; }
+        .outcome-arrest { background: #fee2e2; color: #991b1b; }
+        .outcome-unfounded { background: #ede9fe; color: #5b21b6; }
+        .action-buttons { display: flex; gap: 0.5rem; }
+        .btn-view, .btn-manage {
+            padding: 0.5rem 1rem;
+            background: var(--primary-color);
+            color: #fff;
+            border: none;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            white-space: nowrap;
+        }
         .btn-view:hover { background: #4ca8a6; }
-        .btn-edit { padding: 0.5rem 1rem; background: #ffc107; color: #000; border: none; border-radius: 6px; font-size: 0.85rem; cursor: pointer; transition: all 0.2s ease; }
-        .btn-edit:hover { background: #e0a800; }
-        .action-buttons { display: flex; gap: 0.5rem; align-items: center; }
+        .btn-manage { background: #ff9800; }
+        .btn-manage:hover { background: #f57c00; }
+        .manage-tip-ref { margin: 0 0 0.35rem; color: var(--tertiary-color); font-weight: 600; }
+        .manage-tip-meta { margin: 0 0 1.25rem; color: var(--text-secondary); font-size: 0.92rem; line-height: 1.5; }
+        .manage-tip-actions { display: flex; flex-direction: column; gap: 0.75rem; }
+        .manage-tip-actions button {
+            width: 100%;
+            padding: 0.85rem 1rem;
+            border: none;
+            border-radius: 8px;
+            color: #fff;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            text-align: left;
+            display: flex;
+            align-items: center;
+            gap: 0.65rem;
+            transition: background 0.2s ease, transform 0.15s ease;
+        }
+        .manage-tip-actions button:hover { transform: translateY(-1px); }
+        .manage-tip-actions button:disabled { opacity: 0.55; cursor: not-allowed; transform: none; }
+        .manage-btn-assign { background: var(--primary-color); }
+        .manage-btn-assign:hover:not(:disabled) { background: #4ca8a6; }
+        .manage-btn-incident { background: var(--secondary-color); }
+        .manage-btn-incident:hover:not(:disabled) { background: #2d3f54; }
+        .manage-btn-agency { background: var(--tertiary-color); }
+        .manage-btn-agency:hover:not(:disabled) { background: #141c30; }
+        @media (max-width: 768px) {
+            .tips-toolbar { flex-direction: column; align-items: stretch; }
+            .btn-export-tips, .btn-cancel-export { width: 100%; justify-content: center; }
+        }
         .tip-photo-thumbnail { width: 60px; height: 60px; object-fit: cover; border-radius: 6px; cursor: pointer; border: 2px solid var(--border-color); transition: transform 0.2s ease, border-color 0.2s ease; }
         .tip-photo-thumbnail:hover { transform: scale(1.1); border-color: var(--primary-color); }
         .tip-photo-placeholder { width: 60px; height: 60px; background: #f0f0f0; border-radius: 6px; display: flex; align-items: center; justify-content: center; color: #999; font-size: 0.75rem; border: 2px solid var(--border-color); }
@@ -388,8 +456,8 @@ require_once __DIR__ . '/db.php';
         .form-group input:focus, .form-group select:focus, .form-group textarea:focus { outline: none; border-color: var(--primary-color); box-shadow: 0 0 0 3px rgba(76, 138, 137, 0.1); }
         .form-group textarea { resize: vertical; min-height: 100px; }
         .form-actions { display: flex; justify-content: flex-end; gap: 1rem; margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid var(--border-color); }
-        .btn-cancel { padding: 0.75rem 1.5rem; background: #6c757d; color: #fff; border: none; border-radius: 8px; font-size: 0.95rem; cursor: pointer; transition: all 0.2s ease; }
-        .btn-cancel:hover { background: #5a6268; }
+        .btn-cancel { padding: 0.75rem 1.5rem; background: #e5e5e5; color: var(--text-color); border: none; border-radius: 8px; font-size: 0.95rem; font-weight: 500; cursor: pointer; transition: all 0.2s ease; }
+        .btn-cancel:hover { background: #d5d5d5; }
         .btn-save { padding: 0.75rem 1.5rem; background: var(--primary-color); color: #fff; border: none; border-radius: 8px; font-size: 0.95rem; font-weight: 600; cursor: pointer; transition: all 0.2s ease; }
         .btn-save:hover { background: #4ca8a6; }
         @media (max-width: 768px) { .sidebar { width: 320px; transform: translateX(-100%); transition: transform 0.3s ease; } .sidebar.mobile-open { transform: translateX(0); } .sidebar.collapsed { width: 80px; transform: translateX(0); } .main-wrapper { margin-left: 0; } body.sidebar-collapsed .main-wrapper { margin-left: 80px; } .modal-content { width: 95%; margin: 10% auto; padding: 1.5rem; } }
@@ -554,20 +622,30 @@ require_once __DIR__ . '/db.php';
         </header>
         <main class="content-area">
             <div class="page-content">
-                <div class="search-box">
-                    <input type="text" id="searchInput" placeholder="Search tips by ID, timestamp, location, or description..." onkeyup="filterTips()">
+                <div class="tips-toolbar">
+                    <div class="search-box">
+                        <input type="text" id="searchInput" placeholder="Search tips by ID, timestamp, location, or description..." onkeyup="filterTips()">
+                    </div>
+                    <button type="button" class="btn-export-tips tip-export-enter-only" id="btnEnterTipExportSelect" onclick="enterTipExportSelectMode()">
+                        <i class="fas fa-file-export"></i> Export
+                    </button>
+                    <button type="button" class="btn-export-tips tip-export-select-only" id="btnExportSelectedTips" onclick="exportSelectedTips()" disabled>
+                        <i class="fas fa-file-export"></i> Export Selected
+                    </button>
+                    <button type="button" class="btn-cancel-export tip-export-select-only" onclick="exitTipExportSelectMode()">Cancel</button>
                 </div>
                 <div class="table-container">
                     <table id="tipsTable">
                         <thead>
                             <tr>
+                                <th class="col-select"><input type="checkbox" id="selectAllTips" title="Select all visible tips" onchange="toggleSelectAllTips(this)"></th>
                                 <th>Tip ID</th>
                                 <th>Timestamp</th>
                                 <th>Location</th>
                                 <th>Photo</th>
                                 <th>Tip Description</th>
-                                <th>Status</th>
-                                <th>Outcome</th>
+                                <th>Assigned To</th>
+                                <th title="Set by the assigned BPSO patrol in their tip report">Outcome</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
@@ -580,78 +658,86 @@ require_once __DIR__ . '/db.php';
         </main>
     </div>
 
-    <!-- View Tip Modal -->
+    <!-- View Tip Modal (details only) -->
     <div id="viewTipModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
                 <h2>Tip Details</h2>
                 <span class="close" onclick="closeViewTipModal()">&times;</span>
             </div>
-            <div id="viewTipContent" class="tip-details">
-                <!-- Content will be populated by JavaScript -->
-            </div>
-            <div class="form-group" id="statusGroup" style="margin-top: 1.5rem;">
-                <label for="tipStatus">Status *</label>
-                <select id="tipStatus" name="status" onchange="updateTipStatus()">
-                    <option value="Under Review">Under Review</option>
-                    <option value="Reviewed">Reviewed</option>
-                </select>
-            </div>
-            <div class="form-group" id="outcomeGroup" style="margin-top: 1rem;">
-                <label for="tipOutcome">Outcome</label>
-                <select id="tipOutcome" name="outcome" onchange="updateTipOutcome()">
-                    <option value="No Outcome Yet">No Outcome Yet</option>
-                    <option value="Under Investigation">Under Investigation</option>
-                    <option value="Investigation Successful">Investigation Successful (No Arrest)</option>
-                    <option value="Arrest Made">Arrest Made</option>
-                    <option value="Unfounded / No Action">Unfounded / No Action</option>
-                </select>
-            </div>
+            <div id="viewTipContent" class="tip-details"></div>
             <div class="form-actions">
                 <button type="button" class="btn-cancel" onclick="closeViewTipModal()">Close</button>
-                <button type="button" class="btn-action" id="actionButton" onclick="openActionModal()" style="display: none;">
-                    <i class="fas fa-cog"></i> Action
+            </div>
+        </div>
+    </div>
+
+    <!-- Manage Tip Modal -->
+    <div id="manageTipModal" class="modal">
+        <div class="modal-content" style="max-width: 520px;">
+            <div class="modal-header">
+                <h2>Manage Tip</h2>
+                <span class="close" onclick="closeManageTipModal()">&times;</span>
+            </div>
+            <p class="manage-tip-ref" id="manageTipRef"></p>
+            <p class="manage-tip-meta" id="manageTipMeta"></p>
+            <div class="manage-tip-actions">
+                <button type="button" class="manage-btn-assign" id="manageAssignBtn" onclick="manageAssignPatrol()">
+                    <i class="fas fa-user-check"></i> Assign Patrol
+                </button>
+                <button type="button" class="manage-btn-incident" id="manageIncidentBtn" onclick="manageSendIncident()">
+                    <i class="fas fa-file-alt"></i> Send to Incident Logging
+                </button>
+                <button type="button" class="manage-btn-agency" id="manageAgencyBtn" onclick="manageSendAgency()">
+                    <i class="fas fa-shield-alt"></i> Send to Inter-Agency
+                </button>
+            </div>
+            <div class="form-actions">
+                <button type="button" class="btn-cancel" onclick="closeManageTipModal()">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Assign Patrol Modal -->
+    <div id="assignTipModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Assign Patrol</h2>
+                <span class="close" onclick="closeAssignTipModal()">&times;</span>
+            </div>
+            <p id="assignTipSummary" style="margin:0 0 1rem 0;color:var(--text-secondary);line-height:1.5;"></p>
+            <div class="form-group">
+                <label for="assignTipPatrol">Available BPSO Personnel *</label>
+                <select id="assignTipPatrol" required>
+                    <option value="">Loading personnel...</option>
+                </select>
+                <p style="margin:0.5rem 0 0;font-size:0.85rem;color:var(--text-secondary);">Only Available personnel currently timed in at the barangay hall can be assigned.</p>
+            </div>
+            <div class="form-actions">
+                <button type="button" class="btn-cancel" onclick="closeAssignTipModal()">Cancel</button>
+                <button type="button" class="btn-save" onclick="submitAssignTip()">
+                    <i class="fas fa-user-check"></i> Assign Patrol
                 </button>
             </div>
         </div>
     </div>
 
-    <!-- Action Modal -->
-    <div id="actionModal" class="modal">
+    <!-- Inter-Agency / Police Backup Modal -->
+    <div id="agencyTipModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h2>Tip Actions</h2>
-                <span class="close" onclick="closeActionModal()">&times;</span>
+                <h2>Send to Inter-Agency</h2>
+                <span class="close" onclick="closeAgencyTipModal()">&times;</span>
             </div>
-            <div id="actionTipContent" class="tip-details" style="margin-bottom: 1.5rem; padding: 1rem; background: #f9f9f9; border-radius: 8px; line-height: 1.8;">
-                <!-- Tip details will be populated here -->
-            </div>
+            <p style="margin:0 0 1rem 0;color:var(--text-secondary);line-height:1.5;">Request police backup assistance. BPSO remains responsible for the final tip report.</p>
             <div class="form-group">
-                <label style="display: block; margin-bottom: 0.75rem; color: var(--text-color); font-weight: 500; font-size: 0.95rem;">Select Actions:</label>
-                <div style="display: flex; flex-direction: column; gap: 0.75rem; margin-top: 0.5rem;">
-                    <label style="display: flex; align-items: flex-start; gap: 0.75rem; cursor: pointer; padding: 0.5rem; border-radius: 6px; transition: background 0.2s ease;">
-                        <input type="checkbox" id="saveTipOnly" value="save" style="margin-top: 0.25rem; flex-shrink: 0; width: 18px; height: 18px; cursor: pointer;">
-                        <span style="flex: 1; line-height: 1.5;">Save</span>
-                    </label>
-                    <label style="display: flex; align-items: flex-start; gap: 0.75rem; cursor: pointer; padding: 0.5rem; border-radius: 6px; transition: background 0.2s ease;">
-                        <input type="checkbox" id="sendToIncidentReporting" value="incident_reporting" style="margin-top: 0.25rem; flex-shrink: 0; width: 18px; height: 18px; cursor: pointer;">
-                        <span style="flex: 1; line-height: 1.5;">Send to Incident Reporting</span>
-                    </label>
-                    <label style="display: flex; align-items: flex-start; gap: 0.75rem; cursor: pointer; padding: 0.5rem; border-radius: 6px; transition: background 0.2s ease;">
-                        <input type="checkbox" id="sendToEmergencyResponse" value="emergency_response" style="margin-top: 0.25rem; flex-shrink: 0; width: 18px; height: 18px; cursor: pointer;">
-                        <span style="flex: 1; line-height: 1.5;">Send to Emergency Response (Police Backup)</span>
-                    </label>
-                    <label style="display: flex; align-items: flex-start; gap: 0.75rem; cursor: pointer; padding: 0.5rem; border-radius: 6px; transition: background 0.2s ease;">
-                        <input type="checkbox" id="exportWord" value="export" style="margin-top: 0.25rem; flex-shrink: 0; width: 18px; height: 18px; cursor: pointer;">
-                        <span style="flex: 1; line-height: 1.5;">Export to Word Document</span>
-                    </label>
-                </div>
+                <label for="agencyBackupReason">Reason for police backup</label>
+                <textarea id="agencyBackupReason" placeholder="Describe why police assistance is needed..."></textarea>
             </div>
-            <div id="actionReviewPreview" style="display: none; margin-bottom: 1.25rem; padding: 0.85rem 1rem; background: #eef6f6; border: 1px solid #b8d4d4; border-radius: 8px; line-height: 1.6; font-size: 0.92rem;"></div>
             <div class="form-actions">
-                <button type="button" class="btn-cancel" onclick="closeActionModal()">Cancel</button>
-                <button type="button" class="btn-save" onclick="executeActions()">
-                    <i class="fas fa-check"></i> Execute Actions
+                <button type="button" class="btn-cancel" onclick="closeAgencyTipModal()">Cancel</button>
+                <button type="button" class="btn-save" onclick="submitAgencyTip()">
+                    <i class="fas fa-shield-alt"></i> Request Backup
                 </button>
             </div>
         </div>
@@ -700,6 +786,8 @@ require_once __DIR__ . '/db.php';
             document.querySelectorAll('.nav-module').forEach(m => { m.classList.remove('active'); });
             if (!isActive) { module.classList.add('active'); }
         }
+        let tipExportSelectMode = false;
+
         function filterTips() {
             const input = document.getElementById('searchInput');
             const filter = input.value.toLowerCase();
@@ -712,8 +800,79 @@ require_once __DIR__ . '/db.php';
                     row.style.display = '';
                 } else {
                     row.style.display = 'none';
+                    const cb = row.querySelector('.tip-select');
+                    if (cb) cb.checked = false;
                 }
             }
+            syncSelectAllTipsState();
+            updateExportTipsButtonState();
+        }
+
+        function enterTipExportSelectMode() {
+            tipExportSelectMode = true;
+            document.body.classList.add('tip-export-select-mode');
+            const master = document.getElementById('selectAllTips');
+            if (master) {
+                master.checked = false;
+                master.indeterminate = false;
+            }
+            document.querySelectorAll('.tip-select').forEach(cb => { cb.checked = false; });
+            updateExportTipsButtonState();
+        }
+
+        function exitTipExportSelectMode() {
+            tipExportSelectMode = false;
+            document.body.classList.remove('tip-export-select-mode');
+            const master = document.getElementById('selectAllTips');
+            if (master) {
+                master.checked = false;
+                master.indeterminate = false;
+            }
+            document.querySelectorAll('.tip-select').forEach(cb => { cb.checked = false; });
+            updateExportTipsButtonState();
+        }
+
+        function getVisibleTipCheckboxes() {
+            return Array.from(document.querySelectorAll('#tipsTableBody tr'))
+                .filter(row => row.style.display !== 'none')
+                .map(row => row.querySelector('.tip-select'))
+                .filter(Boolean);
+        }
+
+        function toggleSelectAllTips(master) {
+            getVisibleTipCheckboxes().forEach(cb => {
+                cb.checked = !!master.checked;
+            });
+            updateExportTipsButtonState();
+        }
+
+        function syncSelectAllTipsState() {
+            const master = document.getElementById('selectAllTips');
+            if (!master) return;
+            const boxes = getVisibleTipCheckboxes();
+            if (!boxes.length) {
+                master.checked = false;
+                master.indeterminate = false;
+                return;
+            }
+            const checkedCount = boxes.filter(cb => cb.checked).length;
+            master.checked = checkedCount === boxes.length;
+            master.indeterminate = checkedCount > 0 && checkedCount < boxes.length;
+        }
+
+        function updateExportTipsButtonState() {
+            const btn = document.getElementById('btnExportSelectedTips');
+            if (!btn) return;
+            const selected = document.querySelectorAll('#tipsTableBody .tip-select:checked').length;
+            btn.disabled = !tipExportSelectMode || selected === 0;
+            btn.innerHTML = selected > 0
+                ? `<i class="fas fa-file-export"></i> Export Selected (${selected})`
+                : `<i class="fas fa-file-export"></i> Export Selected`;
+        }
+
+        function getSelectedTipIds() {
+            return Array.from(document.querySelectorAll('#tipsTableBody .tip-select:checked'))
+                .map(cb => cb.value);
         }
         // Tip data storage (loaded from database)
         let tipData = {};
@@ -743,6 +902,11 @@ require_once __DIR__ . '/db.php';
                 tips.forEach(tip => {
                     addTipTableRow(tip.id);
                 });
+                if (tipExportSelectMode) {
+                    exitTipExportSelectMode();
+                } else {
+                    updateExportTipsButtonState();
+                }
             } catch (e) {
                 console.error('Error loading tips:', e);
             }
@@ -752,6 +916,37 @@ require_once __DIR__ . '/db.php';
             loadTips();
         }
         
+        function escapeHtml(text) {
+            return String(text ?? '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function formatTipTimestamp(value) {
+            if (!value) return '';
+            return new Date(value).toLocaleString('en-US', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+                hour12: false
+            }).replace(',', '');
+        }
+
+        function displayTipOutcome(tip) {
+            if (!tip) return 'No Outcome Yet';
+            // Outcome is owned by the assigned patrol's report — not admin-editable.
+            if (!tip.assigned_patrol_id) {
+                return 'No Outcome Yet';
+            }
+            return tip.outcome || 'No Outcome Yet';
+        }
+
         function getOutcomeBadgeClass(outcome) {
             switch (outcome) {
                 case 'Under Investigation':
@@ -770,52 +965,41 @@ require_once __DIR__ . '/db.php';
         function addTipTableRow(id) {
             const tip = tipData[id];
             if (!tip) return;
-            
+
             const tableBody = document.getElementById('tipsTableBody');
             const row = document.createElement('tr');
             row.setAttribute('data-tip-id', id);
-            
-            const statusClass = tip.status === 'Reviewed' ? 'status-reviewed' : 'status-under-review';
-            const statusText = tip.status || 'Under Review';
-            const outcomeText = tip.outcome || 'No Outcome Yet';
+
+            const outcomeText = displayTipOutcome(tip);
             const outcomeClass = getOutcomeBadgeClass(outcomeText);
-            
-            // Format timestamp
-            const timestamp = tip.submitted_at ? new Date(tip.submitted_at).toLocaleString('en-US', {
-                year: 'numeric',
-                month: '2-digit',
-                day: '2-digit',
-                hour: '2-digit',
-                minute: '2-digit',
-                second: '2-digit',
-                hour12: false
-            }).replace(',', '') : '';
-            
-            // Photo thumbnail
+            const timestamp = formatTipTimestamp(tip.submitted_at);
+            const assignedTo = tip.assigned_to || '—';
+
             let photoCell = '<div class="tip-photo-placeholder">No Photo</div>';
             if (tip.photo_data) {
                 const thumbnailId = 'tip-thumbnail-' + id;
-                photoCell = `<img id="${thumbnailId}" src="${tip.photo_data}" alt="Tip Photo" class="tip-photo-thumbnail" data-photo-src="${tip.photo_data.replace(/"/g, '&quot;')}">`;
+                photoCell = `<img id="${thumbnailId}" src="${tip.photo_data}" alt="Tip Photo" class="tip-photo-thumbnail">`;
             }
-            
+
             row.innerHTML = `
-                <td>${tip.tip_id || ''}</td>
-                <td>${timestamp}</td>
-                <td>${tip.location || ''}</td>
+                <td class="col-select"><input type="checkbox" class="tip-select" value="${escapeHtml(String(id))}" onchange="onTipSelectChange()"></td>
+                <td>${escapeHtml(tip.tip_id || '')}</td>
+                <td>${escapeHtml(timestamp)}</td>
+                <td>${escapeHtml(tip.location || '')}</td>
                 <td>${photoCell}</td>
-                <td>${tip.description || ''}</td>
-                <td><span class="status-badge ${statusClass}">${statusText}</span></td>
-                <td><span class="outcome-badge ${outcomeClass}">${outcomeText}</span></td>
+                <td>${escapeHtml(tip.description || '')}</td>
+                <td>${escapeHtml(assignedTo)}</td>
+                <td><span class="outcome-badge ${outcomeClass}">${escapeHtml(outcomeText)}</span></td>
                 <td>
                     <div class="action-buttons">
-                        <button class="btn-view" onclick="viewTip('${id}')">View</button>
+                        <button type="button" class="btn-view" onclick="viewTip('${id}')">View</button>
+                        <button type="button" class="btn-manage" onclick="openManageTipModal('${id}')">Manage</button>
                     </div>
                 </td>
             `;
-            
+
             tableBody.appendChild(row);
-            
-            // Add click event listener to thumbnail if it exists
+
             if (tip.photo_data) {
                 const thumbnailId = 'tip-thumbnail-' + id;
                 setTimeout(() => {
@@ -837,39 +1021,31 @@ require_once __DIR__ . '/db.php';
                 alert('Tip not found');
                 return;
             }
-            
+
             currentTipId = id;
-            
-            // Format timestamp
-            const timestamp = tip.submitted_at ? new Date(tip.submitted_at).toLocaleString('en-US', {
-                year: 'numeric',
-                month: '2-digit',
-                day: '2-digit',
-                hour: '2-digit',
-                minute: '2-digit',
-                second: '2-digit',
-                hour12: false
-            }).replace(',', '') : '';
-            
-            // Photo display
+            const timestamp = formatTipTimestamp(tip.submitted_at);
+
             let photoHtml = '';
             if (tip.photo_data) {
-                // Use data attribute to store photo source for better handling of base64 data
                 const photoId = 'tip-photo-' + id;
-                photoHtml = `<p><strong>Photo:</strong></p><img id="${photoId}" src="${tip.photo_data}" alt="Tip Photo" class="tip-photo-full" data-photo-src="${tip.photo_data.replace(/"/g, '&quot;')}" style="cursor: pointer;">`;
+                photoHtml = `<p><strong>Photo:</strong></p><img id="${photoId}" src="${tip.photo_data}" alt="Tip Photo" class="tip-photo-full" style="cursor: pointer;">`;
             }
-            
-            const content = `
-                <p><strong>Tip ID:</strong> ${tip.tip_id || ''}</p>
-                <p><strong>Timestamp:</strong> ${timestamp}</p>
-                <p><strong>Location:</strong> ${tip.location || ''}</p>
-                <p><strong>Tip Description:</strong><br>${tip.description || ''}</p>
+
+            const reportHtml = tip.resolution_report
+                ? `<p><strong>BPSO Report:</strong><br>${escapeHtml(tip.resolution_report)}</p>`
+                : '';
+
+            document.getElementById('viewTipContent').innerHTML = `
+                <p><strong>Tip ID:</strong> ${escapeHtml(tip.tip_id || '')}</p>
+                <p><strong>Timestamp:</strong> ${escapeHtml(timestamp)}</p>
+                <p><strong>Location:</strong> ${escapeHtml(tip.location || '')}</p>
+                <p><strong>Assigned To:</strong> ${escapeHtml(tip.assigned_to || 'Not assigned')}</p>
+                <p><strong>Outcome:</strong> ${escapeHtml(displayTipOutcome(tip))} <span style="color:var(--text-secondary);font-size:0.85rem;">(from assigned patrol report)</span></p>
+                <p><strong>Tip Description:</strong><br>${escapeHtml(tip.description || '')}</p>
+                ${reportHtml}
                 ${photoHtml}
             `;
-            
-            document.getElementById('viewTipContent').innerHTML = content;
-            
-            // Add click event listener to photo if it exists
+
             if (tip.photo_data) {
                 const photoId = 'tip-photo-' + id;
                 setTimeout(() => {
@@ -881,17 +1057,7 @@ require_once __DIR__ . '/db.php';
                     }
                 }, 100);
             }
-            document.getElementById('tipStatus').value = tip.status || 'Under Review';
-            document.getElementById('tipOutcome').value = tip.outcome || 'No Outcome Yet';
-            
-            // Show Action button only if status is Reviewed
-            const actionButton = document.getElementById('actionButton');
-            if (tip.status === 'Reviewed') {
-                actionButton.style.display = 'inline-block';
-            } else {
-                actionButton.style.display = 'none';
-            }
-            
+
             document.getElementById('viewTipModal').style.display = 'block';
         }
 
@@ -900,576 +1066,457 @@ require_once __DIR__ . '/db.php';
             currentTipId = null;
         }
 
-        function getTipUpdatePayload(overrides = {}) {
-            const tip = tipData[currentTipId];
-            if (!tip) return null;
+        function openManageTipModal(id) {
+            const tip = tipData[id];
+            if (!tip) {
+                alert('Tip not found');
+                return;
+            }
+            currentTipId = id;
+            document.getElementById('manageTipRef').textContent = tip.tip_id || ('Tip #' + id);
+            document.getElementById('manageTipMeta').textContent =
+                (tip.location || 'No location') +
+                ' · Assigned: ' + (tip.assigned_to || 'Not assigned') +
+                ' · Outcome: ' + displayTipOutcome(tip);
 
-            return {
-                action: 'update',
-                id: parseInt(currentTipId, 10),
-                status: overrides.status ?? document.getElementById('tipStatus').value,
-                outcome: overrides.outcome ?? document.getElementById('tipOutcome').value
-            };
+            const incidentBtn = document.getElementById('manageIncidentBtn');
+            const agencyBtn = document.getElementById('manageAgencyBtn');
+            const assignBtn = document.getElementById('manageAssignBtn');
+
+            incidentBtn.disabled = !!tip.forwarded_at;
+            incidentBtn.innerHTML = tip.forwarded_at
+                ? '<i class="fas fa-check"></i> Already sent to Incident Logging'
+                : '<i class="fas fa-file-alt"></i> Send to Incident Logging';
+
+            agencyBtn.disabled = !!tip.backup_requested_at;
+            agencyBtn.innerHTML = tip.backup_requested_at
+                ? '<i class="fas fa-check"></i> Police backup already requested'
+                : '<i class="fas fa-shield-alt"></i> Send to Inter-Agency';
+
+            assignBtn.disabled = tip.status === 'Resolved';
+            assignBtn.innerHTML = tip.status === 'Resolved'
+                ? '<i class="fas fa-ban"></i> Tip already resolved'
+                : '<i class="fas fa-user-check"></i> Assign Patrol';
+
+            document.getElementById('manageTipModal').style.display = 'block';
         }
 
-        function updateTipStatus() {
-            if (!currentTipId) return;
-            
-            const status = document.getElementById('tipStatus').value;
-            const tip = tipData[currentTipId];
-            if (!tip) return;
-            
-            const payload = getTipUpdatePayload({ status });
-            if (!payload) return;
+        function closeManageTipModal() {
+            document.getElementById('manageTipModal').style.display = 'none';
+        }
 
-            // Update in database
-            fetch('api/tips.php', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(payload)
-            })
-            .then(res => res.json())
-            .then(result => {
-                if (!result.success) {
-                    alert(result.message || 'Failed to update tip status.');
-                    return;
-                }
-                
-                // Update local data
-                tipData[currentTipId].status = status;
-                
-                // Update table row
-                const row = document.querySelector(`tr[data-tip-id="${currentTipId}"]`);
-                if (row) {
-                    const cells = row.querySelectorAll('td');
-                    const statusClass = status === 'Reviewed' ? 'status-reviewed' : 'status-under-review';
-                    cells[5].innerHTML = `<span class="status-badge ${statusClass}">${status}</span>`;
-                }
-                
-                // Show/hide Action button based on status
-                const actionButton = document.getElementById('actionButton');
-                if (status === 'Reviewed') {
-                    actionButton.style.display = 'inline-block';
-                } else {
-                    actionButton.style.display = 'none';
-                }
-            })
-            .catch(err => {
-                console.error('Error updating tip status:', err);
-                alert('Error updating tip status. Please try again.');
+        function manageAssignPatrol() {
+            if (!currentTipId) return;
+            closeManageTipModal();
+            openAssignTipModal(currentTipId);
+        }
+
+        function manageSendIncident() {
+            if (!currentTipId) return;
+            sendTipToIncident(currentTipId).then(() => {
+                if (tipData[currentTipId]) openManageTipModal(currentTipId);
             });
         }
 
-        function updateTipOutcome() {
+        function manageSendAgency() {
             if (!currentTipId) return;
-            
-            const outcome = document.getElementById('tipOutcome').value;
-            const tip = tipData[currentTipId];
-            if (!tip) return;
-
-            const payload = getTipUpdatePayload({ outcome });
-            if (!payload) return;
-            
-            // Update in database
-            fetch('api/tips.php', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(payload)
-            })
-            .then(res => res.json())
-            .then(result => {
-                if (!result.success) {
-                    alert(result.message || 'Failed to update tip outcome.');
-                    return;
-                }
-                
-                // Update local data
-                tipData[currentTipId].outcome = outcome;
-                
-                // Update table row
-                const row = document.querySelector(`tr[data-tip-id="${currentTipId}"]`);
-                if (row) {
-                    const cells = row.querySelectorAll('td');
-                    const outcomeClass = getOutcomeBadgeClass(outcome);
-                    cells[6].innerHTML = `<span class="outcome-badge ${outcomeClass}">${outcome}</span>`;
-                }
-            })
-            .catch(err => {
-                console.error('Error updating tip outcome:', err);
-                alert('Error updating tip outcome. Please try again.');
-            });
+            closeManageTipModal();
+            openAgencyTipModal(currentTipId);
         }
 
-        function updateActionReviewPreview() {
-            const preview = document.getElementById('actionReviewPreview');
-            if (!preview || !currentTipId) return;
+        function onTipSelectChange() {
+            syncSelectAllTipsState();
+            updateExportTipsButtonState();
+        }
 
-            const tip = tipData[currentTipId];
-            if (!tip) return;
-
-            const sendToIncidentReporting = document.getElementById('sendToIncidentReporting').checked;
-            const sendToEmergencyResponse = document.getElementById('sendToEmergencyResponse').checked;
-
-            if (!sendToIncidentReporting && !sendToEmergencyResponse) {
-                preview.style.display = 'none';
-                preview.innerHTML = '';
+        async function openAssignTipModal(id) {
+            const tip = tipData[id];
+            if (!tip) {
+                alert('Tip not found');
+                return;
+            }
+            if (tip.status === 'Resolved') {
+                alert('This tip is already resolved. Clear or reassign is not available from here.');
                 return;
             }
 
-            let html = '<p style="margin: 0 0 0.5rem; font-weight: 600; color: var(--tertiary-color);">Will be included in forward:</p>';
-            html += '<p style="margin-bottom: 0.35rem;"><strong>Status:</strong> ' + (tip.status || 'Under Review') + '</p>';
-            if (sendToIncidentReporting) {
-                html += '<p style="margin-bottom: 0;"><strong>Outcome:</strong> ' + (tip.outcome || 'No Outcome Yet') + '</p>';
-            }
+            currentTipId = id;
+            document.getElementById('assignTipSummary').textContent =
+                `${tip.tip_id || ''} — ${tip.location || ''}`;
 
-            preview.innerHTML = html;
-            preview.style.display = 'block';
-        }
+            const select = document.getElementById('assignTipPatrol');
+            select.innerHTML = '<option value="">Loading available personnel...</option>';
+            document.getElementById('assignTipModal').style.display = 'block';
 
-        function openActionModal() {
-            if (!currentTipId) return;
-            
-            const tip = tipData[currentTipId];
-            if (!tip) return;
-            
-            // Format timestamp
-            const timestamp = tip.submitted_at ? new Date(tip.submitted_at).toLocaleString('en-US', {
-                year: 'numeric',
-                month: '2-digit',
-                day: '2-digit',
-                hour: '2-digit',
-                minute: '2-digit',
-                second: '2-digit',
-                hour12: false
-            }).replace(',', '') : '';
-            
-            let photoHtml = '';
-            if (tip.photo_data) {
-                const photoId = 'action-tip-photo-' + currentTipId;
-                photoHtml = `<p style="margin-bottom: 0.75rem;"><strong>Photo:</strong></p><img id="${photoId}" src="${tip.photo_data}" alt="Tip Photo" class="tip-photo-full" data-photo-src="${tip.photo_data.replace(/"/g, '&quot;')}" style="cursor: pointer;">`;
-            }
-            
-            // Populate tip details in action modal
-            document.getElementById('actionTipContent').innerHTML = `
-                <h3 style="margin-top: 0; margin-bottom: 1rem; color: var(--tertiary-color); font-size: 1.1rem;">Tip Details</h3>
-                <p style="margin-bottom: 0.75rem;"><strong>Tip ID:</strong> ${tip.tip_id || ''}</p>
-                <p style="margin-bottom: 0.75rem;"><strong>Timestamp:</strong> ${timestamp}</p>
-                <p style="margin-bottom: 0.75rem;"><strong>Location:</strong> ${tip.location || ''}</p>
-                <p style="margin-bottom: 0.75rem;"><strong>Description:</strong> ${tip.description || ''}</p>
-                ${photoHtml}
-            `;
+            try {
+                const [patrolResponse, hallResponse] = await Promise.all([
+                    fetch('api/patrols.php'),
+                    fetch('api/bpso_attendance.php?view=at_hall')
+                ]);
+                const patrolResult = await patrolResponse.json();
+                const hallResult = await hallResponse.json();
+                const atHallIds = new Set(
+                    (hallResult.success ? (hallResult.data || []) : []).map(row => String(row.patrol_id))
+                );
 
-            if (tip.photo_data) {
-                const photoId = 'action-tip-photo-' + currentTipId;
-                setTimeout(function() {
-                    const photoElement = document.getElementById(photoId);
-                    if (photoElement) {
-                        photoElement.addEventListener('click', function() {
-                            viewPhotoFull(tip.photo_data);
-                        });
+                select.innerHTML = '<option value="">Select BPSO Personnel</option>';
+                const officers = (patrolResult.success ? (patrolResult.data || []) : [])
+                    .filter(officer => atHallIds.has(String(officer.id)));
+
+                if (!officers.length) {
+                    const option = document.createElement('option');
+                    option.value = '';
+                    option.textContent = 'No personnel at barangay hall';
+                    option.disabled = true;
+                    select.appendChild(option);
+                    return;
+                }
+
+                officers.forEach(officer => {
+                    const option = document.createElement('option');
+                    option.value = officer.id;
+                    const status = officer.status || 'Unknown';
+                    option.textContent = `${officer.bpso_personnel_id} - ${officer.personnel_name} (${status})`;
+                    if (status !== 'Available' && String(officer.id) !== String(tip.assigned_patrol_id || '')) {
+                        option.disabled = true;
                     }
-                }, 100);
-            }
-            
-            // Reset checkboxes
-            document.getElementById('saveTipOnly').checked = false;
-            document.getElementById('sendToIncidentReporting').checked = false;
-            document.getElementById('sendToEmergencyResponse').checked = false;
-            document.getElementById('exportWord').checked = false;
-
-            const saveTipInput = document.getElementById('saveTipOnly');
-            const incidentReportingInput = document.getElementById('sendToIncidentReporting');
-            const emergencyResponseInput = document.getElementById('sendToEmergencyResponse');
-            saveTipInput.disabled = Boolean(tip.saved_at);
-            incidentReportingInput.disabled = Boolean(tip.forwarded_at);
-            emergencyResponseInput.disabled = Boolean(tip.backup_requested_at);
-            incidentReportingInput.onchange = updateActionReviewPreview;
-            emergencyResponseInput.onchange = updateActionReviewPreview;
-            updateActionReviewPreview();
-
-            let statusHtml = '';
-            if (tip.saved_at) {
-                statusHtml += `<p style="margin-bottom:0.5rem;color:#0f5132;"><strong>Saved:</strong> Kept on record ${new Date(tip.saved_at).toLocaleString()} (no forward)</p>`;
-            }
-            if (tip.forwarded_at) {
-                statusHtml += `<p style="margin-bottom:0.5rem;color:#0f5132;"><strong>Incident Reporting:</strong> Sent ${new Date(tip.forwarded_at).toLocaleString()}${tip.blotter_reference_id ? ' — Ref: ' + tip.blotter_reference_id : ''}</p>`;
-            }
-            if (tip.backup_requested_at) {
-                statusHtml += `<p style="margin-bottom:0.5rem;color:#0f5132;"><strong>Emergency Response:</strong> Backup requested ${new Date(tip.backup_requested_at).toLocaleString()}${tip.emergency_response_reference_id ? ' — Ref: ' + tip.emergency_response_reference_id : ''}</p>`;
-            }
-            if (statusHtml) {
-                document.getElementById('actionTipContent').innerHTML += `<div style="margin-top:1rem;padding-top:0.75rem;border-top:1px solid var(--border-color);">${statusHtml}</div>`;
-            }
-            
-            document.getElementById('actionModal').style.display = 'block';
-        }
-
-        function closeActionModal() {
-            document.getElementById('actionModal').style.display = 'none';
-            const preview = document.getElementById('actionReviewPreview');
-            if (preview) {
-                preview.style.display = 'none';
-                preview.innerHTML = '';
+                    if (String(officer.id) === String(tip.assigned_patrol_id || '')) {
+                        option.selected = true;
+                    }
+                    select.appendChild(option);
+                });
+            } catch (e) {
+                console.error(e);
+                select.innerHTML = '<option value="">Failed to load personnel</option>';
             }
         }
 
-        function executeActions() {
+        function closeAssignTipModal() {
+            document.getElementById('assignTipModal').style.display = 'none';
+            currentTipId = null;
+        }
+
+        async function submitAssignTip() {
             if (!currentTipId) return;
-            
-            const tip = tipData[currentTipId];
-            const saveTipOnly = document.getElementById('saveTipOnly').checked;
-            const sendToIncidentReporting = document.getElementById('sendToIncidentReporting').checked;
-            const sendToEmergencyResponse = document.getElementById('sendToEmergencyResponse').checked;
-            const exportWord = document.getElementById('exportWord').checked;
-            
-            if (!saveTipOnly && !sendToIncidentReporting && !sendToEmergencyResponse && !exportWord) {
-                alert('Please select at least one action.');
+            const patrolId = parseInt(document.getElementById('assignTipPatrol').value, 10) || 0;
+            if (patrolId <= 0) {
+                alert('Please select Available BPSO personnel.');
                 return;
             }
 
-            if (saveTipOnly && tip.saved_at) {
-                alert('This tip was already saved.');
+            try {
+                const response = await fetch('api/tips.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        action: 'assign',
+                        id: parseInt(currentTipId, 10),
+                        assigned_patrol_id: patrolId
+                    })
+                });
+                const result = await response.json();
+                if (!result.success) {
+                    alert(result.message || 'Failed to assign patrol.');
+                    return;
+                }
+                alert(result.message || 'Tip assigned successfully.');
+                closeAssignTipModal();
+                await loadTips();
+            } catch (e) {
+                console.error(e);
+                alert('Failed to assign patrol. Please try again.');
+            }
+        }
+
+        async function sendTipToIncident(id) {
+            const tip = tipData[id];
+            if (!tip) return;
+            if (tip.forwarded_at) {
+                alert('This tip was already sent to Incident Logging.');
                 return;
             }
+            if (!confirm(`Send tip ${tip.tip_id} to Incident Logging?`)) return;
 
-            if (sendToIncidentReporting && tip.forwarded_at) {
-                alert('This tip was already sent to Incident Reporting.');
-                return;
+            try {
+                const response = await fetch('api/send_to_incident_reporting.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id: tip.id, tip_id: tip.tip_id })
+                });
+                const result = await response.json();
+                if (!result.success) {
+                    alert(result.message || 'Failed to send tip.');
+                    return;
+                }
+                tip.forwarded_at = result.data?.forwarded_at || new Date().toISOString();
+                tip.blotter_reference_id = result.data?.blotter_reference_id || tip.blotter_reference_id;
+                alert(result.message || 'Tip sent to Incident Logging.');
+            } catch (e) {
+                console.error(e);
+                alert('Failed to send tip to Incident Logging.');
             }
+        }
 
-            if (sendToEmergencyResponse && tip.backup_requested_at) {
+        function openAgencyTipModal(id) {
+            const tip = tipData[id];
+            if (!tip) return;
+            if (tip.backup_requested_at) {
                 alert('Police backup was already requested for this tip.');
                 return;
             }
-            
-            const payload = {
-                id: tip.id,
-                tip_id: tip.tip_id
-            };
-            
-            let actionsCompleted = 0;
-            let totalActions = 0;
-            const results = {
-                save: null,
-                incidentReporting: null,
-                emergencyResponse: null,
-                export: null
-            };
-
-            if (saveTipOnly) {
-                totalActions++;
-                fetch('api/tips.php', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ action: 'save', id: tip.id })
-                })
-                .then(response => response.json())
-                .then(data => {
-                    results.save = data;
-                    if (data.success) {
-                        tip.saved_at = data.data?.saved_at || new Date().toISOString();
-                        tip.status = data.data?.status || tip.status || 'Reviewed';
-                        const row = document.querySelector(`tr[data-tip-id="${currentTipId}"]`);
-                        if (row) {
-                            const cells = row.querySelectorAll('td');
-                            if (cells[5]) {
-                                cells[5].innerHTML = `<span class="status-badge status-reviewed">${tip.status}</span>`;
-                            }
-                        }
-                        const statusSelect = document.getElementById('tipStatus');
-                        if (statusSelect) statusSelect.value = tip.status;
-                    }
-                    actionsCompleted++;
-                    checkAllActionsComplete();
-                })
-                .catch(error => {
-                    results.save = { success: false, message: error.message };
-                    actionsCompleted++;
-                    checkAllActionsComplete();
-                });
-            }
-            
-            if (sendToIncidentReporting) {
-                totalActions++;
-                fetch('api/send_to_incident_reporting.php', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                })
-                .then(response => response.json())
-                .then(data => {
-                    results.incidentReporting = data;
-                    if (data.success) {
-                        tip.forwarded_at = data.data?.forwarded_at || new Date().toISOString();
-                        tip.blotter_reference_id = data.data?.blotter_reference_id || '';
-                    }
-                    actionsCompleted++;
-                    checkAllActionsComplete();
-                })
-                .catch(error => {
-                    results.incidentReporting = { success: false, message: error.message };
-                    actionsCompleted++;
-                    checkAllActionsComplete();
-                });
-            }
-            
-            if (sendToEmergencyResponse) {
-                totalActions++;
-                fetch('api/send_to_emergency_response.php', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                })
-                .then(response => response.json())
-                .then(data => {
-                    results.emergencyResponse = data;
-                    if (data.success) {
-                        tip.backup_requested_at = data.data?.backup_requested_at || new Date().toISOString();
-                        tip.emergency_response_reference_id = data.data?.emergency_response_reference_id || '';
-                    }
-                    actionsCompleted++;
-                    checkAllActionsComplete();
-                })
-                .catch(error => {
-                    results.emergencyResponse = { success: false, message: error.message };
-                    actionsCompleted++;
-                    checkAllActionsComplete();
-                });
-            }
-            
-            if (exportWord) {
-                totalActions++;
-                exportTipToWord(tip).then(() => {
-                    results.export = { success: true };
-                    actionsCompleted++;
-                    checkAllActionsComplete();
-                }).catch(error => {
-                    results.export = { success: false, message: error.message };
-                    actionsCompleted++;
-                    checkAllActionsComplete();
-                });
-            }
-            
-            function checkAllActionsComplete() {
-                if (actionsCompleted < totalActions || totalActions === 0) {
-                    return;
-                }
-
-                let message = 'Actions completed:\n';
-                let hasError = false;
-
-                if (saveTipOnly) {
-                    if (results.save?.success) {
-                        message += '- Tip saved (no forward)\n';
-                    } else {
-                        hasError = true;
-                        message += '- Save failed: ' + (results.save?.message || 'Unknown error') + '\n';
-                    }
-                }
-
-                if (sendToIncidentReporting) {
-                    if (results.incidentReporting?.success) {
-                        message += '- Sent to Incident Reporting';
-                        if (results.incidentReporting.data?.blotter_reference_id) {
-                            message += ' (Ref: ' + results.incidentReporting.data.blotter_reference_id + ')';
-                        }
-                        message += '\n';
-                    } else {
-                        hasError = true;
-                        message += '- Incident Reporting failed: ' + (results.incidentReporting?.message || 'Unknown error') + '\n';
-                    }
-                }
-
-                if (sendToEmergencyResponse) {
-                    if (results.emergencyResponse?.success) {
-                        message += '- Sent to Inter-agency Coordination Portal (Police Backup)';
-                        if (results.emergencyResponse.data?.emergency_response_reference_id) {
-                            message += ' (Ref: ' + results.emergencyResponse.data.emergency_response_reference_id + ')';
-                        }
-                        message += '\n';
-                    } else {
-                        hasError = true;
-                        message += '- Police backup request failed: ' + (results.emergencyResponse?.message || 'Unknown error') + '\n';
-                    }
-                }
-
-                if (exportWord) {
-                    if (results.export?.success) {
-                        message += '- Exported to Word document\n';
-                    } else {
-                        hasError = true;
-                        message += '- Word export failed\n';
-                    }
-                }
-
-                alert(message.trim());
-                if (!hasError || (saveTipOnly && results.save?.success) || (sendToIncidentReporting && results.incidentReporting?.success) || (sendToEmergencyResponse && results.emergencyResponse?.success)) {
-                    closeActionModal();
-                }
-            }
+            currentTipId = id;
+            document.getElementById('agencyBackupReason').value = tip.police_backup_reason || tip.description || '';
+            document.getElementById('agencyTipModal').style.display = 'block';
         }
 
-        async function exportTipToWord(tip) {
+        function closeAgencyTipModal() {
+            document.getElementById('agencyTipModal').style.display = 'none';
+            currentTipId = null;
+        }
+
+        async function submitAgencyTip() {
+            if (!currentTipId) return;
+            const tip = tipData[currentTipId];
+            if (!tip) return;
+
+            const reason = document.getElementById('agencyBackupReason').value.trim();
             try {
-                if (typeof JSZip === 'undefined') {
-                    alert('Export library not loaded. Please refresh the page.');
+                const response = await fetch('api/send_to_emergency_response.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        id: tip.id,
+                        tip_id: tip.tip_id,
+                        police_backup_reason: reason
+                    })
+                });
+                const result = await response.json();
+                if (!result.success) {
+                    alert(result.message || 'Failed to request police backup.');
                     return;
                 }
-
-                const zip = new JSZip();
-
-                const escapeXml = (text) => {
-                    if (!text) return '';
-                    return String(text)
-                        .replace(/&/g, '&amp;')
-                        .replace(/</g, '&lt;')
-                        .replace(/>/g, '&gt;')
-                        .replace(/"/g, '&quot;')
-                        .replace(/'/g, '&apos;');
-                };
-
-                const contentTypes = '<' + '?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' +
-'<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">\n' +
-'    <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>\n' +
-'    <Default Extension="xml" ContentType="application/xml"/>\n' +
-'    <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>\n' +
-'    <Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>\n' +
-'</Types>';
-
-                const documentXml = '<' + '?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' +
-'<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">\n' +
-'    <w:body>\n' +
-'        <w:p>\n' +
-'            <w:pPr>\n' +
-'                <w:jc w:val="center"/>\n' +
-'                <w:spacing w:after="400"/>\n' +
-'            </w:pPr>\n' +
-'            <w:r>\n' +
-'                <w:rPr>\n' +
-'                    <w:b/>\n' +
-'                    <w:sz w:val="32"/>\n' +
-'                </w:rPr>\n' +
-'                <w:t>TIP REPORT</w:t>\n' +
-'            </w:r>\n' +
-'        </w:p>\n' +
-'        <w:p>\n' +
-'            <w:pPr>\n' +
-'                <w:jc w:val="center"/>\n' +
-'                <w:spacing w:after="600"/>\n' +
-'            </w:pPr>\n' +
-'            <w:r>\n' +
-'                <w:t>Barangay San Agustin, Quezon City</w:t>\n' +
-'            </w:r>\n' +
-'        </w:p>\n' +
-'        <w:p>\n' +
-'            <w:r>\n' +
-'                <w:rPr><w:b/></w:rPr>\n' +
-'                <w:t>Tip ID:</w:t>\n' +
-'            </w:r>\n' +
-'            <w:r>\n' +
-'                <w:t> ' + escapeXml(tip.tipId) + '</w:t>\n' +
-'            </w:r>\n' +
-'        </w:p>\n' +
-'        <w:p>\n' +
-'            <w:r>\n' +
-'                <w:rPr><w:b/></w:rPr>\n' +
-'                <w:t>Timestamp:</w:t>\n' +
-'            </w:r>\n' +
-'            <w:r>\n' +
-'                <w:t> ' + escapeXml(tip.timestamp) + '</w:t>\n' +
-'            </w:r>\n' +
-'        </w:p>\n' +
-'        <w:p>\n' +
-'            <w:r>\n' +
-'                <w:rPr><w:b/></w:rPr>\n' +
-'                <w:t>Location:</w:t>\n' +
-'            </w:r>\n' +
-'            <w:r>\n' +
-'                <w:t> ' + escapeXml(tip.location) + '</w:t>\n' +
-'            </w:r>\n' +
-'        </w:p>\n' +
-'        <w:p>\n' +
-'            <w:pPr>\n' +
-'                <w:spacing w:before="400"/>\n' +
-'            </w:pPr>\n' +
-'            <w:r>\n' +
-'                <w:rPr><w:b/></w:rPr>\n' +
-'                <w:t>Tip Description:</w:t>\n' +
-'            </w:r>\n' +
-'        </w:p>\n' +
-'        <w:p>\n' +
-'            <w:r>\n' +
-'                <w:t>' + escapeXml(tip.description) + '</w:t>\n' +
-'            </w:r>\n' +
-'        </w:p>\n' +
-'        <w:p>\n' +
-'            <w:pPr>\n' +
-'                <w:jc w:val="right"/>\n' +
-'                <w:spacing w:before="600"/>\n' +
-'            </w:pPr>\n' +
-'            <w:r>\n' +
-'                <w:t>Generated on: ' + escapeXml(new Date().toLocaleString()) + '</w:t>\n' +
-'            </w:r>\n' +
-'        </w:p>\n' +
-'    </w:body>\n' +
-'</w:document>';
-
-                const stylesXml = '<' + '?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' +
-'<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">\n' +
-'    <w:style w:type="paragraph" w:styleId="Normal">\n' +
-'        <w:name w:val="Normal"/>\n' +
-'        <w:qFormat/>\n' +
-'    </w:style>\n' +
-'</w:styles>';
-
-                const rels = '<' + '?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' +
-'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">\n' +
-'    <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>\n' +
-'</Relationships>';
-
-                const wordRels = '<' + '?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' +
-'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">\n' +
-'    <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>\n' +
-'</Relationships>';
-
-                zip.file("[Content_Types].xml", contentTypes);
-                zip.file("word/document.xml", documentXml);
-                zip.file("word/styles.xml", stylesXml);
-                zip.file("_rels/.rels", rels);
-                zip.file("word/_rels/document.xml.rels", wordRels);
-
-                const blob = await zip.generateAsync({ type: "blob", mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" });
-                const fileName = `tip_report_${tip.tipId}_${tip.timestamp.replace(/[:\s]/g, '_')}.docx`;
-                
-                const link = document.createElement("a");
-                link.href = URL.createObjectURL(blob);
-                link.download = fileName;
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-                URL.revokeObjectURL(link.href);
-            } catch (error) {
-                console.error('Error generating DOCX:', error);
-                throw error;
+                tip.backup_requested_at = result.data?.backup_requested_at || new Date().toISOString();
+                tip.police_backup_reason = reason;
+                tip.emergency_response_reference_id = result.data?.emergency_response_reference_id || tip.emergency_response_reference_id;
+                alert(result.message || 'Police backup requested. BPSO must still submit the final tip report.');
+                closeAgencyTipModal();
+            } catch (e) {
+                console.error(e);
+                alert('Failed to send tip to Inter-Agency.');
             }
         }
 
+        function tipToExportPayload(tip) {
+            return {
+                tipId: tip.tip_id || '',
+                timestamp: formatTipTimestamp(tip.submitted_at),
+                location: tip.location || '',
+                description: tip.description || '',
+                assignedTo: tip.assigned_to || 'Not assigned',
+                outcome: displayTipOutcome(tip),
+                resolutionReport: tip.resolution_report || ''
+            };
+        }
 
-        // Close modal when clicking outside
+        async function exportSelectedTips() {
+            if (!tipExportSelectMode) {
+                enterTipExportSelectMode();
+                return;
+            }
+            const ids = getSelectedTipIds();
+            if (!ids.length) {
+                alert('Please select at least one tip to export.');
+                return;
+            }
+            const tips = ids.map(id => tipData[id]).filter(Boolean);
+            if (!tips.length) {
+                alert('Selected tips could not be found. Please refresh and try again.');
+                return;
+            }
+            try {
+                await exportTipsToWord(tips.map(tipToExportPayload));
+                exitTipExportSelectMode();
+            } catch (e) {
+                console.error(e);
+                alert('Failed to export selected tips.');
+            }
+        }
+
+        async function exportTipsToWord(tips) {
+            if (typeof JSZip === 'undefined') {
+                alert('Export library not loaded. Please refresh the page.');
+                return;
+            }
+            if (!Array.isArray(tips) || !tips.length) return;
+
+            const zip = new JSZip();
+            const escapeXml = (value) => {
+                if (!value) return '';
+                return String(value)
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;')
+                    .replace(/'/g, '&apos;');
+            };
+
+            const nl = String.fromCharCode(10);
+            const fieldLine = (label, value) => (
+                '        <w:p>' + nl +
+                '            <w:r>' + nl +
+                '                <w:rPr><w:b/></w:rPr>' + nl +
+                '                <w:t>' + escapeXml(label) + ':</w:t>' + nl +
+                '            </w:r>' + nl +
+                '            <w:r>' + nl +
+                '                <w:t> ' + escapeXml(value) + '</w:t>' + nl +
+                '            </w:r>' + nl +
+                '        </w:p>' + nl
+            );
+
+            const blockLine = (label, value) => (
+                '        <w:p>' + nl +
+                '            <w:pPr>' + nl +
+                '                <w:spacing w:before="200"/>' + nl +
+                '            </w:pPr>' + nl +
+                '            <w:r>' + nl +
+                '                <w:rPr><w:b/></w:rPr>' + nl +
+                '                <w:t>' + escapeXml(label) + ':</w:t>' + nl +
+                '            </w:r>' + nl +
+                '        </w:p>' + nl +
+                '        <w:p>' + nl +
+                '            <w:r>' + nl +
+                '                <w:t>' + escapeXml(value) + '</w:t>' + nl +
+                '            </w:r>' + nl +
+                '        </w:p>' + nl
+            );
+
+            let body = '';
+            tips.forEach((tip, index) => {
+                if (index > 0) {
+                    body +=
+                        '        <w:p>' + nl +
+                        '            <w:pPr>' + nl +
+                        '                <w:spacing w:before="400" w:after="200"/>' + nl +
+                        '            </w:pPr>' + nl +
+                        '            <w:r><w:t>---</w:t></w:r>' + nl +
+                        '        </w:p>' + nl;
+                }
+                body += fieldLine('Tip ID', tip.tipId || '');
+                body += fieldLine('Timestamp', tip.timestamp || '');
+                body += fieldLine('Location', tip.location || '');
+                body += fieldLine('Assigned To', tip.assignedTo || 'Not assigned');
+                body += fieldLine('Outcome', tip.outcome || 'No Outcome Yet');
+                body += blockLine('Tip Description', tip.description || '');
+                if (tip.resolutionReport) {
+                    body += blockLine('BPSO Report', tip.resolutionReport);
+                }
+            });
+
+            const xmlDecl = '<' + '?xml version="1.0" encoding="UTF-8" standalone="yes"?>' + nl;
+            const contentTypes =
+                xmlDecl +
+                '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">' + nl +
+                '    <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>' + nl +
+                '    <Default Extension="xml" ContentType="application/xml"/>' + nl +
+                '    <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>' + nl +
+                '    <Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>' + nl +
+                '</Types>';
+
+            const title = tips.length > 1 ? 'TIP REPORTS' : 'TIP REPORT';
+            const documentXml =
+                xmlDecl +
+                '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">' + nl +
+                '    <w:body>' + nl +
+                '        <w:p>' + nl +
+                '            <w:pPr>' + nl +
+                '                <w:jc w:val="center"/>' + nl +
+                '                <w:spacing w:after="400"/>' + nl +
+                '            </w:pPr>' + nl +
+                '            <w:r>' + nl +
+                '                <w:rPr>' + nl +
+                '                    <w:b/>' + nl +
+                '                    <w:sz w:val="32"/>' + nl +
+                '                </w:rPr>' + nl +
+                '                <w:t>' + title + '</w:t>' + nl +
+                '            </w:r>' + nl +
+                '        </w:p>' + nl +
+                '        <w:p>' + nl +
+                '            <w:pPr>' + nl +
+                '                <w:jc w:val="center"/>' + nl +
+                '                <w:spacing w:after="600"/>' + nl +
+                '            </w:pPr>' + nl +
+                '            <w:r>' + nl +
+                '                <w:t>Barangay San Agustin, Quezon City</w:t>' + nl +
+                '            </w:r>' + nl +
+                '        </w:p>' + nl +
+                body +
+                '        <w:p>' + nl +
+                '            <w:pPr>' + nl +
+                '                <w:jc w:val="right"/>' + nl +
+                '                <w:spacing w:before="600"/>' + nl +
+                '            </w:pPr>' + nl +
+                '            <w:r>' + nl +
+                '                <w:t>Generated on: ' + escapeXml(new Date().toLocaleString()) + '</w:t>' + nl +
+                '            </w:r>' + nl +
+                '        </w:p>' + nl +
+                '    </w:body>' + nl +
+                '</w:document>';
+
+            const stylesXml =
+                xmlDecl +
+                '<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">' + nl +
+                '    <w:style w:type="paragraph" w:styleId="Normal">' + nl +
+                '        <w:name w:val="Normal"/>' + nl +
+                '        <w:qFormat/>' + nl +
+                '    </w:style>' + nl +
+                '</w:styles>';
+
+            const rels =
+                xmlDecl +
+                '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' + nl +
+                '    <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>' + nl +
+                '</Relationships>';
+
+            const wordRels =
+                xmlDecl +
+                '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' + nl +
+                '    <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>' + nl +
+                '</Relationships>';
+
+            zip.file('[Content_Types].xml', contentTypes);
+            zip.file('word/document.xml', documentXml);
+            zip.file('word/styles.xml', stylesXml);
+            zip.file('_rels/.rels', rels);
+            zip.file('word/_rels/document.xml.rels', wordRels);
+
+            const blob = await zip.generateAsync({
+                type: 'blob',
+                mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+            });
+            const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
+            const fileName = tips.length === 1
+                ? ('tip_report_' + (tips[0].tipId || 'tip') + '_' + stamp + '.docx')
+                : ('tip_reports_' + tips.length + '_' + stamp + '.docx');
+
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = fileName;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(link.href);
+        }
+
+
         window.onclick = function(event) {
             const viewModal = document.getElementById('viewTipModal');
-            const actionModal = document.getElementById('actionModal');
-            
-            if (event.target === viewModal) {
-                closeViewTipModal();
-            }
-            if (event.target === actionModal) {
-                closeActionModal();
-            }
+            const manageModal = document.getElementById('manageTipModal');
+            const assignModal = document.getElementById('assignTipModal');
+            const agencyModal = document.getElementById('agencyTipModal');
+            if (event.target === viewModal) closeViewTipModal();
+            if (event.target === manageModal) closeManageTipModal();
+            if (event.target === assignModal) closeAssignTipModal();
+            if (event.target === agencyModal) closeAgencyTipModal();
         }
 
         function viewPhotoFull(photoSrc) {

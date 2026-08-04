@@ -159,6 +159,34 @@ if ($action === 'sync') {
 
     try {
         $stmt = $pdo->prepare("
+            SELECT id, tip_id, location, assigned_at, created_at
+            FROM tips
+            WHERE assigned_patrol_id = :patrol_id
+              AND assigned_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+            ORDER BY assigned_at DESC
+        ");
+        $stmt->execute([':patrol_id' => $patrolId]);
+        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+            $link = 'tab:tips:' . $row['id'];
+            $assignedAt = $row['assigned_at'] ?: $row['created_at'];
+            if (createPatrolNotification(
+                $pdo,
+                $patrolId,
+                'tip_assignment',
+                'Tip Assigned',
+                'Tip #' . $row['tip_id'] . ' — ' . $row['location'],
+                $link,
+                $assignedAt
+            )) {
+                $synced++;
+            }
+        }
+    } catch (PDOException $e) {
+        // continue
+    }
+
+    try {
+        $stmt = $pdo->prepare("
             SELECT id, personnel_name, route, patrol_zone, schedule_date, shift, status
             FROM patrol_schedules
             WHERE patrol_id = :patrol_id

@@ -15,7 +15,7 @@ Configured in `.env`:
 | `EMERGENCY_RESPONSE_API_URL` | Emergency Response | Police backup / coordination endpoint |
 | `EMERGENCY_RESPONSE_API_KEY` | Emergency Response | Shared API key |
 
-Admin triggers from **Review Tip → Action → Execute Actions**.
+Admin triggers from **Review Tip** per-row actions: **Send to Incident Logging**, **Send to Inter-Agency**, or **Export**. Assign patrol separately via **Assign Patrol**.
 
 ### Local testing
 

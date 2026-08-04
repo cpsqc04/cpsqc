@@ -338,8 +338,9 @@ require_once __DIR__ . '/db.php';
         .content-burger-btn span::after { bottom: -7px; }
         .page-title { font-size: 2rem; font-weight: 700; color: var(--tertiary-color); margin: 0; }
         .page-content { background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 12px; padding: 2rem; box-shadow: 0 2px 8px var(--shadow); margin-top: 1.5rem; }
-        .search-box { margin-bottom: 1.5rem; position: relative; }
-        .search-box input { width: 100%; padding: 0.75rem 1rem 0.75rem 2.5rem; border: 1px solid var(--border-color); border-radius: 8px; font-size: 0.95rem; transition: all 0.2s ease; }
+        .logs-toolbar { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; margin-bottom: 1.5rem; }
+        .search-box { flex: 1; min-width: 220px; position: relative; margin-bottom: 0; }
+        .search-box input { width: 100%; padding: 0.75rem 1rem 0.75rem 2.5rem; border: 1px solid var(--border-color); border-radius: 8px; font-size: 0.95rem; transition: all 0.2s ease; box-sizing: border-box; }
         .search-box input:focus { outline: none; border-color: var(--primary-color); box-shadow: 0 0 0 3px rgba(76, 138, 137, 0.1); }
         .search-box::before { content: "🔍"; position: absolute; left: 0.75rem; top: 50%; transform: translateY(-50%); font-size: 1rem; }
         .table-container { overflow-x: auto; border-radius: 8px; border: 1px solid var(--border-color); }
@@ -356,12 +357,23 @@ require_once __DIR__ . '/db.php';
         .btn-view:hover { background: #4ca8a6; }
         .btn-export { padding: 0.5rem 1rem; background: #28a745; color: #fff; border: none; border-radius: 6px; font-size: 0.85rem; cursor: pointer; transition: all 0.2s ease; }
         .btn-export:hover { background: #218838; }
-        .logs-toolbar { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; margin-bottom: 1rem; }
-        .btn-campaign { padding: 0.55rem 1rem; background: #0f766e; color: #fff; border: none; border-radius: 8px; font-size: 0.9rem; font-weight: 600; cursor: pointer; }
-        .btn-campaign:hover { background: #0d9488; }
+        .btn-campaign {
+            padding: 0.75rem 1.25rem;
+            background: var(--primary-color);
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            white-space: nowrap;
+            flex-shrink: 0;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .btn-campaign:hover { background: #4ca8a6; }
         .btn-campaign:disabled { opacity: 0.55; cursor: not-allowed; }
-        .btn-suggest { padding: 0.55rem 1rem; background: #e2e8f0; color: #0f172a; border: none; border-radius: 8px; font-size: 0.9rem; font-weight: 600; cursor: pointer; }
-        .btn-suggest:hover { background: #cbd5e1; }
         .badge-youth { display: inline-block; margin-left: 0.35rem; padding: 0.1rem 0.45rem; border-radius: 999px; background: #fef3c7; color: #92400e; font-size: 0.7rem; font-weight: 700; }
         .badge-sent { display: inline-block; margin-left: 0.35rem; padding: 0.1rem 0.45rem; border-radius: 999px; background: #d1fae5; color: #065f46; font-size: 0.7rem; font-weight: 700; }
         .campaign-field { margin-bottom: 1rem; }
@@ -409,7 +421,16 @@ require_once __DIR__ . '/db.php';
         .form-actions { display: flex; justify-content: flex-end; gap: 1rem; margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid var(--border-color); }
         .btn-cancel { padding: 0.75rem 1.5rem; background: #6c757d; color: #fff; border: none; border-radius: 8px; font-size: 0.95rem; cursor: pointer; transition: all 0.2s ease; }
         .btn-cancel:hover { background: #5a6268; }
-        @media (max-width: 768px) { .sidebar { width: 320px; transform: translateX(-100%); transition: transform 0.3s ease; } .sidebar.mobile-open { transform: translateX(0); } .sidebar.collapsed { width: 80px; transform: translateX(0); } .main-wrapper { margin-left: 0; } body.sidebar-collapsed .main-wrapper { margin-left: 80px; } .modal-content { width: 95%; margin: 10% auto; padding: 1.5rem; } }
+        @media (max-width: 768px) {
+            .sidebar { width: 320px; transform: translateX(-100%); transition: transform 0.3s ease; }
+            .sidebar.mobile-open { transform: translateX(0); }
+            .sidebar.collapsed { width: 80px; transform: translateX(0); }
+            .main-wrapper { margin-left: 0; }
+            body.sidebar-collapsed .main-wrapper { margin-left: 80px; }
+            .modal-content { width: 95%; margin: 10% auto; padding: 1.5rem; }
+            .logs-toolbar { flex-direction: column; align-items: stretch; }
+            .btn-campaign, .btn-cancel { width: 100%; justify-content: center; }
+        }
     </style>
     <link rel="stylesheet" href="css/mobile-responsive.css">
 </head>
@@ -571,12 +592,11 @@ require_once __DIR__ . '/db.php';
         </header>
         <main class="content-area">
             <div class="page-content">
-                <div class="search-box">
-                    <input type="text" id="searchInput" placeholder="Search patrol logs by date, BPSO personnel, or incident..." onkeyup="filterLogs()">
-                </div>
                 <div class="logs-toolbar">
-                    <button type="button" class="btn-campaign campaign-enter-only" id="btnEnterCampaignSelect" onclick="enterCampaignSelectMode()">Select for Campaign</button>
-                    <button type="button" class="btn-suggest campaign-select-only" onclick="selectYouthSuggested()">Select youth / curfew suggested</button>
+                    <div class="search-box">
+                        <input type="text" id="searchInput" placeholder="Search patrol logs by date, BPSO personnel, or incident..." onkeyup="filterLogs()">
+                    </div>
+                    <button type="button" class="btn-campaign campaign-enter-only" id="btnEnterCampaignSelect" onclick="enterCampaignSelectMode()">Send to Campaign</button>
                     <button type="button" class="btn-campaign campaign-select-only" id="btnOpenCampaignForward" onclick="openCampaignForwardModal()" disabled>Send to Campaign</button>
                     <button type="button" class="btn-cancel campaign-select-only" onclick="exitCampaignSelectMode()">Cancel</button>
                 </div>
@@ -797,29 +817,6 @@ require_once __DIR__ . '/db.php';
             return Array.from(document.querySelectorAll('.log-select:checked:not(:disabled)'))
                 .map(function(cb) { return Number(cb.value); })
                 .filter(function(id) { return id > 0; });
-        }
-
-        function selectYouthSuggested() {
-            if (!campaignSelectMode) {
-                enterCampaignSelectMode();
-            }
-            let count = 0;
-            document.querySelectorAll('.log-select').forEach(function(cb) {
-                const log = patrolLogData[cb.value];
-                if (!log || cb.disabled) {
-                    cb.checked = false;
-                    return;
-                }
-                const suggest = looksYouthRelated(log) || inCurfewWindow(log.time);
-                cb.checked = suggest;
-                if (suggest) count += 1;
-            });
-            const master = document.getElementById('selectAllLogs');
-            if (master) master.checked = false;
-            updateCampaignButtonState();
-            if (count === 0) {
-                alert('No youth/curfew-related patrol reports found. Select reports manually, or ensure incidents/details mention youth, loitering, or curfew.');
-            }
         }
 
         async function loadPatrolLogs() {
