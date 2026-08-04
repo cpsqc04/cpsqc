@@ -362,7 +362,6 @@ require_once __DIR__ . '/db.php';
         .btn-campaign:disabled { opacity: 0.55; cursor: not-allowed; }
         .btn-suggest { padding: 0.55rem 1rem; background: #e2e8f0; color: #0f172a; border: none; border-radius: 8px; font-size: 0.9rem; font-weight: 600; cursor: pointer; }
         .btn-suggest:hover { background: #cbd5e1; }
-        .youth-hint { font-size: 0.85rem; color: var(--text-secondary); }
         .badge-youth { display: inline-block; margin-left: 0.35rem; padding: 0.1rem 0.45rem; border-radius: 999px; background: #fef3c7; color: #92400e; font-size: 0.7rem; font-weight: 700; }
         .badge-sent { display: inline-block; margin-left: 0.35rem; padding: 0.1rem 0.45rem; border-radius: 999px; background: #d1fae5; color: #065f46; font-size: 0.7rem; font-weight: 700; }
         .campaign-field { margin-bottom: 1rem; }
@@ -374,7 +373,11 @@ require_once __DIR__ . '/db.php';
         .theme-checks { display: flex; flex-wrap: wrap; gap: 0.75rem 1.25rem; }
         .theme-checks label { font-weight: 500; display: flex; align-items: center; gap: 0.4rem; }
         .selected-report-list { max-height: 160px; overflow: auto; border: 1px solid var(--border-color); border-radius: 8px; padding: 0.75rem; background: #f8fafc; font-size: 0.9rem; }
-        #logsTable th:first-child, #logsTable td:first-child { width: 42px; text-align: center; }
+        #logsTable th.col-select, #logsTable td.col-select { width: 42px; text-align: center; }
+        body:not(.campaign-select-mode) #logsTable .col-select { display: none; }
+        body:not(.campaign-select-mode) .campaign-select-only { display: none !important; }
+        body.campaign-select-mode .campaign-enter-only { display: none !important; }
+        body.campaign-select-mode #logsTable tbody tr:not(.empty-row):hover { background: #f0fdfa; }
         .log-photo {
             max-width: 280px;
             max-height: 200px;
@@ -572,15 +575,16 @@ require_once __DIR__ . '/db.php';
                     <input type="text" id="searchInput" placeholder="Search patrol logs by date, BPSO personnel, or incident..." onkeyup="filterLogs()">
                 </div>
                 <div class="logs-toolbar">
-                    <button type="button" class="btn-suggest" onclick="selectYouthSuggested()">Select youth / curfew suggested</button>
-                    <button type="button" class="btn-campaign" id="btnOpenCampaignForward" onclick="openCampaignForwardModal()" disabled>Send to Campaign</button>
-                    <span class="youth-hint">Link night patrol youth/loitering reports + curfew ordinance → Campaign creates youth / sports / cultural programs.</span>
+                    <button type="button" class="btn-campaign campaign-enter-only" id="btnEnterCampaignSelect" onclick="enterCampaignSelectMode()">Select for Campaign</button>
+                    <button type="button" class="btn-suggest campaign-select-only" onclick="selectYouthSuggested()">Select youth / curfew suggested</button>
+                    <button type="button" class="btn-campaign campaign-select-only" id="btnOpenCampaignForward" onclick="openCampaignForwardModal()" disabled>Send to Campaign</button>
+                    <button type="button" class="btn-cancel campaign-select-only" onclick="exitCampaignSelectMode()">Cancel</button>
                 </div>
                 <div class="table-container">
                     <table id="logsTable">
                         <thead>
                             <tr>
-                                <th><input type="checkbox" id="selectAllLogs" title="Select all" onchange="toggleSelectAll(this)"></th>
+                                <th class="col-select"><input type="checkbox" id="selectAllLogs" title="Select all" onchange="toggleSelectAll(this)"></th>
                                 <th>Date & Time</th>
                                 <th>BPSO Personnel</th>
                                 <th>Route</th>
@@ -590,7 +594,7 @@ require_once __DIR__ . '/db.php';
                             </tr>
                         </thead>
                         <tbody id="logsTableBody">
-                            <tr><td colspan="7" style="text-align:center;padding:2rem;color:#666;">Loading patrol logs...</td></tr>
+                            <tr class="empty-row"><td colspan="7" style="text-align:center;padding:2rem;color:#666;">Loading patrol logs...</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -609,7 +613,6 @@ require_once __DIR__ . '/db.php';
                 <!-- Content will be populated by JavaScript -->
             </div>
             <div class="form-actions">
-                <button type="button" class="btn-campaign" id="btnViewSendCampaign" onclick="forwardSingleFromView()">Send to Campaign</button>
                 <button type="button" class="btn-cancel" onclick="closeViewLogModal()">Close</button>
             </div>
         </div>
@@ -718,7 +721,7 @@ require_once __DIR__ . '/db.php';
         // Patrol log data loaded from database
         let patrolLogData = {};
         let pendingCampaignIds = [];
-        let viewingLogId = null;
+        let campaignSelectMode = false;
 
         function statusClass(status) {
             if (status === 'Completed') return 'status-completed';
@@ -757,11 +760,29 @@ require_once __DIR__ . '/db.php';
             return total >= (22 * 60) || total < (8 * 60);
         }
 
+        function enterCampaignSelectMode() {
+            campaignSelectMode = true;
+            document.body.classList.add('campaign-select-mode');
+            const master = document.getElementById('selectAllLogs');
+            if (master) master.checked = false;
+            document.querySelectorAll('.log-select').forEach(function(cb) { cb.checked = false; });
+            updateCampaignButtonState();
+        }
+
+        function exitCampaignSelectMode() {
+            campaignSelectMode = false;
+            document.body.classList.remove('campaign-select-mode');
+            const master = document.getElementById('selectAllLogs');
+            if (master) master.checked = false;
+            document.querySelectorAll('.log-select').forEach(function(cb) { cb.checked = false; });
+            updateCampaignButtonState();
+        }
+
         function updateCampaignButtonState() {
             const checked = document.querySelectorAll('.log-select:checked:not(:disabled)');
             const btn = document.getElementById('btnOpenCampaignForward');
             if (btn) {
-                btn.disabled = checked.length === 0;
+                btn.disabled = !campaignSelectMode || checked.length === 0;
             }
         }
 
@@ -779,6 +800,9 @@ require_once __DIR__ . '/db.php';
         }
 
         function selectYouthSuggested() {
+            if (!campaignSelectMode) {
+                enterCampaignSelectMode();
+            }
             let count = 0;
             document.querySelectorAll('.log-select').forEach(function(cb) {
                 const log = patrolLogData[cb.value];
@@ -805,7 +829,7 @@ require_once __DIR__ . '/db.php';
                 const result = await response.json();
 
                 if (!result.success) {
-                    tableBody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:2rem;color:#666;">Failed to load patrol logs.</td></tr>';
+                    tableBody.innerHTML = '<tr class="empty-row"><td colspan="7" style="text-align:center;padding:2rem;color:#666;">Failed to load patrol logs.</td></tr>';
                     return;
                 }
 
@@ -813,7 +837,7 @@ require_once __DIR__ . '/db.php';
                 const rows = result.data || [];
 
                 if (rows.length === 0) {
-                    tableBody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:2rem;color:#666;">No patrol logs yet.</td></tr>';
+                    tableBody.innerHTML = '<tr class="empty-row"><td colspan="7" style="text-align:center;padding:2rem;color:#666;">No patrol logs yet.</td></tr>';
                     updateCampaignButtonState();
                     return;
                 }
@@ -840,7 +864,7 @@ require_once __DIR__ . '/db.php';
                         + (alreadySent ? '<span class="badge-sent">Sent to Campaign</span>' : '');
                     const disabledAttr = alreadySent ? ' disabled' : '';
                     return `<tr data-log-id="${row.id}">
-                        <td><input type="checkbox" class="log-select" value="${row.id}" onchange="updateCampaignButtonState()"${disabledAttr}></td>
+                        <td class="col-select"><input type="checkbox" class="log-select" value="${row.id}" onchange="updateCampaignButtonState()"${disabledAttr}></td>
                         <td>${escapeHtml(dateTime)}${badges}</td>
                         <td>${escapeHtml(row.personnel_name)}</td>
                         <td>${escapeHtml(row.route)}</td>
@@ -857,7 +881,7 @@ require_once __DIR__ . '/db.php';
                 updateCampaignButtonState();
             } catch (e) {
                 console.error('Error loading patrol logs:', e);
-                tableBody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:2rem;color:#666;">Error loading patrol logs.</td></tr>';
+                tableBody.innerHTML = '<tr class="empty-row"><td colspan="7" style="text-align:center;padding:2rem;color:#666;">Error loading patrol logs.</td></tr>';
             }
         }
 
@@ -920,7 +944,6 @@ require_once __DIR__ . '/db.php';
                 return;
             }
 
-            viewingLogId = id;
             const statusClassName = statusClass(log.status);
             const sentNote = log.campaign_forwarded_at
                 ? `<p><strong>Campaign:</strong> Sent ${escapeHtml(new Date(log.campaign_forwarded_at).toLocaleString())}${log.campaign_reference_id ? ' — Ref: ' + escapeHtml(log.campaign_reference_id) : ''}</p>`
@@ -948,30 +971,11 @@ require_once __DIR__ . '/db.php';
             `;
 
             document.getElementById('viewLogContent').innerHTML = content;
-            const sendBtn = document.getElementById('btnViewSendCampaign');
-            if (sendBtn) {
-                sendBtn.disabled = !!log.campaign_forwarded_at;
-                sendBtn.textContent = log.campaign_forwarded_at ? 'Already Sent' : 'Send to Campaign';
-            }
             document.getElementById('viewLogModal').style.display = 'block';
         }
 
         function closeViewLogModal() {
             document.getElementById('viewLogModal').style.display = 'none';
-            viewingLogId = null;
-        }
-
-        function forwardSingleFromView() {
-            if (!viewingLogId) return;
-            const log = patrolLogData[viewingLogId];
-            if (!log) return;
-            if (log.campaign_forwarded_at) {
-                alert('This report was already forwarded to Campaign.');
-                return;
-            }
-            pendingCampaignIds = [Number(viewingLogId)];
-            closeViewLogModal();
-            openCampaignForwardModal(pendingCampaignIds);
         }
 
         async function loadBulletinOptions() {
@@ -1077,6 +1081,7 @@ require_once __DIR__ . '/db.php';
                 const ref = result.data && result.data.campaign_reference_id ? ('\nReference: ' + result.data.campaign_reference_id) : '';
                 alert((result.message || 'Forwarded to Campaign.') + ref);
                 closeCampaignForwardModal();
+                exitCampaignSelectMode();
                 await loadPatrolLogs();
             } catch (e) {
                 console.error(e);
