@@ -380,29 +380,111 @@ require_once __DIR__ . '/db.php';
         .btn-save:hover { background: #4ca8a6; }
         .status-in-progress { background: #cfe2ff; color: #084298; }
         .status-completed { background: #d1e7dd; color: #0f5132; }
-        .risk-alerts-panel { margin-bottom: 1.5rem; padding: 1.25rem 1.5rem; border: 1px solid var(--border-color); border-radius: 12px; background: #fff; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04); }
-        .risk-alerts-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; margin-bottom: 1rem; flex-wrap: wrap; }
-        .risk-alerts-header h3 { margin: 0 0 0.25rem 0; color: var(--tertiary-color); font-size: 1.15rem; }
-        .risk-alerts-subtitle { color: var(--text-secondary); font-size: 0.9rem; }
-        .risk-alerts-refresh { padding: 0.45rem 0.85rem; background: transparent; border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-color); cursor: pointer; font-size: 0.85rem; }
+        .schedule-toolbar { display: flex; gap: 0.75rem; margin-bottom: 1.5rem; align-items: center; flex-wrap: wrap; }
+        .schedule-toolbar .search-box { flex: 1; min-width: 220px; }
+        .btn-high-risk {
+            padding: 0.75rem 1.15rem;
+            background: #fff;
+            color: #b91c1c;
+            border: 1px solid #fecaca;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+        .btn-high-risk:hover { background: #fef2f2; }
+        .btn-high-risk .count-badge {
+            background: #dc2626;
+            color: #fff;
+            border-radius: 999px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            min-width: 1.4rem;
+            padding: 0.1rem 0.45rem;
+            text-align: center;
+            line-height: 1.2;
+        }
+        .btn-back-schedule {
+            width: 2.5rem;
+            height: 2.5rem;
+            padding: 0;
+            background: #fff;
+            color: var(--primary-color);
+            border: 1.5px solid var(--primary-color);
+            border-radius: 8px;
+            font-size: 1rem;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            box-shadow: 0 1px 2px rgba(76, 138, 137, 0.12);
+            transition: background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+        }
+        .btn-back-schedule i { font-size: 0.95rem; }
+        .btn-back-schedule:hover {
+            background: var(--primary-color);
+            color: #fff;
+            box-shadow: 0 4px 10px rgba(76, 138, 137, 0.28);
+            transform: translateY(-1px);
+        }
+        .btn-back-schedule:active { transform: translateY(0); }
+        .section-heading { margin: 0 0 1rem 0; color: var(--tertiary-color); font-size: 1.25rem; }
+        .filter-tabs { display: flex; gap: 0.5rem; margin-bottom: 1.25rem; flex-wrap: wrap; align-items: center; }
+        .filter-tab {
+            padding: 0.5rem 1rem;
+            border: 1px solid var(--border-color);
+            border-radius: 999px;
+            background: #fff;
+            color: var(--text-color);
+            font: inherit;
+            font-size: 0.85rem;
+            cursor: pointer;
+        }
+        .filter-tab.active { background: var(--primary-color); color: #fff; border-color: var(--primary-color); }
+        .risk-panel-actions { margin-left: auto; display: flex; gap: 0.5rem; flex-wrap: wrap; }
+        .risk-alerts-refresh {
+            padding: 0.5rem 0.9rem;
+            background: transparent;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            color: var(--text-color);
+            cursor: pointer;
+            font-size: 0.85rem;
+        }
         .risk-alerts-refresh:hover { background: #f5f5f5; }
-        .risk-alerts-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1rem; }
-        .risk-alert-card { border: 1px solid var(--border-color); border-radius: 10px; padding: 1rem; background: #fafafa; display: flex; flex-direction: column; gap: 0.65rem; }
-        .risk-alert-card-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 0.75rem; }
-        .risk-alert-title { font-weight: 600; color: var(--tertiary-color); font-size: 0.98rem; margin: 0; }
-        .risk-alert-type { color: var(--text-secondary); font-size: 0.82rem; }
-        .risk-alert-location { color: var(--text-color); font-size: 0.92rem; line-height: 1.45; }
-        .risk-alert-condition { color: var(--text-secondary); font-size: 0.85rem; font-style: italic; }
-        .risk-alert-meta { color: var(--text-secondary); font-size: 0.8rem; }
-        .severity-badge { padding: 0.2rem 0.55rem; border-radius: 999px; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.03em; white-space: nowrap; }
+        .risk-alerts-empty {
+            padding: 1.25rem;
+            text-align: center;
+            color: var(--text-secondary);
+            background: #f9fafb;
+            border-radius: 8px;
+            border: 1px dashed var(--border-color);
+        }
+        .severity-badge { padding: 0.2rem 0.55rem; border-radius: 999px; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.03em; white-space: nowrap; display: inline-block; }
         .severity-critical { background: #fee2e2; color: #b91c1c; }
         .severity-high { background: #ffedd5; color: #c2410c; }
         .severity-medium { background: #fef3c7; color: #a16207; }
         .severity-low { background: #e5e7eb; color: #4b5563; }
-        .btn-assign-hotspot { margin-top: auto; padding: 0.55rem 0.9rem; background: var(--primary-color); color: #fff; border: none; border-radius: 6px; font-size: 0.85rem; font-weight: 600; cursor: pointer; transition: all 0.2s ease; }
+        .btn-assign-hotspot {
+            padding: 0.45rem 0.8rem;
+            background: var(--primary-color);
+            color: #fff;
+            border: none;
+            border-radius: 6px;
+            font-size: 0.82rem;
+            font-weight: 600;
+            cursor: pointer;
+            white-space: nowrap;
+        }
         .btn-assign-hotspot:hover { background: #4ca8a6; }
-        .risk-alerts-empty { padding: 1.25rem; text-align: center; color: var(--text-secondary); background: #f9fafb; border-radius: 8px; border: 1px dashed var(--border-color); }
-        @media (max-width: 768px) { .sidebar { width: 320px; transform: translateX(-100%); transition: transform 0.3s ease; } .sidebar.mobile-open { transform: translateX(0); } .sidebar.collapsed { width: 80px; transform: translateX(0); } .main-wrapper { margin-left: 0; } body.sidebar-collapsed .main-wrapper { margin-left: 80px; } .modal-content { width: 95%; margin: 10% auto; padding: 1.5rem; } .search-container { flex-direction: column; } .btn-add { width: 100%; justify-content: center; } }
+        .risk-condition { color: var(--text-secondary); font-size: 0.85rem; font-style: italic; }
+        @media (max-width: 768px) { .sidebar { width: 320px; transform: translateX(-100%); transition: transform 0.3s ease; } .sidebar.mobile-open { transform: translateX(0); } .sidebar.collapsed { width: 80px; transform: translateX(0); } .main-wrapper { margin-left: 0; } body.sidebar-collapsed .main-wrapper { margin-left: 80px; } .modal-content { width: 95%; margin: 10% auto; padding: 1.5rem; } .schedule-toolbar { flex-direction: column; align-items: stretch; } .btn-add, .btn-high-risk { width: 100%; justify-content: center; } .risk-panel-actions { margin-left: 0; width: 100%; } }
     </style>
     <link rel="stylesheet" href="css/mobile-responsive.css">
 </head>
@@ -564,46 +646,81 @@ require_once __DIR__ . '/db.php';
         </header>
         <main class="content-area">
             <div class="page-content">
-                <div class="risk-alerts-panel" id="riskAlertsPanel">
-                    <div class="risk-alerts-header">
-                        <div>
-                            <h3><i class="fas fa-exclamation-triangle" style="color:#dc2626;margin-right:0.4rem;"></i>High-Risk Areas</h3>
+                <!-- Default: Patrol Schedule -->
+                <div id="scheduleSection">
+                    <div class="schedule-toolbar">
+                        <div class="search-box">
+                            <input type="text" id="searchInput" placeholder="Search by personnel, patrol zone, shift, status, or date..." onkeyup="filterPatrols()">
                         </div>
-                        <button type="button" class="risk-alerts-refresh" onclick="loadRiskAlerts()">
-                            <i class="fas fa-sync-alt"></i> Refresh
+                        <button type="button" class="btn-high-risk" id="btnOpenHighRisk" onclick="showHighRiskSection()">
+                            <i class="fas fa-exclamation-triangle"></i>
+                            High-Risk Areas
+                            <span class="count-badge" id="highRiskCountBadge" hidden>0</span>
+                        </button>
+                        <button type="button" class="btn-add" onclick="openAssignPatrolModal()" style="white-space: nowrap;">
+                            <i class="fas fa-plus"></i> Assign Patrol
                         </button>
                     </div>
-                    <div id="riskAlertsList">
-                        <div class="risk-alerts-empty">Loading high-risk alerts...</div>
+                    <div class="table-container">
+                        <table id="patrolsTable">
+                            <thead>
+                                <tr>
+                                    <th>BPSO Personnel</th>
+                                    <th>Shift</th>
+                                    <th>Patrol Zone</th>
+                                    <th>Date</th>
+                                    <th>Patrol Start</th>
+                                    <th>Patrol End</th>
+                                    <th>Duration</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="patrolsTableBody">
+                                <tr><td colspan="9" style="text-align:center;padding:2rem;color:#666;">Loading patrol schedules...</td></tr>
+                            </tbody>
+                        </table>
                     </div>
                 </div>
-                <div class="search-container">
-                    <div class="search-box">
-                        <input type="text" id="searchInput" placeholder="Search by personnel, patrol zone, shift, status, or date..." onkeyup="filterPatrols()">
+
+                <!-- High-Risk Areas table view (My Schedule style) -->
+                <div id="highRiskSection" hidden>
+                    <div style="display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap;margin-bottom:0.75rem;">
+                        <button type="button" class="btn-back-schedule" onclick="showScheduleSection()" title="Back to Schedule" aria-label="Back to Schedule">
+                            <i class="fas fa-arrow-left"></i>
+                        </button>
+                        <h2 class="section-heading" style="margin:0;">High-Risk Areas</h2>
                     </div>
-                    <button type="button" class="btn-add" onclick="openAssignPatrolModal()" style="white-space: nowrap;">
-                        <i class="fas fa-plus"></i> Assign Patrol
-                    </button>
-                </div>
-                <div class="table-container">
-                    <table id="patrolsTable">
-                        <thead>
-                            <tr>
-                                <th>BPSO Personnel</th>
-                                <th>Shift</th>
-                                <th>Patrol Zone</th>
-                                <th>Date</th>
-                                <th>Patrol Start</th>
-                                <th>Patrol End</th>
-                                <th>Duration</th>
-                                <th>Status</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody id="patrolsTableBody">
-                            <tr><td colspan="9" style="text-align:center;padding:2rem;color:#666;">Loading patrol schedules...</td></tr>
-                        </tbody>
-                    </table>
+                    <div class="filter-tabs" id="riskFilterTabs">
+                        <button type="button" class="filter-tab active" data-filter="all" onclick="setRiskFilter('all', this)">All</button>
+                        <button type="button" class="filter-tab" data-filter="critical" onclick="setRiskFilter('critical', this)">Critical</button>
+                        <button type="button" class="filter-tab" data-filter="high" onclick="setRiskFilter('high', this)">High</button>
+                        <button type="button" class="filter-tab" data-filter="medium" onclick="setRiskFilter('medium', this)">Medium</button>
+                        <div class="risk-panel-actions">
+                            <button type="button" class="risk-alerts-refresh" onclick="loadRiskAlerts()">
+                                <i class="fas fa-sync-alt"></i> Refresh
+                            </button>
+                        </div>
+                    </div>
+                    <div id="riskAlertsEmpty" class="risk-alerts-empty" hidden>Loading high-risk alerts...</div>
+                    <div class="table-container" id="riskAlertsTableWrap">
+                        <table id="riskAlertsTable">
+                            <thead>
+                                <tr>
+                                    <th>Severity</th>
+                                    <th>Area</th>
+                                    <th>Alert</th>
+                                    <th>Type</th>
+                                    <th>Incidents</th>
+                                    <th>Triggered</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="riskAlertsTableBody">
+                                <tr><td colspan="7" style="text-align:center;padding:2rem;color:#666;">Loading high-risk alerts...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </main>
@@ -739,6 +856,38 @@ require_once __DIR__ . '/db.php';
         // Patrol schedule data from database
         let patrolData = {};
         let riskAlertData = {};
+        let riskAlertRows = [];
+        let riskFilter = 'all';
+
+        function showScheduleSection() {
+            document.getElementById('scheduleSection').hidden = false;
+            document.getElementById('highRiskSection').hidden = true;
+        }
+
+        function showHighRiskSection() {
+            document.getElementById('scheduleSection').hidden = true;
+            document.getElementById('highRiskSection').hidden = false;
+            renderRiskAlertsTable();
+        }
+
+        function setRiskFilter(filter, btn) {
+            riskFilter = filter || 'all';
+            document.querySelectorAll('#riskFilterTabs .filter-tab').forEach(tab => {
+                tab.classList.toggle('active', tab === btn);
+            });
+            renderRiskAlertsTable();
+        }
+
+        function updateHighRiskBadge(count) {
+            const badge = document.getElementById('highRiskCountBadge');
+            if (!badge) return;
+            if (count > 0) {
+                badge.textContent = String(count);
+                badge.hidden = false;
+            } else {
+                badge.hidden = true;
+            }
+        }
 
         function severityBadgeClass(severity) {
             const level = String(severity || '').toUpperCase();
@@ -768,62 +917,111 @@ require_once __DIR__ . '/db.php';
             return parts.join('\n');
         }
 
+        function setRiskAlertsEmpty(message, showEmpty) {
+            const emptyEl = document.getElementById('riskAlertsEmpty');
+            const tableWrap = document.getElementById('riskAlertsTableWrap');
+            const tbody = document.getElementById('riskAlertsTableBody');
+            if (showEmpty) {
+                emptyEl.textContent = message;
+                emptyEl.hidden = false;
+                tableWrap.hidden = true;
+                tbody.innerHTML = '';
+            } else {
+                emptyEl.hidden = true;
+                tableWrap.hidden = false;
+            }
+        }
+
+        function renderRiskAlertsTable() {
+            const tbody = document.getElementById('riskAlertsTableBody');
+            const filtered = riskAlertRows.filter(row => {
+                if (riskFilter === 'all') return true;
+                return String(row.severity || '').toLowerCase() === riskFilter;
+            });
+
+            if (riskAlertRows.length === 0) {
+                return;
+            }
+
+            if (filtered.length === 0) {
+                setRiskAlertsEmpty('No alerts match this severity filter.', true);
+                return;
+            }
+
+            setRiskAlertsEmpty('', false);
+            tbody.innerHTML = filtered.map(row => {
+                const severity = String(row.severity || 'MEDIUM').toUpperCase();
+                const area = row.area_name || row.location || '—';
+                const incidents = row.incident_count
+                    ? `${escapeHtml(String(row.incident_count))}${row.time_window ? ' · ' + escapeHtml(row.time_window) : ''}`
+                    : (row.time_window ? escapeHtml(row.time_window) : '—');
+                return `<tr>
+                    <td><span class="severity-badge ${severityBadgeClass(severity)}">${escapeHtml(severity)}</span></td>
+                    <td>${escapeHtml(area)}</td>
+                    <td>
+                        <div>${escapeHtml(row.rule_name || 'Alert')}</div>
+                        ${row.condition_text ? `<div class="risk-condition">${escapeHtml(row.condition_text)}</div>` : ''}
+                    </td>
+                    <td>${escapeHtml(row.rule_type || '—')}</td>
+                    <td>${incidents}</td>
+                    <td>${escapeHtml(formatAlertTime(row.triggered_at))}</td>
+                    <td>
+                        <button type="button" class="btn-assign-hotspot" data-alert-id="${escapeHtml(row.alert_id)}">
+                            <i class="fas fa-walking"></i> Assign Patrol
+                        </button>
+                    </td>
+                </tr>`;
+            }).join('');
+
+            tbody.querySelectorAll('.btn-assign-hotspot').forEach(btn => {
+                btn.addEventListener('click', () => assignPatrolFromHotspot(btn.dataset.alertId));
+            });
+        }
+
         async function loadRiskAlerts() {
-            const listEl = document.getElementById('riskAlertsList');
+            const emptyEl = document.getElementById('riskAlertsEmpty');
+            const tbody = document.getElementById('riskAlertsTableBody');
             try {
+                emptyEl.hidden = true;
+                document.getElementById('riskAlertsTableWrap').hidden = false;
+                tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:2rem;color:#666;">Loading high-risk alerts...</td></tr>';
+
                 const response = await fetch('api/risk_alerts.php?status=active');
                 const result = await response.json();
 
                 if (!result.success) {
-                    listEl.innerHTML = `<div class="risk-alerts-empty">${escapeHtml(result.message || 'Unable to load high-risk alerts.')}</div>`;
+                    riskAlertRows = [];
+                    riskAlertData = {};
+                    updateHighRiskBadge(0);
+                    setRiskAlertsEmpty(result.message || 'Unable to load high-risk alerts.', true);
                     return;
                 }
 
                 riskAlertData = {};
-                const rows = result.data || [];
+                riskAlertRows = result.data || [];
                 const sync = result.sync || null;
 
-                if (rows.length === 0) {
+                riskAlertRows.forEach(row => {
+                    if (row.alert_id) riskAlertData[row.alert_id] = row;
+                });
+                updateHighRiskBadge(riskAlertRows.length);
+
+                if (riskAlertRows.length === 0) {
                     let emptyMsg = 'No active high-risk alerts right now.';
                     if (sync && sync.success === false) {
                         emptyMsg = 'Could not sync Crime Analytics alerts: ' + (sync.message || 'Unknown error');
                     }
-                    listEl.innerHTML = `<div class="risk-alerts-empty">${escapeHtml(emptyMsg)}</div>`;
+                    setRiskAlertsEmpty(emptyMsg, true);
                     return;
                 }
 
-                listEl.innerHTML = `<div class="risk-alerts-grid">${rows.map(row => {
-                    riskAlertData[row.alert_id] = row;
-                    const severity = String(row.severity || 'MEDIUM').toUpperCase();
-                    return `<div class="risk-alert-card">
-                        <div class="risk-alert-card-top">
-                            <div>
-                                <p class="risk-alert-title">${escapeHtml(row.rule_name)}</p>
-                                <div class="risk-alert-type">${escapeHtml(row.rule_type || 'Alert')}</div>
-                            </div>
-                            <span class="severity-badge ${severityBadgeClass(severity)}">${escapeHtml(severity)}</span>
-                        </div>
-                        <div class="risk-alert-location"><strong>Area:</strong> ${escapeHtml(row.area_name || row.location)}</div>
-                        ${row.condition_text ? `<div class="risk-alert-condition">${escapeHtml(row.condition_text)}</div>` : ''}
-                        <div class="risk-alert-meta">
-                            ${row.incident_count ? `${escapeHtml(String(row.incident_count))} incident(s)` : ''}
-                            ${row.incident_count && row.time_window ? ' · ' : ''}
-                            ${row.time_window ? escapeHtml(row.time_window) : ''}
-                            ${(row.incident_count || row.time_window) ? '<br>' : ''}
-                            Triggered: ${escapeHtml(formatAlertTime(row.triggered_at))}
-                        </div>
-                        <button type="button" class="btn-assign-hotspot" data-alert-id="${escapeHtml(row.alert_id)}">
-                            <i class="fas fa-walking"></i> Assign Patrol Here
-                        </button>
-                    </div>`;
-                }).join('')}</div>`;
-
-                listEl.querySelectorAll('.btn-assign-hotspot').forEach(btn => {
-                    btn.addEventListener('click', () => assignPatrolFromHotspot(btn.dataset.alertId));
-                });
+                renderRiskAlertsTable();
             } catch (e) {
                 console.error('Error loading risk alerts:', e);
-                listEl.innerHTML = '<div class="risk-alerts-empty">Error loading high-risk alerts.</div>';
+                riskAlertRows = [];
+                riskAlertData = {};
+                updateHighRiskBadge(0);
+                setRiskAlertsEmpty('Error loading high-risk alerts.', true);
             }
         }
 
