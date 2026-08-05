@@ -173,11 +173,21 @@ AlertaraQC **sends** tips to Incident Reporting when admin clicks send.
 | Trigger | Admin Review Tip → Send to Incident Reporting (`api/send_to_incident_reporting.php`) |
 | Local test receiver | `POST /api/tip_incident_receive.php` |
 
-Outbound fields include: Tip ID, Date & Time, Location, Tip Description, Attached Evidence (photo), Status, Outcome.
+Outbound fields include: Tip ID, Date & Time, Location, Tip Description, Status, Outcome, and photo evidence:
 
-Police backup uses **Emergency Response**:
+| Photo field | Notes |
+|-------------|-------|
+| `has_photo` | `true` when a tip photo exists |
+| `photo_data` | JPEG/PNG data URL (may be compressed) |
+| `photo_of_evidence` | Same photo (partner alias; primary for Emergency Response) |
+| `attached_evidence.photo_data` | Nested copy of the tip photo |
+
+Police backup / Inter-Agency uses **Emergency Response**:
 | Partner URL env | `EMERGENCY_RESPONSE_API_URL` (legacy: `GROUP3_API_URL`) |
 | API key | `EMERGENCY_RESPONSE_API_KEY` (legacy: `GROUP3_API_KEY`) |
+| Trigger | Admin Review Tip → Send to Inter-Agency (`api/send_to_emergency_response.php`) |
+
+Catalog URL for partners: `https://surveillance.alertaraqc.com/api/partner-api.php`
 
 ---
 

@@ -713,11 +713,19 @@ Forward a reviewed community tip to Incident Reporting.
 
 ### Payload AlertaraQC sends
 
+Tip photo evidence is included when the tip has an attached photo (compressed JPEG data URL when large).
+
 ```json
 {
   "source": "alertaraqc",
   "record_type": "tip",
   "source_tip_id": "TIP-2026-002",
+  "tip_id": "TIP-2026-002",
+  "date_time": "2026-07-09T20:59:59+08:00",
+  "location": "Heavenly Drive Brgy. San Agustin QC",
+  "tip_description": "nagririot mga kabataan",
+  "status": "Assigned",
+  "outcome": "No Outcome Yet",
   "incident": {
     "location": "Heavenly Drive Brgy. San Agustin QC",
     "description": "nagririot mga kabataan",
@@ -729,10 +737,18 @@ Forward a reviewed community tip to Incident Reporting.
     "anonymous": true
   },
   "has_photo": true,
+  "photo_data": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD...",
+  "photo_of_evidence": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD...",
+  "attached_evidence": {
+    "type": "photo",
+    "photo_data": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD...",
+    "available": true
+  },
   "metadata": {
     "internal_id": 1,
     "forwarded_by": "alertaraqc_bpso_admin",
-    "forwarded_at": "2026-07-10T00:00:00+08:00"
+    "forwarded_at": "2026-07-10T00:00:00+08:00",
+    "has_photo": true
   }
 }
 ```
@@ -744,6 +760,7 @@ Forward a reviewed community tip to Incident Reporting.
 | `source_tip_id` | Yes |
 | `incident.location` | Yes |
 | `incident.description` | Yes |
+| `has_photo` / `photo_data` / `photo_of_evidence` | No — present when tip has a photo |
 
 ### Expected partner response (HTTP 200)
 
@@ -838,15 +855,26 @@ Request police backup for a reviewed tip.
 
 ### Payload AlertaraQC sends
 
+Matches Emergency Response `anonymous_tip.php`-style fields. Tip photo is sent in `photo_of_evidence` (and aliases) when available.
+
 ```json
 {
+  "tip_id": "TIP-2026-002",
+  "tip_datetime": "2026-07-09 20:59:59",
+  "location": "Heavenly Drive Brgy. San Agustin QC",
+  "tip_description": "nagririot mga kabataan\n\n[Police backup] Youth riot reported; immediate police backup needed.",
+  "photo_of_evidence": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD...",
+  "photo_data": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD...",
+  "status": "Assigned",
+  "outcome": "No Outcome Yet",
+  "source_system": "alertaraqc",
   "source": "alertaraqc",
   "request_type": "police_backup",
   "source_tip_id": "TIP-2026-002",
   "requesting_agency": "BPSO - Quezon City",
   "incident": {
     "location": "Heavenly Drive Brgy. San Agustin QC",
-    "description": "nagririot mga kabataan",
+    "description": "nagririot mga kabataan\n\n[Police backup] Youth riot reported; immediate police backup needed.",
     "submitted_at": "2026-07-09T20:59:59+08:00"
   },
   "backup": {
@@ -858,10 +886,17 @@ Request police backup for a reviewed tip.
     "contact_number": null
   },
   "has_photo": true,
+  "attached_evidence": {
+    "type": "photo",
+    "photo_data": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD...",
+    "available": true
+  },
   "metadata": {
     "internal_id": 1,
     "forwarded_by": "alertaraqc_bpso_admin",
-    "forwarded_at": "2026-07-10T00:00:00+08:00"
+    "forwarded_at": "2026-07-10T00:00:00+08:00",
+    "police_backup": true,
+    "has_photo": true
   }
 }
 ```
@@ -870,9 +905,10 @@ Request police backup for a reviewed tip.
 
 | Field | Required |
 |-------|----------|
-| `source_tip_id` | Yes |
-| `incident.location` | Yes |
+| `tip_id` or `source_tip_id` | Yes |
+| `location` / `incident.location` | Yes |
 | `backup.reason` | Yes (falls back to tip description if not provided in UI) |
+| `photo_of_evidence` | No — included when tip has a photo |
 
 ### Expected partner response (HTTP 200)
 

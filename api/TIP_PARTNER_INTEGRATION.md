@@ -2,7 +2,7 @@
 
 > **See also:** [`API_INTEGRATION.md`](./API_INTEGRATION.md) for the complete partner API guide including Patrol Request (Campaign / Disaster Preparedness), CCTV Request, Tips, Digital Blotter, and Emergency Response coordination.
 
-AlertaraQC forwards BPSO-reviewed community tips to partner systems via HTTP JSON APIs.
+AlertaraQC forwards BPSO-reviewed community tips to partner systems via HTTP JSON APIs. **Tip photo evidence is included when available.**
 
 ## Outbound (AlertaraQC → Partner)
 
@@ -12,10 +12,21 @@ Configured in `.env`:
 |----------|-------|---------|
 | `INCIDENT_REPORTING_TIP_API_URL` | Incident Reporting | Tip incident logging endpoint (falls back to `INCIDENT_REPORTING_API_URL`) |
 | `INCIDENT_REPORTING_API_KEY` | Incident Reporting | Shared API key |
-| `EMERGENCY_RESPONSE_API_URL` | Emergency Response | Police backup / coordination endpoint |
+| `EMERGENCY_RESPONSE_API_URL` | Emergency Response | Police backup / Inter-Agency tip endpoint |
 | `EMERGENCY_RESPONSE_API_KEY` | Emergency Response | Shared API key |
 
-Admin triggers from **Review Tip** per-row actions: **Send to Incident Logging**, **Send to Inter-Agency**, or **Export**. Assign patrol separately via **Assign Patrol**.
+Admin triggers from **Review Tip**: **Send to Incident Logging**, **Send to Inter-Agency**, or **Export**. Assign patrol separately via **Assign Patrol**.
+
+Live catalog: `https://surveillance.alertaraqc.com/api/partner-api.php`
+
+### Photo fields (both partners)
+
+| Field | Description |
+|-------|-------------|
+| `has_photo` | `true` when the tip has an attached photo |
+| `photo_data` | `data:image/jpeg;base64,...` (may be compressed for size) |
+| `photo_of_evidence` | Same image — primary field for Emergency Response |
+| `attached_evidence.photo_data` | Nested copy of the tip photo |
 
 ### Local testing
 
@@ -44,6 +55,12 @@ EMERGENCY_RESPONSE_API_URL=http://localhost/cpsqc-main/api/coordination_receive.
   "source": "alertaraqc",
   "record_type": "tip",
   "source_tip_id": "TIP-2026-002",
+  "tip_id": "TIP-2026-002",
+  "date_time": "2026-07-09T20:59:59+08:00",
+  "location": "Heavenly Drive Brgy. San Agustin QC",
+  "tip_description": "nagririot mga kabataan",
+  "status": "Assigned",
+  "outcome": "No Outcome Yet",
   "incident": {
     "location": "Heavenly Drive Brgy. San Agustin QC",
     "description": "nagririot mga kabataan",
@@ -55,10 +72,18 @@ EMERGENCY_RESPONSE_API_URL=http://localhost/cpsqc-main/api/coordination_receive.
     "anonymous": true
   },
   "has_photo": true,
+  "photo_data": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD...",
+  "photo_of_evidence": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD...",
+  "attached_evidence": {
+    "type": "photo",
+    "photo_data": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD...",
+    "available": true
+  },
   "metadata": {
     "internal_id": 1,
     "forwarded_by": "alertaraqc_bpso_admin",
-    "forwarded_at": "2026-07-10T00:00:00+08:00"
+    "forwarded_at": "2026-07-10T00:00:00+08:00",
+    "has_photo": true
   }
 }
 ```
@@ -75,9 +100,10 @@ EMERGENCY_RESPONSE_API_URL=http://localhost/cpsqc-main/api/coordination_receive.
 
 ---
 
-## Emergency Response (Police Backup)
+## Emergency Response (Police Backup / Inter-Agency)
 
-**Reference receive endpoint:** `POST /api/coordination_receive.php`
+**Reference receive endpoint:** `POST /api/coordination_receive.php`  
+Production partner URL typically: `anonymous_tip.php` (`EMERGENCY_RESPONSE_API_URL`)
 
 **Headers:**
 - `Content-Type: application/json`
@@ -87,13 +113,22 @@ EMERGENCY_RESPONSE_API_URL=http://localhost/cpsqc-main/api/coordination_receive.
 
 ```json
 {
+  "tip_id": "TIP-2026-002",
+  "tip_datetime": "2026-07-09 20:59:59",
+  "location": "Heavenly Drive Brgy. San Agustin QC",
+  "tip_description": "nagririot mga kabataan\n\n[Police backup] Youth riot reported; immediate police backup needed.",
+  "photo_of_evidence": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD...",
+  "photo_data": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD...",
+  "status": "Assigned",
+  "outcome": "No Outcome Yet",
+  "source_system": "alertaraqc",
   "source": "alertaraqc",
   "request_type": "police_backup",
   "source_tip_id": "TIP-2026-002",
   "requesting_agency": "BPSO - Quezon City",
   "incident": {
     "location": "Heavenly Drive Brgy. San Agustin QC",
-    "description": "nagririot mga kabataan",
+    "description": "nagririot mga kabataan\n\n[Police backup] Youth riot reported; immediate police backup needed.",
     "submitted_at": "2026-07-09T20:59:59+08:00"
   },
   "backup": {
@@ -101,14 +136,18 @@ EMERGENCY_RESPONSE_API_URL=http://localhost/cpsqc-main/api/coordination_receive.
     "priority": "high",
     "units_requested": "patrol"
   },
-  "contact": {
-    "contact_number": null
-  },
   "has_photo": true,
+  "attached_evidence": {
+    "type": "photo",
+    "photo_data": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD...",
+    "available": true
+  },
   "metadata": {
     "internal_id": 1,
     "forwarded_by": "alertaraqc_bpso_admin",
-    "forwarded_at": "2026-07-10T00:00:00+08:00"
+    "forwarded_at": "2026-07-10T00:00:00+08:00",
+    "police_backup": true,
+    "has_photo": true
   }
 }
 ```
