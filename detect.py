@@ -161,10 +161,11 @@ IDLE_RECORD_EVERY_N = 5  # legacy; recording now uses wall-clock pacing at RECOR
 IDLE_CPU_SLEEP = 0.04  # Extra sleep per frame while idle (reduces PC load)
 MOTION_MEAN_DIFF_THRESHOLD = 12.0  # Mean abs grayscale frame-diff for "motion"
 MOTION_CHANGED_RATIO = 0.015  # Min share of pixels that changed
-# Stop detect.py when Open Surveillance stops sending heartbeats
+# Optional: stop detect.py when Open Surveillance stops sending heartbeats.
+# Disabled so continuous recording keeps running via start_detection / autostart.
 HEARTBEAT_FILE = "detection_heartbeat.json"
-IDLE_AUTO_STOP_SECONDS = 600  # Exit after 10 minutes without a viewer heartbeat
-IDLE_AUTO_STOP_ENABLED = True
+IDLE_AUTO_STOP_SECONDS = 600  # Used only when IDLE_AUTO_STOP_ENABLED is True
+IDLE_AUTO_STOP_ENABLED = False
 CONFIDENCE_THRESHOLD = 0.35
 PLANT_CONFIDENCE_THRESHOLD = 0.20  # Potted plants are often lower-confidence in YOLO
 PHONE_CONFIDENCE_THRESHOLD = 0.25  # Phones are small / often partially occluded
