@@ -41,6 +41,11 @@ if ($sourceTipId === '' || $location === '' || $description === '') {
     exit;
 }
 
+$hasPhoto = !empty($input['has_photo'])
+    || !empty($input['photo_data'])
+    || !empty($input['photo_of_evidence'])
+    || !empty($input['attached_evidence']['photo_data']);
+
 $referenceId = 'INC-' . date('Y') . '-' . strtoupper(substr(md5($sourceTipId . microtime(true)), 0, 6));
 
 echo json_encode([
@@ -55,5 +60,6 @@ echo json_encode([
         'location' => $location,
         'status' => trim($input['review']['status'] ?? ''),
         'outcome' => trim($input['review']['outcome'] ?? ''),
+        'has_photo' => $hasPhoto,
     ],
 ]);

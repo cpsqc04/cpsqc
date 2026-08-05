@@ -13,6 +13,7 @@
  */
 
 require_once __DIR__ . '/api_key_auth.php';
+require_once __DIR__ . '/tip_outbound_photo.php';
 
 function buildEmergencyResponseBackupPayload(array $tip, string $backupReason = ''): array
 {
@@ -50,12 +51,9 @@ function buildEmergencyResponseBackupPayload(array $tip, string $backupReason = 
         $tipDatetime = date('Y-m-d H:i:s');
     }
 
-    $hasPhoto = !empty($tip['photo_data']);
-    $photoData = $hasPhoto ? (string) $tip['photo_data'] : '';
-    if ($photoData !== '' && strlen($photoData) > 2_500_000) {
-        $photoData = '';
-        $hasPhoto = false;
-    }
+    $photo = prepareTipOutboundPhoto($tip['photo_data'] ?? null);
+    $hasPhoto = !empty($photo['has_photo']);
+    $photoData = $hasPhoto ? (string) $photo['photo_data'] : '';
 
     $tipId = trim((string) ($tip['tip_id'] ?? ''));
     $location = trim((string) ($tip['location'] ?? ''));
@@ -73,6 +71,7 @@ function buildEmergencyResponseBackupPayload(array $tip, string $backupReason = 
         'location' => $location,
         'tip_description' => $description,
         'photo_of_evidence' => $photoData,
+        'photo_data' => $photoData !== '' ? $photoData : null,
         'status' => $status,
         'outcome' => $outcome,
         'source_system' => 'alertaraqc',
@@ -100,11 +99,17 @@ function buildEmergencyResponseBackupPayload(array $tip, string $backupReason = 
             'contact_number' => $tip['contact_number'] ?? null,
         ],
         'has_photo' => $hasPhoto,
+        'attached_evidence' => [
+            'type' => $hasPhoto ? 'photo' : null,
+            'photo_data' => $photoData !== '' ? $photoData : null,
+            'available' => $hasPhoto,
+        ],
         'metadata' => [
             'internal_id' => (int) ($tip['id'] ?? 0),
             'forwarded_by' => 'alertaraqc_bpso_admin',
             'forwarded_at' => date('c'),
             'police_backup' => true,
+            'has_photo' => $hasPhoto,
         ],
     ];
 }
@@ -148,12 +153,14 @@ function forwardTipToEmergencyResponse(array $tip, string $backupReason = ''): a
         $headers[] = 'Authorization: Bearer ' . $config['api_key'];
     }
 
+    $timeout = max((int) $config['timeout'], !empty($tip['photo_data']) ? 90 : 30);
+
     $ch = curl_init($url);
     curl_setopt_array($ch, [
         CURLOPT_POST => true,
         CURLOPT_POSTFIELDS => $payload,
         CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_TIMEOUT => $config['timeout'],
+        CURLOPT_TIMEOUT => $timeout,
         CURLOPT_HTTPHEADER => $headers,
     ]);
 

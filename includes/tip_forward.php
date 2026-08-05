@@ -10,6 +10,7 @@
  */
 
 require_once __DIR__ . '/api_key_auth.php';
+require_once __DIR__ . '/tip_outbound_photo.php';
 
 function getTipBlotterApiConfig(): array
 {
@@ -33,12 +34,9 @@ function buildTipIncidentPayload(array $tip): array
         }
     }
 
-    $hasPhoto = !empty($tip['photo_data']);
-    $photoData = $hasPhoto ? (string) $tip['photo_data'] : null;
-    // Keep outbound payload reasonable for partners who only need a flag + optional data URL.
-    if ($photoData !== null && strlen($photoData) > 2_500_000) {
-        $photoData = null;
-    }
+    $photo = prepareTipOutboundPhoto($tip['photo_data'] ?? null);
+    $hasPhoto = !empty($photo['has_photo']);
+    $photoData = $hasPhoto ? (string) $photo['photo_data'] : null;
 
     return [
         'source' => 'alertaraqc',
@@ -61,6 +59,9 @@ function buildTipIncidentPayload(array $tip): array
             'assigned_to' => $tip['assigned_to'] ?? null,
         ],
         'has_photo' => $hasPhoto,
+        // Flat photo fields for partner mapping (Incident Reporting + Emergency Response)
+        'photo_data' => $photoData,
+        'photo_of_evidence' => $photoData ?? '',
         'attached_evidence' => [
             'type' => $hasPhoto ? 'photo' : null,
             'photo_data' => $photoData,
@@ -78,6 +79,7 @@ function buildTipIncidentPayload(array $tip): array
             'internal_id' => (int) ($tip['id'] ?? 0),
             'forwarded_by' => 'alertaraqc_bpso_admin',
             'forwarded_at' => date('c'),
+            'has_photo' => $hasPhoto,
         ],
     ];
 }
@@ -110,12 +112,15 @@ function forwardTipToIncidentReporting(array $tip): array
         $headers[] = 'Authorization: Bearer ' . $config['api_key'];
     }
 
+    // Photos enlarge the JSON body — allow more time than the default tip timeout.
+    $timeout = max((int) $config['timeout'], !empty($tip['photo_data']) ? 90 : 30);
+
     $ch = curl_init($config['url']);
     curl_setopt_array($ch, [
         CURLOPT_POST => true,
         CURLOPT_POSTFIELDS => $payload,
         CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_TIMEOUT => $config['timeout'],
+        CURLOPT_TIMEOUT => $timeout,
         CURLOPT_HTTPHEADER => $headers,
     ]);
 

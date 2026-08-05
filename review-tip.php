@@ -729,7 +729,11 @@ require_once __DIR__ . '/db.php';
                 <h2>Send to Inter-Agency</h2>
                 <span class="close" onclick="closeAgencyTipModal()">&times;</span>
             </div>
-            <p style="margin:0 0 1rem 0;color:var(--text-secondary);line-height:1.5;">Request police backup assistance. BPSO remains responsible for the final tip report.</p>
+            <p style="margin:0 0 1rem 0;color:var(--text-secondary);line-height:1.5;">Request police backup assistance. BPSO remains responsible for the final tip report. Tip photo evidence is included when available.</p>
+            <div id="agencyTipPhotoPreview" class="form-group" style="display:none;">
+                <label>Tip photo (included with request)</label>
+                <img id="agencyTipPhotoImg" src="" alt="Tip photo" class="tip-photo-full" style="max-height:220px;margin-top:0.35rem;">
+            </div>
             <div class="form-group">
                 <label for="agencyBackupReason">Reason for police backup</label>
                 <textarea id="agencyBackupReason" placeholder="Describe why police assistance is needed..."></textarea>
@@ -1266,11 +1270,22 @@ require_once __DIR__ . '/db.php';
             }
             currentTipId = id;
             document.getElementById('agencyBackupReason').value = tip.police_backup_reason || tip.description || '';
+            const photoWrap = document.getElementById('agencyTipPhotoPreview');
+            const photoImg = document.getElementById('agencyTipPhotoImg');
+            if (tip.photo_data) {
+                photoImg.src = tip.photo_data;
+                photoWrap.style.display = 'block';
+            } else {
+                photoImg.removeAttribute('src');
+                photoWrap.style.display = 'none';
+            }
             document.getElementById('agencyTipModal').style.display = 'block';
         }
 
         function closeAgencyTipModal() {
             document.getElementById('agencyTipModal').style.display = 'none';
+            const photoImg = document.getElementById('agencyTipPhotoImg');
+            if (photoImg) photoImg.removeAttribute('src');
             currentTipId = null;
         }
 

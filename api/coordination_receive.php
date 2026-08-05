@@ -47,6 +47,11 @@ if ($reason === '') {
     exit;
 }
 
+$hasPhoto = !empty($input['has_photo'])
+    || !empty($input['photo_data'])
+    || !empty($input['photo_of_evidence'])
+    || !empty($input['attached_evidence']['photo_data']);
+
 $referenceId = 'COORD-' . date('Y') . '-' . strtoupper(substr(md5($sourceTipId . microtime(true)), 0, 6));
 
 echo json_encode([
@@ -60,5 +65,7 @@ echo json_encode([
         'requesting_agency' => $input['requesting_agency'] ?? '',
         'priority' => $input['backup']['priority'] ?? 'high',
         'status' => trim($input['review']['status'] ?? ''),
+        'has_photo' => $hasPhoto,
+        'tip_id' => trim((string) ($input['tip_id'] ?? $sourceTipId)),
     ],
 ]);
