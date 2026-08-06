@@ -567,6 +567,20 @@ if ($method === 'POST') {
             }
 
             $previousStatus = trim((string) ($current['status'] ?? ''));
+            $resendRejection = !empty($input['resend_rejection_email']);
+            $resendCredentials = !empty($input['resend_credentials']);
+            // Resident-submitted applications (Pending/Rejected) may only be reviewed — not profile-edited.
+            $isApplicationStatus = in_array($previousStatus, ['Pending', 'Rejected'], true);
+            $isReviewDecision = in_array($status, ['Active', 'Rejected'], true)
+                && ($status !== $previousStatus || $resendRejection);
+            if ($isApplicationStatus && !$isReviewDecision && !$resendCredentials) {
+                http_response_code(403);
+                echo json_encode([
+                    'success' => false,
+                    'message' => 'Submitted neighborhood watch applications cannot be edited. Use Review to approve or reject.',
+                ]);
+                exit;
+            }
             $email = normalizeNwMemberEmail($email);
             $recipientEmail = $email !== '' ? $email : normalizeNwMemberEmail((string) ($current['email'] ?? ''));
             if ($recipientEmail === '' || !filter_var($recipientEmail, FILTER_VALIDATE_EMAIL)) {

@@ -1233,6 +1233,10 @@ $nwSearchPlaceholder = $nwIsMemberList
             
             const statusClass = getStatusBadgeClass(member.status);
             const primaryActionLabel = NW_PAGE_MODE === 'members' ? 'View' : 'Review';
+            // Applications are resident-submitted — admin may Review only, not Edit.
+            const editButtonHtml = NW_PAGE_MODE === 'members'
+                ? `<button class="btn-edit" onclick="editMember('${id}')">Edit</button>`
+                : '';
             
             row.innerHTML = `
                 <td>${member.first_name || ''}</td>
@@ -1244,7 +1248,7 @@ $nwSearchPlaceholder = $nwIsMemberList
                 <td>
                     <div class="action-buttons">
                         <button class="btn-review" onclick="reviewMember('${id}')">${primaryActionLabel}</button>
-                        <button class="btn-edit" onclick="editMember('${id}')">Edit</button>
+                        ${editButtonHtml}
                     </div>
                 </td>
             `;
@@ -1728,6 +1732,10 @@ $nwSearchPlaceholder = $nwIsMemberList
         }
         
         function editMember(id) {
+            if (NW_PAGE_MODE !== 'members') {
+                alert('Submitted neighborhood watch applications cannot be edited. Use Review to approve or reject.');
+                return;
+            }
             const member = memberData[id];
             if (!member) {
                 alert('Member not found!');

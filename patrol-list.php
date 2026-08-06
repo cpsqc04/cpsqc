@@ -909,7 +909,6 @@ require_once __DIR__ . '/db.php';
                 <td>
                     <div class="action-buttons">
                         <button class="btn-view" onclick="viewOfficer('${id}')">View</button>
-                        <button class="btn-edit" onclick="editOfficer('${id}')">Edit</button>
                     </div>
                 </td>
             `;
@@ -991,7 +990,8 @@ require_once __DIR__ . '/db.php';
         }
 
         function editOfficer(id) {
-            openEditOfficerModal(id);
+            alert('BPSO personnel details are managed in their Account Settings. Admins can only View or Add Patrol.');
+            return;
         }
 
         function deleteOfficer(id) {
@@ -1098,84 +1098,7 @@ require_once __DIR__ . '/db.php';
 
         function updateOfficer(event) {
             event.preventDefault();
-            
-            const formData = new FormData(event.target);
-            const id = parseInt(formData.get('id'));
-            const password = formData.get('password');
-            const confirmPassword = formData.get('confirmPassword');
-            
-            const apiData = {
-                action: 'update',
-                id: id,
-                bpso_personnel_id: formData.get('badgeNumber').trim(),
-                personnel_name: formData.get('name').trim(),
-                contact_number: formData.get('contact').trim(),
-                email: formData.get('email').trim(),
-                duty_shift: formData.get('duty_shift'),
-                status: formData.get('status')
-            };
-            
-            if (!apiData.bpso_personnel_id || !apiData.personnel_name || !apiData.contact_number || !apiData.email || !apiData.duty_shift || !apiData.status) {
-                alert('Please fill in all required fields.');
-                return;
-            }
-
-            const contactError = AlertaraFormEnhancements.validateContactInput(document.getElementById('editOfficerContact'), 'Contact number');
-            if (contactError) {
-                alert(contactError);
-                return;
-            }
-
-            if (password || confirmPassword) {
-                if (password !== confirmPassword) {
-                    alert('Passwords do not match.');
-                    return;
-                }
-                if (!/[A-Z]/.test(password) || !/[0-9!@#$%^&*(),.?":{}|<>]/.test(password)) {
-                    alert('Password must contain at least one capital letter and one number or special character.');
-                    return;
-                }
-                apiData.password = password;
-            }
-            
-            fetch('api/patrols.php', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(apiData)
-            })
-            .then(res => {
-                if (!res.ok) {
-                    return res.text().then(text => {
-                        try {
-                            const json = JSON.parse(text);
-                            throw new Error(json.message || 'Server error');
-                        } catch (e) {
-                            if (e instanceof Error && e.message !== 'Server error') {
-                                throw e;
-                            }
-                            throw new Error('Server error: ' + res.status + ' ' + res.statusText);
-                        }
-                    });
-                }
-                return res.json();
-            })
-            .then(result => {
-                if (!result.success) {
-                    alert(result.message || 'Failed to update BPSO personnel.');
-                    return;
-                }
-                
-                // Reload patrols to refresh the table
-                loadPatrols();
-                alert('BPSO personnel updated successfully!');
-                closeEditOfficerModal();
-            })
-            .catch(err => {
-                console.error('Error updating BPSO personnel:', err);
-                alert('Error updating BPSO personnel: ' + (err.message || 'Please try again.'));
-            });
+            alert('BPSO personnel details are managed in their Account Settings. Admins can only View or Add Patrol.');
         }
 
         // Close modals when clicking outside
