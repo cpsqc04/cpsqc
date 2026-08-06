@@ -250,7 +250,8 @@ if ($method === 'POST' && $action === 'manage') {
         ]);
 
         $newlyAssignedIds = array_values(array_diff($assignedPatrolIds, $previousAssignedIds));
-        if ($newlyAssignedIds !== []) {
+        $skipAssignmentNotifications = !empty($input['skip_assignment_notifications']);
+        if ($newlyAssignedIds !== [] && !$skipAssignmentNotifications) {
             $requestCode = (string) ($current['request_id'] ?? ('#' . $id));
             $eventName = trim((string) ($current['event_name'] ?? ''));
             $location = trim((string) ($current['event_location'] ?? ''));
