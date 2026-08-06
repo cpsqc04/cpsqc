@@ -177,8 +177,8 @@ if ($method === 'POST') {
                     $patrolId,
                     'patrol_request_assignment',
                     'New Event / Marshal Assignment',
-                    'You have been assigned for an event/marshal duty on ' . $scheduleDate . ' (' . $shift . ') — ' . $scheduleLabel . '. Open My Schedule → Event / Marshal Duties for details.',
-                    'tab:schedule:' . $id
+                    'You have been assigned for an event/marshal duty on ' . $scheduleDate . ' (' . $shift . ') — ' . $scheduleLabel . '. Open Event / Marshal Duties for details.',
+                    'tab:events:' . $id
                 );
             } else {
                 createPatrolNotification(
