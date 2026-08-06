@@ -1,6 +1,6 @@
 /**
  * Shared Alertara QC branded DOCX export.
- * Layout: circular logo (left) + centered brand/address, title, fields, watermark, Generated on.
+ * Layout: centered brand/address header, title, fields, watermark, Generated on.
  * Requires JSZip (global).
  */
 (function (global) {
@@ -9,12 +9,10 @@
     var BRAND_NAME = 'ALERTARA QC';
     var BRAND_ADDRESS = 'Patnubay Street, Barangay San Agustin, Novaliches Quezon City, District 5, Quezon City';
     var BRAND_LOCATION = 'Barangay San Agustin, Quezon City';
-    var LOGO_URL = 'images/alertara-export-logo.png';
     var WATERMARK_URL = 'images/alertara-export-watermark.png';
-    var BRAND_COLOR = '5B9AA8';
+    var BRAND_COLOR = '14532D'; // dark green
     var NL = '\n';
 
-    var logoCache = null;
     var watermarkCache = null;
 
     function escapeXml(value) {
@@ -155,25 +153,6 @@
         return new Uint8Array(buffer);
     }
 
-    async function loadLogoPart() {
-        if (logoCache) return logoCache;
-        try {
-            var bytes = await fetchAsBytes(LOGO_URL);
-            logoCache = {
-                bytes: bytes,
-                ext: 'png',
-                mime: 'image/png',
-                // ~0.95 inch circle
-                cx: 868680,
-                cy: 868680
-            };
-        } catch (e) {
-            console.warn('Alertara export logo unavailable:', e);
-            logoCache = null;
-        }
-        return logoCache;
-    }
-
     async function loadWatermarkPart() {
         if (watermarkCache) return watermarkCache;
         try {
@@ -233,82 +212,10 @@
         };
     }
 
-    function buildHeaderXml(logoRId, logoCx, logoCy) {
-        var logoCell;
-        if (logoRId) {
-            logoCell =
-                '                    <w:tc>' + NL +
-                '                        <w:tcPr><w:tcW w:w="1400" w:type="dxa"/><w:vAlign w:val="center"/></w:tcPr>' + NL +
-                '                        <w:p>' + NL +
-                '                            <w:pPr><w:jc w:val="center"/><w:spacing w:before="0" w:after="0"/></w:pPr>' + NL +
-                '                            <w:r>' + NL +
-                '                                <w:drawing>' + NL +
-                '                                    <wp:inline distT="0" distB="0" distL="0" distR="0">' + NL +
-                '                                        <wp:extent cx="' + logoCx + '" cy="' + logoCy + '"/>' + NL +
-                '                                        <wp:docPr id="10" name="AlertaraLogo"/>' + NL +
-                '                                        <a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">' + NL +
-                '                                            <a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">' + NL +
-                '                                                <pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture">' + NL +
-                '                                                    <pic:nvPicPr><pic:cNvPr id="0" name="logo.png"/><pic:cNvPicPr/></pic:nvPicPr>' + NL +
-                '                                                    <pic:blipFill><a:blip r:embed="' + logoRId + '"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill>' + NL +
-                '                                                    <pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="' + logoCx + '" cy="' + logoCy + '"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr>' + NL +
-                '                                                </pic:pic>' + NL +
-                '                                            </a:graphicData>' + NL +
-                '                                        </a:graphic>' + NL +
-                '                                    </wp:inline>' + NL +
-                '                                </w:drawing>' + NL +
-                '                            </w:r>' + NL +
-                '                        </w:p>' + NL +
-                '                    </w:tc>' + NL;
-        } else {
-            logoCell =
-                '                    <w:tc>' + NL +
-                '                        <w:tcPr><w:tcW w:w="1400" w:type="dxa"/></w:tcPr>' + NL +
-                '                        <w:p><w:r><w:t></w:t></w:r></w:p>' + NL +
-                '                    </w:tc>' + NL;
-        }
-
-        var brandCell =
-            '                    <w:tc>' + NL +
-            '                        <w:tcPr><w:tcW w:w="6800" w:type="dxa"/><w:vAlign w:val="center"/></w:tcPr>' + NL +
-            '                        <w:p>' + NL +
-            '                            <w:pPr><w:jc w:val="center"/><w:spacing w:after="40"/></w:pPr>' + NL +
-            '                            <w:r>' + NL +
-            '                                <w:rPr><w:b/><w:color w:val="' + BRAND_COLOR + '"/><w:sz w:val="40"/><w:szCs w:val="40"/></w:rPr>' + NL +
-            '                                <w:t>' + escapeXml(BRAND_NAME) + '</w:t>' + NL +
-            '                            </w:r>' + NL +
-            '                        </w:p>' + NL +
-            '                        <w:p>' + NL +
-            '                            <w:pPr><w:jc w:val="center"/><w:spacing w:after="0"/></w:pPr>' + NL +
-            '                            <w:r>' + NL +
-            '                                <w:rPr><w:color w:val="777777"/><w:sz w:val="16"/><w:szCs w:val="16"/></w:rPr>' + NL +
-            '                                <w:t>' + escapeXml(BRAND_ADDRESS) + '</w:t>' + NL +
-            '                            </w:r>' + NL +
-            '                        </w:p>' + NL +
-            '                    </w:tc>' + NL;
-
-        var spacerCell =
-            '                    <w:tc>' + NL +
-            '                        <w:tcPr><w:tcW w:w="1400" w:type="dxa"/></w:tcPr>' + NL +
-            '                        <w:p><w:r><w:t></w:t></w:r></w:p>' + NL +
-            '                    </w:tc>' + NL;
-
+    function buildHeaderXml() {
         return (
-            '        <w:tbl>' + NL +
-            '            <w:tblPr>' + NL +
-            '                <w:tblW w:w="9600" w:type="dxa"/>' + NL +
-            '                <w:tblBorders>' + NL +
-            '                    <w:top w:val="nil"/><w:left w:val="nil"/><w:bottom w:val="nil"/><w:right w:val="nil"/>' + NL +
-            '                    <w:insideH w:val="nil"/><w:insideV w:val="nil"/>' + NL +
-            '                </w:tblBorders>' + NL +
-            '            </w:tblPr>' + NL +
-            '            <w:tblGrid><w:gridCol w:w="1400"/><w:gridCol w:w="6800"/><w:gridCol w:w="1400"/></w:tblGrid>' + NL +
-            '            <w:tr>' + NL +
-            logoCell +
-            brandCell +
-            spacerCell +
-            '            </w:tr>' + NL +
-            '        </w:tbl>' + NL +
+            centeredPara(BRAND_NAME, { bold: true, size: 40, after: 60, color: BRAND_COLOR }) +
+            centeredPara(BRAND_ADDRESS, { size: 24, after: 80, color: '555555' }) + // 12pt
             separatorLine()
         );
     }
@@ -392,18 +299,12 @@
         }
 
         var zip = new JSZip();
-        var logo = await loadLogoPart();
         var watermark = await loadWatermarkPart();
         var mediaFiles = [];
         var imageRels = [];
         var contentTypeDefaults = {};
         var relNum = 20;
 
-        if (logo) {
-            mediaFiles.push({ path: 'word/media/logo.png', bytes: logo.bytes, ext: 'png', mime: 'image/png' });
-            imageRels.push({ id: 'rIdLogo', target: 'media/logo.png' });
-            contentTypeDefaults.png = 'image/png';
-        }
         if (watermark) {
             mediaFiles.push({ path: 'word/media/watermark.png', bytes: watermark.bytes, ext: 'png', mime: 'image/png' });
             imageRels.push({ id: 'rIdWatermark', target: 'media/watermark.png' });
@@ -426,7 +327,7 @@
         if (watermark) {
             body += pictureDrawing('rIdWatermark', 'Watermark', watermark.cx, watermark.cy, 99, true);
         }
-        body += buildHeaderXml(logo ? 'rIdLogo' : null, logo ? logo.cx : 0, logo ? logo.cy : 0);
+        body += buildHeaderXml();
         body += centeredPara(title, { bold: true, size: 36, after: 80, before: 80, color: '000000' });
         body += centeredPara(subtitle, { size: 20, after: 360, color: '333333' });
 
