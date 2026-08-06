@@ -890,6 +890,37 @@ require_once __DIR__ . '/db.php';
         .search-box {
             margin-bottom: 1.5rem;
             position: relative;
+            flex: 1;
+            min-width: 220px;
+        }
+
+        .search-toolbar {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 1.5rem;
+            flex-wrap: wrap;
+        }
+
+        .search-toolbar .search-box {
+            margin-bottom: 0;
+        }
+
+        .search-toolbar .btn-forward {
+            flex-shrink: 0;
+            white-space: nowrap;
+        }
+
+        #complaintsTableBody tr.selected-for-forward {
+            outline: 2px solid var(--primary-color);
+            background: rgba(76, 138, 137, 0.08);
+        }
+
+        .forward-hint {
+            width: 100%;
+            margin: -0.75rem 0 1.25rem;
+            color: var(--text-secondary);
+            font-size: 0.85rem;
         }
         
         .search-box input {
@@ -1467,9 +1498,13 @@ require_once __DIR__ . '/db.php';
         
         <main class="content-area">
             <div class="page-content">
-                <div class="search-box">
-                    <input type="text" id="searchInput" placeholder="Search by complaint ID, complainant, defendant, or contact number..." onkeyup="filterComplaints()">
+                <div class="search-toolbar">
+                    <div class="search-box">
+                        <input type="text" id="searchInput" placeholder="Search by complaint ID, complainant, defendant, or contact number..." onkeyup="filterComplaints()">
+                    </div>
+                    <button type="button" class="btn-forward" id="toolbarForwardBtn" onclick="forwardSelectedComplaint()" disabled title="Select a crime-related complaint in the table first">Forward to Digital Blotter</button>
                 </div>
+                <p class="forward-hint">Select a crime-related complaint (Robbery, Murder, Rape, Illegal Drugs, Carnapping/Motornapping, or Kidnapping), then click Forward. Forwarding is manual — nothing is sent automatically.</p>
                 
                 <div class="table-container">
                     <table id="complaintsTable">
@@ -1526,25 +1561,7 @@ require_once __DIR__ . '/db.php';
                     <small style="display:block;margin-top:0.35rem;color:var(--text-secondary);font-size:0.85rem;">Only personnel <strong>currently at the barangay hall</strong> (timed in today) are shown.</small>
                 </div>
 
-                <div class="form-group">
-                    <label for="manageStatus">Status *</label>
-                    <select id="manageStatus" name="status" required>
-                        <option value="">Select Status</option>
-                        <option value="Pending">Pending</option>
-                        <option value="Processing">Processing</option>
-                        <option value="Resolved">Resolved</option>
-                        <option value="Rejected">Rejected</option>
-                        <option value="Forwarded to Digital Blotter">Forwarded to Digital Blotter</option>
-                    </select>
-                </div>
-
-                <div class="form-group">
-                    <label for="manageNotes">BPSO Resolution</label>
-                    <textarea id="manageNotes" name="notes" placeholder="Resolution report and updates from the assigned BPSO patrol"></textarea>
-                </div>
-
                 <div class="form-actions">
-                    <button type="button" class="btn-forward" id="manageForwardBtn" onclick="forwardComplaintFromManage()">Forward to Digital Blotter</button>
                     <button type="button" class="btn-cancel" onclick="closeManageComplaintModal()">Cancel</button>
                     <button type="submit" class="btn-save">Save Changes</button>
                 </div>
@@ -1670,12 +1687,8 @@ require_once __DIR__ . '/db.php';
         function toggleManageFieldsForForwarded(complaint) {
             const forwarded = isComplaintForwarded(complaint);
             const patrolGroup = document.getElementById('manageAssignedPatrolGroup');
-            const statusSelect = document.getElementById('manageStatus');
             if (patrolGroup) {
                 patrolGroup.style.display = forwarded ? 'none' : '';
-            }
-            if (statusSelect) {
-                statusSelect.disabled = forwarded;
             }
         }
 
@@ -1692,9 +1705,7 @@ require_once __DIR__ . '/db.php';
             'Kidnapping'
         ];
 
-        let forwardCountdownTimer = null;
-        let forwardCountdownInterval = null;
-        let pendingForwardComplaintId = null;
+        let selectedForwardComplaintId = null;
 
         function showToast(message, variant) {
             const toast = document.getElementById('toastPopup');
@@ -1727,28 +1738,29 @@ require_once __DIR__ . '/db.php';
             return ['carnapping', 'motornapping', 'carnapping/motornapping', 'carnappingmotornapping'].includes(normalized);
         }
 
-        function updateForwardButtonState(button, complaint) {
-            if (!button) {
+        function updateToolbarForwardButton() {
+            const button = document.getElementById('toolbarForwardBtn');
+            if (!button) return;
+
+            const complaint = selectedForwardComplaintId
+                ? Object.values(complaintData).find(c => c.id === selectedForwardComplaintId)
+                : null;
+
+            if (!complaint) {
+                button.disabled = true;
+                button.title = 'Select a crime-related complaint in the table first';
+                button.textContent = 'Forward to Digital Blotter';
                 return;
             }
 
-            // Don't override UI while a countdown cancel is active
-            if (pendingForwardComplaintId) {
-                return;
-            }
-
-            const forwarded = isComplaintForwarded(complaint);
-            const forwardable = isComplaintTypeForwardableToBlotter(complaint && complaint.complaint_type);
-            button.classList.remove('canceling');
-
-            if (forwarded) {
+            if (isComplaintForwarded(complaint)) {
                 button.disabled = true;
                 button.title = 'This complaint was already forwarded.';
                 button.textContent = 'Already Forwarded';
                 return;
             }
 
-            if (!forwardable) {
+            if (!isComplaintTypeForwardableToBlotter(complaint.complaint_type)) {
                 button.disabled = true;
                 button.title = 'Only Robbery, Murder, Rape, Illegal Drugs, Carnapping/Motornapping, and Kidnapping can be forwarded.';
                 button.textContent = 'Forward to Digital Blotter';
@@ -1756,27 +1768,19 @@ require_once __DIR__ . '/db.php';
             }
 
             button.disabled = false;
-            button.title = '';
+            button.title = 'Forward ' + (complaint.complaint_id || '') + ' to Digital Blotter';
             button.textContent = 'Forward to Digital Blotter';
         }
 
-        function cancelPendingForward(restoreComplaint) {
-            if (forwardCountdownTimer) {
-                window.clearTimeout(forwardCountdownTimer);
-                forwardCountdownTimer = null;
-            }
-            if (forwardCountdownInterval) {
-                window.clearInterval(forwardCountdownInterval);
-                forwardCountdownInterval = null;
-            }
-            pendingForwardComplaintId = null;
-            hideToast();
+        function selectComplaintForForward(complaintIdKey) {
+            const complaint = complaintData[complaintIdKey];
+            if (!complaint) return;
 
-            const forwardBtn = document.getElementById('manageForwardBtn');
-            if (forwardBtn) {
-                forwardBtn.classList.remove('canceling');
-                updateForwardButtonState(forwardBtn, restoreComplaint || null);
-            }
+            selectedForwardComplaintId = complaint.id;
+            document.querySelectorAll('#complaintsTableBody tr').forEach(row => {
+                row.classList.toggle('selected-for-forward', row.getAttribute('data-complaint-id') === complaintIdKey);
+            });
+            updateToolbarForwardButton();
         }
 
         function updateAssignedPatrolFieldVisibility(complaint) {
@@ -1843,9 +1847,18 @@ require_once __DIR__ . '/db.php';
                 });
                 
                 // Populate table
+                const previousSelectedId = selectedForwardComplaintId;
+                selectedForwardComplaintId = null;
                 complaints.forEach(c => {
                     const row = document.createElement('tr');
                     row.setAttribute('data-complaint-id', c.complaint_id);
+                    row.style.cursor = 'pointer';
+                    row.addEventListener('click', (event) => {
+                        if (event.target.closest('button, a, input, select, textarea')) {
+                            return;
+                        }
+                        selectComplaintForForward(c.complaint_id);
+                    });
                     
                     // Format date
                     const date = new Date(c.incident_date);
@@ -1870,7 +1883,12 @@ require_once __DIR__ . '/db.php';
                         </td>
                     `;
                     tbody.appendChild(row);
+
+                    if (previousSelectedId && Number(c.id) === Number(previousSelectedId)) {
+                        selectComplaintForForward(c.complaint_id);
+                    }
                 });
+                updateToolbarForwardButton();
             } catch (e) {
                 console.error('Error loading complaints:', e);
             }
@@ -2031,41 +2049,24 @@ require_once __DIR__ . '/db.php';
 
             document.getElementById('manageComplaintId').value = complaint.id;
             document.getElementById('manageComplaintRef').textContent = 'Complaint ID: ' + complaint.complaint_id;
-            document.getElementById('manageStatus').value = complaint.status;
-            document.getElementById('manageNotes').value = complaint.notes || '';
             originalAssignedPatrolId = complaint.assigned_patrol_id || '';
             loadAvailablePersonnel(originalAssignedPatrolId);
-            updateForwardButtonState(document.getElementById('manageForwardBtn'), complaint);
             updateAssignedPatrolFieldVisibility(complaint);
 
             document.getElementById('manageComplaintModal').classList.add('active');
         }
 
         function closeManageComplaintModal() {
-            const id = parseInt(document.getElementById('manageComplaintId').value, 10);
-            const complaint = Object.values(complaintData).find(c => c.id === id);
-            cancelPendingForward(complaint || null);
             document.getElementById('manageComplaintModal').classList.remove('active');
             document.getElementById('manageComplaintForm').reset();
-            document.getElementById('manageStatus').disabled = false;
         }
 
-        function forwardComplaintFromManage() {
-            const id = parseInt(document.getElementById('manageComplaintId').value, 10);
-            if (!id) {
-                showToast('Invalid complaint ID.', 'error');
+        function forwardSelectedComplaint() {
+            if (!selectedForwardComplaintId) {
+                showToast('Select a crime-related complaint in the table first.', 'error');
                 return;
             }
-
-            // Second click during countdown cancels the forward
-            if (pendingForwardComplaintId === id) {
-                const complaint = Object.values(complaintData).find(c => c.id === id);
-                cancelPendingForward(complaint || null);
-                showToast('Forwarding cancelled.', 'error');
-                return;
-            }
-
-            forwardComplaintById(id);
+            forwardComplaintById(selectedForwardComplaintId);
         }
 
         function saveComplaintManage(event) {
@@ -2086,48 +2087,33 @@ require_once __DIR__ . '/db.php';
             const newPatrolId = document.getElementById('manageAssignedPatrol').value;
             const assignmentChanged = String(newPatrolId || '') !== String(originalAssignedPatrolId || '');
 
-            const saveManage = () => fetch('api/complaints.php', {
+            if (!assignmentChanged) {
+                alert('No assignment changes to save.');
+                return;
+            }
+
+            if (isComplaintForwarded(complaint)) {
+                alert('Assignment cannot be changed after forwarding to the Digital Blotter.');
+                return;
+            }
+
+            fetch('api/complaints.php', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    action: 'manage',
+                    action: 'assign',
                     id: id,
-                    status: document.getElementById('manageStatus').value,
-                    notes: document.getElementById('manageNotes').value.trim()
+                    assigned_patrol_id: parseInt(newPatrolId, 10) || 0
                 })
-            }).then(res => res.json());
-
-            const assignIfNeeded = () => {
-                if (!assignmentChanged || isComplaintForwarded(complaint)) {
-                    return Promise.resolve({ success: true });
-                }
-                return fetch('api/complaints.php', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        action: 'assign',
-                        id: id,
-                        assigned_patrol_id: parseInt(newPatrolId, 10) || 0
-                    })
-                }).then(res => res.json());
-            };
-
-            assignIfNeeded()
-                .then(assignResult => {
-                    if (!assignResult.success) {
-                        alert(assignResult.message || 'Failed to assign complaint.');
-                        return null;
-                    }
-                    return saveManage();
-                })
+            })
+                .then(res => res.json())
                 .then(result => {
-                    if (!result) return;
                     if (!result.success) {
-                        alert(result.message || 'Failed to update complaint.');
+                        alert(result.message || 'Failed to assign complaint.');
                         return;
                     }
                     loadComplaints();
-                    alert('Complaint updated successfully!');
+                    alert('Complaint assignment updated successfully!');
                     closeManageComplaintModal();
                 })
                 .catch(err => {
@@ -2153,50 +2139,22 @@ require_once __DIR__ . '/db.php';
                 return;
             }
 
-            if (pendingForwardComplaintId) {
+            const label = complaint.complaint_id || ('#' + dbId);
+            if (!window.confirm('Forward ' + label + ' to the Digital Blotter now? This is manual and will send immediately.')) {
                 return;
             }
 
-            const forwardBtn = document.getElementById('manageForwardBtn');
-            let secondsLeft = 3;
-            pendingForwardComplaintId = dbId;
-
-            showToast('Forwarding to Digital Blotter', 'warning');
-
+            const forwardBtn = document.getElementById('toolbarForwardBtn');
             if (forwardBtn) {
-                forwardBtn.disabled = false;
-                forwardBtn.classList.add('canceling');
-                forwardBtn.textContent = 'Cancel (' + secondsLeft + ')';
-                forwardBtn.title = 'Click to cancel forwarding';
+                forwardBtn.disabled = true;
+                forwardBtn.textContent = 'Forwarding...';
             }
 
-            forwardCountdownInterval = window.setInterval(() => {
-                secondsLeft -= 1;
-                if (forwardBtn && secondsLeft > 0) {
-                    forwardBtn.textContent = 'Cancel (' + secondsLeft + ')';
-                }
-            }, 1000);
-
-            forwardCountdownTimer = window.setTimeout(() => {
-                if (forwardCountdownInterval) {
-                    window.clearInterval(forwardCountdownInterval);
-                    forwardCountdownInterval = null;
-                }
-                forwardCountdownTimer = null;
-                pendingForwardComplaintId = null;
-
-                if (forwardBtn) {
-                    forwardBtn.disabled = true;
-                    forwardBtn.classList.remove('canceling');
-                    forwardBtn.textContent = 'Forwarding...';
-                    forwardBtn.title = '';
-                }
-
-                fetch('api/complaints.php', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ action: 'forward', id: dbId })
-                })
+            fetch('api/complaints.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'forward', id: dbId })
+            })
                 .then(response => response.json().then(data => ({ ok: response.ok, data })))
                 .then(({ ok, data }) => {
                     if (!ok || !data.success) {
@@ -2219,15 +2177,11 @@ require_once __DIR__ . '/db.php';
                         message += ' Ref: ' + data.data.blotter_reference_id;
                     }
                     showToast(message, 'success');
-
-                    updateForwardButtonState(forwardBtn, complaint);
-                    updateAssignedPatrolFieldVisibility(complaint);
                 })
                 .catch(error => {
                     showToast(error.message || 'Failed to forward complaint.', 'error');
-                    updateForwardButtonState(forwardBtn, complaint);
+                    updateToolbarForwardButton();
                 });
-            }, 3000);
         }
         
         // Close modal when clicking outside

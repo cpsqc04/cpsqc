@@ -85,6 +85,35 @@ $nwActiveNav = 'bulletin';
         .status-closed { background: #e5e7eb; color: #374151; }
         .resolution-cell { max-width: 300px; white-space: normal; line-height: 1.45; font-size: 0.9rem; }
         .resolution-empty { color: #94a3b8; font-style: italic; }
+        .action-buttons { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+        .btn-view { padding: 0.5rem 1rem; border: none; border-radius: 6px; font-size: 0.85rem; font-weight: 600; cursor: pointer; color: #fff; background: var(--primary-color); }
+        .btn-view:hover { background: #4ca8a6; }
+        .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 2000; align-items: center; justify-content: center; padding: 1rem; }
+        .modal.active { display: flex; }
+        .modal-content { background: #fff; border-radius: 12px; width: 100%; max-width: 720px; max-height: 90vh; overflow-y: auto; padding: 1.5rem; box-shadow: 0 4px 20px rgba(0,0,0,0.3); }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 2px solid var(--border-color); }
+        .modal-header h2 { margin: 0; color: var(--tertiary-color); font-size: 1.25rem; }
+        .close-modal { background: none; border: none; font-size: 1.75rem; cursor: pointer; color: #aaa; line-height: 1; }
+        .detail-row { margin-bottom: 0.85rem; }
+        .detail-label { font-weight: 600; margin-bottom: 0.25rem; color: var(--text-color); }
+        .detail-value { color: var(--text-secondary); line-height: 1.6; white-space: pre-wrap; }
+        .incident-photo {
+            max-width: 280px;
+            max-height: 200px;
+            width: auto;
+            height: auto;
+            object-fit: contain;
+            border-radius: 8px;
+            margin-top: 0.5rem;
+            display: block;
+            border: 1px solid var(--border-color);
+            background: #f8f9fa;
+            cursor: pointer;
+        }
+        .incident-photo:hover { opacity: 0.92; }
+        .modal-actions { display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 1rem; flex-wrap: wrap; }
+        .btn-secondary { background: #e5e7eb; color: #111; padding: 0.55rem 1rem; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; }
+        .report-card-actions { margin-top: 0.85rem; }
         .empty-state { text-align: center; padding: 2.5rem 1rem; color: var(--text-secondary); }
         .empty-state i { font-size: 2rem; margin-bottom: 0.75rem; opacity: 0.4; display: block; }
         #photoPreview img { max-width: 220px; max-height: 160px; border-radius: 8px; margin-top: 0.5rem; border: 1px solid var(--border-color); }
@@ -255,11 +284,81 @@ $nwActiveNav = 'bulletin';
         </div>
     </div>
 
+    <div id="myReportViewModal" class="modal" onclick="if (event.target === this) closeMyReportViewModal()">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="myReportViewTitle">Incident Report</h2>
+                <button type="button" class="close-modal" onclick="closeMyReportViewModal()">&times;</button>
+            </div>
+            <div id="myReportViewBody"></div>
+            <div class="modal-actions">
+                <button type="button" class="btn-secondary" onclick="closeMyReportViewModal()">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/photo-lightbox.js"></script>
     <script src="js/digital-bulletin.js"></script>
     <script>
         const NW_INCIDENT_TERMS_VERSION = <?php echo json_encode(getNwIncidentTermsVersion()); ?>;
         let photoDataUrl = null;
         let pendingReportPayload = null;
+        let myReports = [];
+
+        function formatDateTime(value) {
+            if (!value) return '—';
+            const date = new Date(value);
+            if (Number.isNaN(date.getTime())) return escapeHtml(String(value));
+            return escapeHtml(date.toLocaleString());
+        }
+
+        function buildMyReportDetailsHtml(report) {
+            let photoHtml = '';
+            if (report.photo_data) {
+                photoHtml = '<div class="detail-row"><div class="detail-label">Photo</div>'
+                    + '<img src="' + report.photo_data + '" alt="Incident photo" class="incident-photo" '
+                    + 'onclick="viewMyReportPhoto(' + Number(report.id) + ')" title="Click to view full size"></div>';
+            }
+
+            return ''
+                + '<div class="detail-row"><div class="detail-label">Location</div><div class="detail-value">' + escapeHtml(report.location) + '</div></div>'
+                + '<div class="detail-row"><div class="detail-label">Description</div><div class="detail-value">' + escapeHtml(report.description) + '</div></div>'
+                + '<div class="detail-row"><div class="detail-label">Status</div><div class="detail-value">' + escapeHtml(report.status) + '</div></div>'
+                + '<div class="detail-row"><div class="detail-label">Assigned To</div><div class="detail-value">' + escapeHtml(report.assigned_to || 'Unassigned') + '</div></div>'
+                + (report.resolution_report
+                    ? '<div class="detail-row"><div class="detail-label">Personnel Resolution</div><div class="detail-value">' + escapeHtml(report.resolution_report) + '</div></div>'
+                    : '<div class="detail-row"><div class="detail-label">Personnel Resolution</div><div class="detail-value">Pending — waiting for assigned personnel</div></div>')
+                + '<div class="detail-row"><div class="detail-label">Submitted</div><div class="detail-value">' + formatDateTime(report.created_at) + '</div></div>'
+                + (report.assigned_at ? '<div class="detail-row"><div class="detail-label">Assigned At</div><div class="detail-value">' + formatDateTime(report.assigned_at) + '</div></div>' : '')
+                + (report.resolved_at ? '<div class="detail-row"><div class="detail-label">Resolved At</div><div class="detail-value">' + formatDateTime(report.resolved_at) + '</div></div>' : '')
+                + photoHtml;
+        }
+
+        function viewMyReportPhoto(reportId) {
+            const report = myReports.find(function(r) { return Number(r.id) === Number(reportId); });
+            const photoSrc = report && report.photo_data ? String(report.photo_data) : '';
+            if (!photoSrc) {
+                alert('No photo available for this report.');
+                return;
+            }
+            if (window.AlertaraPhotoLightbox) {
+                AlertaraPhotoLightbox.open(photoSrc, 'Incident photo');
+                return;
+            }
+            alert('Photo viewer is unavailable.');
+        }
+
+        function viewMyReport(id) {
+            const report = myReports.find(function(r) { return Number(r.id) === Number(id); });
+            if (!report) return;
+            document.getElementById('myReportViewTitle').textContent = report.report_id || 'Incident Report';
+            document.getElementById('myReportViewBody').innerHTML = buildMyReportDetailsHtml(report);
+            document.getElementById('myReportViewModal').classList.add('active');
+        }
+
+        function closeMyReportViewModal() {
+            document.getElementById('myReportViewModal').classList.remove('active');
+        }
 
         function toggleSidebar() {
             const sidebar = document.getElementById('sidebar');
@@ -466,12 +565,13 @@ $nwActiveNav = 'bulletin';
                 }
 
                 const reports = result.data || [];
+                myReports = reports;
                 if (!reports.length) {
                     container.innerHTML = '<div class="empty-state"><i class="fas fa-inbox"></i>No incident reports yet.</div>';
                     return;
                 }
 
-                let html = '<div class="table-container"><table><thead><tr><th>Report ID</th><th>Location</th><th>Assigned To</th><th>Status</th><th>BPSO Resolution</th><th>Submitted</th></tr></thead><tbody>';
+                let html = '<div class="table-container"><table><thead><tr><th>Report ID</th><th>Location</th><th>Assigned To</th><th>Status</th><th>BPSO Resolution</th><th>Submitted</th><th>Actions</th></tr></thead><tbody>';
                 let cardsHtml = '<div class="report-cards">';
                 reports.forEach(function(report) {
                     const date = report.created_at ? new Date(report.created_at).toLocaleString() : '-';
@@ -486,6 +586,7 @@ $nwActiveNav = 'bulletin';
                         + '<td><span class="status-badge ' + statusClass(report.status) + '">' + escapeHtml(report.status) + '</span></td>'
                         + resolutionHtml
                         + '<td>' + escapeHtml(date) + '</td>'
+                        + '<td><div class="action-buttons"><button type="button" class="btn-view" onclick="viewMyReport(' + Number(report.id) + ')">View</button></div></td>'
                         + '</tr>';
                     cardsHtml += '<article class="report-card">'
                         + '<div class="report-card-top">'
@@ -498,6 +599,7 @@ $nwActiveNav = 'bulletin';
                         + '<div class="report-card-row"><span class="report-card-label">Resolution</span><span class="report-card-value">' + escapeHtml(resolutionText) + '</span></div>'
                         + '<div class="report-card-row"><span class="report-card-label">Submitted</span><span class="report-card-value">' + escapeHtml(date) + '</span></div>'
                         + '</div>'
+                        + '<div class="report-card-actions"><button type="button" class="btn-view" onclick="viewMyReport(' + Number(report.id) + ')">View</button></div>'
                         + '</article>';
                 });
                 html += '</tbody></table></div>';
