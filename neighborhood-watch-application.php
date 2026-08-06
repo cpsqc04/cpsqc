@@ -1227,10 +1227,8 @@ $nwSearchPlaceholder = $nwIsMemberList
             
             const statusClass = getStatusBadgeClass(member.status);
             const primaryActionLabel = NW_PAGE_MODE === 'members' ? 'View' : 'Review';
-            // Applications are resident-submitted — admin may Review only, not Edit.
-            const editButtonHtml = NW_PAGE_MODE === 'members'
-                ? `<button class="btn-edit" onclick="editMember('${id}')">Edit</button>`
-                : '';
+            // Members manage their own profile; applications are resident-submitted — admin View/Review only.
+            const editButtonHtml = '';
             
             row.innerHTML = `
                 <td>${member.first_name || ''}</td>
