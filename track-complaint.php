@@ -1546,7 +1546,7 @@ require_once __DIR__ . '/db.php';
     <div id="manageComplaintModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h2>Manage Complaint</h2>
+                <h2>Assign Patrol</h2>
                 <button class="close-modal" onclick="closeManageComplaintModal()">&times;</button>
             </div>
             <p class="manage-complaint-ref" id="manageComplaintRef"></p>
@@ -1563,7 +1563,7 @@ require_once __DIR__ . '/db.php';
 
                 <div class="form-actions">
                     <button type="button" class="btn-cancel" onclick="closeManageComplaintModal()">Cancel</button>
-                    <button type="submit" class="btn-save">Save Changes</button>
+                    <button type="submit" class="btn-save">Assign</button>
                 </div>
             </form>
         </div>
@@ -1845,7 +1845,7 @@ require_once __DIR__ . '/db.php';
                             <div class="action-buttons">
                                 <button class="btn-view" onclick="viewComplaint('${c.complaint_id}')">View</button>
                                 ${String(c.status || '').toLowerCase() !== 'resolved'
-                                    ? `<button class="btn-manage" onclick="manageComplaint('${c.complaint_id}')">Manage</button>`
+                                    ? `<button class="btn-manage" onclick="manageComplaint('${c.complaint_id}')">Assign Patrol</button>`
                                     : ''}
                             </div>
                         </td>
