@@ -501,6 +501,21 @@ $personnelCode = htmlspecialchars(getBpsoPersonnelCode());
             font-size: 0.88rem;
             line-height: 1.5;
         }
+        .assignment-info .assignment-line { margin-top: 0.35rem; }
+        .assignment-info .assignment-more-btn {
+            margin-top: 0.65rem;
+            padding: 0;
+            border: none;
+            background: none;
+            color: var(--primary-color);
+            font: inherit;
+            font-size: 0.88rem;
+            font-weight: 600;
+            cursor: pointer;
+            text-decoration: underline;
+        }
+        .assignment-info .assignment-more[hidden] { display: none !important; }
+        .form-group[hidden] { display: none !important; }
         .report-hint { margin: 0 0 1rem; color: var(--text-secondary); font-size: 0.9rem; }
         .btn-cancel-add { padding: 0.5rem 1rem; background: #e5e7eb; color: #374151; border: none; border-radius: 6px; font-size: 0.85rem; cursor: pointer; margin-right: 0.5rem; }
         .btn-cancel-add:hover { background: #d1d5db; }
@@ -792,20 +807,20 @@ $personnelCode = htmlspecialchars(getBpsoPersonnelCode());
                 </section>
 
                 <section id="panel-report" class="portal-panel">
-                    <h2 class="section-heading">Submit Patrol Report</h2>
+                    <h2 class="section-heading" id="reportSectionHeading">Submit Report</h2>
                     <div id="reportAlert"></div>
-                    <p class="report-hint">Submit at least one report per shift. You can submit additional reports for the same assignment while still clocked on.</p>
-                    <div id="reportAssignmentInfo" class="assignment-info">No active assignment selected. Open Submit Report from My Schedule.</div>
+                    <p class="report-hint" id="reportHint">Select an assignment from My Schedule or Event / Marshal Duties, then fill in what you did.</p>
+                    <div id="reportAssignmentInfo" class="assignment-info">No active assignment selected. Open Submit Report from My Schedule or Event / Marshal Duties.</div>
                     <form id="reportForm" class="form-grid">
                         <input type="hidden" id="reportSchedule" name="schedule_id" value="">
                         <input type="hidden" id="editingReportId" value="">
-                        <div class="form-group">
-                            <label for="reportRoute">Route *</label>
+                        <div class="form-group" id="reportRouteGroup">
+                            <label for="reportRoute" id="reportRouteLabel">Route / Streets *</label>
                             <input type="text" id="reportRoute" name="route" required readonly>
                         </div>
                         <div class="form-grid-split">
                             <div class="form-group">
-                                <label for="reportDate">Date *</label>
+                                <label for="reportDate">Assignment Date *</label>
                                 <input type="date" id="reportDate" name="date" required readonly>
                             </div>
                             <div class="form-group">
@@ -813,26 +828,26 @@ $personnelCode = htmlspecialchars(getBpsoPersonnelCode());
                                 <input type="time" id="reportTime" name="time" required>
                             </div>
                         </div>
-                        <div class="form-group">
-                            <label for="reportLocation">Location</label>
-                            <input type="text" id="reportLocation" name="location">
+                        <div class="form-group" id="reportLocationGroup">
+                            <label for="reportLocation" id="reportLocationLabel">Specific Location <span style="font-weight:400;color:var(--text-secondary);">(optional)</span></label>
+                            <input type="text" id="reportLocation" name="location" placeholder="Street, landmark, or area you covered">
                         </div>
                         <div class="form-group">
-                            <label for="reportIncidents">Incidents</label>
+                            <label for="reportIncidents" id="reportIncidentsLabel">Incidents</label>
                             <input type="text" id="reportIncidents" name="incidents" placeholder="None" value="None">
                         </div>
                         <div class="form-group">
-                            <label for="reportDetails">Patrol Details / Summary *</label>
-                            <textarea id="reportDetails" name="details" required placeholder="Describe patrol activities, observations, and actions taken..."></textarea>
+                            <label for="reportDetails" id="reportDetailsLabel">Report Summary *</label>
+                            <textarea id="reportDetails" name="details" required placeholder="Describe what you did, observed, and any actions taken..."></textarea>
                         </div>
                         <div class="form-group">
-                            <label for="reportDocumentation">Documentation <span style="font-weight:400;color:var(--text-secondary);">(optional)</span></label>
+                            <label for="reportDocumentation">Photo Documentation <span style="font-weight:400;color:var(--text-secondary);">(optional)</span></label>
                             <input type="file" id="reportDocumentation" name="documentation" accept="image/jpeg,image/png,image/gif,image/webp">
                             <input type="hidden" id="reportDocumentationData" value="">
                         </div>
                         <div class="form-grid-actions">
                             <button type="button" class="btn-cancel-add" id="cancelAddReportBtn" hidden onclick="cancelAddReportForm()">Cancel</button>
-                            <button type="submit" class="btn-submit" id="reportSubmitBtn">Submit</button>
+                            <button type="submit" class="btn-submit" id="reportSubmitBtn">Submit Report</button>
                         </div>
                     </form>
                 </section>
@@ -1491,24 +1506,86 @@ $personnelCode = htmlspecialchars(getBpsoPersonnelCode());
             }
         }
 
+        function adaptReportFormForAssignment(row) {
+            const isEvent = !!(row && getScheduleAssignmentType(row) === 'event');
+            const heading = document.getElementById('reportSectionHeading');
+            const hint = document.getElementById('reportHint');
+            const routeLabel = document.getElementById('reportRouteLabel');
+            const locationGroup = document.getElementById('reportLocationGroup');
+            const locationLabel = document.getElementById('reportLocationLabel');
+            const detailsLabel = document.getElementById('reportDetailsLabel');
+            const details = document.getElementById('reportDetails');
+            const incidentsLabel = document.getElementById('reportIncidentsLabel');
+            const submitBtn = document.getElementById('reportSubmitBtn');
+            const editingId = parseInt(document.getElementById('editingReportId')?.value || '0', 10) || 0;
+
+            if (heading) {
+                heading.textContent = isEvent ? 'Submit Event / Marshal Report' : 'Submit Patrol Report';
+            }
+            if (hint) {
+                hint.textContent = isEvent
+                    ? 'You are reporting on this event/marshal duty. Fill in what you did during the assignment.'
+                    : 'You are reporting on this patrol assignment. Fill in what you did during the shift.';
+            }
+            if (routeLabel) {
+                routeLabel.textContent = isEvent ? 'Event Location *' : 'Route / Streets *';
+            }
+            if (locationGroup) {
+                locationGroup.hidden = isEvent;
+            }
+            if (locationLabel) {
+                locationLabel.innerHTML = 'Specific Location <span style="font-weight:400;color:var(--text-secondary);">(optional)</span>';
+            }
+            if (detailsLabel) {
+                detailsLabel.textContent = isEvent ? 'Duty Summary *' : 'Patrol Summary *';
+            }
+            if (details) {
+                details.placeholder = isEvent
+                    ? 'Describe your marshal/event duties, observations, and actions taken...'
+                    : 'Describe patrol activities, observations, and actions taken...';
+            }
+            if (incidentsLabel) {
+                incidentsLabel.textContent = isEvent ? 'Incidents / Issues' : 'Incidents';
+            }
+            if (submitBtn && editingId <= 0) {
+                submitBtn.textContent = 'Submit Report';
+            }
+        }
+
         function updateAssignmentInfo(scheduleId) {
             const info = document.getElementById('reportAssignmentInfo');
             if (!info) return;
             const row = scheduleData[scheduleId] || portalSchedules.find(s => Number(s.id) === Number(scheduleId));
             if (!row) {
-                info.textContent = 'No active assignment selected. Open Submit Report from My Schedule.';
+                info.textContent = 'No active assignment selected. Open Submit Report from My Schedule or Event / Marshal Duties.';
+                adaptReportFormForAssignment(null);
                 return;
             }
+
+            adaptReportFormForAssignment(row);
             const isEvent = getScheduleAssignmentType(row) === 'event';
             const notes = String(row.notes || '').trim();
+
             if (isEvent) {
                 const eventName = getNoteField(notes, 'Event Name') || row.patrol_zone || '—';
-                const eventLocation = getNoteField(notes, 'Event Location') || row.location || '—';
+                const eventLocation = getNoteField(notes, 'Event Location') || row.location || row.patrol_zone || '—';
+                const instructions = getNoteField(notes, 'Special Instructions') || '';
+                const requestId = getNoteField(notes, 'Request ID') || '';
+                const eventWindow = getNoteField(notes, 'Event Date / Time') || '';
                 info.innerHTML = `
-                    <div><strong>Event / Marshal Assignment:</strong> ${escapeHtml(row.schedule_date || '')} · ${escapeHtml(formatShiftWithHours(row.shift))}</div>
-                    <div style="margin-top:0.35rem;"><strong>Event:</strong> ${escapeHtml(eventName)}</div>
-                    <div style="margin-top:0.35rem;"><strong>Event Location:</strong> ${escapeHtml(eventLocation)}</div>
-                    ${notes ? `<div class="assignment-notes"><strong>Event Details:</strong><br>${escapeHtml(notes)}</div>` : ''}
+                    <div><strong>Event / Marshal Duty</strong></div>
+                    <div class="assignment-line"><strong>Date / Shift:</strong> ${escapeHtml(row.schedule_date || '')} · ${escapeHtml(formatShiftWithHours(row.shift))}</div>
+                    <div class="assignment-line"><strong>Event:</strong> ${escapeHtml(eventName)}</div>
+                    <div class="assignment-line"><strong>Location:</strong> ${escapeHtml(eventLocation)}</div>
+                    ${instructions ? `<div class="assignment-line"><strong>Instructions:</strong> ${escapeHtml(instructions)}</div>` : ''}
+                    ${notes ? `
+                        <button type="button" class="assignment-more-btn" data-kind="details" onclick="toggleAssignmentMore(this)">Show more details</button>
+                        <div class="assignment-more assignment-notes" hidden>
+                            ${requestId ? `<div><strong>Request ID:</strong> ${escapeHtml(requestId)}</div>` : ''}
+                            ${eventWindow ? `<div class="assignment-line"><strong>Event Date / Time:</strong> ${escapeHtml(eventWindow)}</div>` : ''}
+                            <div class="assignment-line" style="margin-top:0.55rem;white-space:pre-wrap;">${escapeHtml(notes)}</div>
+                        </div>
+                    ` : ''}
                 `;
                 return;
             }
@@ -1516,11 +1593,32 @@ $personnelCode = htmlspecialchars(getBpsoPersonnelCode());
             const zone = row.patrol_zone || '—';
             const route = row.route || row.location || '—';
             info.innerHTML = `
-                <div><strong>Patrol Assignment:</strong> ${escapeHtml(row.schedule_date || '')} · ${escapeHtml(formatShiftWithHours(row.shift))} · ${escapeHtml(zone)}</div>
-                <div style="margin-top:0.35rem;"><strong>Route / Streets:</strong> ${escapeHtml(route)}</div>
-                ${notes ? `<div class="assignment-notes"><strong>Patrol Notes:</strong><br>${escapeHtml(notes)}</div>` : ''}
+                <div><strong>Patrol Duty</strong></div>
+                <div class="assignment-line"><strong>Date / Shift:</strong> ${escapeHtml(row.schedule_date || '')} · ${escapeHtml(formatShiftWithHours(row.shift))}</div>
+                <div class="assignment-line"><strong>Patrol Zone:</strong> ${escapeHtml(zone)}</div>
+                <div class="assignment-line"><strong>Route / Streets:</strong> ${escapeHtml(route)}</div>
+                ${notes ? `
+                    <button type="button" class="assignment-more-btn" data-kind="notes" onclick="toggleAssignmentMore(this)">Show notes</button>
+                    <div class="assignment-more assignment-notes" hidden>${escapeHtml(notes)}</div>
+                ` : ''}
             `;
         }
+
+        function toggleAssignmentMore(button) {
+            if (!button) return;
+            const more = button.nextElementSibling;
+            if (!more) return;
+            const isNotes = button.dataset.kind === 'notes';
+            const opening = more.hasAttribute('hidden');
+            if (opening) {
+                more.removeAttribute('hidden');
+                button.textContent = isNotes ? 'Hide notes' : 'Hide details';
+            } else {
+                more.setAttribute('hidden', '');
+                button.textContent = isNotes ? 'Show notes' : 'Show more details';
+            }
+        }
+        window.toggleAssignmentMore = toggleAssignmentMore;
 
         function setReportFormVisible(visible, isAdditional = false) {
             const form = document.getElementById('reportForm');
@@ -1535,7 +1633,7 @@ $personnelCode = htmlspecialchars(getBpsoPersonnelCode());
             }
             if (submitBtn) {
                 const editingId = parseInt(document.getElementById('editingReportId')?.value || '0', 10) || 0;
-                submitBtn.textContent = editingId > 0 ? 'Save Changes' : 'Submit';
+                submitBtn.textContent = editingId > 0 ? 'Save Changes' : 'Submit Report';
             }
         }
 
@@ -1544,7 +1642,9 @@ $personnelCode = htmlspecialchars(getBpsoPersonnelCode());
             if (!scheduleInput) return;
 
             const scheduleId = parseInt(scheduleInput.value, 10) || 0;
+            const row = scheduleData[scheduleId] || portalSchedules.find(s => Number(s.id) === Number(scheduleId));
             updateAssignmentInfo(scheduleId);
+            adaptReportFormForAssignment(row || null);
 
             if (!scheduleId) {
                 setReportFormVisible(false, false);
@@ -2331,11 +2431,23 @@ $personnelCode = htmlspecialchars(getBpsoPersonnelCode());
         function fillReportFromSchedule(scheduleId, clearDetails = false) {
             const row = scheduleData[scheduleId] || portalSchedules.find(s => Number(s.id) === Number(scheduleId));
             if (!row) return;
+            const isEvent = getScheduleAssignmentType(row) === 'event';
+            const notes = String(row.notes || '');
+            const eventLocation = getNoteField(notes, 'Event Location') || row.location || row.patrol_zone || '';
+            const patrolRoute = row.route || row.patrol_zone || '';
+
             document.getElementById('reportSchedule').value = String(scheduleId);
             updateAssignmentInfo(scheduleId);
-            document.getElementById('reportRoute').value = row.route || row.patrol_zone || '';
+            adaptReportFormForAssignment(row);
+            document.getElementById('reportRoute').value = isEvent ? eventLocation : patrolRoute;
             document.getElementById('reportDate').value = row.schedule_date || '';
-            document.getElementById('reportLocation').value = clearDetails ? (row.location || row.patrol_zone || '') : (document.getElementById('reportLocation').value || row.location || '');
+            if (isEvent) {
+                document.getElementById('reportLocation').value = eventLocation;
+            } else if (clearDetails) {
+                document.getElementById('reportLocation').value = '';
+            } else {
+                document.getElementById('reportLocation').value = document.getElementById('reportLocation').value || '';
+            }
             if (clearDetails) {
                 document.getElementById('editingReportId').value = '';
                 document.getElementById('reportIncidents').value = 'None';
@@ -2371,15 +2483,20 @@ $personnelCode = htmlspecialchars(getBpsoPersonnelCode());
             }
 
             const documentationPhoto = (document.getElementById('reportDocumentationData')?.value || '').trim();
+            const routeValue = document.getElementById('reportRoute').value.trim();
+            const locationGroup = document.getElementById('reportLocationGroup');
+            const locationValue = (locationGroup && locationGroup.hidden)
+                ? routeValue
+                : document.getElementById('reportLocation').value.trim();
 
             const payload = {
                 action: editingId > 0 ? 'update_report' : 'submit_report',
                 id: editingId,
                 schedule_id: scheduleId,
-                route: document.getElementById('reportRoute').value.trim(),
+                route: routeValue,
                 date: document.getElementById('reportDate').value,
                 time: document.getElementById('reportTime').value,
-                location: document.getElementById('reportLocation').value.trim(),
+                location: locationValue || routeValue,
                 incidents: document.getElementById('reportIncidents').value.trim() || 'None',
                 details: document.getElementById('reportDetails').value.trim(),
                 documentation_photo: documentationPhoto,
