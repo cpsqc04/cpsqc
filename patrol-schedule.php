@@ -669,15 +669,12 @@ require_once __DIR__ . '/db.php';
                                     <th>Shift</th>
                                     <th>Patrol Zone</th>
                                     <th>Date</th>
-                                    <th>Patrol Start</th>
-                                    <th>Patrol End</th>
-                                    <th>Duration</th>
                                     <th>Status</th>
                                     <th>Actions</th>
                                 </tr>
                             </thead>
                             <tbody id="patrolsTableBody">
-                                <tr><td colspan="9" style="text-align:center;padding:2rem;color:#666;">Loading patrol schedules...</td></tr>
+                                <tr><td colspan="6" style="text-align:center;padding:2rem;color:#666;">Loading patrol schedules...</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -1170,7 +1167,7 @@ require_once __DIR__ . '/db.php';
                 const result = await response.json();
 
                 if (!result.success) {
-                    tableBody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:2rem;color:#666;">Failed to load patrol schedules.</td></tr>';
+                    tableBody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:2rem;color:#666;">Failed to load patrol schedules.</td></tr>';
                     return;
                 }
 
@@ -1178,25 +1175,20 @@ require_once __DIR__ . '/db.php';
                 const rows = result.data || [];
 
                 if (rows.length === 0) {
-                    tableBody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:2rem;color:#666;">No patrol assignments yet. Click "Assign Patrol" to create one.</td></tr>';
+                    tableBody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:2rem;color:#666;">No patrol assignments yet. Click "Assign Patrol" to create one.</td></tr>';
                     return;
                 }
 
                 tableBody.innerHTML = rows.map(row => {
                     patrolData[row.id] = row;
                     const zone = row.patrol_zone || row.location || row.route || '—';
-                    const startDisplay = row.patrol_start_display || formatScheduleTime(row.patrol_start || row.schedule_time) || (row.status === 'Scheduled' ? 'Pending' : '—');
-                    const endDisplay = row.patrol_end_display || formatScheduleTime(row.patrol_end) || (row.status === 'Scheduled' ? 'Pending' : (row.status === 'In Progress' ? 'In progress' : '—'));
-                    const durationLabel = row.duration_label || (row.status === 'In Progress' ? 'In progress' : '—');
-                    const searchText = [row.personnel_name, row.shift, zone, row.schedule_date, row.status, startDisplay, endDisplay, durationLabel].join(' ').toLowerCase();
+                    const shiftLabel = formatShiftWithHours(row.shift);
+                    const searchText = [row.personnel_name, shiftLabel, row.shift, zone, row.schedule_date, row.status].join(' ').toLowerCase();
                     return `<tr data-schedule-id="${row.id}" data-search="${escapeHtml(searchText)}">
                         <td>${escapeHtml(row.personnel_name)}</td>
-                        <td>${escapeHtml(row.shift || '—')}</td>
+                        <td>${escapeHtml(shiftLabel)}</td>
                         <td>${escapeHtml(zone)}</td>
                         <td>${escapeHtml(row.schedule_date)}</td>
-                        <td>${escapeHtml(startDisplay)}</td>
-                        <td>${escapeHtml(endDisplay)}</td>
-                        <td>${escapeHtml(durationLabel)}</td>
                         <td><span class="status-badge ${statusClass(row.status)}">${escapeHtml(row.status)}</span></td>
                         <td>
                             <div class="action-buttons">
@@ -1207,7 +1199,7 @@ require_once __DIR__ . '/db.php';
                 }).join('');
             } catch (e) {
                 console.error('Error loading patrol schedules:', e);
-                tableBody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:2rem;color:#666;">Error loading patrol schedules.</td></tr>';
+                tableBody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:2rem;color:#666;">Error loading patrol schedules.</td></tr>';
             }
         }
 
@@ -1343,6 +1335,13 @@ require_once __DIR__ . '/db.php';
             return '';
         }
 
+        function formatShiftWithHours(value) {
+            const shift = normalizeDutyShift(value) || String(value || '').trim();
+            if (shift === 'Day Shift') return 'Day Shift (8:00 AM – 8:00 PM)';
+            if (shift === 'Night Shift') return 'Night Shift (8:00 PM – 8:00 AM)';
+            return shift || '—';
+        }
+
         function getSelectedPatrolOptions() {
             const select = document.getElementById('patrolOfficer');
             return Array.from(select.selectedOptions).filter(opt => opt.value && !opt.disabled);
@@ -1400,14 +1399,12 @@ require_once __DIR__ . '/db.php';
             const content = `
                 <div style="line-height: 1.8;">
                     <p><strong>BPSO Personnel:</strong> ${escapeHtml(schedule.personnel_name)}</p>
-                    <p><strong>Shift:</strong> ${escapeHtml(schedule.shift || '—')}</p>
+                    <p><strong>Shift:</strong> ${escapeHtml(formatShiftWithHours(schedule.shift))}</p>
                     <p><strong>Patrol Zone:</strong> ${escapeHtml(zone)}</p>
                     <p><strong>Date:</strong> ${escapeHtml(schedule.schedule_date)}</p>
-                    <p><strong>Patrol Start:</strong> ${escapeHtml(schedule.patrol_start_display || formatScheduleTime(schedule.patrol_start || schedule.schedule_time) || 'Pending')}</p>
-                    <p><strong>Patrol End:</strong> ${escapeHtml(schedule.patrol_end_display || formatScheduleTime(schedule.patrol_end) || '—')}</p>
-                    <p><strong>Duration:</strong> ${escapeHtml(schedule.duration_label || '—')}</p>
                     <p><strong>Status:</strong> <span class="status-badge ${statusClass(schedule.status)}">${escapeHtml(schedule.status)}</span></p>
                     <p><strong>Notes:</strong> ${escapeHtml(schedule.notes || '—')}</p>
+                    <p style="margin-top:0.75rem;color:var(--text-secondary);font-size:0.9rem;"><em>Attendance is based on Clock On / Clock Out in the BPSO portal.</em></p>
                 </div>
             `;
             

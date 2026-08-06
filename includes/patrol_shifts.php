@@ -21,6 +21,22 @@ function isValidPatrolShift(?string $shift): bool
     return in_array(trim((string) $shift), patrolShiftOptions(), true);
 }
 
+/**
+ * Human-readable shift with fixed duty hours, e.g. "Day Shift (8:00 AM – 8:00 PM)".
+ */
+function formatPatrolShiftLabel(?string $shift): string
+{
+    $normalized = trim((string) $shift);
+    if (strcasecmp($normalized, PATROL_SHIFT_DAY) === 0 || stripos($normalized, 'day') !== false) {
+        return PATROL_SHIFT_DAY . ' (8:00 AM – 8:00 PM)';
+    }
+    if (strcasecmp($normalized, PATROL_SHIFT_NIGHT) === 0 || stripos($normalized, 'night') !== false) {
+        return PATROL_SHIFT_NIGHT . ' (8:00 PM – 8:00 AM)';
+    }
+
+    return $normalized !== '' ? $normalized : '—';
+}
+
 function normalizePatrolTime(?string $time): string
 {
     $time = trim((string) $time);

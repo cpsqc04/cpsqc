@@ -726,14 +726,11 @@ $personnelCode = htmlspecialchars(getBpsoPersonnelCode());
                                     <th>Date</th>
                                     <th>Shift</th>
                                     <th>Patrol Zone</th>
-                                    <th>Start</th>
-                                    <th>End</th>
-                                    <th>Duration</th>
                                     <th>Actions</th>
                                 </tr>
                             </thead>
                             <tbody id="scheduleTableBody">
-                                <tr><td colspan="7" class="empty-state">Loading schedule...</td></tr>
+                                <tr><td colspan="4" class="empty-state">Loading schedule...</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -1209,6 +1206,13 @@ $personnelCode = htmlspecialchars(getBpsoPersonnelCode());
             return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
         }
 
+        function formatShiftWithHours(value) {
+            const raw = String(value || '').trim().toLowerCase();
+            if (raw.includes('night')) return 'Night Shift (8:00 PM – 8:00 AM)';
+            if (raw.includes('day')) return 'Day Shift (8:00 AM – 8:00 PM)';
+            return String(value || '').trim() || '—';
+        }
+
         function getFilteredSchedules() {
             const today = getTodayDateString();
             if (scheduleFilter === 'today') {
@@ -1228,14 +1232,12 @@ $personnelCode = htmlspecialchars(getBpsoPersonnelCode());
             const rows = getFilteredSchedules();
 
             if (rows.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="7" class="empty-state"><i class="fas fa-calendar-times"></i>No patrol assignments in this view.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="4" class="empty-state"><i class="fas fa-calendar-times"></i>No patrol assignments in this view.</td></tr>';
             } else {
                 tbody.innerHTML = rows.map(row => {
                     scheduleData[row.id] = row;
                     const zone = row.patrol_zone || row.location || row.route || '—';
-                    const startDisplay = row.patrol_start_display || (row.patrol_start || row.schedule_time ? formatScheduleTime(row.patrol_start || row.schedule_time) : (row.status === 'Scheduled' ? 'Pending' : '—'));
-                    const endDisplay = row.patrol_end_display || (row.patrol_end ? formatScheduleTime(row.patrol_end) : (row.status === 'In Progress' ? 'In progress' : (row.status === 'Scheduled' ? 'Pending' : '—')));
-                    const durationLabel = row.duration_label || (row.status === 'In Progress' ? 'In progress' : '—');
+                    const shiftLabel = formatShiftWithHours(row.shift);
                     const isSubmitted = getReportCountForSchedule(row.id) > 0 || row.status === 'Completed';
                     const canReport = !isSubmitted && (row.status === 'Scheduled' || row.status === 'In Progress');
                     let actions = '—';
@@ -1246,11 +1248,8 @@ $personnelCode = htmlspecialchars(getBpsoPersonnelCode());
                     }
                     return `<tr>
                         <td>${escapeHtml(row.schedule_date)}</td>
-                        <td>${escapeHtml(row.shift || '—')}</td>
+                        <td>${escapeHtml(shiftLabel)}</td>
                         <td>${escapeHtml(zone)}</td>
-                        <td>${escapeHtml(startDisplay)}</td>
-                        <td>${escapeHtml(endDisplay)}</td>
-                        <td>${escapeHtml(durationLabel)}</td>
                         <td>${actions}</td>
                     </tr>`;
                 }).join('');
@@ -1298,7 +1297,7 @@ $personnelCode = htmlspecialchars(getBpsoPersonnelCode());
                 return;
             }
             const zone = row.patrol_zone || row.route || '—';
-            info.innerHTML = `<strong>Assignment:</strong> ${escapeHtml(row.schedule_date || '')} · ${escapeHtml(row.shift || '—')} · ${escapeHtml(zone)}`;
+            info.innerHTML = `<strong>Assignment:</strong> ${escapeHtml(row.schedule_date || '')} · ${escapeHtml(formatShiftWithHours(row.shift))} · ${escapeHtml(zone)}`;
         }
 
         function setReportFormVisible(visible, isAdditional = false) {
