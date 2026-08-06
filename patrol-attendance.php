@@ -1340,9 +1340,7 @@ $personnelCode = htmlspecialchars(getBpsoPersonnelCode());
             const actionBits = [
                 `<button type="button" class="btn-view" onclick="openScheduleDetailModal(${row.id})">View</button>`
             ];
-            if (isSubmitted) {
-                actionBits.push('<span class="actions-submitted">Submitted</span>');
-            } else if (canReport) {
+            if (canReport) {
                 actionBits.push(`<button type="button" class="btn-report" onclick="openReportForSchedule(${row.id})">Submit Report</button>`);
             }
             return actionBits.join('');
