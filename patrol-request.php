@@ -162,10 +162,12 @@ $patrolNavActive = 'patrol-request';
         .status-cancelled { background: #e9ecef; color: #6c757d; }
         .action-buttons { display: flex; gap: 0.5rem; flex-wrap: wrap; }
         .btn-view, .btn-manage, .btn-link, .btn-assign, .btn-decline { padding: 0.5rem 1rem; border: none; border-radius: 6px; font-size: 0.85rem; cursor: pointer; color: #fff; background: var(--primary-color); text-decoration: none; display: inline-flex; align-items: center; }
-        .btn-manage { background: #ff9800; }
-        .btn-assign { background: #0f766e; }
+        .btn-manage { background: var(--primary-color); }
+        .btn-assign { background: var(--primary-color); }
+        .btn-assign:hover { background: #4ca8a6; }
         .btn-decline { background: #b91c1c; }
-        .btn-link { background: #6366f1; }
+        .btn-link { background: var(--primary-color); }
+        .btn-link:hover { background: #4ca8a6; }
         .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 2000; align-items: center; justify-content: center; }
         .modal.active { display: flex; }
         .modal-content { background: var(--card-bg); border-radius: 12px; padding: 2rem; width: 90%; max-width: 760px; max-height: 90vh; overflow-y: auto; }

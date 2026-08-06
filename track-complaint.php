@@ -18,6 +18,8 @@ require_once __DIR__ . '/db.php';
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="css/theme.css">
     <link rel="stylesheet" href="css/admin-sidebar.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="js/alertara-report-export.js"></script>
     <style>
         body {
             margin: 0;
@@ -1022,29 +1024,35 @@ require_once __DIR__ . '/db.php';
         .action-buttons {
             display: flex;
             gap: 0.5rem;
+            flex-wrap: wrap;
+            align-items: center;
         }
         
-        .btn-view, .btn-manage {
+        .btn-view, .btn-manage, .btn-export {
             padding: 0.5rem 1rem;
             background: var(--primary-color);
             color: #fff;
             border: none;
             border-radius: 6px;
             font-size: 0.85rem;
+            font-weight: 600;
             cursor: pointer;
             transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
         }
         
-        .btn-view:hover {
+        .btn-view:hover, .btn-export:hover {
             background: #4ca8a6;
         }
         
         .btn-manage {
-            background: #ff9800;
+            background: var(--primary-color);
         }
         
         .btn-manage:hover {
-            background: #f57c00;
+            background: #4ca8a6;
         }
 
         .manage-complaint-ref {
@@ -1844,6 +1852,7 @@ require_once __DIR__ . '/db.php';
                         <td>
                             <div class="action-buttons">
                                 <button class="btn-view" onclick="viewComplaint('${c.complaint_id}')">View</button>
+                                <button class="btn-export" onclick="exportComplaint('${c.complaint_id}')"><i class="fas fa-file-export"></i> Export</button>
                                 ${String(c.status || '').toLowerCase() !== 'resolved'
                                     ? `<button class="btn-manage" onclick="manageComplaint('${c.complaint_id}')">Assign Patrol</button>`
                                     : ''}
@@ -1996,6 +2005,85 @@ require_once __DIR__ . '/db.php';
             modal.classList.add('active');
         }
         
+        async function exportComplaint(complaintId) {
+            const complaint = complaintData[complaintId];
+            if (!complaint) {
+                alert('Complaint details not found for: ' + complaintId);
+                return;
+            }
+            if (!window.AlertaraReportExport) {
+                alert('Export helper not loaded. Please refresh the page.');
+                return;
+            }
+
+            try {
+                const incidentDate = new Date(complaint.incident_date);
+                const formattedIncidentDate = incidentDate.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'Asia/Manila' });
+                const formattedTime = formatIncidentTime(complaint.incident_time);
+                let lastUpdated = 'N/A';
+                if (complaint.submitted_at) {
+                    lastUpdated = new Date(complaint.submitted_at).toLocaleString('en-US', {
+                        year: 'numeric', month: '2-digit', day: '2-digit',
+                        hour: '2-digit', minute: '2-digit', hour12: true
+                    });
+                }
+
+                const fields = [
+                    { label: 'Complaint ID', value: complaint.complaint_id },
+                    { label: 'Status', value: complaint.status },
+                    { label: "Complainant's Name", value: complaint.complainant_name },
+                    { label: "Complainant's Address", value: complaint.address },
+                    { label: "Complainant's Contact Number", value: complaint.contact_number },
+                    { label: 'Date', value: formattedIncidentDate },
+                    { label: 'Time', value: formattedTime },
+                    { label: "Defendant's Name", value: complaint.defendant_name || 'N/A' },
+                    { label: "Defendant's Address", value: complaint.defendant_address || 'N/A' },
+                    { label: "Defendant's Contact Number", value: complaint.defendant_contact_number || 'N/A' },
+                    { label: 'Complaint Type', value: formatComplaintTypeLabel(complaint) }
+                ];
+                if (!isComplaintForwarded(complaint)) {
+                    fields.push({ label: 'Assigned To', value: complaint.assigned_to || 'Pending Assignment' });
+                }
+                if (complaint.resolved_at) {
+                    fields.push({
+                        label: 'Resolved At',
+                        value: new Date(complaint.resolved_at).toLocaleString('en-US', {
+                            year: 'numeric', month: '2-digit', day: '2-digit',
+                            hour: '2-digit', minute: '2-digit', hour12: true
+                        })
+                    });
+                }
+                if (complaint.blotter_reference_id) {
+                    fields.push({ label: 'Digital Blotter Reference', value: complaint.blotter_reference_id });
+                }
+                if (complaint.forwarded_at) {
+                    fields.push({
+                        label: 'Forwarded At',
+                        value: new Date(complaint.forwarded_at).toLocaleString('en-US', {
+                            year: 'numeric', month: '2-digit', day: '2-digit',
+                            hour: '2-digit', minute: '2-digit', hour12: true
+                        })
+                    });
+                }
+                fields.push({ label: 'Last Updated', value: lastUpdated });
+
+                const fileName = 'complaint_report_' + String(complaint.complaint_id || 'complaint').replace(/\s+/g, '_') + '.docx';
+                await AlertaraReportExport.downloadReport({
+                    title: 'COMPLAINT REPORT',
+                    fileName: fileName,
+                    fields: fields,
+                    blocks: [
+                        { label: 'Description', value: complaint.description || '' },
+                        { label: 'BPSO Resolution', value: complaint.resolution_report || 'No BPSO resolution report yet.' }
+                    ]
+                });
+                alert('Complaint exported successfully as ' + fileName + '!');
+            } catch (error) {
+                console.error('Error generating DOCX:', error);
+                alert(error.message || 'Error generating DOCX file. Please try again.');
+            }
+        }
+
         function closeComplaintModal() {
             document.getElementById('complaintModal').classList.remove('active');
         }

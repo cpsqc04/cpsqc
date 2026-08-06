@@ -20,6 +20,8 @@ define('NW_PAGE_MODE', 'incidents');
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="css/theme.css">
     <link rel="stylesheet" href="css/admin-sidebar.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="js/alertara-report-export.js"></script>
     <style>
         body { margin: 0; padding: 0; font-family: var(--font-family); background-color: var(--bg-color); display: flex; min-height: 100vh; }
         .sidebar { width: 320px; background: var(--tertiary-color); color: #fff; position: fixed; left: 0; top: 0; height: 100vh; overflow: hidden; box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1); z-index: 1000; transition: width 0.3s ease; display: flex; flex-direction: column; }
@@ -102,11 +104,11 @@ define('NW_PAGE_MODE', 'incidents');
         tbody tr:hover { background: #f9f9f9; }
         tbody tr:last-child td { border-bottom: none; }
         .action-buttons { display: flex; gap: 0.5rem; flex-wrap: wrap; }
-        .btn-view, .btn-manage { padding: 0.5rem 1rem; border: none; border-radius: 6px; font-size: 0.85rem; font-weight: 600; cursor: pointer; color: #fff; }
-        .btn-view { background: var(--primary-color); }
-        .btn-view:hover { background: #4ca8a6; }
-        .btn-manage { background: #ff9800; }
-        .btn-manage:hover { background: #f57c00; }
+        .btn-view, .btn-manage, .btn-export { padding: 0.5rem 1rem; border: none; border-radius: 6px; font-size: 0.85rem; font-weight: 600; cursor: pointer; color: #fff; display: inline-flex; align-items: center; gap: 0.4rem; }
+        .btn-view, .btn-export { background: var(--primary-color); }
+        .btn-view:hover, .btn-export:hover { background: #4ca8a6; }
+        .btn-manage { background: var(--primary-color); }
+        .btn-manage:hover { background: #4ca8a6; }
         .status-badge { padding: 0.25rem 0.65rem; border-radius: 999px; font-size: 0.8rem; font-weight: 600; background: #fef3c7; color: #92400e; display: inline-block; }
         .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 2000; align-items: center; justify-content: center; padding: 1rem; }
         .modal.active { display: flex; }
@@ -137,7 +139,8 @@ define('NW_PAGE_MODE', 'incidents');
         .form-field textarea { min-height: 90px; }
         .modal-actions { display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 1rem; flex-wrap: wrap; }
         .btn-secondary { background: #e5e7eb; color: #111; padding: 0.55rem 1rem; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; }
-        .btn-save { background: #059669; color: #fff; padding: 0.55rem 1rem; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; }
+        .btn-save { background: var(--primary-color); color: #fff; padding: 0.55rem 1rem; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; }
+        .btn-save:hover { background: #4ca8a6; }
         .manage-report-ref { color: var(--text-secondary); margin: 0 0 1rem; font-size: 0.95rem; }
         .empty-state { text-align: center; padding: 2rem; color: var(--text-secondary); }
         @media (max-width: 768px) {
@@ -429,6 +432,7 @@ define('NW_PAGE_MODE', 'incidents');
                     + '<td>' + escapeHtml(date) + '</td>'
                     + '<td><div class="action-buttons">'
                     + '<button type="button" class="btn-view" onclick="viewReport(' + report.id + ')">View</button>'
+                    + '<button type="button" class="btn-export" onclick="exportIncidentReport(' + report.id + ')"><i class="fas fa-file-export"></i> Export</button>'
                     + (isResolved ? '' : '<button type="button" class="btn-manage" onclick="manageReport(' + report.id + ')">Assign</button>')
                     + '</div></td>'
                     + '</tr>';
@@ -457,6 +461,61 @@ define('NW_PAGE_MODE', 'incidents');
                 }
             } catch (err) {
                 document.getElementById('tableContainer').innerHTML = '<div class="empty-state">Network error while loading reports.</div>';
+            }
+        }
+
+        async function exportIncidentReport(id) {
+            const report = reports.find(function(r) { return Number(r.id) === Number(id); });
+            if (!report) {
+                alert('Incident report not found');
+                return;
+            }
+            if (!window.AlertaraReportExport) {
+                alert('Export helper not loaded. Please refresh the page.');
+                return;
+            }
+
+            try {
+                const fields = [
+                    { label: 'Report ID', value: report.report_id || '' },
+                    { label: 'Member', value: (report.member_name || '') + (report.member_contact ? ' (' + report.member_contact + ')' : '') },
+                    { label: 'Email', value: report.member_email || '' },
+                    { label: 'Location', value: report.location || '' },
+                    { label: 'Status', value: report.status || '' },
+                    { label: 'Assigned To', value: report.assigned_to || 'Unassigned' },
+                    { label: 'Submitted', value: report.created_at ? new Date(report.created_at).toLocaleString() : '—' }
+                ];
+                if (report.assigned_at) {
+                    fields.push({ label: 'Assigned At', value: new Date(report.assigned_at).toLocaleString() });
+                }
+                if (report.resolved_at) {
+                    fields.push({ label: 'Resolved At', value: new Date(report.resolved_at).toLocaleString() });
+                }
+
+                const blocks = [
+                    { label: 'Description', value: report.description || '' }
+                ];
+                if (report.resolution_report) {
+                    blocks.push({ label: 'Personnel Resolution', value: report.resolution_report });
+                }
+
+                const images = [];
+                if (report.photo_data) {
+                    images.push({ label: 'Photo', src: report.photo_data });
+                }
+
+                const fileName = 'nw_incident_report_' + String(report.report_id || report.id).replace(/\s+/g, '_') + '.docx';
+                await AlertaraReportExport.downloadReport({
+                    title: 'NEIGHBORHOOD WATCH INCIDENT REPORT',
+                    fileName: fileName,
+                    fields: fields,
+                    blocks: blocks,
+                    images: images
+                });
+                alert('Incident report exported successfully as ' + fileName + '!');
+            } catch (error) {
+                console.error('Error generating DOCX:', error);
+                alert(error.message || 'Error generating DOCX file. Please try again.');
             }
         }
 

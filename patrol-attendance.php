@@ -374,8 +374,8 @@ $personnelCode = htmlspecialchars(getBpsoPersonnelCode());
         .status-resolved { background: #d1fae5; color: #047857; }
         .btn-view { padding: 0.5rem 1rem; background: var(--primary-color); color: #fff; border: none; border-radius: 6px; font-size: 0.85rem; cursor: pointer; }
         .btn-view:hover { background: #4ca8a6; }
-        .btn-edit { padding: 0.5rem 1rem; background: #2563eb; color: #fff; border: none; border-radius: 6px; font-size: 0.85rem; cursor: pointer; margin-left: 0.35rem; }
-        .btn-edit:hover { background: #1d4ed8; }
+        .btn-edit { padding: 0.5rem 1rem; background: var(--primary-color); color: #fff; border: none; border-radius: 6px; font-size: 0.85rem; cursor: pointer; margin-left: 0.35rem; }
+        .btn-edit:hover { background: #4ca8a6; }
         .btn-edit:disabled { background: #94a3b8; cursor: not-allowed; opacity: 0.7; }
         .report-actions { display: flex; flex-wrap: wrap; gap: 0.35rem; align-items: center; }
         .doc-cell { display: flex; flex-direction: column; align-items: flex-start; gap: 0.4rem; min-width: 120px; }
@@ -958,7 +958,7 @@ $personnelCode = htmlspecialchars(getBpsoPersonnelCode());
                     <textarea id="resolutionReport" required placeholder="Describe how you handled the complaint, actions taken, and outcome..."></textarea>
                 </div>
                 <div style="display:flex;gap:0.75rem;flex-wrap:wrap;">
-                    <button type="button" id="saveProgressBtn" class="btn-submit" style="background:#2563eb;" onclick="submitComplaintResolution('Processing')">Save Progress</button>
+                    <button type="button" id="saveProgressBtn" class="btn-submit" onclick="submitComplaintResolution('Processing')">Save Progress</button>
                     <button type="submit" id="resolveComplaintBtn" class="btn-submit">Mark as Resolved</button>
                 </div>
             </form>
@@ -1009,7 +1009,7 @@ $personnelCode = htmlspecialchars(getBpsoPersonnelCode());
                     <p class="field-hint">Final outcome is set by your report. Police backup (if requested) is assistance only.</p>
                 </div>
                 <div style="display:flex;gap:0.75rem;flex-wrap:wrap;">
-                    <button type="button" id="saveTipProgressBtn" class="btn-submit" style="background:#2563eb;" onclick="submitTipResolution('Assigned')">Save Progress</button>
+                    <button type="button" id="saveTipProgressBtn" class="btn-submit" onclick="submitTipResolution('Assigned')">Save Progress</button>
                     <button type="submit" id="resolveTipBtn" class="btn-submit">Mark as Resolved</button>
                 </div>
             </form>

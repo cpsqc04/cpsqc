@@ -161,7 +161,8 @@ $cctvNavActive = 'camera-management';
         .btn-primary { background: var(--primary-color); color: #fff; border: none; padding: 0.75rem 1.2rem; border-radius: 8px; cursor: pointer; font-weight: 600; }
         .btn-primary:hover { background: #4ca8a6; }
         .btn-edit, .btn-delete { padding: 0.45rem 0.85rem; border: none; border-radius: 6px; font-size: 0.85rem; cursor: pointer; color: #fff; }
-        .btn-edit { background: #ff9800; margin-right: 0.35rem; }
+        .btn-edit { background: var(--primary-color); margin-right: 0.35rem; }
+        .btn-edit:hover { background: #4ca8a6; }
         .btn-delete { background: #dc3545; }
         .stream-badge { display: inline-block; padding: 0.15rem 0.55rem; border-radius: 999px; font-size: 0.75rem; font-weight: 600; background: #e0f2fe; color: #0369a1; }
         .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 2000; align-items: center; justify-content: center; }

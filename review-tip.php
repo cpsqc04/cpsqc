@@ -19,6 +19,7 @@ require_once __DIR__ . '/db.php';
     <link rel="stylesheet" href="css/theme.css">
     <link rel="stylesheet" href="css/admin-sidebar.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="js/alertara-report-export.js"></script>
     <style>
         @keyframes fadeIn {
             from { opacity: 0; }
@@ -404,8 +405,8 @@ require_once __DIR__ . '/db.php';
             white-space: nowrap;
         }
         .btn-view:hover { background: #4ca8a6; }
-        .btn-manage { background: #ff9800; }
-        .btn-manage:hover { background: #f57c00; }
+        .btn-manage { background: var(--primary-color); }
+        .btn-manage:hover { background: #4ca8a6; }
         .manage-tip-ref { margin: 0 0 0.35rem; color: var(--tertiary-color); font-weight: 600; }
         .manage-tip-meta { margin: 0 0 1.25rem; color: var(--text-secondary); font-size: 0.92rem; line-height: 1.5; }
         .manage-tip-actions { display: flex; flex-direction: column; gap: 0.75rem; }
@@ -1359,168 +1360,41 @@ require_once __DIR__ . '/db.php';
         }
 
         async function exportTipsToWord(tips) {
-            if (typeof JSZip === 'undefined') {
-                alert('Export library not loaded. Please refresh the page.');
+            if (!window.AlertaraReportExport) {
+                alert('Export helper not loaded. Please refresh the page.');
                 return;
             }
             if (!Array.isArray(tips) || !tips.length) return;
 
-            const zip = new JSZip();
-            const escapeXml = (value) => {
-                if (!value) return '';
-                return String(value)
-                    .replace(/&/g, '&amp;')
-                    .replace(/</g, '&lt;')
-                    .replace(/>/g, '&gt;')
-                    .replace(/"/g, '&quot;')
-                    .replace(/'/g, '&apos;');
-            };
-
-            const nl = String.fromCharCode(10);
-            const fieldLine = (label, value) => (
-                '        <w:p>' + nl +
-                '            <w:r>' + nl +
-                '                <w:rPr><w:b/></w:rPr>' + nl +
-                '                <w:t>' + escapeXml(label) + ':</w:t>' + nl +
-                '            </w:r>' + nl +
-                '            <w:r>' + nl +
-                '                <w:t> ' + escapeXml(value) + '</w:t>' + nl +
-                '            </w:r>' + nl +
-                '        </w:p>' + nl
-            );
-
-            const blockLine = (label, value) => (
-                '        <w:p>' + nl +
-                '            <w:pPr>' + nl +
-                '                <w:spacing w:before="200"/>' + nl +
-                '            </w:pPr>' + nl +
-                '            <w:r>' + nl +
-                '                <w:rPr><w:b/></w:rPr>' + nl +
-                '                <w:t>' + escapeXml(label) + ':</w:t>' + nl +
-                '            </w:r>' + nl +
-                '        </w:p>' + nl +
-                '        <w:p>' + nl +
-                '            <w:r>' + nl +
-                '                <w:t>' + escapeXml(value) + '</w:t>' + nl +
-                '            </w:r>' + nl +
-                '        </w:p>' + nl
-            );
-
-            let body = '';
-            tips.forEach((tip, index) => {
-                if (index > 0) {
-                    body +=
-                        '        <w:p>' + nl +
-                        '            <w:pPr>' + nl +
-                        '                <w:spacing w:before="400" w:after="200"/>' + nl +
-                        '            </w:pPr>' + nl +
-                        '            <w:r><w:t>---</w:t></w:r>' + nl +
-                        '        </w:p>' + nl;
-                }
-                body += fieldLine('Tip ID', tip.tipId || '');
-                body += fieldLine('Timestamp', tip.timestamp || '');
-                body += fieldLine('Location', tip.location || '');
-                body += fieldLine('Assigned To', tip.assignedTo || 'Not assigned');
-                body += fieldLine('Outcome', tip.outcome || 'No Outcome Yet');
-                body += blockLine('Tip Description', tip.description || '');
+            const sections = tips.map(function(tip) {
+                const blocks = [
+                    { label: 'Tip Description', value: tip.description || '' }
+                ];
                 if (tip.resolutionReport) {
-                    body += blockLine('BPSO Report', tip.resolutionReport);
+                    blocks.push({ label: 'BPSO Report', value: tip.resolutionReport });
                 }
+                return {
+                    fields: [
+                        { label: 'Tip ID', value: tip.tipId || '' },
+                        { label: 'Timestamp', value: tip.timestamp || '' },
+                        { label: 'Location', value: tip.location || '' },
+                        { label: 'Assigned To', value: tip.assignedTo || 'Not assigned' },
+                        { label: 'Outcome', value: tip.outcome || 'No Outcome Yet' }
+                    ],
+                    blocks: blocks
+                };
             });
 
-            const xmlDecl = '<' + '?xml version="1.0" encoding="UTF-8" standalone="yes"?>' + nl;
-            const contentTypes =
-                xmlDecl +
-                '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">' + nl +
-                '    <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>' + nl +
-                '    <Default Extension="xml" ContentType="application/xml"/>' + nl +
-                '    <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>' + nl +
-                '    <Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>' + nl +
-                '</Types>';
-
-            const title = tips.length > 1 ? 'TIP REPORTS' : 'TIP REPORT';
-            const documentXml =
-                xmlDecl +
-                '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">' + nl +
-                '    <w:body>' + nl +
-                '        <w:p>' + nl +
-                '            <w:pPr>' + nl +
-                '                <w:jc w:val="center"/>' + nl +
-                '                <w:spacing w:after="400"/>' + nl +
-                '            </w:pPr>' + nl +
-                '            <w:r>' + nl +
-                '                <w:rPr>' + nl +
-                '                    <w:b/>' + nl +
-                '                    <w:sz w:val="32"/>' + nl +
-                '                </w:rPr>' + nl +
-                '                <w:t>' + title + '</w:t>' + nl +
-                '            </w:r>' + nl +
-                '        </w:p>' + nl +
-                '        <w:p>' + nl +
-                '            <w:pPr>' + nl +
-                '                <w:jc w:val="center"/>' + nl +
-                '                <w:spacing w:after="600"/>' + nl +
-                '            </w:pPr>' + nl +
-                '            <w:r>' + nl +
-                '                <w:t>Barangay San Agustin, Quezon City</w:t>' + nl +
-                '            </w:r>' + nl +
-                '        </w:p>' + nl +
-                body +
-                '        <w:p>' + nl +
-                '            <w:pPr>' + nl +
-                '                <w:jc w:val="right"/>' + nl +
-                '                <w:spacing w:before="600"/>' + nl +
-                '            </w:pPr>' + nl +
-                '            <w:r>' + nl +
-                '                <w:t>Generated on: ' + escapeXml(new Date().toLocaleString()) + '</w:t>' + nl +
-                '            </w:r>' + nl +
-                '        </w:p>' + nl +
-                '    </w:body>' + nl +
-                '</w:document>';
-
-            const stylesXml =
-                xmlDecl +
-                '<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">' + nl +
-                '    <w:style w:type="paragraph" w:styleId="Normal">' + nl +
-                '        <w:name w:val="Normal"/>' + nl +
-                '        <w:qFormat/>' + nl +
-                '    </w:style>' + nl +
-                '</w:styles>';
-
-            const rels =
-                xmlDecl +
-                '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' + nl +
-                '    <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>' + nl +
-                '</Relationships>';
-
-            const wordRels =
-                xmlDecl +
-                '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' + nl +
-                '    <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>' + nl +
-                '</Relationships>';
-
-            zip.file('[Content_Types].xml', contentTypes);
-            zip.file('word/document.xml', documentXml);
-            zip.file('word/styles.xml', stylesXml);
-            zip.file('_rels/.rels', rels);
-            zip.file('word/_rels/document.xml.rels', wordRels);
-
-            const blob = await zip.generateAsync({
-                type: 'blob',
-                mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-            });
             const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
             const fileName = tips.length === 1
                 ? ('tip_report_' + (tips[0].tipId || 'tip') + '_' + stamp + '.docx')
                 : ('tip_reports_' + tips.length + '_' + stamp + '.docx');
 
-            const link = document.createElement('a');
-            link.href = URL.createObjectURL(blob);
-            link.download = fileName;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            URL.revokeObjectURL(link.href);
+            await AlertaraReportExport.downloadReport({
+                title: tips.length > 1 ? 'TIP REPORTS' : 'TIP REPORT',
+                fileName: fileName,
+                sections: sections
+            });
         }
 
 

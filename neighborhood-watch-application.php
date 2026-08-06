@@ -369,8 +369,8 @@ $nwSearchPlaceholder = $nwIsMemberList
         .action-buttons { display: flex; gap: 0.5rem; flex-wrap: wrap; }
         .btn-review, .btn-edit, .btn-delete { padding: 0.5rem 1rem; background: var(--primary-color); color: #fff; border: none; border-radius: 6px; font-size: 0.85rem; cursor: pointer; transition: all 0.2s ease; }
         .btn-review:hover { background: #4ca8a6; }
-        .btn-edit { background: #ff9800; }
-        .btn-edit:hover { background: #f57c00; }
+        .btn-edit { background: var(--primary-color); }
+        .btn-edit:hover { background: #4ca8a6; }
         .btn-delete { background: #dc3545; }
         .btn-delete:hover { background: #c82333; }
         /* Modal Styles */
@@ -400,8 +400,8 @@ $nwSearchPlaceholder = $nwIsMemberList
         .btn-cancel:hover { background: #d5d5d5; }
         .btn-submit { background: var(--primary-color); color: #fff; }
         .btn-submit:hover { background: #4ca8a6; }
-        .btn-approve { padding: 0.75rem 1.5rem; border: none; border-radius: 8px; font-size: 0.95rem; font-weight: 600; cursor: pointer; background: #059669; color: #fff; transition: all 0.2s ease; }
-        .btn-approve:hover { background: #047857; }
+        .btn-approve { padding: 0.75rem 1.5rem; border: none; border-radius: 8px; font-size: 0.95rem; font-weight: 600; cursor: pointer; background: var(--primary-color); color: #fff; transition: all 0.2s ease; }
+        .btn-approve:hover { background: #4ca8a6; }
         .btn-reject { padding: 0.75rem 1.5rem; border: none; border-radius: 8px; font-size: 0.95rem; font-weight: 600; cursor: pointer; background: #dc3545; color: #fff; transition: all 0.2s ease; }
         .btn-reject:hover { background: #c82333; }
         .btn-reject-cancel { padding: 0.75rem 1.5rem; border: 1px solid var(--border-color); border-radius: 8px; font-size: 0.95rem; font-weight: 600; cursor: pointer; background: #fff; color: var(--text-color); }

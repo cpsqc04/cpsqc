@@ -202,9 +202,12 @@ $cctvNavActive = 'cctv-request';
         .status-cancelled { background: #e9ecef; color: #6c757d; }
         .action-buttons { display: flex; gap: 0.5rem; flex-wrap: wrap; }
         .btn-view, .btn-manage, .btn-link, .btn-approve, .btn-reject, .btn-search-footage { padding: 0.5rem 1rem; border: none; border-radius: 6px; font-size: 0.85rem; cursor: pointer; color: #fff; background: var(--primary-color); text-decoration: none; display: inline-flex; align-items: center; gap: 0.4rem; font-weight: 600; }
-        .btn-manage { background: #ff9800; }
-        .btn-link { background: #6366f1; }
-        .btn-approve { background: #059669; }
+        .btn-manage { background: var(--primary-color); }
+        .btn-manage:hover { background: #4ca8a6; }
+        .btn-link { background: var(--primary-color); }
+        .btn-link:hover { background: #4ca8a6; }
+        .btn-approve { background: var(--primary-color); }
+        .btn-approve:hover { background: #4ca8a6; }
         .btn-reject { background: #dc2626; }
         .btn-search-footage { background: var(--tertiary-color); }
         .detail-actions {

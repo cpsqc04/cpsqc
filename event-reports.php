@@ -19,6 +19,7 @@ require_once __DIR__ . '/db.php';
     <link rel="stylesheet" href="css/theme.css">
     <link rel="stylesheet" href="css/admin-sidebar.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="js/alertara-report-export.js"></script>
     <style>
         body { margin: 0; padding: 0; font-family: var(--font-family); background-color: var(--bg-color); display: flex; min-height: 100vh; }
         .sidebar { width: 320px; background: var(--tertiary-color); color: #fff; position: fixed; left: 0; top: 0; height: 100vh; overflow: hidden; box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1); z-index: 1000; transition: width 0.3s ease; display: flex; flex-direction: column; }
@@ -354,8 +355,21 @@ require_once __DIR__ . '/db.php';
         .status-resolved { background: #d1e7dd; color: #0f5132; }
         .btn-view { padding: 0.5rem 1rem; background: var(--primary-color); color: #fff; border: none; border-radius: 6px; font-size: 0.85rem; cursor: pointer; transition: all 0.2s ease; margin-right: 0.5rem; }
         .btn-view:hover { background: #4ca8a6; }
-        .btn-export { padding: 0.5rem 1rem; background: #28a745; color: #fff; border: none; border-radius: 6px; font-size: 0.85rem; cursor: pointer; transition: all 0.2s ease; }
-        .btn-export:hover { background: #218838; }
+        .btn-export {
+            padding: 0.5rem 1rem;
+            background: var(--primary-color);
+            color: #fff;
+            border: none;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+        }
+        .btn-export:hover { background: #4ca8a6; }
         .action-buttons { display: flex; gap: 0.5rem; align-items: center; }
         .modal { display: none; position: fixed; z-index: 2000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.5); overflow: auto; }
         .modal-content { background-color: var(--card-bg); margin: 5% auto; padding: 2rem; border: 1px solid var(--border-color); border-radius: 12px; width: 90%; max-width: 700px; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3); }
@@ -681,7 +695,7 @@ require_once __DIR__ . '/db.php';
                         <td>
                             <div class="action-buttons">
                                 <button class="btn-view" onclick="viewReport('${reportId}')">View</button>
-                                <button class="btn-export" onclick="exportReport('${reportId}')">Export</button>
+                                <button class="btn-export" onclick="exportReport('${reportId}')"><i class="fas fa-file-export"></i> Export</button>
                             </div>
                         </td>
                     </tr>
@@ -729,186 +743,32 @@ require_once __DIR__ . '/db.php';
                 alert('Report not found');
                 return;
             }
+            if (!window.AlertaraReportExport) {
+                alert('Export helper not loaded. Please refresh the page.');
+                return;
+            }
 
             try {
-                // Check if JSZip is available
-                if (typeof JSZip === 'undefined') {
-                    alert('Export library not loaded. Please refresh the page.');
-                    return;
-                }
-
-                // Create DOCX file structure using JSZip
-                const zip = new JSZip();
-
-                // Create [Content_Types].xml
-                const contentTypes = '<' + '?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' +
-'<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">\n' +
-'    <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>\n' +
-'    <Default Extension="xml" ContentType="application/xml"/>\n' +
-'    <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>\n' +
-'    <Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>\n' +
-'</Types>';
-
-                // Create word/document.xml with the actual content
-                const escapeXml = (text) => {
-                    if (!text) return '';
-                    return String(text)
-                        .replace(/&/g, '&amp;')
-                        .replace(/</g, '&lt;')
-                        .replace(/>/g, '&gt;')
-                        .replace(/"/g, '&quot;')
-                        .replace(/'/g, '&apos;');
-                };
-
-                const documentXml = '<' + '?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' +
-'<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">\n' +
-'    <w:body>\n' +
-'        <w:p>\n' +
-'            <w:pPr>\n' +
-'                <w:jc w:val="center"/>\n' +
-'                <w:spacing w:after="400"/>\n' +
-'            </w:pPr>\n' +
-'            <w:r>\n' +
-'                <w:rPr>\n' +
-'                    <w:b/>\n' +
-'                    <w:sz w:val="32"/>\n' +
-'                </w:rPr>\n' +
-'                <w:t>EVENT REPORT</w:t>\n' +
-'            </w:r>\n' +
-'        </w:p>\n' +
-'        <w:p>\n' +
-'            <w:pPr>\n' +
-'                <w:jc w:val="center"/>\n' +
-'                <w:spacing w:after="600"/>\n' +
-'            </w:pPr>\n' +
-'            <w:r>\n' +
-'                <w:t>Barangay San Agustin, Quezon City</w:t>\n' +
-'            </w:r>\n' +
-'        </w:p>\n' +
-'        <w:p>\n' +
-'            <w:r>\n' +
-'                <w:rPr><w:b/></w:rPr>\n' +
-'                <w:t>Event Name:</w:t>\n' +
-'            </w:r>\n' +
-'            <w:r>\n' +
-'                <w:t> ' + escapeXml(report.title) + '</w:t>\n' +
-'            </w:r>\n' +
-'        </w:p>\n' +
-'        <w:p>\n' +
-'            <w:r>\n' +
-'                <w:rPr><w:b/></w:rPr>\n' +
-'                <w:t>Date:</w:t>\n' +
-'            </w:r>\n' +
-'            <w:r>\n' +
-'                <w:t> ' + escapeXml(report.date) + '</w:t>\n' +
-'            </w:r>\n' +
-'        </w:p>\n' +
-'        <w:p>\n' +
-'            <w:r>\n' +
-'                <w:rPr><w:b/></w:rPr>\n' +
-'                <w:t>Location:</w:t>\n' +
-'            </w:r>\n' +
-'            <w:r>\n' +
-'                <w:t> ' + escapeXml(report.location) + '</w:t>\n' +
-'            </w:r>\n' +
-'        </w:p>\n' +
-'        <w:p>\n' +
-'            <w:r>\n' +
-'                <w:rPr><w:b/></w:rPr>\n' +
-'                <w:t>Attendance:</w:t>\n' +
-'            </w:r>\n' +
-'            <w:r>\n' +
-'                <w:t> ' + escapeXml(report.attendanceCount) + ' participants</w:t>\n' +
-'            </w:r>\n' +
-'        </w:p>\n' +
-'        <w:p>\n' +
-'            <w:r>\n' +
-'                <w:rPr><w:b/></w:rPr>\n' +
-'                <w:t>Organizer:</w:t>\n' +
-'            </w:r>\n' +
-'            <w:r>\n' +
-'                <w:t> ' + escapeXml(report.organizer) + '</w:t>\n' +
-'            </w:r>\n' +
-'        </w:p>\n' +
-'        <w:p>\n' +
-'            <w:r>\n' +
-'                <w:rPr><w:b/></w:rPr>\n' +
-'                <w:t>Survey Result:</w:t>\n' +
-'            </w:r>\n' +
-'            <w:r>\n' +
-'                <w:t> ' + escapeXml(report.surveyResult) + '</w:t>\n' +
-'            </w:r>\n' +
-'        </w:p>\n' +
-'        <w:p>\n' +
-'            <w:pPr>\n' +
-'                <w:spacing w:before="400"/>\n' +
-'            </w:pPr>\n' +
-'            <w:r>\n' +
-'                <w:rPr><w:b/></w:rPr>\n' +
-'                <w:t>Description:</w:t>\n' +
-'            </w:r>\n' +
-'        </w:p>\n' +
-'        <w:p>\n' +
-'            <w:r>\n' +
-'                <w:t>' + escapeXml(report.description) + '</w:t>\n' +
-'            </w:r>\n' +
-'        </w:p>\n' +
-'        <w:p>\n' +
-'            <w:pPr>\n' +
-'                <w:jc w:val="right"/>\n' +
-'                <w:spacing w:before="600"/>\n' +
-'            </w:pPr>\n' +
-'            <w:r>\n' +
-'                <w:t>Generated on: ' + escapeXml(new Date().toLocaleString()) + '</w:t>\n' +
-'            </w:r>\n' +
-'        </w:p>\n' +
-'    </w:body>\n' +
-'</w:document>';
-
-                // Create word/styles.xml
-                const stylesXml = '<' + '?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' +
-'<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">\n' +
-'    <w:style w:type="paragraph" w:styleId="Normal">\n' +
-'        <w:name w:val="Normal"/>\n' +
-'        <w:qFormat/>\n' +
-'    </w:style>\n' +
-'</w:styles>';
-
-                // Create _rels/.rels
-                const rels = '<' + '?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' +
-'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">\n' +
-'    <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>\n' +
-'</Relationships>';
-
-                // Create word/_rels/document.xml.rels
-                const wordRels = '<' + '?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' +
-'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">\n' +
-'    <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>\n' +
-'</Relationships>';
-
-                // Add files to zip
-                zip.file("[Content_Types].xml", contentTypes);
-                zip.file("word/document.xml", documentXml);
-                zip.file("word/styles.xml", stylesXml);
-                zip.file("_rels/.rels", rels);
-                zip.file("word/_rels/document.xml.rels", wordRels);
-
-                // Generate the DOCX file
-                const blob = await zip.generateAsync({ type: "blob", mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" });
-                const fileName = `event_report_${report.title.replace(/\s+/g, '_')}_${report.date}.docx`;
-                
-                const link = document.createElement("a");
-                link.href = URL.createObjectURL(blob);
-                link.download = fileName;
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-                URL.revokeObjectURL(link.href);
-                
-                alert(`Event report exported successfully as ${fileName}!`);
+                const fileName = 'event_report_' + String(report.title || 'event').replace(/\s+/g, '_') + '_' + report.date + '.docx';
+                await AlertaraReportExport.downloadReport({
+                    title: 'EVENT REPORT',
+                    fileName: fileName,
+                    fields: [
+                        { label: 'Event Name', value: report.title },
+                        { label: 'Date', value: report.date },
+                        { label: 'Location', value: report.location },
+                        { label: 'Attendance', value: (report.attendanceCount || '0') + ' participants' },
+                        { label: 'Organizer', value: report.organizer },
+                        { label: 'Survey Result', value: report.surveyResult }
+                    ],
+                    blocks: [
+                        { label: 'Description', value: report.description || '' }
+                    ]
+                });
+                alert('Event report exported successfully as ' + fileName + '!');
             } catch (error) {
                 console.error('Error generating DOCX:', error);
-                alert('Error generating DOCX file. Please try again.');
+                alert(error.message || 'Error generating DOCX file. Please try again.');
             }
         }
         

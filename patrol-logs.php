@@ -19,6 +19,7 @@ require_once __DIR__ . '/db.php';
     <link rel="stylesheet" href="css/theme.css">
     <link rel="stylesheet" href="css/admin-sidebar.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="js/alertara-report-export.js"></script>
     <style>
         body { margin: 0; padding: 0; font-family: var(--font-family); background-color: var(--bg-color); display: flex; min-height: 100vh; }
         .sidebar { width: 320px; background: var(--tertiary-color); color: #fff; position: fixed; left: 0; top: 0; height: 100vh; overflow: hidden; box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1); z-index: 1000; transition: width 0.3s ease; display: flex; flex-direction: column; }
@@ -355,8 +356,21 @@ require_once __DIR__ . '/db.php';
         .status-resolved { background: #d1e7dd; color: #0f5132; }
         .btn-view { padding: 0.5rem 1rem; background: var(--primary-color); color: #fff; border: none; border-radius: 6px; font-size: 0.85rem; cursor: pointer; transition: all 0.2s ease; margin-right: 0.5rem; }
         .btn-view:hover { background: #4ca8a6; }
-        .btn-export { padding: 0.5rem 1rem; background: #28a745; color: #fff; border: none; border-radius: 6px; font-size: 0.85rem; cursor: pointer; transition: all 0.2s ease; }
-        .btn-export:hover { background: #218838; }
+        .btn-export {
+            padding: 0.5rem 1rem;
+            background: var(--primary-color);
+            color: #fff;
+            border: none;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+        }
+        .btn-export:hover { background: #4ca8a6; }
         .btn-campaign {
             padding: 0.75rem 1.25rem;
             background: var(--primary-color);
@@ -871,7 +885,7 @@ require_once __DIR__ . '/db.php';
                         <td>
                             <div class="action-buttons">
                                 <button class="btn-view" onclick="viewLog('${row.id}')">View</button>
-                                <button class="btn-export" onclick="exportLog('${row.id}')">Export</button>
+                                <button class="btn-export" onclick="exportLog('${row.id}')"><i class="fas fa-file-export"></i> Export</button>
                             </div>
                         </td>
                     </tr>`;
@@ -1076,302 +1090,36 @@ require_once __DIR__ . '/db.php';
                 alert('Log not found');
                 return;
             }
+            if (!window.AlertaraReportExport) {
+                alert('Export helper not loaded. Please refresh the page.');
+                return;
+            }
 
             try {
-                if (typeof JSZip === 'undefined') {
-                    alert('Export library not loaded. Please refresh the page.');
-                    return;
-                }
-
-                const zip = new JSZip();
-                const escapeXml = (text) => {
-                    if (!text) return '';
-                    return String(text)
-                        .replace(/&/g, '&amp;')
-                        .replace(/</g, '&lt;')
-                        .replace(/>/g, '&gt;')
-                        .replace(/"/g, '&quot;')
-                        .replace(/'/g, '&apos;');
-                };
-
-                const photoSrc = String(log.documentation_photo || '');
-                let photoPart = null;
-                if (photoSrc.indexOf('data:image/') === 0) {
-                    const match = photoSrc.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/i);
-                    if (match) {
-                        const mime = match[1].toLowerCase();
-                        const binary = atob(match[2]);
-                        const bytes = new Uint8Array(binary.length);
-                        for (let i = 0; i < binary.length; i++) {
-                            bytes[i] = binary.charCodeAt(i);
-                        }
-                        let ext = 'jpg';
-                        if (mime.indexOf('png') !== -1) ext = 'png';
-                        else if (mime.indexOf('gif') !== -1) ext = 'gif';
-                        else if (mime.indexOf('webp') !== -1) ext = 'webp';
-                        else if (mime.indexOf('jpeg') !== -1 || mime.indexOf('jpg') !== -1) ext = 'jpg';
-
-                        let widthPx = 800;
-                        let heightPx = 600;
-                        try {
-                            const dims = await new Promise(function(resolve, reject) {
-                                const img = new Image();
-                                img.onload = function() {
-                                    resolve({
-                                        width: img.naturalWidth || 800,
-                                        height: img.naturalHeight || 600
-                                    });
-                                };
-                                img.onerror = reject;
-                                img.src = photoSrc;
-                            });
-                            widthPx = dims.width;
-                            heightPx = dims.height;
-                        } catch (e) {
-                            // keep defaults
-                        }
-
-                        const maxWidthEmu = 5486400; // 6 inches
-                        const ratio = heightPx / Math.max(widthPx, 1);
-                        const cx = maxWidthEmu;
-                        const cy = Math.max(914400, Math.round(maxWidthEmu * ratio));
-
-                        photoPart = {
-                            mime: mime,
-                            ext: ext,
-                            bytes: bytes,
-                            cx: cx,
-                            cy: cy
-                        };
-                    }
-                }
-
-                let contentTypes = '<' + '?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' +
-'<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">\n' +
-'    <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>\n' +
-'    <Default Extension="xml" ContentType="application/xml"/>\n';
-                if (photoPart) {
-                    contentTypes += '    <Default Extension="' + photoPart.ext + '" ContentType="' + photoPart.mime + '"/>\n';
-                }
-                contentTypes +=
-'    <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>\n' +
-'    <Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>\n' +
-'</Types>';
-
-                let photoXml = '';
-                if (photoPart) {
-                    photoXml =
-'        <w:p>\n' +
-'            <w:pPr><w:spacing w:before="400"/></w:pPr>\n' +
-'            <w:r><w:rPr><w:b/></w:rPr><w:t>Documentation Photo:</w:t></w:r>\n' +
-'        </w:p>\n' +
-'        <w:p>\n' +
-'            <w:r>\n' +
-'                <w:drawing>\n' +
-'                    <wp:inline distT="0" distB="0" distL="0" distR="0">\n' +
-'                        <wp:extent cx="' + photoPart.cx + '" cy="' + photoPart.cy + '"/>\n' +
-'                        <wp:docPr id="1" name="DocumentationPhoto"/>\n' +
-'                        <a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">\n' +
-'                            <a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">\n' +
-'                                <pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture">\n' +
-'                                    <pic:nvPicPr>\n' +
-'                                        <pic:cNvPr id="0" name="documentation.' + photoPart.ext + '"/>\n' +
-'                                        <pic:cNvPicPr/>\n' +
-'                                    </pic:nvPicPr>\n' +
-'                                    <pic:blipFill>\n' +
-'                                        <a:blip r:embed="rIdPhoto"/>\n' +
-'                                        <a:stretch><a:fillRect/></a:stretch>\n' +
-'                                    </pic:blipFill>\n' +
-'                                    <pic:spPr>\n' +
-'                                        <a:xfrm>\n' +
-'                                            <a:off x="0" y="0"/>\n' +
-'                                            <a:ext cx="' + photoPart.cx + '" cy="' + photoPart.cy + '"/>\n' +
-'                                        </a:xfrm>\n' +
-'                                        <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>\n' +
-'                                    </pic:spPr>\n' +
-'                                </pic:pic>\n' +
-'                            </a:graphicData>\n' +
-'                        </a:graphic>\n' +
-'                    </wp:inline>\n' +
-'                </w:drawing>\n' +
-'            </w:r>\n' +
-'        </w:p>\n';
-                } else {
-                    photoXml =
-'        <w:p>\n' +
-'            <w:pPr><w:spacing w:before="400"/></w:pPr>\n' +
-'            <w:r><w:rPr><w:b/></w:rPr><w:t>Documentation Photo:</w:t></w:r>\n' +
-'        </w:p>\n' +
-'        <w:p>\n' +
-'            <w:r><w:t>No photo uploaded</w:t></w:r>\n' +
-'        </w:p>\n';
-                }
-
-                const documentXml = '<' + '?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' +
-'<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"\n' +
-'            xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"\n' +
-'            xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing">\n' +
-'    <w:body>\n' +
-'        <w:p>\n' +
-'            <w:pPr>\n' +
-'                <w:jc w:val="center"/>\n' +
-'                <w:spacing w:after="400"/>\n' +
-'            </w:pPr>\n' +
-'            <w:r>\n' +
-'                <w:rPr>\n' +
-'                    <w:b/>\n' +
-'                    <w:sz w:val="32"/>\n' +
-'                </w:rPr>\n' +
-'                <w:t>PATROL LOG REPORT</w:t>\n' +
-'            </w:r>\n' +
-'        </w:p>\n' +
-'        <w:p>\n' +
-'            <w:pPr>\n' +
-'                <w:jc w:val="center"/>\n' +
-'                <w:spacing w:after="600"/>\n' +
-'            </w:pPr>\n' +
-'            <w:r>\n' +
-'                <w:t>Barangay San Agustin, Quezon City</w:t>\n' +
-'            </w:r>\n' +
-'        </w:p>\n' +
-'        <w:p>\n' +
-'            <w:r>\n' +
-'                <w:rPr><w:b/></w:rPr>\n' +
-'                <w:t>Date:</w:t>\n' +
-'            </w:r>\n' +
-'            <w:r>\n' +
-'                <w:t> ' + escapeXml(log.date) + '</w:t>\n' +
-'            </w:r>\n' +
-'        </w:p>\n' +
-'        <w:p>\n' +
-'            <w:r>\n' +
-'                <w:rPr><w:b/></w:rPr>\n' +
-'                <w:t>Time:</w:t>\n' +
-'            </w:r>\n' +
-'            <w:r>\n' +
-'                <w:t> ' + escapeXml(log.time) + '</w:t>\n' +
-'            </w:r>\n' +
-'        </w:p>\n' +
-'        <w:p>\n' +
-'            <w:r>\n' +
-'                <w:rPr><w:b/></w:rPr>\n' +
-'                <w:t>BPSO Personnel:</w:t>\n' +
-'            </w:r>\n' +
-'            <w:r>\n' +
-'                <w:t> ' + escapeXml(log.personnel_name) + '</w:t>\n' +
-'            </w:r>\n' +
-'        </w:p>\n' +
-'        <w:p>\n' +
-'            <w:r>\n' +
-'                <w:rPr><w:b/></w:rPr>\n' +
-'                <w:t>Route:</w:t>\n' +
-'            </w:r>\n' +
-'            <w:r>\n' +
-'                <w:t> ' + escapeXml(log.route) + '</w:t>\n' +
-'            </w:r>\n' +
-'        </w:p>\n' +
-'        <w:p>\n' +
-'            <w:r>\n' +
-'                <w:rPr><w:b/></w:rPr>\n' +
-'                <w:t>Location:</w:t>\n' +
-'            </w:r>\n' +
-'            <w:r>\n' +
-'                <w:t> ' + escapeXml(log.location) + '</w:t>\n' +
-'            </w:r>\n' +
-'        </w:p>\n' +
-'        <w:p>\n' +
-'            <w:r>\n' +
-'                <w:rPr><w:b/></w:rPr>\n' +
-'                <w:t>Status:</w:t>\n' +
-'            </w:r>\n' +
-'            <w:r>\n' +
-'                <w:t> ' + escapeXml(log.status) + '</w:t>\n' +
-'            </w:r>\n' +
-'        </w:p>\n' +
-'        <w:p>\n' +
-'            <w:r>\n' +
-'                <w:rPr><w:b/></w:rPr>\n' +
-'                <w:t>Incidents:</w:t>\n' +
-'            </w:r>\n' +
-'            <w:r>\n' +
-'                <w:t> ' + escapeXml(log.incidents) + '</w:t>\n' +
-'            </w:r>\n' +
-'        </w:p>\n' +
-'        <w:p>\n' +
-'            <w:pPr>\n' +
-'                <w:spacing w:before="400"/>\n' +
-'            </w:pPr>\n' +
-'            <w:r>\n' +
-'                <w:rPr><w:b/></w:rPr>\n' +
-'                <w:t>Details:</w:t>\n' +
-'            </w:r>\n' +
-'        </w:p>\n' +
-'        <w:p>\n' +
-'            <w:r>\n' +
-'                <w:t>' + escapeXml(log.details) + '</w:t>\n' +
-'            </w:r>\n' +
-'        </w:p>\n' +
-photoXml +
-'        <w:p>\n' +
-'            <w:pPr>\n' +
-'                <w:jc w:val="right"/>\n' +
-'                <w:spacing w:before="600"/>\n' +
-'            </w:pPr>\n' +
-'            <w:r>\n' +
-'                <w:t>Generated on: ' + escapeXml(new Date().toLocaleString()) + '</w:t>\n' +
-'            </w:r>\n' +
-'        </w:p>\n' +
-'    </w:body>\n' +
-'</w:document>';
-
-                const stylesXml = '<' + '?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' +
-'<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">\n' +
-'    <w:style w:type="paragraph" w:styleId="Normal">\n' +
-'        <w:name w:val="Normal"/>\n' +
-'        <w:qFormat/>\n' +
-'    </w:style>\n' +
-'</w:styles>';
-
-                const rels = '<' + '?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' +
-'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">\n' +
-'    <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>\n' +
-'</Relationships>';
-
-                let wordRels = '<' + '?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' +
-'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">\n' +
-'    <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>\n';
-                if (photoPart) {
-                    wordRels += '    <Relationship Id="rIdPhoto" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/documentation.' + photoPart.ext + '"/>\n';
-                }
-                wordRels += '</Relationships>';
-
-                zip.file('[Content_Types].xml', contentTypes);
-                zip.file('word/document.xml', documentXml);
-                zip.file('word/styles.xml', stylesXml);
-                zip.file('_rels/.rels', rels);
-                zip.file('word/_rels/document.xml.rels', wordRels);
-                if (photoPart) {
-                    zip.file('word/media/documentation.' + photoPart.ext, photoPart.bytes);
-                }
-
-                const blob = await zip.generateAsync({
-                    type: 'blob',
-                    mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+                const fileName = 'patrol_log_' + String(log.personnel_name || 'officer').replace(/\s+/g, '_') + '_' + log.date + '.docx';
+                await AlertaraReportExport.downloadReport({
+                    title: 'PATROL LOG REPORT',
+                    fileName: fileName,
+                    fields: [
+                        { label: 'Date', value: log.date },
+                        { label: 'Time', value: log.time },
+                        { label: 'Officer', value: log.personnel_name },
+                        { label: 'Route', value: log.route },
+                        { label: 'Location', value: log.location },
+                        { label: 'Status', value: log.status },
+                        { label: 'Incidents', value: log.incidents || 'None' }
+                    ],
+                    blocks: [
+                        { label: 'Details', value: log.details || '' }
+                    ],
+                    images: [
+                        { label: 'Documentation Photo', src: log.documentation_photo || '' }
+                    ]
                 });
-                const fileName = 'patrol_log_' + log.personnel_name.replace(/\s+/g, '_') + '_' + log.date + '.docx';
-
-                const link = document.createElement('a');
-                link.href = URL.createObjectURL(blob);
-                link.download = fileName;
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-                URL.revokeObjectURL(link.href);
-
                 alert('Patrol log exported successfully as ' + fileName + '!');
             } catch (error) {
                 console.error('Error generating DOCX:', error);
-                alert('Error generating DOCX file. Please try again.');
+                alert(error.message || 'Error generating DOCX file. Please try again.');
             }
         }
         
