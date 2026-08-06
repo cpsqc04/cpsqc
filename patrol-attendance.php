@@ -1752,9 +1752,9 @@ $personnelCode = htmlspecialchars(getBpsoPersonnelCode());
                     return `
                     <tr>
                         <td>${escapeHtml(row.attendance_date || '—')}</td>
-                        <td>${escapeHtml(row.duty || '—')}</td>
-                        <td>${escapeHtml(formatManilaDateTime(row.time_in))}</td>
-                        <td>${escapeHtml(row.time_out ? formatManilaDateTime(row.time_out) : '')}</td>
+                        <td>${escapeHtml(formatShiftWithHours(row.duty))}</td>
+                        <td>${escapeHtml(formatManilaTimeOnly(row.time_in))}</td>
+                        <td>${escapeHtml(row.time_out ? formatManilaTimeOnly(row.time_out) : '')}</td>
                         <td>${escapeHtml(row.patrol_duration_label || '—')}</td>
                         <td class="overtime-cell" data-time-in="${escapeHtml(row.time_in || '')}" data-time-out="${escapeHtml(row.time_out || '')}">${escapeHtml(overtime)}</td>
                         <td>${escapeHtml(row.status_label || '—')}</td>
