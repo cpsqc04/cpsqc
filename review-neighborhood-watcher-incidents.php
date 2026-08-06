@@ -92,8 +92,8 @@ define('NW_PAGE_MODE', 'incidents');
         .datetime-display .time-part { color: var(--text-color); font-weight: 600; }
         .content-area { padding: 2rem; flex: 1; background: #f5f5f5; }
         .page-content { background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 12px; padding: 2rem; box-shadow: 0 2px 8px var(--shadow); }
-        .toolbar { display: flex; gap: 1rem; margin-bottom: 1rem; }
-        .search-box { flex: 1; max-width: 420px; position: relative; }
+        .toolbar { display: flex; gap: 0.75rem; margin-bottom: 1rem; align-items: center; flex-wrap: wrap; }
+        .search-box { flex: 1; min-width: 220px; max-width: none; position: relative; }
         .search-box input { width: 100%; padding: 0.75rem 1rem 0.75rem 2.5rem; border: 1px solid var(--border-color); border-radius: 8px; box-sizing: border-box; }
         .search-box i { position: absolute; left: 0.85rem; top: 50%; transform: translateY(-50%); color: var(--text-secondary); }
         .table-container { overflow-x: auto; border-radius: 8px; border: 1px solid var(--border-color); }
@@ -104,11 +104,35 @@ define('NW_PAGE_MODE', 'incidents');
         tbody tr:hover { background: #f9f9f9; }
         tbody tr:last-child td { border-bottom: none; }
         .action-buttons { display: flex; gap: 0.5rem; flex-wrap: wrap; }
-        .btn-view, .btn-manage, .btn-export { padding: 0.5rem 1rem; border: none; border-radius: 6px; font-size: 0.85rem; font-weight: 600; cursor: pointer; color: #fff; display: inline-flex; align-items: center; gap: 0.4rem; }
-        .btn-view, .btn-export { background: var(--primary-color); }
-        .btn-view:hover, .btn-export:hover { background: #4ca8a6; }
+        .btn-view, .btn-manage { padding: 0.5rem 1rem; border: none; border-radius: 6px; font-size: 0.85rem; font-weight: 600; cursor: pointer; color: #fff; display: inline-flex; align-items: center; gap: 0.4rem; }
+        .btn-view { background: var(--primary-color); }
+        .btn-view:hover { background: #4ca8a6; }
         .btn-manage { background: var(--primary-color); }
         .btn-manage:hover { background: #4ca8a6; }
+        .toolbar .btn-export, .toolbar .btn-cancel-export {
+            padding: 0.75rem 1.25rem;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            white-space: nowrap;
+            flex-shrink: 0;
+            color: #fff;
+        }
+        .toolbar .btn-export { background: var(--primary-color); }
+        .toolbar .btn-export:hover:not(:disabled) { background: #4ca8a6; }
+        .toolbar .btn-export:disabled { opacity: 0.55; cursor: not-allowed; }
+        .toolbar .btn-cancel-export { background: #6c757d; }
+        .toolbar .btn-cancel-export:hover { background: #5a6268; }
+        th.col-select, td.col-select { width: 42px; text-align: center; }
+        body:not(.export-select-mode) #nwIncidentsTable .col-select { display: none; }
+        body:not(.export-select-mode) .export-select-only { display: none !important; }
+        body.export-select-mode .export-enter-only { display: none !important; }
+        body.export-select-mode #nwIncidentsTable tbody tr:hover { background: #f0fdfa; }
         .status-badge { padding: 0.25rem 0.65rem; border-radius: 999px; font-size: 0.8rem; font-weight: 600; background: #fef3c7; color: #92400e; display: inline-block; }
         .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 2000; align-items: center; justify-content: center; padding: 1rem; }
         .modal.active { display: flex; }
@@ -315,6 +339,13 @@ define('NW_PAGE_MODE', 'incidents');
                         <i class="fas fa-search"></i>
                         <input type="text" id="searchInput" placeholder="Search by report ID, member, or location...">
                     </div>
+                    <button type="button" class="btn-export export-enter-only" id="btnEnterNwExportSelect" onclick="enterNwExportSelectMode()">
+                        <i class="fas fa-file-export"></i> Export
+                    </button>
+                    <button type="button" class="btn-export export-select-only" id="btnExportSelectedNw" onclick="exportSelectedNwIncidents()" disabled>
+                        <i class="fas fa-file-export"></i> Export Selected
+                    </button>
+                    <button type="button" class="btn-cancel-export export-select-only" onclick="exitNwExportSelectMode()">Cancel</button>
                 </div>
                 <div id="tableContainer"><div class="empty-state">Loading reports...</div></div>
             </div>
@@ -413,17 +444,20 @@ define('NW_PAGE_MODE', 'incidents');
             const container = document.getElementById('tableContainer');
             if (!data.length) {
                 container.innerHTML = '<div class="empty-state">No incident reports found.</div>';
+                updateNwExportButtonState();
                 return;
             }
 
-            let html = '<div class="table-container"><table><thead><tr>'
+            let html = '<div class="table-container"><table id="nwIncidentsTable"><thead><tr>'
+                + '<th class="col-select"><input type="checkbox" id="selectAllNwIncidents" title="Select all" onchange="toggleSelectAllNwIncidents(this)"></th>'
                 + '<th>Report ID</th><th>Member</th><th>Location</th><th>Assigned To</th><th>Status</th><th>Submitted</th><th>Actions</th>'
                 + '</tr></thead><tbody>';
 
             data.forEach(function(report) {
                 const date = report.created_at ? new Date(report.created_at).toLocaleString() : '-';
                 const isResolved = String(report.status || '').toLowerCase() === 'resolved';
-                html += '<tr>'
+                html += '<tr data-report-id="' + Number(report.id) + '">'
+                    + '<td class="col-select"><input type="checkbox" class="nw-incident-select" value="' + Number(report.id) + '" onchange="updateNwExportButtonState()"></td>'
                     + '<td>' + escapeHtml(report.report_id) + '</td>'
                     + '<td>' + escapeHtml(report.member_name) + '</td>'
                     + '<td>' + escapeHtml(report.location) + '</td>'
@@ -432,7 +466,6 @@ define('NW_PAGE_MODE', 'incidents');
                     + '<td>' + escapeHtml(date) + '</td>'
                     + '<td><div class="action-buttons">'
                     + '<button type="button" class="btn-view" onclick="viewReport(' + report.id + ')">View</button>'
-                    + '<button type="button" class="btn-export" onclick="exportIncidentReport(' + report.id + ')"><i class="fas fa-file-export"></i> Export</button>'
                     + (isResolved ? '' : '<button type="button" class="btn-manage" onclick="manageReport(' + report.id + ')">Assign</button>')
                     + '</div></td>'
                     + '</tr>';
@@ -440,6 +473,122 @@ define('NW_PAGE_MODE', 'incidents');
 
             html += '</tbody></table></div>';
             container.innerHTML = html;
+            updateNwExportButtonState();
+        }
+
+        function enterNwExportSelectMode() {
+            document.body.classList.add('export-select-mode');
+            const master = document.getElementById('selectAllNwIncidents');
+            if (master) master.checked = false;
+            document.querySelectorAll('.nw-incident-select').forEach(function(cb) { cb.checked = false; });
+            updateNwExportButtonState();
+        }
+
+        function exitNwExportSelectMode() {
+            document.body.classList.remove('export-select-mode');
+            const master = document.getElementById('selectAllNwIncidents');
+            if (master) master.checked = false;
+            document.querySelectorAll('.nw-incident-select').forEach(function(cb) { cb.checked = false; });
+            updateNwExportButtonState();
+        }
+
+        function getSelectedNwIncidentIds() {
+            return Array.from(document.querySelectorAll('.nw-incident-select:checked'))
+                .map(function(cb) { return Number(cb.value); })
+                .filter(function(id) { return id > 0; });
+        }
+
+        function updateNwExportButtonState() {
+            const btn = document.getElementById('btnExportSelectedNw');
+            if (!btn) return;
+            const selected = getSelectedNwIncidentIds().length;
+            const active = document.body.classList.contains('export-select-mode');
+            btn.disabled = !active || selected === 0;
+            btn.innerHTML = selected > 0
+                ? ('<i class="fas fa-file-export"></i> Export Selected (' + selected + ')')
+                : '<i class="fas fa-file-export"></i> Export Selected';
+        }
+
+        function toggleSelectAllNwIncidents(master) {
+            const checked = Boolean(master && master.checked);
+            document.querySelectorAll('#nwIncidentsTable tbody tr').forEach(function(row) {
+                if (row.style.display === 'none') return;
+                const cb = row.querySelector('.nw-incident-select');
+                if (cb) cb.checked = checked;
+            });
+            updateNwExportButtonState();
+        }
+
+        function nwIncidentToExportSection(report) {
+            const fields = [
+                { label: 'Report ID', value: report.report_id || '' },
+                { label: 'Member', value: (report.member_name || '') + (report.member_contact ? ' (' + report.member_contact + ')' : '') },
+                { label: 'Email', value: report.member_email || '' },
+                { label: 'Location', value: report.location || '' },
+                { label: 'Status', value: report.status || '' },
+                { label: 'Assigned To', value: report.assigned_to || 'Unassigned' },
+                { label: 'Submitted', value: report.created_at ? new Date(report.created_at).toLocaleString() : '—' }
+            ];
+            if (report.assigned_at) {
+                fields.push({ label: 'Assigned At', value: new Date(report.assigned_at).toLocaleString() });
+            }
+            if (report.resolved_at) {
+                fields.push({ label: 'Resolved At', value: new Date(report.resolved_at).toLocaleString() });
+            }
+
+            const blocks = [
+                { label: 'Description', value: report.description || '' }
+            ];
+            if (report.resolution_report) {
+                blocks.push({ label: 'Personnel Resolution', value: report.resolution_report });
+            }
+
+            const images = [];
+            if (report.photo_data) {
+                images.push({ label: 'Photo', src: report.photo_data });
+            }
+
+            return { fields: fields, blocks: blocks, images: images };
+        }
+
+        async function exportSelectedNwIncidents() {
+            if (!document.body.classList.contains('export-select-mode')) {
+                enterNwExportSelectMode();
+                return;
+            }
+            const ids = getSelectedNwIncidentIds();
+            if (!ids.length) {
+                alert('Please select at least one incident report to export.');
+                return;
+            }
+            const selected = ids.map(function(id) {
+                return reports.find(function(r) { return Number(r.id) === Number(id); });
+            }).filter(Boolean);
+            if (!selected.length) {
+                alert('Selected reports could not be found. Please refresh and try again.');
+                return;
+            }
+            if (!window.AlertaraReportExport) {
+                alert('Export helper not loaded. Please refresh the page.');
+                return;
+            }
+
+            try {
+                const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
+                const fileName = selected.length === 1
+                    ? ('nw_incident_report_' + String(selected[0].report_id || selected[0].id).replace(/\s+/g, '_') + '.docx')
+                    : ('nw_incident_reports_' + selected.length + '_' + stamp + '.docx');
+                await AlertaraReportExport.downloadReport({
+                    title: selected.length > 1 ? 'NEIGHBORHOOD WATCH INCIDENT REPORTS' : 'NEIGHBORHOOD WATCH INCIDENT REPORT',
+                    fileName: fileName,
+                    sections: selected.map(nwIncidentToExportSection)
+                });
+                exitNwExportSelectMode();
+                alert('Incident report export saved as ' + fileName + '!');
+            } catch (error) {
+                console.error('Error generating DOCX:', error);
+                alert(error.message || 'Error generating DOCX file. Please try again.');
+            }
         }
 
         async function loadReports() {
@@ -461,61 +610,6 @@ define('NW_PAGE_MODE', 'incidents');
                 }
             } catch (err) {
                 document.getElementById('tableContainer').innerHTML = '<div class="empty-state">Network error while loading reports.</div>';
-            }
-        }
-
-        async function exportIncidentReport(id) {
-            const report = reports.find(function(r) { return Number(r.id) === Number(id); });
-            if (!report) {
-                alert('Incident report not found');
-                return;
-            }
-            if (!window.AlertaraReportExport) {
-                alert('Export helper not loaded. Please refresh the page.');
-                return;
-            }
-
-            try {
-                const fields = [
-                    { label: 'Report ID', value: report.report_id || '' },
-                    { label: 'Member', value: (report.member_name || '') + (report.member_contact ? ' (' + report.member_contact + ')' : '') },
-                    { label: 'Email', value: report.member_email || '' },
-                    { label: 'Location', value: report.location || '' },
-                    { label: 'Status', value: report.status || '' },
-                    { label: 'Assigned To', value: report.assigned_to || 'Unassigned' },
-                    { label: 'Submitted', value: report.created_at ? new Date(report.created_at).toLocaleString() : '—' }
-                ];
-                if (report.assigned_at) {
-                    fields.push({ label: 'Assigned At', value: new Date(report.assigned_at).toLocaleString() });
-                }
-                if (report.resolved_at) {
-                    fields.push({ label: 'Resolved At', value: new Date(report.resolved_at).toLocaleString() });
-                }
-
-                const blocks = [
-                    { label: 'Description', value: report.description || '' }
-                ];
-                if (report.resolution_report) {
-                    blocks.push({ label: 'Personnel Resolution', value: report.resolution_report });
-                }
-
-                const images = [];
-                if (report.photo_data) {
-                    images.push({ label: 'Photo', src: report.photo_data });
-                }
-
-                const fileName = 'nw_incident_report_' + String(report.report_id || report.id).replace(/\s+/g, '_') + '.docx';
-                await AlertaraReportExport.downloadReport({
-                    title: 'NEIGHBORHOOD WATCH INCIDENT REPORT',
-                    fileName: fileName,
-                    fields: fields,
-                    blocks: blocks,
-                    images: images
-                });
-                alert('Incident report exported successfully as ' + fileName + '!');
-            } catch (error) {
-                console.error('Error generating DOCX:', error);
-                alert(error.message || 'Error generating DOCX file. Please try again.');
             }
         }
 

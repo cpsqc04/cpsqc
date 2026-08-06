@@ -958,7 +958,6 @@ $personnelCode = htmlspecialchars(getBpsoPersonnelCode());
                     <textarea id="resolutionReport" required placeholder="Describe how you handled the complaint, actions taken, and outcome..."></textarea>
                 </div>
                 <div style="display:flex;gap:0.75rem;flex-wrap:wrap;">
-                    <button type="button" id="saveProgressBtn" class="btn-submit" onclick="submitComplaintResolution('Processing')">Save Progress</button>
                     <button type="submit" id="resolveComplaintBtn" class="btn-submit">Mark as Resolved</button>
                 </div>
             </form>
@@ -2359,14 +2358,13 @@ $personnelCode = htmlspecialchars(getBpsoPersonnelCode());
                 <div class="complaint-detail"><strong>Complainant:</strong> ${escapeHtml(complaint.complainant_name)} · ${escapeHtml(complaint.contact_number)}</div>
                 <div class="complaint-detail"><strong>Address:</strong> ${escapeHtml(complaint.address)}</div>
                 <div class="complaint-detail"><strong>Defendant:</strong> ${escapeHtml(complaint.defendant_name || 'N/A')}</div>
-                <div class="complaint-detail"><strong>Type:</strong> ${escapeHtml(complaint.complaint_type)} · <strong>Priority:</strong> <span class="priority-badge ${priorityClass(complaint.priority)}">${escapeHtml(complaint.priority)}</span></div>
+                <div class="complaint-detail"><strong>Type:</strong> ${escapeHtml(complaint.complaint_type)}</div>
                 <div class="complaint-detail"><strong>Description:</strong><br>${escapeHtml(complaint.description)}</div>
                 <div class="complaint-detail"><strong>Status:</strong> <span class="status-badge ${complaintStatusClass(complaint.status)}">${escapeHtml(complaint.status)}</span></div>
                 ${buildComplaintTimeline(complaint)}
             `;
             const isResolved = complaint.status === 'Resolved';
             document.getElementById('resolutionReport').readOnly = isResolved;
-            document.getElementById('saveProgressBtn').style.display = isResolved ? 'none' : '';
             document.getElementById('resolveComplaintBtn').style.display = isResolved ? 'none' : '';
             document.getElementById('complaintResolutionModal').classList.add('active');
         }
@@ -2374,7 +2372,6 @@ $personnelCode = htmlspecialchars(getBpsoPersonnelCode());
         function closeComplaintModal() {
             document.getElementById('complaintResolutionModal').classList.remove('active');
             document.getElementById('resolutionReport').readOnly = false;
-            document.getElementById('saveProgressBtn').style.display = '';
             document.getElementById('resolveComplaintBtn').style.display = '';
         }
 
