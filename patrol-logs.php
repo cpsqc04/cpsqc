@@ -681,6 +681,7 @@ require_once __DIR__ . '/db.php';
         </div>
     </div>
 
+    <script src="js/photo-lightbox.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             const sidebar = document.getElementById('sidebar');
@@ -895,43 +896,11 @@ require_once __DIR__ . '/db.php';
                 alert('No documentation photo available for this report.');
                 return;
             }
-
-            const existing = document.getElementById('patrol-photo-lightbox');
-            if (existing) existing.remove();
-
-            const modal = document.createElement('div');
-            modal.id = 'patrol-photo-lightbox';
-            modal.style.cssText = 'position:fixed;z-index:4000;inset:0;background:rgba(0,0,0,0.92);display:flex;align-items:center;justify-content:center;padding:1rem;';
-
-            const img = document.createElement('img');
-            img.src = photoSrc;
-            img.alt = 'Documentation photo';
-            img.style.cssText = 'max-width:95%;max-height:95%;border-radius:8px;object-fit:contain;box-shadow:0 10px 40px rgba(0,0,0,0.45);';
-            img.onclick = function(e) { e.stopPropagation(); };
-
-            const closeBtn = document.createElement('button');
-            closeBtn.type = 'button';
-            closeBtn.innerHTML = '&times;';
-            closeBtn.setAttribute('aria-label', 'Close photo');
-            closeBtn.style.cssText = 'position:absolute;top:16px;right:20px;width:44px;height:44px;border:none;border-radius:50%;background:rgba(255,255,255,0.2);color:#fff;font-size:2rem;line-height:1;cursor:pointer;';
-
-            const closeLightbox = function() {
-                if (modal.parentNode) modal.parentNode.removeChild(modal);
-                document.removeEventListener('keydown', onKeyDown);
-            };
-            const onKeyDown = function(e) {
-                if (e.key === 'Escape') closeLightbox();
-            };
-
-            modal.onclick = closeLightbox;
-            closeBtn.onclick = function(e) {
-                e.stopPropagation();
-                closeLightbox();
-            };
-            document.addEventListener('keydown', onKeyDown);
-            modal.appendChild(closeBtn);
-            modal.appendChild(img);
-            document.body.appendChild(modal);
+            if (window.AlertaraPhotoLightbox) {
+                AlertaraPhotoLightbox.open(photoSrc, 'Documentation photo');
+                return;
+            }
+            alert('Photo viewer is unavailable.');
         }
 
         function viewLog(id) {

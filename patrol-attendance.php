@@ -1029,6 +1029,7 @@ $personnelCode = htmlspecialchars(getBpsoPersonnelCode());
 
     <div id="toastPopup" class="toast-popup" role="status" aria-live="polite"></div>
 
+    <script src="js/photo-lightbox.js"></script>
     <script>
         let scheduleData = {};
         let complaintData = {};
@@ -1922,6 +1923,10 @@ $personnelCode = htmlspecialchars(getBpsoPersonnelCode());
         function viewDocumentationPhoto(reportId) {
             const report = portalReports.find(r => Number(r.id) === Number(reportId));
             if (!report || !report.documentation_photo) return;
+            if (window.AlertaraPhotoLightbox) {
+                AlertaraPhotoLightbox.open(report.documentation_photo, 'Documentation photo');
+                return;
+            }
             window.open(report.documentation_photo, '_blank');
         }
 
@@ -2029,7 +2034,7 @@ $personnelCode = htmlspecialchars(getBpsoPersonnelCode());
             const report = portalReports.find(r => Number(r.id) === Number(id));
             if (!report) return;
             const photoHtml = report.documentation_photo
-                ? `<div class="complaint-detail"><strong>Documentation:</strong><br><img class="doc-modal-photo" src="${escapeHtml(report.documentation_photo)}" alt="Documentation photo" onclick="window.open(this.src, '_blank')" title="Click to view full size"></div>`
+                ? `<div class="complaint-detail"><strong>Documentation:</strong><br><img class="doc-modal-photo" src="${escapeHtml(report.documentation_photo)}" alt="Documentation photo" onclick="AlertaraPhotoLightbox.open(this.src, 'Documentation photo')" title="Click to view full size"></div>`
                 : `<div class="complaint-detail"><strong>Documentation:</strong> No photo uploaded</div>`;
             document.getElementById('reportDetailContent').innerHTML = `
                 <div class="complaint-detail"><strong>Date:</strong> ${escapeHtml(report.date)} ${escapeHtml(report.time || '')}</div>
@@ -2476,7 +2481,7 @@ $personnelCode = htmlspecialchars(getBpsoPersonnelCode());
 
             let photoHtml = '';
             if (report.photo_data) {
-                photoHtml = `<div class="complaint-detail"><strong>Photo:</strong><br><img src="${report.photo_data}" alt="Incident photo" class="incident-photo" onclick="window.open(this.src, '_blank')" title="Click to view full size"></div>`;
+                photoHtml = `<div class="complaint-detail"><strong>Photo:</strong><br><img src="${report.photo_data}" alt="Incident photo" class="incident-photo" onclick="AlertaraPhotoLightbox.open(this.src, 'Incident photo')" title="Click to view full size"></div>`;
             }
 
             document.getElementById('nwIncidentDetailContent').innerHTML = `

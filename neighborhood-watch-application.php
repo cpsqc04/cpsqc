@@ -887,6 +887,7 @@ $nwSearchPlaceholder = $nwIsMemberList
     </div>
     
     <script src="js/form-contact-validation.js"></script>
+    <script src="js/photo-lightbox.js"></script>
     <script>
         const NW_PAGE_MODE = <?php echo json_encode(NW_PAGE_MODE); ?>;
 
@@ -1065,18 +1066,11 @@ $nwSearchPlaceholder = $nwIsMemberList
         }
         
         function viewPhoto(src) {
-            // Create a simple modal to view the photo
-            const modal = document.createElement('div');
-            modal.style.cssText = 'position: fixed; z-index: 3000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.8); display: flex; align-items: center; justify-content: center;';
-            modal.onclick = function() { document.body.removeChild(modal); };
-            
-            const img = document.createElement('img');
-            img.src = src;
-            img.style.cssText = 'max-width: 90%; max-height: 90%; border-radius: 8px;';
-            img.onclick = function(e) { e.stopPropagation(); };
-            
-            modal.appendChild(img);
-            document.body.appendChild(modal);
+            if (window.AlertaraPhotoLightbox) {
+                AlertaraPhotoLightbox.open(src, 'Neighborhood watch photo');
+                return;
+            }
+            alert('Photo viewer is unavailable.');
         }
         
         // Initialize on page load

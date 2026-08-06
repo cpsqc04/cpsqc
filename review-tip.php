@@ -748,6 +748,7 @@ require_once __DIR__ . '/db.php';
     </div>
 
 
+    <script src="js/photo-lightbox.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             const sidebar = document.getElementById('sidebar');
@@ -1535,60 +1536,11 @@ require_once __DIR__ . '/db.php';
         }
 
         function viewPhotoFull(photoSrc) {
-            if (!photoSrc) {
-                alert('No photo available');
+            if (window.AlertaraPhotoLightbox) {
+                AlertaraPhotoLightbox.open(photoSrc, 'Tip photo');
                 return;
             }
-            
-            const modal = document.createElement('div');
-            modal.id = 'fullscreen-photo-modal';
-            modal.style.cssText = 'position: fixed; z-index: 3000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.95); display: flex; align-items: center; justify-content: center; animation: fadeIn 0.3s ease;';
-            
-            const img = document.createElement('img');
-            img.src = photoSrc;
-            img.style.cssText = 'max-width: 95%; max-height: 95%; border-radius: 8px; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5); object-fit: contain; cursor: zoom-out;';
-            img.onclick = function(e) { 
-                e.stopPropagation(); 
-            };
-            img.onerror = function() {
-                alert('Failed to load photo');
-                document.body.removeChild(modal);
-                if (escHandler) document.removeEventListener('keydown', escHandler);
-            };
-            
-            // Add close button
-            const closeBtn = document.createElement('button');
-            closeBtn.innerHTML = '&times;';
-            closeBtn.style.cssText = 'position: absolute; top: 20px; right: 30px; background: rgba(255, 255, 255, 0.2); color: #fff; border: none; font-size: 40px; width: 50px; height: 50px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background 0.2s ease; z-index: 3001;';
-            closeBtn.onmouseover = function() { this.style.background = 'rgba(255, 255, 255, 0.3)'; };
-            closeBtn.onmouseout = function() { this.style.background = 'rgba(255, 255, 255, 0.2)'; };
-            
-            // Add ESC key listener
-            const escHandler = function(e) {
-                if (e.key === 'Escape' || e.keyCode === 27) {
-                    const existingModal = document.getElementById('fullscreen-photo-modal');
-                    if (existingModal) {
-                        document.body.removeChild(existingModal);
-                        document.removeEventListener('keydown', escHandler);
-                    }
-                }
-            };
-            
-            const closeModal = function() {
-                document.body.removeChild(modal);
-                document.removeEventListener('keydown', escHandler);
-            };
-            
-            modal.onclick = closeModal;
-            closeBtn.onclick = function(e) {
-                e.stopPropagation();
-                closeModal();
-            };
-            document.addEventListener('keydown', escHandler);
-            
-            modal.appendChild(closeBtn);
-            modal.appendChild(img);
-            document.body.appendChild(modal);
+            alert('No photo available');
         }
 
         // Date and Time Display
