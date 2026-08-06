@@ -568,13 +568,52 @@ require_once __DIR__ . '/db.php';
             return String(hours).padStart(2, '0') + ':' + String(mins).padStart(2, '0');
         }
 
+        function normalizeDutyShift(duty) {
+            const s = String(duty || '').toLowerCase();
+            if (s.includes('night')) return 'Night Shift';
+            if (s.includes('day')) return 'Day Shift';
+            return '';
+        }
+
+        function getShiftEndDate(timeInValue, duty) {
+            const match = String(timeInValue || '').match(/(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})/);
+            if (!match) return null;
+            const shift = normalizeDutyShift(duty);
+            if (!shift) return null;
+
+            let y = Number(match[1]);
+            let m = Number(match[2]);
+            let d = Number(match[3]);
+            const hour = Number(match[4]);
+
+            if (shift === 'Night Shift' && hour < 8) {
+                const prev = new Date(Date.UTC(y, m - 1, d));
+                prev.setUTCDate(prev.getUTCDate() - 1);
+                y = prev.getUTCFullYear();
+                m = prev.getUTCMonth() + 1;
+                d = prev.getUTCDate();
+            }
+
+            if (shift === 'Day Shift') {
+                return new Date(`${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}T20:00:00+08:00`);
+            }
+
+            const end = new Date(Date.UTC(y, m - 1, d));
+            end.setUTCDate(end.getUTCDate() + 1);
+            const ey = end.getUTCFullYear();
+            const em = end.getUTCMonth() + 1;
+            const ed = end.getUTCDate();
+            return new Date(`${ey}-${String(em).padStart(2, '0')}-${String(ed).padStart(2, '0')}T08:00:00+08:00`);
+        }
+
         function computeLiveOvertimeLabel(row) {
             const start = parseManilaDate(row.time_in);
             if (!start) return '00:00';
             const end = row.time_out ? parseManilaDate(row.time_out) : new Date();
             if (!end) return '00:00';
-            const totalMinutes = Math.max(0, Math.floor((end.getTime() - start.getTime()) / 60000));
-            const overtimeMinutes = Math.max(0, totalMinutes - (8 * 60));
+            const shiftEnd = getShiftEndDate(row.time_in, row.duty || row.duty_shift);
+            if (!shiftEnd) return '00:00';
+            const overtimeMinutes = Math.max(0, Math.floor((end.getTime() - shiftEnd.getTime()) / 60000));
             if (overtimeMinutes <= 0) return '00:00';
             const label = formatOvertimeClock(overtimeMinutes);
             return row.time_out ? label : (label + ' (running)');
@@ -625,7 +664,7 @@ require_once __DIR__ . '/db.php';
                     <td>${formatDateTime(row.time_in)}</td>
                     <td>${formatDateTime(row.time_out)}</td>
                     <td>${escapeHtml(row.patrol_duration_label || '')}</td>
-                    <td class="overtime-cell" data-time-in="${escapeHtml(row.time_in || '')}" data-time-out="${escapeHtml(row.time_out || '')}">${escapeHtml(computeLiveOvertimeLabel(row))}</td>
+                    <td class="overtime-cell" data-time-in="${escapeHtml(row.time_in || '')}" data-time-out="${escapeHtml(row.time_out || '')}" data-duty="${escapeHtml(row.duty || row.duty_shift || '')}">${escapeHtml(computeLiveOvertimeLabel(row))}</td>
                     <td><span class="status-badge ${statusClass(row.status_label)}">${escapeHtml(row.status_label || '')}</span></td>
                 </tr>
             `).join('');
@@ -635,7 +674,12 @@ require_once __DIR__ . '/db.php';
             document.querySelectorAll('.overtime-cell').forEach(cell => {
                 const timeIn = cell.getAttribute('data-time-in');
                 const timeOut = cell.getAttribute('data-time-out');
-                cell.textContent = computeLiveOvertimeLabel({ time_in: timeIn, time_out: timeOut || null });
+                const duty = cell.getAttribute('data-duty');
+                cell.textContent = computeLiveOvertimeLabel({
+                    time_in: timeIn,
+                    time_out: timeOut || null,
+                    duty: duty || ''
+                });
             });
         }
 

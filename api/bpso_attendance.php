@@ -289,7 +289,12 @@ if ($method === 'POST') {
 
         try {
             $openStmt = $pdo->prepare(
-                'SELECT id, time_in FROM bpso_attendance WHERE patrol_id = :patrol_id AND time_out IS NULL ORDER BY time_in DESC LIMIT 1'
+                'SELECT a.id, a.time_in, p.duty_shift, p.personnel_name
+                 FROM bpso_attendance a
+                 LEFT JOIN patrols p ON p.id = a.patrol_id
+                 WHERE a.patrol_id = :patrol_id AND a.time_out IS NULL
+                 ORDER BY a.time_in DESC
+                 LIMIT 1'
             );
             $openStmt->execute([':patrol_id' => $patrolId]);
             $open = $openStmt->fetch(PDO::FETCH_ASSOC);
@@ -307,14 +312,11 @@ if ($method === 'POST') {
                 ':patrol_id' => $patrolId,
             ]);
 
-            $nameStmt = $pdo->prepare('SELECT personnel_name FROM patrols WHERE id = :id LIMIT 1');
-            $nameStmt->execute([':id' => $patrolId]);
-            $nameRow = $nameStmt->fetch(PDO::FETCH_ASSOC);
             require_once __DIR__ . '/notifications_schema.php';
             notifyAdminActorActivity(
                 $pdo,
                 'patrol',
-                (string) ($nameRow['personnel_name'] ?? getBpsoPersonnelName()),
+                (string) ($open['personnel_name'] ?? getBpsoPersonnelName()),
                 'clocked out.',
                 'bpso-attendance.php?activity=clock_out_' . (int) $open['id']
             );
@@ -329,7 +331,7 @@ if ($method === 'POST') {
                     'is_at_hall' => false,
                     'is_clocked_on' => false,
                     'duration_label' => formatHallDurationLabel($open['time_in'], $timestamp),
-                    'overtime_label' => formatOvertimeLabel($open['time_in'], $timestamp),
+                    'overtime_label' => formatOvertimeLabel($open['time_in'], $timestamp, $open['duty_shift'] ?? null),
                 ],
             ]);
         } catch (PDOException $e) {

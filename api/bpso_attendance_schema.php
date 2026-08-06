@@ -86,20 +86,15 @@ function formatOvertimeClock(int $overtimeMinutes): string
     return sprintf('%02d:%02d', $hours, $mins);
 }
 
-function formatOvertimeLabel(?string $timeIn, ?string $timeOut): string
+function formatOvertimeLabel(?string $timeIn, ?string $timeOut, ?string $dutyShift = null): string
 {
-    $minutes = computeAttendanceMinutes($timeIn, $timeOut);
-    if ($minutes === null) {
-        return '00:00';
-    }
-
-    $overtimeMinutes = max(0, $minutes - (8 * 60));
-    if ($overtimeMinutes <= 0) {
+    $overtimeMinutes = computeOvertimeMinutesPastShiftEnd($timeIn, $timeOut, $dutyShift);
+    if ($overtimeMinutes === null || $overtimeMinutes <= 0) {
         return '00:00';
     }
 
     $label = formatOvertimeClock($overtimeMinutes);
-    // Still clocked on past 8 hours — overtime keeps running.
+    // Still clocked on past official shift end — overtime keeps running.
     if (!$timeOut) {
         return $label . ' (running)';
     }
@@ -113,8 +108,6 @@ function enrichAttendanceRow(array $row, ?PDO $pdo = null): array
     $row['status_label'] = empty($row['time_out']) ? 'Clocked On' : 'Clocked Out';
     $row['patrol_duration_label'] = formatHallDurationLabel($row['time_in'] ?? null, $row['time_out'] ?? null);
     $row['duration_minutes'] = computeAttendanceMinutes($row['time_in'] ?? null, $row['time_out'] ?? null);
-    $row['overtime_label'] = formatOvertimeLabel($row['time_in'] ?? null, $row['time_out'] ?? null);
-    $row['overtime_running'] = empty($row['time_out']) && ($row['duration_minutes'] ?? 0) > (8 * 60);
     $row['duty'] = $row['duty_shift'] ?? '';
 
     if ($pdo && !empty($row['patrol_id']) && $row['duty'] === '') {
@@ -127,6 +120,19 @@ function enrichAttendanceRow(array $row, ?PDO $pdo = null): array
     if ($row['duty'] === '') {
         $row['duty'] = '—';
     }
+
+    $dutyForOt = $row['duty'] !== '—' ? $row['duty'] : null;
+    $overtimeMinutes = computeOvertimeMinutesPastShiftEnd(
+        $row['time_in'] ?? null,
+        $row['time_out'] ?? null,
+        $dutyForOt
+    );
+    $row['overtime_label'] = formatOvertimeLabel(
+        $row['time_in'] ?? null,
+        $row['time_out'] ?? null,
+        $dutyForOt
+    );
+    $row['overtime_running'] = empty($row['time_out']) && ($overtimeMinutes ?? 0) > 0;
 
     return $row;
 }

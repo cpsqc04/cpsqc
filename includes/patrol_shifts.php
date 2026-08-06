@@ -204,11 +204,56 @@ function hasPatrolShiftStarted(string $scheduleDate, string $shift, ?DateTime $n
 }
 
 /**
+ * Normalize free-text duty labels to Day Shift / Night Shift.
+ */
+function normalizePatrolShiftName(?string $shift): string
+{
+    $normalized = trim((string) $shift);
+    if ($normalized === '') {
+        return '';
+    }
+
+    if (strcasecmp($normalized, PATROL_SHIFT_NIGHT) === 0 || stripos($normalized, 'night') !== false) {
+        return PATROL_SHIFT_NIGHT;
+    }
+
+    if (strcasecmp($normalized, PATROL_SHIFT_DAY) === 0 || stripos($normalized, 'day') !== false) {
+        return PATROL_SHIFT_DAY;
+    }
+
+    return '';
+}
+
+/**
+ * Schedule date for a clock-on + duty shift.
+ * Night sessions before 08:00 belong to the previous calendar day's Night Shift.
+ */
+function resolvePatrolShiftScheduleDateFromClockOn(string $timeIn, ?string $dutyShift): ?string
+{
+    $shift = normalizePatrolShiftName($dutyShift);
+    if ($shift === '') {
+        return null;
+    }
+
+    try {
+        $tz = new DateTimeZone('Asia/Manila');
+        $dt = new DateTime(str_replace(' ', 'T', $timeIn), $tz);
+        if ($shift === PATROL_SHIFT_NIGHT && (int) $dt->format('G') < 8) {
+            $dt->modify('-1 day');
+        }
+
+        return $dt->format('Y-m-d');
+    } catch (Exception $e) {
+        return null;
+    }
+}
+
+/**
  * End datetime of a patrol duty shift for the given schedule date.
  */
 function getPatrolShiftEndDateTime(string $scheduleDate, string $shift): ?DateTime
 {
-    $shift = trim($shift);
+    $shift = normalizePatrolShiftName($shift);
     $tz = new DateTimeZone('Asia/Manila');
 
     if ($shift === PATROL_SHIFT_DAY) {
@@ -222,6 +267,37 @@ function getPatrolShiftEndDateTime(string $scheduleDate, string $shift): ?DateTi
     }
 
     return null;
+}
+
+/**
+ * Minutes past official shift end (Day 8:00 PM / Night 8:00 AM). Null if inputs invalid.
+ */
+function computeOvertimeMinutesPastShiftEnd(?string $timeIn, ?string $timeOut, ?string $dutyShift): ?int
+{
+    if (!$timeIn) {
+        return null;
+    }
+
+    $scheduleDate = resolvePatrolShiftScheduleDateFromClockOn($timeIn, $dutyShift);
+    if (!$scheduleDate) {
+        return null;
+    }
+
+    $shiftEnd = getPatrolShiftEndDateTime($scheduleDate, (string) $dutyShift);
+    if (!$shiftEnd) {
+        return null;
+    }
+
+    try {
+        $tz = new DateTimeZone('Asia/Manila');
+        $end = $timeOut
+            ? new DateTime(str_replace(' ', 'T', $timeOut), $tz)
+            : manilaNow();
+    } catch (Exception $e) {
+        return null;
+    }
+
+    return max(0, (int) round(($end->getTimestamp() - $shiftEnd->getTimestamp()) / 60));
 }
 
 /**

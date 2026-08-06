@@ -1463,11 +1463,48 @@ $personnelCode = htmlspecialchars(getBpsoPersonnelCode());
         }
 
         function formatOvertimeFromMinutes(totalMinutes) {
-            if (totalMinutes == null || totalMinutes <= 8 * 60) return '00:00';
-            const overtimeMinutes = totalMinutes - (8 * 60);
-            const hours = Math.floor(overtimeMinutes / 60);
-            const mins = overtimeMinutes % 60;
+            if (totalMinutes == null || totalMinutes <= 0) return '00:00';
+            const hours = Math.floor(totalMinutes / 60);
+            const mins = totalMinutes % 60;
             return String(hours).padStart(2, '0') + ':' + String(mins).padStart(2, '0');
+        }
+
+        function normalizeDutyShift(duty) {
+            const s = String(duty || '').toLowerCase();
+            if (s.includes('night')) return 'Night Shift';
+            if (s.includes('day')) return 'Day Shift';
+            return '';
+        }
+
+        function getShiftEndDate(timeInValue, duty) {
+            const match = String(timeInValue || '').match(/(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})/);
+            if (!match) return null;
+            const shift = normalizeDutyShift(duty);
+            if (!shift) return null;
+
+            let y = Number(match[1]);
+            let m = Number(match[2]);
+            let d = Number(match[3]);
+            const hour = Number(match[4]);
+
+            if (shift === 'Night Shift' && hour < 8) {
+                const prev = new Date(Date.UTC(y, m - 1, d));
+                prev.setUTCDate(prev.getUTCDate() - 1);
+                y = prev.getUTCFullYear();
+                m = prev.getUTCMonth() + 1;
+                d = prev.getUTCDate();
+            }
+
+            if (shift === 'Day Shift') {
+                return new Date(`${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}T20:00:00+08:00`);
+            }
+
+            const end = new Date(Date.UTC(y, m - 1, d));
+            end.setUTCDate(end.getUTCDate() + 1);
+            const ey = end.getUTCFullYear();
+            const em = end.getUTCMonth() + 1;
+            const ed = end.getUTCDate();
+            return new Date(`${ey}-${String(em).padStart(2, '0')}-${String(ed).padStart(2, '0')}T08:00:00+08:00`);
         }
 
         function computeLiveOvertimeLabel(row) {
@@ -1475,12 +1512,11 @@ $personnelCode = htmlspecialchars(getBpsoPersonnelCode());
             if (!start) return '00:00';
             const end = row.time_out ? parseSessionDate(row.time_out) : new Date();
             if (!end) return '00:00';
-            const totalMinutes = Math.max(0, Math.floor((end.getTime() - start.getTime()) / 60000));
-            const overtimeMinutes = Math.max(0, totalMinutes - (8 * 60));
+            const shiftEnd = getShiftEndDate(row.time_in, row.duty || row.duty_shift);
+            if (!shiftEnd) return '00:00';
+            const overtimeMinutes = Math.max(0, Math.floor((end.getTime() - shiftEnd.getTime()) / 60000));
             if (overtimeMinutes <= 0) return '00:00';
-            const hours = Math.floor(overtimeMinutes / 60);
-            const mins = overtimeMinutes % 60;
-            const label = String(hours).padStart(2, '0') + ':' + String(mins).padStart(2, '0');
+            const label = formatOvertimeFromMinutes(overtimeMinutes);
             return row.time_out ? label : (label + ' (running)');
         }
 
@@ -1757,7 +1793,7 @@ $personnelCode = htmlspecialchars(getBpsoPersonnelCode());
                         <td>${escapeHtml(formatManilaTimeOnly(row.time_in))}</td>
                         <td>${escapeHtml(row.time_out ? formatManilaTimeOnly(row.time_out) : '')}</td>
                         <td>${escapeHtml(row.patrol_duration_label || '—')}</td>
-                        <td class="overtime-cell" data-time-in="${escapeHtml(row.time_in || '')}" data-time-out="${escapeHtml(row.time_out || '')}">${escapeHtml(overtime)}</td>
+                        <td class="overtime-cell" data-time-in="${escapeHtml(row.time_in || '')}" data-time-out="${escapeHtml(row.time_out || '')}" data-duty="${escapeHtml(row.duty || row.duty_shift || '')}">${escapeHtml(overtime)}</td>
                         <td>${escapeHtml(row.status_label || '—')}</td>
                     </tr>`;
                 }).join('');
@@ -1825,9 +1861,11 @@ $personnelCode = htmlspecialchars(getBpsoPersonnelCode());
             document.querySelectorAll('#timesheetTableBody .overtime-cell').forEach(cell => {
                 const timeIn = cell.getAttribute('data-time-in');
                 const timeOut = cell.getAttribute('data-time-out');
+                const duty = cell.getAttribute('data-duty');
                 cell.textContent = computeLiveOvertimeLabel({
                     time_in: timeIn,
-                    time_out: timeOut || null
+                    time_out: timeOut || null,
+                    duty: duty || ''
                 });
             });
         }
