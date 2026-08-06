@@ -799,7 +799,9 @@ $patrolNavActive = 'patrol-request';
                             patrol_zone: location,
                             route: location,
                             location: location,
-                            notes: notes
+                            notes: notes,
+                            assignment_type: 'event',
+                            patrol_request_id: dbId
                         })
                     });
                     const scheduleResult = await scheduleRes.json();

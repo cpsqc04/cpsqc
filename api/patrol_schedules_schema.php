@@ -34,10 +34,13 @@ function ensurePatrolSchedulesTable(PDO $pdo): void
             patrol_end VARCHAR(50) DEFAULT NULL,
             duration_minutes INT NOT NULL DEFAULT 0,
             notes TEXT DEFAULT NULL,
+            assignment_type VARCHAR(30) NOT NULL DEFAULT 'patrol',
+            patrol_request_id INT DEFAULT NULL,
             status VARCHAR(50) NOT NULL DEFAULT 'Scheduled',
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             INDEX idx_patrol_id (patrol_id),
             INDEX idx_schedule_date (schedule_date),
+            INDEX idx_assignment_type (assignment_type),
             INDEX idx_status (status)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
@@ -57,14 +60,58 @@ function ensurePatrolSchedulesTable(PDO $pdo): void
         'patrol_end' => 'ALTER TABLE patrol_schedules ADD COLUMN patrol_end VARCHAR(50) DEFAULT NULL AFTER patrol_start',
         'duration_minutes' => 'ALTER TABLE patrol_schedules ADD COLUMN duration_minutes INT NOT NULL DEFAULT 0 AFTER patrol_end',
         'notes' => 'ALTER TABLE patrol_schedules ADD COLUMN notes TEXT DEFAULT NULL AFTER duration_minutes',
-        'status' => 'ALTER TABLE patrol_schedules ADD COLUMN status VARCHAR(50) NOT NULL DEFAULT "Scheduled" AFTER notes',
+        'assignment_type' => "ALTER TABLE patrol_schedules ADD COLUMN assignment_type VARCHAR(30) NOT NULL DEFAULT 'patrol' AFTER notes",
+        'patrol_request_id' => 'ALTER TABLE patrol_schedules ADD COLUMN patrol_request_id INT DEFAULT NULL AFTER assignment_type',
+        'status' => 'ALTER TABLE patrol_schedules ADD COLUMN status VARCHAR(50) NOT NULL DEFAULT "Scheduled" AFTER patrol_request_id',
         'created_at' => 'ALTER TABLE patrol_schedules ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP',
     ];
 
     foreach ($additions as $column => $sql) {
         if (!isset($columns[$column])) {
             $pdo->exec($sql);
+            $columns[$column] = true;
         }
+    }
+
+    // Keep status after the newer assignment columns when upgrading older tables.
+    if (isset($columns['assignment_type'], $columns['status'])) {
+        try {
+            $pdo->exec('ALTER TABLE patrol_schedules MODIFY COLUMN status VARCHAR(50) NOT NULL DEFAULT "Scheduled" AFTER patrol_request_id');
+        } catch (PDOException $e) {
+            // Ignore reorder failures on older MySQL variants.
+        }
+    }
+
+    backfillPatrolScheduleAssignmentTypes($pdo);
+}
+
+/**
+ * Mark legacy request-linked schedules as event/marshal assignments.
+ */
+function backfillPatrolScheduleAssignmentTypes(PDO $pdo): void
+{
+    static $done = false;
+    if ($done) {
+        return;
+    }
+    $done = true;
+
+    try {
+        $pdo->exec(
+            "UPDATE patrol_schedules
+             SET assignment_type = 'event'
+             WHERE (assignment_type = '' OR assignment_type = 'patrol' OR assignment_type IS NULL)
+               AND (
+                    notes LIKE 'Request ID:%'
+                    OR notes LIKE 'Request ID: %'
+                    OR notes LIKE 'Patrol request:%'
+                    OR notes LIKE 'Patrol request: %'
+                    OR notes LIKE '%\\nRequest ID:%'
+                    OR notes LIKE '%\\nRequest ID: %'
+               )"
+        );
+    } catch (PDOException $e) {
+        // Non-fatal: older DBs without notes/type columns skip quietly.
     }
 }
 
@@ -86,9 +133,31 @@ function patrolSchedulesSelectColumns(string $prefix = ''): string
         "{$p}patrol_end",
         "{$p}duration_minutes",
         "{$p}notes",
+        "{$p}assignment_type",
+        "{$p}patrol_request_id",
         "{$p}status",
         "{$p}created_at",
     ]);
+}
+
+function normalizePatrolAssignmentType(?string $type, ?string $notes = null): string
+{
+    $normalized = strtolower(trim((string) $type));
+    if (in_array($normalized, ['event', 'marshal', 'patrol_request'], true)) {
+        return 'event';
+    }
+    if ($normalized === 'patrol' || $normalized === '') {
+        $notesText = (string) $notes;
+        if (
+            preg_match('/(^|\\n)\\s*Request ID\\s*:/i', $notesText)
+            || preg_match('/(^|\\n)\\s*Patrol request\\s*:/i', $notesText)
+        ) {
+            return 'event';
+        }
+        return 'patrol';
+    }
+
+    return 'patrol';
 }
 
 function enrichPatrolScheduleRow(array $row): array
@@ -96,6 +165,10 @@ function enrichPatrolScheduleRow(array $row): array
     $status = (string) ($row['status'] ?? 'Scheduled');
     $start = $row['patrol_start'] ?? $row['schedule_time'] ?? '';
     $end = $row['patrol_end'] ?? '';
+    $row['assignment_type'] = normalizePatrolAssignmentType(
+        isset($row['assignment_type']) ? (string) $row['assignment_type'] : null,
+        isset($row['notes']) ? (string) $row['notes'] : null
+    );
 
     if ($status === 'In Progress' && $start !== '' && $end === '') {
         $now = new DateTime();

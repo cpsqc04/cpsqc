@@ -326,6 +326,8 @@ $personnelCode = htmlspecialchars(getBpsoPersonnelCode());
             .attendance-live-clock { font-size: 1.85rem; }
         }
         .filter-tabs { display: flex; gap: 0.5rem; margin-bottom: 1.25rem; flex-wrap: wrap; }
+        #scheduleTypeTabs { margin-bottom: 0.65rem; }
+        #scheduleDateTabs { margin-top: 0; }
         .filter-tab { padding: 0.5rem 1rem; border: 1px solid var(--border-color); border-radius: 999px; background: #fff; color: var(--text-color); font: inherit; font-size: 0.85rem; cursor: pointer; }
         .filter-tab.active { background: var(--primary-color); color: #fff; border-color: var(--primary-color); }
         .priority-badge { padding: 0.2rem 0.6rem; border-radius: 999px; font-size: 0.78rem; font-weight: 600; display: inline-block; }
@@ -733,18 +735,22 @@ $personnelCode = htmlspecialchars(getBpsoPersonnelCode());
                 </section>
 
                 <section id="panel-schedule" class="portal-panel">
-                    <h2 class="section-heading">Assigned Patrol Schedule</h2>
+                    <h2 class="section-heading" id="scheduleSectionHeading">Assigned Patrol Schedule</h2>
                     <div id="scheduleAlert"></div>
-                    <div class="filter-tabs">
-                        <button type="button" class="filter-tab active" data-filter="all" onclick="setScheduleFilter('all', this)">All</button>
-                        <button type="button" class="filter-tab" data-filter="today" onclick="setScheduleFilter('today', this)">Today</button>
-                        <button type="button" class="filter-tab" data-filter="upcoming" onclick="setScheduleFilter('upcoming', this)">Upcoming</button>
-                        <button type="button" class="filter-tab" data-filter="completed" onclick="setScheduleFilter('completed', this)">Completed</button>
+                    <div class="filter-tabs" id="scheduleTypeTabs">
+                        <button type="button" class="filter-tab schedule-type-tab active" data-type="patrol" onclick="setScheduleType('patrol', this)">Patrol Duties</button>
+                        <button type="button" class="filter-tab schedule-type-tab" data-type="event" onclick="setScheduleType('event', this)">Event / Marshal Duties</button>
+                    </div>
+                    <div class="filter-tabs" id="scheduleDateTabs">
+                        <button type="button" class="filter-tab schedule-date-tab active" data-filter="all" onclick="setScheduleFilter('all', this)">All</button>
+                        <button type="button" class="filter-tab schedule-date-tab" data-filter="today" onclick="setScheduleFilter('today', this)">Today</button>
+                        <button type="button" class="filter-tab schedule-date-tab" data-filter="upcoming" onclick="setScheduleFilter('upcoming', this)">Upcoming</button>
+                        <button type="button" class="filter-tab schedule-date-tab" data-filter="completed" onclick="setScheduleFilter('completed', this)">Completed</button>
                     </div>
                     <div class="table-container">
                         <table>
                             <thead>
-                                <tr>
+                                <tr id="scheduleTableHead">
                                     <th>Date</th>
                                     <th>Shift</th>
                                     <th>Patrol Zone</th>
@@ -1051,7 +1057,7 @@ $personnelCode = htmlspecialchars(getBpsoPersonnelCode());
     <div id="scheduleDetailModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h2>Patrol Assignment Details</h2>
+                <h2 id="scheduleDetailTitle">Patrol Assignment Details</h2>
                 <button type="button" class="close-modal" onclick="closeScheduleDetailModal()">&times;</button>
             </div>
             <div id="scheduleDetailContent"></div>
@@ -1079,6 +1085,7 @@ $personnelCode = htmlspecialchars(getBpsoPersonnelCode());
         let nwIncidentFilter = 'all';
         let tipFilter = 'all';
         let scheduleFilter = 'all';
+        let scheduleType = 'patrol';
         let refreshTimer = null;
         let initialSectionSet = false;
         let seenScheduleBadgeIds = loadSeenBadgeIds('bpso_seen_schedule_badge_ids');
@@ -1220,9 +1227,22 @@ $personnelCode = htmlspecialchars(getBpsoPersonnelCode());
             goToTab('bulletin');
         }
 
+        function setScheduleType(type, button) {
+            scheduleType = type === 'event' ? 'event' : 'patrol';
+            document.querySelectorAll('#scheduleTypeTabs .schedule-type-tab').forEach(tab => tab.classList.remove('active'));
+            if (button) button.classList.add('active');
+            const heading = document.getElementById('scheduleSectionHeading');
+            if (heading) {
+                heading.textContent = scheduleType === 'event'
+                    ? 'Event / Marshal Assignments'
+                    : 'Assigned Patrol Schedule';
+            }
+            renderScheduleTable();
+        }
+
         function setScheduleFilter(filter, button) {
             scheduleFilter = filter;
-            document.querySelectorAll('#panel-schedule .filter-tab').forEach(tab => tab.classList.remove('active'));
+            document.querySelectorAll('#scheduleDateTabs .schedule-date-tab').forEach(tab => tab.classList.remove('active'));
             button.classList.add('active');
             renderScheduleTable();
         }
@@ -1246,31 +1266,70 @@ $personnelCode = htmlspecialchars(getBpsoPersonnelCode());
             return String(value || '').trim() || '—';
         }
 
+        function getScheduleAssignmentType(row) {
+            const type = String(row && row.assignment_type ? row.assignment_type : '').toLowerCase();
+            if (type === 'event' || type === 'marshal' || type === 'patrol_request') return 'event';
+            const notes = String(row && row.notes ? row.notes : '');
+            if (/(^|\n)\s*Request ID\s*:/i.test(notes) || /(^|\n)\s*Patrol request\s*:/i.test(notes)) {
+                return 'event';
+            }
+            return 'patrol';
+        }
+
+        function getNoteField(notes, label) {
+            const match = String(notes || '').match(new RegExp('(?:^|\\n)\\s*' + label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*:\\s*(.*)', 'i'));
+            return match ? String(match[1] || '').trim() : '';
+        }
+
         function getFilteredSchedules() {
             const today = getTodayDateString();
+            let rows = portalSchedules.filter(s => getScheduleAssignmentType(s) === scheduleType);
             if (scheduleFilter === 'today') {
-                return portalSchedules.filter(s => s.schedule_date === today);
+                rows = rows.filter(s => s.schedule_date === today);
+            } else if (scheduleFilter === 'upcoming') {
+                rows = rows.filter(s => s.schedule_date > today && s.status !== 'Completed');
+            } else if (scheduleFilter === 'completed') {
+                rows = rows.filter(s => s.status === 'Completed');
             }
-            if (scheduleFilter === 'upcoming') {
-                return portalSchedules.filter(s => s.schedule_date > today && s.status !== 'Completed');
+            return rows;
+        }
+
+        function updateScheduleTableHead() {
+            const head = document.getElementById('scheduleTableHead');
+            if (!head) return;
+            if (scheduleType === 'event') {
+                head.innerHTML = `
+                    <th>Date</th>
+                    <th>Shift</th>
+                    <th>Event</th>
+                    <th>Event Location</th>
+                    <th>Actions</th>
+                `;
+            } else {
+                head.innerHTML = `
+                    <th>Date</th>
+                    <th>Shift</th>
+                    <th>Patrol Zone</th>
+                    <th>Route / Streets</th>
+                    <th>Actions</th>
+                `;
             }
-            if (scheduleFilter === 'completed') {
-                return portalSchedules.filter(s => s.status === 'Completed');
-            }
-            return portalSchedules;
         }
 
         function renderScheduleTable() {
             const tbody = document.getElementById('scheduleTableBody');
             const rows = getFilteredSchedules();
+            updateScheduleTableHead();
 
             if (rows.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="5" class="empty-state"><i class="fas fa-calendar-times"></i>No patrol assignments in this view.</td></tr>';
+                const emptyLabel = scheduleType === 'event'
+                    ? 'No event / marshal assignments in this view.'
+                    : 'No patrol assignments in this view.';
+                tbody.innerHTML = '<tr><td colspan="5" class="empty-state"><i class="fas fa-calendar-times"></i>' + emptyLabel + '</td></tr>';
             } else {
                 tbody.innerHTML = rows.map(row => {
                     scheduleData[row.id] = row;
-                    const zone = row.patrol_zone || row.location || '—';
-                    const route = row.route || row.location || row.patrol_zone || '—';
+                    const notes = String(row.notes || '');
                     const shiftLabel = formatShiftWithHours(row.shift);
                     const isSubmitted = getReportCountForSchedule(row.id) > 0 || row.status === 'Completed';
                     const canReport = !isSubmitted && (row.status === 'Scheduled' || row.status === 'In Progress');
@@ -1282,11 +1341,19 @@ $personnelCode = htmlspecialchars(getBpsoPersonnelCode());
                     } else if (canReport) {
                         actionBits.push(`<button type="button" class="btn-report" onclick="openReportForSchedule(${row.id})">Submit Report</button>`);
                     }
+
+                    let col3 = row.patrol_zone || row.location || '—';
+                    let col4 = row.route || row.location || row.patrol_zone || '—';
+                    if (scheduleType === 'event') {
+                        col3 = getNoteField(notes, 'Event Name') || row.patrol_zone || '—';
+                        col4 = getNoteField(notes, 'Event Location') || row.location || row.patrol_zone || '—';
+                    }
+
                     return `<tr>
                         <td>${escapeHtml(row.schedule_date)}</td>
                         <td>${escapeHtml(shiftLabel)}</td>
-                        <td>${escapeHtml(zone)}</td>
-                        <td>${escapeHtml(route)}</td>
+                        <td>${escapeHtml(col3)}</td>
+                        <td>${escapeHtml(col4)}</td>
                         <td><div class="schedule-actions">${actionBits.join('')}</div></td>
                     </tr>`;
                 }).join('');
@@ -1300,22 +1367,51 @@ $personnelCode = htmlspecialchars(getBpsoPersonnelCode());
             const row = scheduleData[scheduleId] || portalSchedules.find(s => Number(s.id) === Number(scheduleId));
             const content = document.getElementById('scheduleDetailContent');
             const actions = document.getElementById('scheduleDetailActions');
+            const title = document.getElementById('scheduleDetailTitle');
             if (!row || !content) return;
 
             const notes = String(row.notes || '').trim();
-            content.innerHTML = `
-                <div class="complaint-detail"><strong>Date:</strong> ${escapeHtml(row.schedule_date || '—')}</div>
-                <div class="complaint-detail"><strong>Shift:</strong> ${escapeHtml(formatShiftWithHours(row.shift))}</div>
-                <div class="complaint-detail"><strong>Patrol Zone:</strong> ${escapeHtml(row.patrol_zone || '—')}</div>
-                <div class="complaint-detail"><strong>Route / Streets:</strong> ${escapeHtml(row.route || '—')}</div>
-                <div class="complaint-detail"><strong>Location:</strong> ${escapeHtml(row.location || '—')}</div>
-                <div class="complaint-detail"><strong>Status:</strong> ${escapeHtml(row.status || '—')}</div>
-                <div class="complaint-detail"><strong>Assignment Details / Notes:</strong>${
-                    notes
-                        ? `<div class="schedule-notes-block">${escapeHtml(notes)}</div>`
-                        : ' —'
-                }</div>
-            `;
+            const isEvent = getScheduleAssignmentType(row) === 'event';
+            if (title) {
+                title.textContent = isEvent ? 'Event / Marshal Assignment Details' : 'Patrol Assignment Details';
+            }
+
+            if (isEvent) {
+                const eventName = getNoteField(notes, 'Event Name') || '—';
+                const eventLocation = getNoteField(notes, 'Event Location') || row.location || row.patrol_zone || '—';
+                const eventWindow = getNoteField(notes, 'Event Date / Time') || '—';
+                const requestId = getNoteField(notes, 'Request ID') || '—';
+                const instructions = getNoteField(notes, 'Special Instructions') || '—';
+                content.innerHTML = `
+                    <div class="complaint-detail"><strong>Request ID:</strong> ${escapeHtml(requestId)}</div>
+                    <div class="complaint-detail"><strong>Event Name:</strong> ${escapeHtml(eventName)}</div>
+                    <div class="complaint-detail"><strong>Event Date / Time:</strong> ${escapeHtml(eventWindow)}</div>
+                    <div class="complaint-detail"><strong>Event Location:</strong> ${escapeHtml(eventLocation)}</div>
+                    <div class="complaint-detail"><strong>Duty Date:</strong> ${escapeHtml(row.schedule_date || '—')}</div>
+                    <div class="complaint-detail"><strong>Shift:</strong> ${escapeHtml(formatShiftWithHours(row.shift))}</div>
+                    <div class="complaint-detail"><strong>Status:</strong> ${escapeHtml(row.status || '—')}</div>
+                    <div class="complaint-detail"><strong>Special Instructions:</strong> ${escapeHtml(instructions)}</div>
+                    <div class="complaint-detail"><strong>Full Event Details:</strong>${
+                        notes
+                            ? `<div class="schedule-notes-block">${escapeHtml(notes)}</div>`
+                            : ' —'
+                    }</div>
+                `;
+            } else {
+                content.innerHTML = `
+                    <div class="complaint-detail"><strong>Date:</strong> ${escapeHtml(row.schedule_date || '—')}</div>
+                    <div class="complaint-detail"><strong>Shift:</strong> ${escapeHtml(formatShiftWithHours(row.shift))}</div>
+                    <div class="complaint-detail"><strong>Patrol Zone:</strong> ${escapeHtml(row.patrol_zone || '—')}</div>
+                    <div class="complaint-detail"><strong>Route / Streets:</strong> ${escapeHtml(row.route || '—')}</div>
+                    <div class="complaint-detail"><strong>Location:</strong> ${escapeHtml(row.location || '—')}</div>
+                    <div class="complaint-detail"><strong>Status:</strong> ${escapeHtml(row.status || '—')}</div>
+                    <div class="complaint-detail"><strong>Patrol Notes:</strong>${
+                        notes
+                            ? `<div class="schedule-notes-block">${escapeHtml(notes)}</div>`
+                            : ' —'
+                    }</div>
+                `;
+            }
 
             const isSubmitted = getReportCountForSchedule(row.id) > 0 || row.status === 'Completed';
             const canReport = !isSubmitted && (row.status === 'Scheduled' || row.status === 'In Progress');
@@ -1370,13 +1466,26 @@ $personnelCode = htmlspecialchars(getBpsoPersonnelCode());
                 info.textContent = 'No active assignment selected. Open Submit Report from My Schedule.';
                 return;
             }
+            const isEvent = getScheduleAssignmentType(row) === 'event';
+            const notes = String(row.notes || '').trim();
+            if (isEvent) {
+                const eventName = getNoteField(notes, 'Event Name') || row.patrol_zone || '—';
+                const eventLocation = getNoteField(notes, 'Event Location') || row.location || '—';
+                info.innerHTML = `
+                    <div><strong>Event / Marshal Assignment:</strong> ${escapeHtml(row.schedule_date || '')} · ${escapeHtml(formatShiftWithHours(row.shift))}</div>
+                    <div style="margin-top:0.35rem;"><strong>Event:</strong> ${escapeHtml(eventName)}</div>
+                    <div style="margin-top:0.35rem;"><strong>Event Location:</strong> ${escapeHtml(eventLocation)}</div>
+                    ${notes ? `<div class="assignment-notes"><strong>Event Details:</strong><br>${escapeHtml(notes)}</div>` : ''}
+                `;
+                return;
+            }
+
             const zone = row.patrol_zone || '—';
             const route = row.route || row.location || '—';
-            const notes = String(row.notes || '').trim();
             info.innerHTML = `
-                <div><strong>Assignment:</strong> ${escapeHtml(row.schedule_date || '')} · ${escapeHtml(formatShiftWithHours(row.shift))} · ${escapeHtml(zone)}</div>
+                <div><strong>Patrol Assignment:</strong> ${escapeHtml(row.schedule_date || '')} · ${escapeHtml(formatShiftWithHours(row.shift))} · ${escapeHtml(zone)}</div>
                 <div style="margin-top:0.35rem;"><strong>Route / Streets:</strong> ${escapeHtml(route)}</div>
-                ${notes ? `<div class="assignment-notes"><strong>Details / Notes:</strong><br>${escapeHtml(notes)}</div>` : ''}
+                ${notes ? `<div class="assignment-notes"><strong>Patrol Notes:</strong><br>${escapeHtml(notes)}</div>` : ''}
             `;
         }
 

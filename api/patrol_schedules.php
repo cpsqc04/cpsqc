@@ -74,6 +74,14 @@ if ($method === 'POST') {
         $scheduleDate = trim($input['schedule_date'] ?? '');
         $shift = trim($input['shift'] ?? '');
         $notes = trim($input['notes'] ?? '');
+        $assignmentType = normalizePatrolAssignmentType(
+            (string) ($input['assignment_type'] ?? 'patrol'),
+            $notes
+        );
+        $patrolRequestId = (int) ($input['patrol_request_id'] ?? 0);
+        if ($assignmentType !== 'event') {
+            $patrolRequestId = 0;
+        }
 
         if ($patrolId <= 0 || $patrolZone === '' || $scheduleDate === '' || !isValidPatrolShift($shift)) {
             http_response_code(400);
@@ -117,9 +125,9 @@ if ($method === 'POST') {
 
             $stmt = $pdo->prepare(
                 'INSERT INTO patrol_schedules
-                (patrol_id, personnel_name, patrol_zone, route, location, schedule_date, schedule_time, shift, notes, status)
+                (patrol_id, personnel_name, patrol_zone, route, location, schedule_date, schedule_time, shift, notes, assignment_type, patrol_request_id, status)
                 VALUES
-                (:patrol_id, :personnel_name, :patrol_zone, :route, :location, :schedule_date, :schedule_time, :shift, :notes, :status)'
+                (:patrol_id, :personnel_name, :patrol_zone, :route, :location, :schedule_date, :schedule_time, :shift, :notes, :assignment_type, :patrol_request_id, :status)'
             );
             $stmt->execute([
                 ':patrol_id' => $patrolId,
@@ -131,6 +139,8 @@ if ($method === 'POST') {
                 ':schedule_time' => '',
                 ':shift' => $shift,
                 ':notes' => $notes !== '' ? $notes : null,
+                ':assignment_type' => $assignmentType,
+                ':patrol_request_id' => $patrolRequestId > 0 ? $patrolRequestId : null,
                 ':status' => 'Scheduled',
             ]);
 
@@ -153,24 +163,39 @@ if ($method === 'POST') {
                 ':time' => '',
                 ':status' => 'Scheduled',
                 ':location' => $resolvedLocation,
-                ':details' => $notes !== '' ? $notes : 'Patrol assignment scheduled by admin.',
+                ':details' => $notes !== '' ? $notes : (
+                    $assignmentType === 'event'
+                        ? 'Event / marshal assignment scheduled by admin.'
+                        : 'Patrol assignment scheduled by admin.'
+                ),
             ]);
 
             $scheduleLabel = $resolvedRoute !== '' ? $resolvedRoute : $patrolZone;
-            createPatrolNotification(
-                $pdo,
-                $patrolId,
-                'patrol_schedule',
-                'New Patrol Assignment',
-                'You have been assigned for patrolling on ' . $scheduleDate . ' (' . $shift . ') — ' . $scheduleLabel . '. Check My Schedule for details.',
-                'tab:schedule:' . $id
-            );
+            if ($assignmentType === 'event') {
+                createPatrolNotification(
+                    $pdo,
+                    $patrolId,
+                    'patrol_request_assignment',
+                    'New Event / Marshal Assignment',
+                    'You have been assigned for an event/marshal duty on ' . $scheduleDate . ' (' . $shift . ') — ' . $scheduleLabel . '. Open My Schedule → Event / Marshal Duties for details.',
+                    'tab:schedule:' . $id
+                );
+            } else {
+                createPatrolNotification(
+                    $pdo,
+                    $patrolId,
+                    'patrol_schedule',
+                    'New Patrol Assignment',
+                    'You have been assigned for patrolling on ' . $scheduleDate . ' (' . $shift . ') — ' . $scheduleLabel . '. Check My Schedule for details.',
+                    'tab:schedule:' . $id
+                );
+            }
             createPatrolNotification(
                 $pdo,
                 $patrolId,
                 'submit_report',
                 'Submit Report',
-                'Please submit at least one patrol report for your shift on ' . $scheduleDate . ' (' . $shift . ') — ' . $scheduleLabel . '.',
+                'Please submit at least one report for your assignment on ' . $scheduleDate . ' (' . $shift . ') — ' . $scheduleLabel . '.',
                 'tab:report:' . $id
             );
 
