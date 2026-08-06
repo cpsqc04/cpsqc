@@ -479,6 +479,28 @@ $personnelCode = htmlspecialchars(getBpsoPersonnelCode());
         .btn-report { padding: 0.5rem 1rem; background: var(--primary-color); color: #fff; border: none; border-radius: 6px; font-size: 0.85rem; cursor: pointer; }
         .btn-report:hover { background: #4ca8a6; }
         .actions-submitted { color: #047857; font-weight: 600; font-size: 0.9rem; }
+        .schedule-actions { display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; }
+        .schedule-notes-block {
+            white-space: pre-wrap;
+            word-break: break-word;
+            margin-top: 0.35rem;
+            padding: 0.75rem 0.9rem;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            background: #f8fafc;
+            font-size: 0.92rem;
+            line-height: 1.55;
+        }
+        .assignment-info .assignment-notes {
+            white-space: pre-wrap;
+            word-break: break-word;
+            margin-top: 0.55rem;
+            padding-top: 0.55rem;
+            border-top: 1px solid var(--border-color);
+            color: var(--text-secondary);
+            font-size: 0.88rem;
+            line-height: 1.5;
+        }
         .report-hint { margin: 0 0 1rem; color: var(--text-secondary); font-size: 0.9rem; }
         .btn-cancel-add { padding: 0.5rem 1rem; background: #e5e7eb; color: #374151; border: none; border-radius: 6px; font-size: 0.85rem; cursor: pointer; margin-right: 0.5rem; }
         .btn-cancel-add:hover { background: #d1d5db; }
@@ -726,11 +748,12 @@ $personnelCode = htmlspecialchars(getBpsoPersonnelCode());
                                     <th>Date</th>
                                     <th>Shift</th>
                                     <th>Patrol Zone</th>
+                                    <th>Route / Streets</th>
                                     <th>Actions</th>
                                 </tr>
                             </thead>
                             <tbody id="scheduleTableBody">
-                                <tr><td colspan="4" class="empty-state">Loading schedule...</td></tr>
+                                <tr><td colspan="5" class="empty-state">Loading schedule...</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -1025,6 +1048,17 @@ $personnelCode = htmlspecialchars(getBpsoPersonnelCode());
         </div>
     </div>
 
+    <div id="scheduleDetailModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Patrol Assignment Details</h2>
+                <button type="button" class="close-modal" onclick="closeScheduleDetailModal()">&times;</button>
+            </div>
+            <div id="scheduleDetailContent"></div>
+            <div class="form-grid-actions" style="margin-top:1.25rem;justify-content:flex-end;" id="scheduleDetailActions"></div>
+        </div>
+    </div>
+
     <div id="toastPopup" class="toast-popup" role="status" aria-live="polite"></div>
 
     <script src="js/photo-lightbox.js"></script>
@@ -1231,31 +1265,72 @@ $personnelCode = htmlspecialchars(getBpsoPersonnelCode());
             const rows = getFilteredSchedules();
 
             if (rows.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="4" class="empty-state"><i class="fas fa-calendar-times"></i>No patrol assignments in this view.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="5" class="empty-state"><i class="fas fa-calendar-times"></i>No patrol assignments in this view.</td></tr>';
             } else {
                 tbody.innerHTML = rows.map(row => {
                     scheduleData[row.id] = row;
-                    const zone = row.patrol_zone || row.location || row.route || '—';
+                    const zone = row.patrol_zone || row.location || '—';
+                    const route = row.route || row.location || row.patrol_zone || '—';
                     const shiftLabel = formatShiftWithHours(row.shift);
                     const isSubmitted = getReportCountForSchedule(row.id) > 0 || row.status === 'Completed';
                     const canReport = !isSubmitted && (row.status === 'Scheduled' || row.status === 'In Progress');
-                    let actions = '—';
+                    const actionBits = [
+                        `<button type="button" class="btn-view" onclick="openScheduleDetailModal(${row.id})">View Details</button>`
+                    ];
                     if (isSubmitted) {
-                        actions = '<span class="actions-submitted">Submitted</span>';
+                        actionBits.push('<span class="actions-submitted">Submitted</span>');
                     } else if (canReport) {
-                        actions = `<button type="button" class="btn-report" onclick="openReportForSchedule(${row.id})">Submit Report</button>`;
+                        actionBits.push(`<button type="button" class="btn-report" onclick="openReportForSchedule(${row.id})">Submit Report</button>`);
                     }
                     return `<tr>
                         <td>${escapeHtml(row.schedule_date)}</td>
                         <td>${escapeHtml(shiftLabel)}</td>
                         <td>${escapeHtml(zone)}</td>
-                        <td>${actions}</td>
+                        <td>${escapeHtml(route)}</td>
+                        <td><div class="schedule-actions">${actionBits.join('')}</div></td>
                     </tr>`;
                 }).join('');
             }
 
             populateReportScheduleOptions();
             updateReportFormForSelectedSchedule();
+        }
+
+        function openScheduleDetailModal(scheduleId) {
+            const row = scheduleData[scheduleId] || portalSchedules.find(s => Number(s.id) === Number(scheduleId));
+            const content = document.getElementById('scheduleDetailContent');
+            const actions = document.getElementById('scheduleDetailActions');
+            if (!row || !content) return;
+
+            const notes = String(row.notes || '').trim();
+            content.innerHTML = `
+                <div class="complaint-detail"><strong>Date:</strong> ${escapeHtml(row.schedule_date || '—')}</div>
+                <div class="complaint-detail"><strong>Shift:</strong> ${escapeHtml(formatShiftWithHours(row.shift))}</div>
+                <div class="complaint-detail"><strong>Patrol Zone:</strong> ${escapeHtml(row.patrol_zone || '—')}</div>
+                <div class="complaint-detail"><strong>Route / Streets:</strong> ${escapeHtml(row.route || '—')}</div>
+                <div class="complaint-detail"><strong>Location:</strong> ${escapeHtml(row.location || '—')}</div>
+                <div class="complaint-detail"><strong>Status:</strong> ${escapeHtml(row.status || '—')}</div>
+                <div class="complaint-detail"><strong>Assignment Details / Notes:</strong>${
+                    notes
+                        ? `<div class="schedule-notes-block">${escapeHtml(notes)}</div>`
+                        : ' —'
+                }</div>
+            `;
+
+            const isSubmitted = getReportCountForSchedule(row.id) > 0 || row.status === 'Completed';
+            const canReport = !isSubmitted && (row.status === 'Scheduled' || row.status === 'In Progress');
+            if (actions) {
+                actions.innerHTML = canReport
+                    ? `<button type="button" class="btn-report" onclick="closeScheduleDetailModal(); openReportForSchedule(${row.id})">Submit Report</button>`
+                    : '';
+            }
+
+            document.getElementById('scheduleDetailModal').classList.add('active');
+        }
+
+        function closeScheduleDetailModal() {
+            const modal = document.getElementById('scheduleDetailModal');
+            if (modal) modal.classList.remove('active');
         }
 
         function getReportCountForSchedule(scheduleId) {
@@ -1295,8 +1370,14 @@ $personnelCode = htmlspecialchars(getBpsoPersonnelCode());
                 info.textContent = 'No active assignment selected. Open Submit Report from My Schedule.';
                 return;
             }
-            const zone = row.patrol_zone || row.route || '—';
-            info.innerHTML = `<strong>Assignment:</strong> ${escapeHtml(row.schedule_date || '')} · ${escapeHtml(formatShiftWithHours(row.shift))} · ${escapeHtml(zone)}`;
+            const zone = row.patrol_zone || '—';
+            const route = row.route || row.location || '—';
+            const notes = String(row.notes || '').trim();
+            info.innerHTML = `
+                <div><strong>Assignment:</strong> ${escapeHtml(row.schedule_date || '')} · ${escapeHtml(formatShiftWithHours(row.shift))} · ${escapeHtml(zone)}</div>
+                <div style="margin-top:0.35rem;"><strong>Route / Streets:</strong> ${escapeHtml(route)}</div>
+                ${notes ? `<div class="assignment-notes"><strong>Details / Notes:</strong><br>${escapeHtml(notes)}</div>` : ''}
+            `;
         }
 
         function setReportFormVisible(visible, isAdditional = false) {
@@ -1888,7 +1969,7 @@ $personnelCode = htmlspecialchars(getBpsoPersonnelCode());
                 const result = await res.json();
 
                 if (!result.success) {
-                    tbody.innerHTML = '<tr><td colspan="7" class="empty-state">Failed to load schedule.</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="5" class="empty-state">Failed to load schedule.</td></tr>';
                     portalSchedules = [];
                     updateNavBadges();
                     return;
@@ -1898,7 +1979,7 @@ $personnelCode = htmlspecialchars(getBpsoPersonnelCode());
                 portalSchedules = result.data || [];
 
                 if (portalSchedules.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="7" class="empty-state"><i class="fas fa-calendar-times"></i>No patrol assignments yet.</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="5" class="empty-state"><i class="fas fa-calendar-times"></i>No patrol assignments yet.</td></tr>';
                     populateReportScheduleOptions();
                     updateReportFormForSelectedSchedule(false);
                     updateNavBadges();
@@ -1908,7 +1989,7 @@ $personnelCode = htmlspecialchars(getBpsoPersonnelCode());
                 renderScheduleTable();
                 updateNavBadges();
             } catch (e) {
-                tbody.innerHTML = '<tr><td colspan="7" class="empty-state">Error loading schedule.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="5" class="empty-state">Error loading schedule.</td></tr>';
                 portalSchedules = [];
                 updateNavBadges();
             }
@@ -2723,10 +2804,12 @@ $personnelCode = htmlspecialchars(getBpsoPersonnelCode());
             const nwIncidentModal = document.getElementById('nwIncidentResolutionModal');
             const tipModal = document.getElementById('tipResolutionModal');
             const reportModal = document.getElementById('reportDetailModal');
+            const scheduleModal = document.getElementById('scheduleDetailModal');
             if (event.target === complaintModal) closeComplaintModal();
             if (event.target === nwIncidentModal) closeNwIncidentModal();
             if (event.target === tipModal) closeTipModal();
             if (event.target === reportModal) closeReportModal();
+            if (event.target === scheduleModal) closeScheduleDetailModal();
         };
 
         async function refreshAllData() {
