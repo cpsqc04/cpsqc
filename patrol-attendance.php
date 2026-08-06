@@ -1275,7 +1275,7 @@ $personnelCode = htmlspecialchars(getBpsoPersonnelCode());
                     const isSubmitted = getReportCountForSchedule(row.id) > 0 || row.status === 'Completed';
                     const canReport = !isSubmitted && (row.status === 'Scheduled' || row.status === 'In Progress');
                     const actionBits = [
-                        `<button type="button" class="btn-view" onclick="openScheduleDetailModal(${row.id})">View Details</button>`
+                        `<button type="button" class="btn-view" onclick="openScheduleDetailModal(${row.id})">View</button>`
                     ];
                     if (isSubmitted) {
                         actionBits.push('<span class="actions-submitted">Submitted</span>');
