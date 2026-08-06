@@ -911,17 +911,16 @@ require_once __DIR__ . '/db.php';
             white-space: nowrap;
         }
 
-        #complaintsTableBody tr.selected-for-forward {
-            outline: 2px solid var(--primary-color);
-            background: rgba(76, 138, 137, 0.08);
+        #complaintsTable th.col-select,
+        #complaintsTable td.col-select {
+            width: 42px;
+            text-align: center;
         }
 
-        .forward-hint {
-            width: 100%;
-            margin: -0.75rem 0 1.25rem;
-            color: var(--text-secondary);
-            font-size: 0.85rem;
-        }
+        body:not(.blotter-select-mode) #complaintsTable .col-select { display: none; }
+        body:not(.blotter-select-mode) .blotter-select-only { display: none !important; }
+        body.blotter-select-mode .blotter-enter-only { display: none !important; }
+        body.blotter-select-mode #complaintsTable tbody tr:not(.empty-row):hover { background: #f0fdfa; }
         
         .search-box input {
             width: 100%;
@@ -1255,33 +1254,32 @@ require_once __DIR__ . '/db.php';
         }
 
         .btn-forward {
-            padding: 0.75rem 1.5rem;
+            padding: 0.75rem 1.25rem;
             border: none;
             border-radius: 8px;
             font-size: 0.95rem;
-            font-weight: 500;
+            font-weight: 600;
             cursor: pointer;
             transition: all 0.2s ease;
-            background: #5b4b8a;
+            background: var(--primary-color);
             color: #fff;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
         }
 
         .btn-forward:hover {
-            background: #4a3d72;
+            background: #4ca8a6;
         }
 
         .btn-forward:disabled {
-            background: #b8b0cc;
+            opacity: 0.55;
             cursor: not-allowed;
-            opacity: 0.7;
         }
 
-        .btn-forward.canceling {
-            background: #b91c1c;
-        }
-
-        .btn-forward.canceling:hover {
-            background: #991b1b;
+        .search-toolbar .btn-cancel {
+            flex-shrink: 0;
+            white-space: nowrap;
         }
 
         .toast-popup {
@@ -1502,14 +1500,16 @@ require_once __DIR__ . '/db.php';
                     <div class="search-box">
                         <input type="text" id="searchInput" placeholder="Search by complaint ID, complainant, defendant, or contact number..." onkeyup="filterComplaints()">
                     </div>
-                    <button type="button" class="btn-forward" id="toolbarForwardBtn" onclick="forwardSelectedComplaint()" disabled title="Select a crime-related complaint in the table first">Forward to Digital Blotter</button>
+                    <button type="button" class="btn-forward blotter-enter-only" id="btnEnterBlotterSelect" onclick="enterBlotterSelectMode()">Forward to Digital Blotter</button>
+                    <button type="button" class="btn-forward blotter-select-only" id="toolbarForwardBtn" onclick="forwardSelectedComplaints()" disabled>Forward to Digital Blotter</button>
+                    <button type="button" class="btn-cancel blotter-select-only" onclick="exitBlotterSelectMode()">Cancel</button>
                 </div>
-                <p class="forward-hint">Select a crime-related complaint (Robbery, Murder, Rape, Illegal Drugs, Carnapping/Motornapping, or Kidnapping), then click Forward. Forwarding is manual — nothing is sent automatically.</p>
                 
                 <div class="table-container">
                     <table id="complaintsTable">
                         <thead>
                             <tr>
+                                <th class="col-select"><input type="checkbox" id="selectAllComplaints" title="Select all" onchange="toggleSelectAllComplaints(this)"></th>
                                 <th>Complaint ID</th>
                                 <th>Complainant</th>
                                 <th>Defendant</th>
@@ -1696,17 +1696,6 @@ require_once __DIR__ . '/db.php';
             return Boolean(complaint && (complaint.forwarded_at || complaint.status === 'Forwarded to Digital Blotter'));
         }
 
-        const BLOTTER_FORWARDABLE_TYPES = [
-            'Robbery',
-            'Murder',
-            'Rape',
-            'Illegal Drugs',
-            'Carnapping/Motornapping',
-            'Kidnapping'
-        ];
-
-        let selectedForwardComplaintId = null;
-
         function showToast(message, variant) {
             const toast = document.getElementById('toastPopup');
             if (!toast) return;
@@ -1728,59 +1717,44 @@ require_once __DIR__ . '/db.php';
             window.clearTimeout(showToast._timer);
         }
 
-        function isComplaintTypeForwardableToBlotter(complaintType) {
-            const type = String(complaintType || '').trim();
-            if (!type) return false;
-            if (BLOTTER_FORWARDABLE_TYPES.some(allowed => allowed.toLowerCase() === type.toLowerCase())) {
-                return true;
-            }
-            const normalized = type.toLowerCase().replace(/[\s_\-]+/g, '');
-            return ['carnapping', 'motornapping', 'carnapping/motornapping', 'carnappingmotornapping'].includes(normalized);
+        function enterBlotterSelectMode() {
+            document.body.classList.add('blotter-select-mode');
+            const selectAll = document.getElementById('selectAllComplaints');
+            if (selectAll) selectAll.checked = false;
+            document.querySelectorAll('.complaint-select').forEach(cb => { cb.checked = false; });
+            updateBlotterForwardButtonState();
         }
 
-        function updateToolbarForwardButton() {
+        function exitBlotterSelectMode() {
+            document.body.classList.remove('blotter-select-mode');
+            const selectAll = document.getElementById('selectAllComplaints');
+            if (selectAll) selectAll.checked = false;
+            document.querySelectorAll('.complaint-select').forEach(cb => { cb.checked = false; });
+            updateBlotterForwardButtonState();
+        }
+
+        function getSelectedComplaintIds() {
+            return Array.from(document.querySelectorAll('.complaint-select:checked'))
+                .map(cb => parseInt(cb.value, 10))
+                .filter(id => id > 0);
+        }
+
+        function updateBlotterForwardButtonState() {
             const button = document.getElementById('toolbarForwardBtn');
             if (!button) return;
-
-            const complaint = selectedForwardComplaintId
-                ? Object.values(complaintData).find(c => c.id === selectedForwardComplaintId)
-                : null;
-
-            if (!complaint) {
-                button.disabled = true;
-                button.title = 'Select a crime-related complaint in the table first';
-                button.textContent = 'Forward to Digital Blotter';
-                return;
-            }
-
-            if (isComplaintForwarded(complaint)) {
-                button.disabled = true;
-                button.title = 'This complaint was already forwarded.';
-                button.textContent = 'Already Forwarded';
-                return;
-            }
-
-            if (!isComplaintTypeForwardableToBlotter(complaint.complaint_type)) {
-                button.disabled = true;
-                button.title = 'Only Robbery, Murder, Rape, Illegal Drugs, Carnapping/Motornapping, and Kidnapping can be forwarded.';
-                button.textContent = 'Forward to Digital Blotter';
-                return;
-            }
-
-            button.disabled = false;
-            button.title = 'Forward ' + (complaint.complaint_id || '') + ' to Digital Blotter';
-            button.textContent = 'Forward to Digital Blotter';
+            const ids = getSelectedComplaintIds();
+            button.disabled = ids.length === 0;
+            button.title = ids.length
+                ? ('Forward ' + ids.length + ' selected complaint(s)')
+                : 'Select one or more complaints to forward';
         }
 
-        function selectComplaintForForward(complaintIdKey) {
-            const complaint = complaintData[complaintIdKey];
-            if (!complaint) return;
-
-            selectedForwardComplaintId = complaint.id;
-            document.querySelectorAll('#complaintsTableBody tr').forEach(row => {
-                row.classList.toggle('selected-for-forward', row.getAttribute('data-complaint-id') === complaintIdKey);
+        function toggleSelectAllComplaints(source) {
+            const checked = Boolean(source && source.checked);
+            document.querySelectorAll('.complaint-select:not(:disabled)').forEach(cb => {
+                cb.checked = checked;
             });
-            updateToolbarForwardButton();
+            updateBlotterForwardButtonState();
         }
 
         function updateAssignedPatrolFieldVisibility(complaint) {
@@ -1847,18 +1821,11 @@ require_once __DIR__ . '/db.php';
                 });
                 
                 // Populate table
-                const previousSelectedId = selectedForwardComplaintId;
-                selectedForwardComplaintId = null;
                 complaints.forEach(c => {
                     const row = document.createElement('tr');
                     row.setAttribute('data-complaint-id', c.complaint_id);
-                    row.style.cursor = 'pointer';
-                    row.addEventListener('click', (event) => {
-                        if (event.target.closest('button, a, input, select, textarea')) {
-                            return;
-                        }
-                        selectComplaintForForward(c.complaint_id);
-                    });
+                    const alreadyForwarded = isComplaintForwarded(c);
+                    const disabledAttr = alreadyForwarded ? ' disabled' : '';
                     
                     // Format date
                     const date = new Date(c.incident_date);
@@ -1866,6 +1833,7 @@ require_once __DIR__ . '/db.php';
                     const formattedTime = formatIncidentTime(c.incident_time);
                     
                     row.innerHTML = `
+                        <td class="col-select"><input type="checkbox" class="complaint-select" value="${Number(c.id)}" onchange="updateBlotterForwardButtonState()"${disabledAttr}></td>
                         <td>${c.complaint_id}</td>
                         <td>${c.complainant_name}</td>
                         <td>${c.defendant_name || '—'}</td>
@@ -1883,12 +1851,8 @@ require_once __DIR__ . '/db.php';
                         </td>
                     `;
                     tbody.appendChild(row);
-
-                    if (previousSelectedId && Number(c.id) === Number(previousSelectedId)) {
-                        selectComplaintForForward(c.complaint_id);
-                    }
                 });
-                updateToolbarForwardButton();
+                updateBlotterForwardButtonState();
             } catch (e) {
                 console.error('Error loading complaints:', e);
             }
@@ -2061,12 +2025,23 @@ require_once __DIR__ . '/db.php';
             document.getElementById('manageComplaintForm').reset();
         }
 
-        function forwardSelectedComplaint() {
-            if (!selectedForwardComplaintId) {
-                showToast('Select a crime-related complaint in the table first.', 'error');
+        function forwardSelectedComplaints() {
+            const ids = getSelectedComplaintIds();
+            if (!ids.length) {
+                showToast('Select one or more complaints to forward.', 'error');
                 return;
             }
-            forwardComplaintById(selectedForwardComplaintId);
+
+            const labels = ids.map(id => {
+                const complaint = Object.values(complaintData).find(c => Number(c.id) === Number(id));
+                return complaint ? complaint.complaint_id : ('#' + id);
+            });
+
+            if (!window.confirm('Forward ' + labels.join(', ') + ' to the Digital Blotter now?')) {
+                return;
+            }
+
+            forwardComplaintsByIds(ids);
         }
 
         function saveComplaintManage(event) {
@@ -2122,66 +2097,63 @@ require_once __DIR__ . '/db.php';
                 });
         }
 
-        function forwardComplaintById(dbId) {
-            const complaint = Object.values(complaintData).find(c => c.id === dbId);
-            if (!complaint) {
-                showToast('Complaint not found.', 'error');
-                return;
-            }
-
-            if (isComplaintForwarded(complaint)) {
-                showToast('This complaint was already forwarded to the Digital Blotter System.', 'error');
-                return;
-            }
-
-            if (!isComplaintTypeForwardableToBlotter(complaint.complaint_type)) {
-                showToast('This complaint type cannot be forwarded to the Digital Blotter.', 'error');
-                return;
-            }
-
-            const label = complaint.complaint_id || ('#' + dbId);
-            if (!window.confirm('Forward ' + label + ' to the Digital Blotter now? This is manual and will send immediately.')) {
-                return;
-            }
-
+        async function forwardComplaintsByIds(dbIds) {
             const forwardBtn = document.getElementById('toolbarForwardBtn');
             if (forwardBtn) {
                 forwardBtn.disabled = true;
                 forwardBtn.textContent = 'Forwarding...';
             }
 
-            fetch('api/complaints.php', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ action: 'forward', id: dbId })
-            })
-                .then(response => response.json().then(data => ({ ok: response.ok, data })))
-                .then(({ ok, data }) => {
-                    if (!ok || !data.success) {
+            let successCount = 0;
+            const errors = [];
+
+            for (const dbId of dbIds) {
+                const complaint = Object.values(complaintData).find(c => Number(c.id) === Number(dbId));
+                if (!complaint) {
+                    errors.push('#' + dbId + ': not found');
+                    continue;
+                }
+                if (isComplaintForwarded(complaint)) {
+                    errors.push((complaint.complaint_id || ('#' + dbId)) + ': already forwarded');
+                    continue;
+                }
+
+                try {
+                    const response = await fetch('api/complaints.php', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ action: 'forward', id: dbId })
+                    });
+                    const data = await response.json();
+                    if (!response.ok || !data.success) {
                         throw new Error(data.message || 'Failed to forward complaint.');
                     }
 
                     complaint.status = data.data?.status || 'Forwarded to Digital Blotter';
                     complaint.forwarded_at = data.data?.forwarded_at || new Date().toISOString();
                     complaint.blotter_reference_id = data.data?.blotter_reference_id || '';
-                    if (data.data?.blotter_reference_id) {
-                        const timestamp = new Date().toLocaleString('en-US');
-                        const refNote = `[${timestamp}] Forwarded to Digital Blotter System (Ref: ${data.data.blotter_reference_id}).`;
-                        complaint.notes = (complaint.notes || '') + '\n\n' + refNote;
-                    }
+                    successCount += 1;
+                } catch (error) {
+                    errors.push((complaint.complaint_id || ('#' + dbId)) + ': ' + (error.message || 'failed'));
+                }
+            }
 
-                    loadComplaints();
+            await loadComplaints();
+            exitBlotterSelectMode();
 
-                    let message = data.message || 'Successfully forwarded to Digital Blotter.';
-                    if (data.data?.blotter_reference_id) {
-                        message += ' Ref: ' + data.data.blotter_reference_id;
-                    }
-                    showToast(message, 'success');
-                })
-                .catch(error => {
-                    showToast(error.message || 'Failed to forward complaint.', 'error');
-                    updateToolbarForwardButton();
-                });
+            if (forwardBtn) {
+                forwardBtn.textContent = 'Forward to Digital Blotter';
+            }
+
+            if (successCount > 0 && errors.length === 0) {
+                showToast(successCount === 1
+                    ? 'Successfully forwarded to Digital Blotter.'
+                    : ('Successfully forwarded ' + successCount + ' complaints to Digital Blotter.'), 'success');
+            } else if (successCount > 0) {
+                showToast('Forwarded ' + successCount + '. Some failed: ' + errors.join('; '), 'warning');
+            } else {
+                showToast(errors[0] || 'Failed to forward complaint.', 'error');
+            }
         }
         
         // Close modal when clicking outside

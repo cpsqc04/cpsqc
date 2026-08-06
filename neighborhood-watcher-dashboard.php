@@ -326,8 +326,8 @@ $nwActiveNav = 'bulletin';
                 + '<div class="detail-row"><div class="detail-label">Status</div><div class="detail-value">' + escapeHtml(report.status) + '</div></div>'
                 + '<div class="detail-row"><div class="detail-label">Assigned To</div><div class="detail-value">' + escapeHtml(report.assigned_to || 'Unassigned') + '</div></div>'
                 + (report.resolution_report
-                    ? '<div class="detail-row"><div class="detail-label">Personnel Resolution</div><div class="detail-value">' + escapeHtml(report.resolution_report) + '</div></div>'
-                    : '<div class="detail-row"><div class="detail-label">Personnel Resolution</div><div class="detail-value">Pending — waiting for assigned personnel</div></div>')
+                    ? '<div class="detail-row"><div class="detail-label">BPSO Resolution</div><div class="detail-value">' + escapeHtml(report.resolution_report) + '</div></div>'
+                    : '<div class="detail-row"><div class="detail-label">BPSO Resolution</div><div class="detail-value">Pending — waiting for assigned personnel</div></div>')
                 + '<div class="detail-row"><div class="detail-label">Submitted</div><div class="detail-value">' + formatDateTime(report.created_at) + '</div></div>'
                 + (report.assigned_at ? '<div class="detail-row"><div class="detail-label">Assigned At</div><div class="detail-value">' + formatDateTime(report.assigned_at) + '</div></div>' : '')
                 + (report.resolved_at ? '<div class="detail-row"><div class="detail-label">Resolved At</div><div class="detail-value">' + formatDateTime(report.resolved_at) + '</div></div>' : '')
@@ -571,20 +571,15 @@ $nwActiveNav = 'bulletin';
                     return;
                 }
 
-                let html = '<div class="table-container"><table><thead><tr><th>Report ID</th><th>Location</th><th>Assigned To</th><th>Status</th><th>BPSO Resolution</th><th>Submitted</th><th>Actions</th></tr></thead><tbody>';
+                let html = '<div class="table-container"><table><thead><tr><th>Report ID</th><th>Location</th><th>Assigned To</th><th>Status</th><th>Submitted</th><th>Actions</th></tr></thead><tbody>';
                 let cardsHtml = '<div class="report-cards">';
                 reports.forEach(function(report) {
                     const date = report.created_at ? new Date(report.created_at).toLocaleString() : '-';
-                    const resolutionText = report.resolution_report || 'Pending — waiting for assigned personnel';
-                    const resolutionHtml = report.resolution_report
-                        ? '<td class="resolution-cell">' + escapeHtml(report.resolution_report) + '</td>'
-                        : '<td class="resolution-cell"><span class="resolution-empty">Pending — waiting for assigned personnel</span></td>';
                     html += '<tr>'
                         + '<td>' + escapeHtml(report.report_id) + '</td>'
                         + '<td>' + escapeHtml(report.location) + '</td>'
                         + '<td>' + escapeHtml(report.assigned_to || '—') + '</td>'
                         + '<td><span class="status-badge ' + statusClass(report.status) + '">' + escapeHtml(report.status) + '</span></td>'
-                        + resolutionHtml
                         + '<td>' + escapeHtml(date) + '</td>'
                         + '<td><div class="action-buttons"><button type="button" class="btn-view" onclick="viewMyReport(' + Number(report.id) + ')">View</button></div></td>'
                         + '</tr>';
@@ -596,7 +591,6 @@ $nwActiveNav = 'bulletin';
                         + '<div class="report-card-meta">'
                         + '<div class="report-card-row"><span class="report-card-label">Location</span><span class="report-card-value">' + escapeHtml(report.location) + '</span></div>'
                         + '<div class="report-card-row"><span class="report-card-label">Assigned To</span><span class="report-card-value">' + escapeHtml(report.assigned_to || '—') + '</span></div>'
-                        + '<div class="report-card-row"><span class="report-card-label">Resolution</span><span class="report-card-value">' + escapeHtml(resolutionText) + '</span></div>'
                         + '<div class="report-card-row"><span class="report-card-label">Submitted</span><span class="report-card-value">' + escapeHtml(date) + '</span></div>'
                         + '</div>'
                         + '<div class="report-card-actions"><button type="button" class="btn-view" onclick="viewMyReport(' + Number(report.id) + ')">View</button></div>'

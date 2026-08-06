@@ -270,15 +270,6 @@ if ($method === 'POST') {
                 exit;
             }
 
-            if (!isComplaintTypeForwardableToBlotter($complaint['complaint_type'] ?? '')) {
-                http_response_code(400);
-                echo json_encode([
-                    'success' => false,
-                    'message' => 'Only Robbery, Murder, Rape, Illegal Drugs, Carnapping/Motornapping, and Kidnapping complaints can be forwarded to the Digital Blotter.',
-                ]);
-                exit;
-            }
-
             $forwardResult = forwardComplaintToBlotter($complaint);
             if (!$forwardResult['success']) {
                 http_response_code(502);
