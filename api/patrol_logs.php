@@ -97,11 +97,14 @@ if ($method === 'POST' && $action === 'submit_report') {
         exit;
     }
 
-    $photoError = validatePatrolDocumentationPhoto($documentationPhoto, true);
+    $photoError = validatePatrolDocumentationPhoto($documentationPhoto, false);
     if ($photoError !== null) {
         http_response_code(400);
         echo json_encode(['success' => false, 'message' => $photoError]);
         exit;
+    }
+    if ($documentationPhoto === '') {
+        $documentationPhoto = null;
     }
 
     try {
@@ -326,11 +329,9 @@ if ($method === 'POST' && $action === 'update_report') {
             exit;
         }
 
-        $photoToSave = $documentationPhoto !== '' ? $documentationPhoto : ($report['documentation_photo'] ?? '');
-        if (trim((string) $photoToSave) === '') {
-            http_response_code(400);
-            echo json_encode(['success' => false, 'message' => 'Documentation photo is required as evidence.']);
-            exit;
+        $photoToSave = $documentationPhoto !== '' ? $documentationPhoto : ($report['documentation_photo'] ?? null);
+        if ($photoToSave === '') {
+            $photoToSave = null;
         }
 
         $update = $pdo->prepare('UPDATE patrol_logs SET route = :route, date = :date, time = :time, location = :location, incidents = :incidents, details = :details, documentation_photo = :documentation_photo WHERE id = :id AND patrol_id = :patrol_id');

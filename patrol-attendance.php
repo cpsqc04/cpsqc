@@ -774,8 +774,8 @@ $personnelCode = htmlspecialchars(getBpsoPersonnelCode());
                             <textarea id="reportDetails" name="details" required placeholder="Describe patrol activities, observations, and actions taken..."></textarea>
                         </div>
                         <div class="form-group">
-                            <label for="reportDocumentation">Documentation *</label>
-                            <input type="file" id="reportDocumentation" name="documentation" accept="image/jpeg,image/png,image/gif,image/webp" required>
+                            <label for="reportDocumentation">Documentation <span style="font-weight:400;color:var(--text-secondary);">(optional)</span></label>
+                            <input type="file" id="reportDocumentation" name="documentation" accept="image/jpeg,image/png,image/gif,image/webp">
                             <input type="hidden" id="reportDocumentationData" value="">
                         </div>
                         <div class="form-grid-actions">
@@ -1936,7 +1936,7 @@ $personnelCode = htmlspecialchars(getBpsoPersonnelCode());
             const fileInput = document.getElementById('reportDocumentation');
             if (fileInput) {
                 fileInput.value = '';
-                fileInput.required = true;
+                fileInput.required = false;
             }
             setReportDocumentationPreview('');
         }
@@ -2018,8 +2018,7 @@ $personnelCode = htmlspecialchars(getBpsoPersonnelCode());
             const fileInput = document.getElementById('reportDocumentation');
             if (fileInput) {
                 fileInput.value = '';
-                // Existing photo already saved; new file only needed if replacing.
-                fileInput.required = !report.documentation_photo;
+                fileInput.required = false;
             }
             setReportDocumentationPreview(report.documentation_photo || '');
             setReportFormVisible(true, false);
@@ -2114,11 +2113,6 @@ $personnelCode = htmlspecialchars(getBpsoPersonnelCode());
             }
 
             const documentationPhoto = (document.getElementById('reportDocumentationData')?.value || '').trim();
-            if (!documentationPhoto) {
-                showToast('Please upload a documentation photo as evidence.', true);
-                btn.disabled = false;
-                return;
-            }
 
             const payload = {
                 action: editingId > 0 ? 'update_report' : 'submit_report',
