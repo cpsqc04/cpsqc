@@ -417,7 +417,6 @@ $patrolNavActive = 'patrol-request';
                 <div class="form-group">
                     <label for="assignPatrolSelect">Assign BPSO Personnel</label>
                     <select id="assignPatrolSelect" multiple></select>
-                    <small id="assignPatrolHint">Only personnel currently at the barangay hall (timed in today) are shown. Hold Ctrl/Cmd to select multiple. Their My Schedule will include the request details above.</small>
                 </div>
                 <div class="form-actions">
                     <button type="button" class="btn-cancel" onclick="closeAssignPatrolModal()">Cancel</button>
@@ -654,9 +653,6 @@ $patrolNavActive = 'patrol-request';
             document.getElementById('assignRequiredSlots').value = String(remaining);
             document.getElementById('assignRequestRef').textContent = 'Request ID: ' + item.request_id;
             renderAssignRequestDetails(item);
-            document.getElementById('assignPatrolHint').textContent = remaining > 1
-                ? ('Only personnel currently at the barangay hall (timed in today) are shown. Select exactly ' + remaining + ' personnel (Ctrl/Cmd + click). Request details will appear in their My Schedule.')
-                : 'Only personnel currently at the barangay hall (timed in today) are shown. Select 1 personnel. Request details will appear in their My Schedule.';
 
             await loadAssignPersonnelOptions(item, remaining);
             closeViewModal();
