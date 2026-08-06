@@ -758,11 +758,16 @@ require_once __DIR__ . '/db.php';
                 </div>
                 <div class="form-group">
                     <label for="patrolZone">Patrol Zone *</label>
-                    <input type="text" id="patrolZone" name="patrol_zone" required placeholder="e.g. Zone 1 - North or Heavenly Drive, Barangay San Agustin">
+                    <select id="patrolZone" name="patrol_zone" required>
+                        <option value="">Select patrol zone</option>
+                    </select>
+                    <small style="display:block;margin-top:0.35rem;color:var(--text-secondary);font-size:0.85rem;">Barangay San Agustin zones — pick a zone, then a street/route.</small>
                 </div>
                 <div class="form-group">
-                    <label for="patrolRoute">Route / Streets</label>
-                    <input type="text" id="patrolRoute" name="route" placeholder="Optional route details">
+                    <label for="patrolRoute">Route / Streets *</label>
+                    <select id="patrolRoute" name="route" required disabled>
+                        <option value="">Select zone first</option>
+                    </select>
                 </div>
                 <div class="form-group">
                     <label for="patrolNotes">Notes</label>
@@ -793,6 +798,8 @@ require_once __DIR__ . '/db.php';
     </div>
 
 
+    <script src="js/san-agustin-patrol-zones.js"></script>
+    <script src="js/san-agustin-patrol-zones.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             const sidebar = document.getElementById('sidebar');
@@ -801,7 +808,119 @@ require_once __DIR__ . '/db.php';
                 sidebar.classList.add('collapsed');
                 document.body.classList.add('sidebar-collapsed');
             }
+            initPatrolZoneDropdowns();
         });
+
+        function getPatrolZoneMap() {
+            return window.SAN_AGUSTIN_PATROL_ZONES || {};
+        }
+
+        function initPatrolZoneDropdowns() {
+            const zoneSelect = document.getElementById('patrolZone');
+            const routeSelect = document.getElementById('patrolRoute');
+            if (!zoneSelect || !routeSelect) return;
+
+            const zones = getPatrolZoneMap();
+            zoneSelect.innerHTML = '<option value="">Select patrol zone</option>';
+            Object.keys(zones).forEach(zoneName => {
+                const option = document.createElement('option');
+                option.value = zoneName;
+                option.textContent = zoneName;
+                zoneSelect.appendChild(option);
+            });
+
+            routeSelect.innerHTML = '<option value="">Select zone first</option>';
+            routeSelect.disabled = true;
+
+            zoneSelect.addEventListener('change', function() {
+                populatePatrolRouteOptions(this.value);
+            });
+        }
+
+        function populatePatrolRouteOptions(zoneName, selectedRoute = '') {
+            const routeSelect = document.getElementById('patrolRoute');
+            if (!routeSelect) return;
+
+            const streets = getPatrolZoneMap()[zoneName] || [];
+            routeSelect.innerHTML = '';
+
+            if (!zoneName || streets.length === 0) {
+                routeSelect.innerHTML = '<option value="">Select zone first</option>';
+                routeSelect.disabled = true;
+                return;
+            }
+
+            routeSelect.disabled = false;
+            const placeholder = document.createElement('option');
+            placeholder.value = '';
+            placeholder.textContent = 'Select street / route';
+            routeSelect.appendChild(placeholder);
+
+            streets.forEach(street => {
+                const option = document.createElement('option');
+                option.value = street;
+                option.textContent = street;
+                routeSelect.appendChild(option);
+            });
+
+            if (selectedRoute) {
+                ensureSelectOption(routeSelect, selectedRoute);
+                routeSelect.value = selectedRoute;
+            }
+        }
+
+        function ensureSelectOption(selectEl, value) {
+            if (!selectEl || !value) return;
+            const exists = Array.from(selectEl.options).some(opt => opt.value === value);
+            if (!exists) {
+                const option = document.createElement('option');
+                option.value = value;
+                option.textContent = value;
+                selectEl.appendChild(option);
+            }
+        }
+
+        function setPatrolZoneAndRoute(zoneValue, routeValue) {
+            const zoneSelect = document.getElementById('patrolZone');
+            const routeSelect = document.getElementById('patrolRoute');
+            if (!zoneSelect || !routeSelect) return;
+
+            const zones = getPatrolZoneMap();
+            let zone = (zoneValue || '').trim();
+            let route = (routeValue || '').trim();
+
+            // High-risk / request prefills may send a street as "zone".
+            if (zone && !zones[zone]) {
+                const matchedZone = Object.keys(zones).find(name => (zones[name] || []).includes(zone));
+                if (matchedZone) {
+                    if (!route) route = zone;
+                    zone = matchedZone;
+                } else if (route && zones[route]) {
+                    zone = route;
+                    route = '';
+                } else {
+                    ensureSelectOption(zoneSelect, zone);
+                }
+            }
+
+            if (zone && zones[zone]) {
+                zoneSelect.value = zone;
+                populatePatrolRouteOptions(zone, route);
+            } else if (zone) {
+                zoneSelect.value = zone;
+                populatePatrolRouteOptions('', '');
+                routeSelect.disabled = false;
+                routeSelect.innerHTML = '<option value="">Select street / route</option>';
+                if (route) {
+                    ensureSelectOption(routeSelect, route);
+                    routeSelect.value = route;
+                }
+            } else {
+                zoneSelect.value = '';
+                populatePatrolRouteOptions('', '');
+            }
+        }
+
         function toggleSidebar() {
             const sidebar = document.getElementById('sidebar');
             const isCollapsed = sidebar.classList.contains('collapsed');
@@ -1112,8 +1231,10 @@ require_once __DIR__ . '/db.php';
 
             const today = new Date().toISOString().split('T')[0];
             document.getElementById('patrolDate').value = (prefill && prefill.date) ? prefill.date : today;
-            document.getElementById('patrolRoute').value = (prefill && prefill.route) ? prefill.route : '';
-            document.getElementById('patrolZone').value = (prefill && (prefill.zone || prefill.route)) ? (prefill.zone || prefill.route) : '';
+            setPatrolZoneAndRoute(
+                (prefill && prefill.zone) ? prefill.zone : '',
+                (prefill && prefill.route) ? prefill.route : ''
+            );
             document.getElementById('patrolShift').value = '';
             document.getElementById('patrolNotes').value = (prefill && prefill.notes) ? prefill.notes : '';
 
