@@ -413,8 +413,12 @@ $patrolNavActive = 'patrol-request';
             <div id="assignRequestDetails" style="margin-bottom:1rem;"></div>
             <form id="assignPatrolForm" onsubmit="savePatrolRequestAssignment(event)">
                 <input type="hidden" id="assignRequestDbId" value="">
-                <div id="assignPatrolSlots"></div>
-                <small id="assignPatrolHint" style="display:block;margin:0.35rem 0 1rem;color:var(--text-secondary);font-size:0.85rem;">Only personnel currently at the barangay hall (timed in today) are shown. Their My Schedule will include the request details above.</small>
+                <input type="hidden" id="assignRequiredSlots" value="1">
+                <div class="form-group">
+                    <label for="assignPatrolSelect">Assign BPSO Personnel</label>
+                    <select id="assignPatrolSelect" multiple></select>
+                    <small id="assignPatrolHint">Only personnel currently at the barangay hall (timed in today) are shown. Hold Ctrl/Cmd to select multiple. Their My Schedule will include the request details above.</small>
+                </div>
                 <div class="form-actions">
                     <button type="button" class="btn-cancel" onclick="closeAssignPatrolModal()">Cancel</button>
                     <button type="submit" class="btn-save" id="assignSaveBtn">Assign</button>
@@ -632,8 +636,6 @@ $patrolNavActive = 'patrol-request';
             }).join('\n');
         }
 
-        let assignPersonnelCandidates = [];
-
         async function openAssignPatrolModal() {
             const item = requestData[currentViewRequestId];
             if (!item) return;
@@ -649,11 +651,12 @@ $patrolNavActive = 'patrol-request';
             }
 
             document.getElementById('assignRequestDbId').value = item.id;
+            document.getElementById('assignRequiredSlots').value = String(remaining);
             document.getElementById('assignRequestRef').textContent = 'Request ID: ' + item.request_id;
             renderAssignRequestDetails(item);
             document.getElementById('assignPatrolHint').textContent = remaining > 1
-                ? ('Only personnel currently at the barangay hall (timed in today) are shown. Choose ' + remaining + ' different personnel below. Request details will appear in their My Schedule.')
-                : 'Only personnel currently at the barangay hall (timed in today) are shown. Request details will appear in their My Schedule.';
+                ? ('Only personnel currently at the barangay hall (timed in today) are shown. Select exactly ' + remaining + ' personnel (Ctrl/Cmd + click). Request details will appear in their My Schedule.')
+                : 'Only personnel currently at the barangay hall (timed in today) are shown. Select 1 personnel. Request details will appear in their My Schedule.';
 
             await loadAssignPersonnelOptions(item, remaining);
             closeViewModal();
@@ -664,49 +667,17 @@ $patrolNavActive = 'patrol-request';
             document.getElementById('assignModal').classList.remove('active');
             document.getElementById('assignPatrolForm').reset();
             document.getElementById('assignRequestDbId').value = '';
+            document.getElementById('assignRequiredSlots').value = '1';
             document.getElementById('assignRequestDetails').innerHTML = '';
-            document.getElementById('assignPatrolSlots').innerHTML = '';
-            assignPersonnelCandidates = [];
-        }
-
-        function buildPersonnelOptionHtml(personnel, selectedId) {
-            const status = String(personnel.status || 'Available').trim() || 'Available';
-            const dutyShift = normalizeDutyShift(personnel.duty_shift || personnel.schedule || '');
-            const disabled = (status !== 'Available' || !dutyShift) ? ' disabled' : '';
-            const selected = String(personnel.id) === String(selectedId || '') ? ' selected' : '';
-            return '<option value="' + personnel.id + '" data-duty-shift="' + dutyShift + '" data-status="' + status + '"' + disabled + selected + '>'
-                + personnel.bpso_personnel_id + ' - ' + personnel.personnel_name + ' (' + status + ')'
-                + '</option>';
-        }
-
-        function getAssignSlotSelects() {
-            return Array.from(document.querySelectorAll('#assignPatrolSlots select.assign-patrol-slot'));
-        }
-
-        function syncAssignSlotOptions() {
-            const selects = getAssignSlotSelects();
-            const selectedIds = selects.map(function(select) { return String(select.value || ''); });
-
-            selects.forEach(function(select, index) {
-                const currentValue = String(select.value || '');
-                const takenByOthers = new Set(
-                    selectedIds.filter(function(id, i) { return id && i !== index; })
-                );
-
-                select.innerHTML = '<option value="">Select BPSO Personnel</option>'
-                    + assignPersonnelCandidates.map(function(personnel) {
-                        if (takenByOthers.has(String(personnel.id)) && String(personnel.id) !== currentValue) {
-                            return '';
-                        }
-                        return buildPersonnelOptionHtml(personnel, currentValue);
-                    }).join('');
-            });
+            const select = document.getElementById('assignPatrolSelect');
+            if (select) select.innerHTML = '';
         }
 
         async function loadAssignPersonnelOptions(item, remainingSlots) {
-            const container = document.getElementById('assignPatrolSlots');
-            container.innerHTML = '';
-            assignPersonnelCandidates = [];
+            const select = document.getElementById('assignPatrolSelect');
+            select.innerHTML = '';
+            select.multiple = true;
+            select.size = Math.min(Math.max(remainingSlots + 3, 6), 12);
 
             const alreadyAssigned = new Set(
                 (Array.isArray(item.assigned_patrol_ids) ? item.assigned_patrol_ids : [])
@@ -721,7 +692,7 @@ $patrolNavActive = 'patrol-request';
                 const result = await patrolResponse.json();
                 const hallResult = await hallResponse.json();
                 if (!result.success || !result.data) {
-                    container.innerHTML = '<div class="form-group"><select disabled><option>No personnel available</option></select></div>';
+                    select.innerHTML = '<option value="" disabled>No personnel available</option>';
                     return;
                 }
 
@@ -730,39 +701,39 @@ $patrolNavActive = 'patrol-request';
                         .map(function(row) { return String(row.patrol_id); })
                 );
 
-                assignPersonnelCandidates = result.data.filter(function(p) {
+                const candidates = result.data.filter(function(p) {
                     return atHallIds.has(String(p.id)) && !alreadyAssigned.has(String(p.id));
                 });
 
-                if (!assignPersonnelCandidates.length) {
-                    container.innerHTML = '<div class="form-group"><select disabled><option>No personnel currently at the barangay hall</option></select></div>';
+                if (!candidates.length) {
+                    select.innerHTML = '<option value="" disabled>No personnel currently at the barangay hall</option>';
                     return;
                 }
 
-                const slotCount = Math.max(1, Number(remainingSlots) || 1);
-                for (let i = 0; i < slotCount; i++) {
-                    const group = document.createElement('div');
-                    group.className = 'form-group';
-                    const label = document.createElement('label');
-                    label.setAttribute('for', 'assignPatrolSelect' + i);
-                    label.textContent = slotCount > 1
-                        ? ('Assign BPSO Personnel ' + (i + 1) + ' of ' + slotCount)
-                        : 'Assign BPSO Personnel';
-                    const select = document.createElement('select');
-                    select.id = 'assignPatrolSelect' + i;
-                    select.className = 'assign-patrol-slot';
-                    select.required = true;
-                    select.innerHTML = '<option value="">Select BPSO Personnel</option>';
-                    select.addEventListener('change', syncAssignSlotOptions);
-                    group.appendChild(label);
-                    group.appendChild(select);
-                    container.appendChild(group);
-                }
+                candidates.forEach(function(personnel) {
+                    const option = document.createElement('option');
+                    const status = String(personnel.status || 'Available').trim() || 'Available';
+                    const dutyShift = normalizeDutyShift(personnel.duty_shift || personnel.schedule || '');
+                    option.value = personnel.id;
+                    option.dataset.dutyShift = dutyShift;
+                    option.dataset.status = status;
+                    option.textContent = personnel.bpso_personnel_id + ' - ' + personnel.personnel_name + ' (' + status + ')';
+                    if (status !== 'Available' || !dutyShift) {
+                        option.disabled = true;
+                    }
+                    select.appendChild(option);
+                });
 
-                syncAssignSlotOptions();
+                select.onchange = function() {
+                    const selected = Array.from(select.selectedOptions).filter(function(opt) { return !opt.disabled && opt.value; });
+                    if (selected.length > remainingSlots) {
+                        selected.slice(remainingSlots).forEach(function(opt) { opt.selected = false; });
+                        alert('Select exactly ' + remainingSlots + ' personnel for this request.');
+                    }
+                };
             } catch (e) {
                 console.error('Error loading BPSO personnel:', e);
-                container.innerHTML = '<div class="form-group"><select disabled><option>Failed to load personnel</option></select></div>';
+                select.innerHTML = '<option value="" disabled>Failed to load personnel</option>';
             }
         }
 
@@ -775,22 +746,21 @@ $patrolNavActive = 'patrol-request';
                 return;
             }
 
-            const selects = getAssignSlotSelects();
-            const selected = [];
-            const seen = new Set();
+            const requiredSlots = parseInt(document.getElementById('assignRequiredSlots').value, 10) || getRemainingAssignSlots(item);
+            const select = document.getElementById('assignPatrolSelect');
+            const selectedOptions = Array.from(select.selectedOptions).filter(function(opt) {
+                return opt.value && !opt.disabled;
+            });
 
-            for (let i = 0; i < selects.length; i++) {
-                const select = selects[i];
-                const option = select.options[select.selectedIndex];
-                const patrolId = parseInt(select.value, 10);
-                if (!patrolId || !option) {
-                    alert('Please select BPSO personnel for every slot.');
-                    return;
-                }
-                if (seen.has(patrolId)) {
-                    alert('Each slot must use a different BPSO personnel.');
-                    return;
-                }
+            if (selectedOptions.length !== requiredSlots) {
+                alert('This request needs ' + requiredSlots + ' personnel. Please select exactly ' + requiredSlots + '.');
+                return;
+            }
+
+            const selected = [];
+            for (let i = 0; i < selectedOptions.length; i++) {
+                const option = selectedOptions[i];
+                const patrolId = parseInt(option.value, 10);
                 if ((option.dataset.status || '') !== 'Available') {
                     alert('Only personnel with Available status can be assigned.');
                     return;
@@ -800,19 +770,7 @@ $patrolNavActive = 'patrol-request';
                     alert('Selected personnel must have a fixed duty shift (Day Shift or Night Shift).');
                     return;
                 }
-                seen.add(patrolId);
                 selected.push({ id: patrolId, shift: shift });
-            }
-
-            if (!selected.length) {
-                alert('Please select BPSO personnel to assign.');
-                return;
-            }
-
-            const remaining = getRemainingAssignSlots(item);
-            if (selected.length > remaining) {
-                alert('You can assign at most ' + remaining + ' more personnel for this request.');
-                return;
             }
 
             const assigned = Array.isArray(item.assigned_patrol_ids)
@@ -875,7 +833,7 @@ $patrolNavActive = 'patrol-request';
                 await loadRequests();
                 alert(status === 'Scheduled'
                     ? 'All required personnel assigned. Request marked as Scheduled.'
-                    : 'Personnel assigned successfully. Assign again for remaining slots if needed.');
+                    : 'Personnel assigned successfully.');
             } catch (err) {
                 alert(err.message || 'Failed to assign personnel.');
             } finally {
