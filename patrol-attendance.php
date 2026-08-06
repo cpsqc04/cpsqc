@@ -1070,15 +1070,14 @@ $personnelCode = htmlspecialchars(getBpsoPersonnelCode());
                 <div class="form-group">
                     <label for="tipOutcomeSelect">Outcome *</label>
                     <select id="tipOutcomeSelect" required>
-                        <option value="Under Investigation">Under Investigation</option>
+                        <option value="">Select outcome</option>
                         <option value="Investigation Successful">Investigation Successful (No Arrest)</option>
                         <option value="Arrest Made">Arrest Made</option>
                         <option value="Unfounded / No Action">Unfounded / No Action</option>
                     </select>
                     <p class="field-hint">Final outcome is set by your report. Police backup (if requested) is assistance only.</p>
                 </div>
-                <div style="display:flex;gap:0.75rem;flex-wrap:wrap;">
-                    <button type="button" id="saveTipProgressBtn" class="btn-submit" onclick="submitTipResolution('Assigned')">Save Progress</button>
+                <div style="display:flex;gap:0.75rem;flex-wrap:wrap;justify-content:flex-end;">
                     <button type="submit" id="resolveTipBtn" class="btn-submit">Mark as Resolved</button>
                 </div>
             </form>
@@ -2982,19 +2981,26 @@ $personnelCode = htmlspecialchars(getBpsoPersonnelCode());
             document.getElementById('resolutionTipId').value = id;
             document.getElementById('tipResolutionReport').value = tip.resolution_report || '';
             const outcomeSelect = document.getElementById('tipOutcomeSelect');
-            const currentOutcome = tip.outcome && tip.outcome !== 'No Outcome Yet' ? tip.outcome : 'Under Investigation';
+            const finalOutcomes = ['Investigation Successful', 'Arrest Made', 'Unfounded / No Action'];
+            const currentOutcome = finalOutcomes.includes(tip.outcome) ? tip.outcome : '';
             outcomeSelect.value = currentOutcome;
+            let photoHtml = '';
+            if (tip.photo_data) {
+                photoHtml = `<div class="complaint-detail"><strong>Photo:</strong><br><img src="${tip.photo_data}" alt="Tip photo" class="incident-photo" onclick="AlertaraPhotoLightbox.open(this.src, 'Tip photo')" title="Click to view full size"></div>`;
+            } else {
+                photoHtml = '<div class="complaint-detail"><strong>Photo:</strong> No photo attached</div>';
+            }
             document.getElementById('tipDetailContent').innerHTML = `
                 <div class="complaint-detail"><strong>Tip ID:</strong> ${escapeHtml(tip.tip_id)}</div>
                 <div class="complaint-detail"><strong>Location:</strong> ${escapeHtml(tip.location)}</div>
                 <div class="complaint-detail"><strong>Description:</strong><br>${escapeHtml(tip.description)}</div>
+                ${photoHtml}
                 <div class="complaint-detail"><strong>Status:</strong> <span class="status-badge ${tipStatusClass(tip.status)}">${escapeHtml(tip.status)}</span></div>
                 ${tip.backup_requested_at ? '<div class="complaint-detail"><strong>Police backup:</strong> Requested (assistance only — you still submit the final report)</div>' : ''}
             `;
             const isResolved = tip.status === 'Resolved';
             document.getElementById('tipResolutionReport').readOnly = isResolved;
             outcomeSelect.disabled = isResolved;
-            document.getElementById('saveTipProgressBtn').style.display = isResolved ? 'none' : '';
             document.getElementById('resolveTipBtn').style.display = isResolved ? 'none' : '';
             document.getElementById('tipResolutionModal').classList.add('active');
         }
@@ -3003,7 +3009,6 @@ $personnelCode = htmlspecialchars(getBpsoPersonnelCode());
             document.getElementById('tipResolutionModal').classList.remove('active');
             document.getElementById('tipResolutionReport').readOnly = false;
             document.getElementById('tipOutcomeSelect').disabled = false;
-            document.getElementById('saveTipProgressBtn').style.display = '';
             document.getElementById('resolveTipBtn').style.display = '';
         }
 
