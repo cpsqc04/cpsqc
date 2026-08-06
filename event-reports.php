@@ -339,10 +339,35 @@ require_once __DIR__ . '/db.php';
         .content-burger-btn span::after { bottom: -7px; }
         .page-title { font-size: 2rem; font-weight: 700; color: var(--tertiary-color); margin: 0; }
         .page-content { background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 12px; padding: 2rem; box-shadow: 0 2px 8px var(--shadow); margin-top: 1.5rem; }
-        .search-box { margin-bottom: 1.5rem; position: relative; }
-        .search-box input { width: 100%; padding: 0.75rem 1rem 0.75rem 2.5rem; border: 1px solid var(--border-color); border-radius: 8px; font-size: 0.95rem; transition: all 0.2s ease; }
+        .reports-toolbar { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; margin-bottom: 1.5rem; }
+        .search-box { flex: 1; min-width: 220px; margin-bottom: 0; position: relative; }
+        .search-box input { width: 100%; padding: 0.75rem 1rem 0.75rem 2.5rem; border: 1px solid var(--border-color); border-radius: 8px; font-size: 0.95rem; transition: all 0.2s ease; box-sizing: border-box; }
         .search-box input:focus { outline: none; border-color: var(--primary-color); box-shadow: 0 0 0 3px rgba(76, 138, 137, 0.1); }
         .search-box::before { content: "🔍"; position: absolute; left: 0.75rem; top: 50%; transform: translateY(-50%); font-size: 1rem; }
+        .reports-toolbar .btn-export, .reports-toolbar .btn-cancel-export {
+            padding: 0.75rem 1.25rem;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            white-space: nowrap;
+            flex-shrink: 0;
+            color: #fff;
+        }
+        .reports-toolbar .btn-export { background: var(--primary-color); }
+        .reports-toolbar .btn-export:hover:not(:disabled) { background: #4ca8a6; }
+        .reports-toolbar .btn-export:disabled { opacity: 0.55; cursor: not-allowed; }
+        .reports-toolbar .btn-cancel-export { background: #6c757d; }
+        .reports-toolbar .btn-cancel-export:hover { background: #5a6268; }
+        #reportsTable th.col-select, #reportsTable td.col-select { width: 42px; text-align: center; }
+        body:not(.export-select-mode) #reportsTable .col-select { display: none; }
+        body:not(.export-select-mode) .export-select-only { display: none !important; }
+        body.export-select-mode .export-enter-only { display: none !important; }
+        body.export-select-mode #reportsTable tbody tr:hover { background: #f0fdfa; }
         .table-container { overflow-x: auto; border-radius: 8px; border: 1px solid var(--border-color); }
         table { width: 100%; border-collapse: collapse; background: var(--card-bg); }
         thead { background: var(--tertiary-color); color: #fff; }
@@ -546,13 +571,23 @@ require_once __DIR__ . '/db.php';
         </header>
         <main class="content-area">
             <div class="page-content">
-                <div class="search-box">
-                    <input type="text" id="searchInput" placeholder="Search event reports by ID, title, date, or organizer..." onkeyup="filterReports()">
+                <div class="reports-toolbar">
+                    <div class="search-box">
+                        <input type="text" id="searchInput" placeholder="Search event reports by ID, title, date, or organizer..." onkeyup="filterReports()">
+                    </div>
+                    <button type="button" class="btn-export export-enter-only" id="btnEnterEventExportSelect" onclick="enterEventExportSelectMode()">
+                        <i class="fas fa-file-export"></i> Export
+                    </button>
+                    <button type="button" class="btn-export export-select-only" id="btnExportSelectedEvents" onclick="exportSelectedEvents()" disabled>
+                        <i class="fas fa-file-export"></i> Export Selected
+                    </button>
+                    <button type="button" class="btn-cancel-export export-select-only" onclick="exitEventExportSelectMode()">Cancel</button>
                 </div>
                 <div class="table-container">
                     <table id="reportsTable">
                         <thead>
                             <tr>
+                                <th class="col-select"><input type="checkbox" id="selectAllEvents" title="Select all" onchange="toggleSelectAllEvents(this)"></th>
                                 <th>Event ID</th>
                                 <th>Title</th>
                                 <th>Date</th>
@@ -563,7 +598,7 @@ require_once __DIR__ . '/db.php';
                             </tr>
                         </thead>
                         <tbody id="reportsTableBody">
-                            <tr><td colspan="7" style="text-align:center;color:var(--text-secondary);">Loading event reports...</td></tr>
+                            <tr><td colspan="8" style="text-align:center;color:var(--text-secondary);">Loading event reports...</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -659,7 +694,7 @@ require_once __DIR__ . '/db.php';
                 }
             } catch (e) {
                 console.error(e);
-                tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#b91c1c;">Failed to load event reports.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#b91c1c;">Failed to load event reports.</td></tr>';
             }
         }
 
@@ -667,7 +702,7 @@ require_once __DIR__ . '/db.php';
             const tbody = document.getElementById('reportsTableBody');
             eventReportData = {};
             if (!reports.length) {
-                tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text-secondary);">No event reports found.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--text-secondary);">No event reports found.</td></tr>';
                 return;
             }
             tbody.innerHTML = reports.map(function(item) {
@@ -686,6 +721,7 @@ require_once __DIR__ . '/db.php';
                 };
                 return `
                     <tr data-report-id="${reportId}">
+                        <td class="col-select"><input type="checkbox" class="event-select" value="${reportId}" onchange="updateEventExportButtonState()"></td>
                         <td>${item.event_id}</td>
                         <td>${item.title}</td>
                         <td>${item.event_date}</td>
@@ -695,7 +731,6 @@ require_once __DIR__ . '/db.php';
                         <td>
                             <div class="action-buttons">
                                 <button class="btn-view" onclick="viewReport('${reportId}')">View</button>
-                                <button class="btn-export" onclick="exportReport('${reportId}')"><i class="fas fa-file-export"></i> Export</button>
                             </div>
                         </td>
                     </tr>
@@ -737,35 +772,96 @@ require_once __DIR__ . '/db.php';
             }
         }
 
-        async function exportReport(id) {
-            const report = eventReportData[id];
-            if (!report) {
-                alert('Report not found');
+        function enterEventExportSelectMode() {
+            document.body.classList.add('export-select-mode');
+            const master = document.getElementById('selectAllEvents');
+            if (master) master.checked = false;
+            document.querySelectorAll('.event-select').forEach(function(cb) { cb.checked = false; });
+            updateEventExportButtonState();
+        }
+
+        function exitEventExportSelectMode() {
+            document.body.classList.remove('export-select-mode');
+            const master = document.getElementById('selectAllEvents');
+            if (master) master.checked = false;
+            document.querySelectorAll('.event-select').forEach(function(cb) { cb.checked = false; });
+            updateEventExportButtonState();
+        }
+
+        function getSelectedEventIds() {
+            return Array.from(document.querySelectorAll('.event-select:checked'))
+                .map(function(cb) { return cb.value; })
+                .filter(Boolean);
+        }
+
+        function updateEventExportButtonState() {
+            const btn = document.getElementById('btnExportSelectedEvents');
+            if (!btn) return;
+            const selected = getSelectedEventIds().length;
+            const active = document.body.classList.contains('export-select-mode');
+            btn.disabled = !active || selected === 0;
+            btn.innerHTML = selected > 0
+                ? ('<i class="fas fa-file-export"></i> Export Selected (' + selected + ')')
+                : '<i class="fas fa-file-export"></i> Export Selected';
+        }
+
+        function toggleSelectAllEvents(master) {
+            const checked = Boolean(master && master.checked);
+            document.querySelectorAll('#reportsTableBody tr').forEach(function(row) {
+                if (row.style.display === 'none') return;
+                const cb = row.querySelector('.event-select');
+                if (cb) cb.checked = checked;
+            });
+            updateEventExportButtonState();
+        }
+
+        function eventToExportSection(report) {
+            return {
+                fields: [
+                    { label: 'Event Name', value: report.title },
+                    { label: 'Date', value: report.date },
+                    { label: 'Location', value: report.location },
+                    { label: 'Attendance', value: (report.attendanceCount || '0') + ' participants' },
+                    { label: 'Organizer', value: report.organizer },
+                    { label: 'Survey Result', value: report.surveyResult }
+                ],
+                blocks: [
+                    { label: 'Description', value: report.description || '' }
+                ]
+            };
+        }
+
+        async function exportSelectedEvents() {
+            if (!document.body.classList.contains('export-select-mode')) {
+                enterEventExportSelectMode();
+                return;
+            }
+            const ids = getSelectedEventIds();
+            if (!ids.length) {
+                alert('Please select at least one event report to export.');
+                return;
+            }
+            const reports = ids.map(function(id) { return eventReportData[id]; }).filter(Boolean);
+            if (!reports.length) {
+                alert('Selected reports could not be found. Please refresh and try again.');
                 return;
             }
             if (!window.AlertaraReportExport) {
                 alert('Export helper not loaded. Please refresh the page.');
                 return;
             }
-
             try {
-                const fileName = 'event_report_' + String(report.title || 'event').replace(/\s+/g, '_') + '_' + report.date + '.docx';
+                const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
+                const fileName = reports.length === 1
+                    ? ('event_report_' + String(reports[0].title || 'event').replace(/\s+/g, '_') + '_' + reports[0].date + '.docx')
+                    : ('event_reports_' + reports.length + '_' + stamp + '.docx');
                 await AlertaraReportExport.downloadReport({
-                    title: 'EVENT REPORT',
+                    title: reports.length > 1 ? 'EVENT REPORTS' : 'EVENT REPORT',
                     fileName: fileName,
-                    fields: [
-                        { label: 'Event Name', value: report.title },
-                        { label: 'Date', value: report.date },
-                        { label: 'Location', value: report.location },
-                        { label: 'Attendance', value: (report.attendanceCount || '0') + ' participants' },
-                        { label: 'Organizer', value: report.organizer },
-                        { label: 'Survey Result', value: report.surveyResult }
-                    ],
-                    blocks: [
-                        { label: 'Description', value: report.description || '' }
-                    ]
+                    sections: reports.map(eventToExportSection)
                 });
-                alert('Event report exported successfully as ' + fileName + '!');
+                exitEventExportSelectMode();
+                alert('Event report export saved as ' + fileName + '!');
             } catch (error) {
                 console.error('Error generating DOCX:', error);
                 alert(error.message || 'Error generating DOCX file. Please try again.');

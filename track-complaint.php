@@ -919,10 +919,35 @@ require_once __DIR__ . '/db.php';
             text-align: center;
         }
 
-        body:not(.blotter-select-mode) #complaintsTable .col-select { display: none; }
+        body:not(.blotter-select-mode):not(.export-select-mode) #complaintsTable .col-select { display: none; }
         body:not(.blotter-select-mode) .blotter-select-only { display: none !important; }
-        body.blotter-select-mode .blotter-enter-only { display: none !important; }
-        body.blotter-select-mode #complaintsTable tbody tr:not(.empty-row):hover { background: #f0fdfa; }
+        body:not(.export-select-mode) .export-select-only { display: none !important; }
+        body:not(.blotter-select-mode):not(.export-select-mode) .select-mode-only { display: none !important; }
+        body.blotter-select-mode .blotter-enter-only,
+        body.export-select-mode .blotter-enter-only,
+        body.blotter-select-mode .export-enter-only,
+        body.export-select-mode .export-enter-only { display: none !important; }
+        body.blotter-select-mode #complaintsTable tbody tr:not(.empty-row):hover,
+        body.export-select-mode #complaintsTable tbody tr:not(.empty-row):hover { background: #f0fdfa; }
+
+        .search-toolbar .btn-export {
+            padding: 0.75rem 1.25rem;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            flex-shrink: 0;
+            white-space: nowrap;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: var(--primary-color);
+            color: #fff;
+            transition: background 0.2s ease;
+        }
+        .search-toolbar .btn-export:hover:not(:disabled) { background: #4ca8a6; }
+        .search-toolbar .btn-export:disabled { opacity: 0.55; cursor: not-allowed; }
         
         .search-box input {
             width: 100%;
@@ -1508,9 +1533,15 @@ require_once __DIR__ . '/db.php';
                     <div class="search-box">
                         <input type="text" id="searchInput" placeholder="Search by complaint ID, complainant, defendant, or contact number..." onkeyup="filterComplaints()">
                     </div>
+                    <button type="button" class="btn-export export-enter-only" id="btnEnterComplaintExportSelect" onclick="enterComplaintExportSelectMode()">
+                        <i class="fas fa-file-export"></i> Export
+                    </button>
+                    <button type="button" class="btn-export export-select-only" id="btnExportSelectedComplaints" onclick="exportSelectedComplaints()" disabled>
+                        <i class="fas fa-file-export"></i> Export Selected
+                    </button>
                     <button type="button" class="btn-forward blotter-enter-only" id="btnEnterBlotterSelect" onclick="enterBlotterSelectMode()">Forward to Digital Blotter</button>
                     <button type="button" class="btn-forward blotter-select-only" id="toolbarForwardBtn" onclick="forwardSelectedComplaints()" disabled>Forward to Digital Blotter</button>
-                    <button type="button" class="btn-cancel blotter-select-only" onclick="exitBlotterSelectMode()">Cancel</button>
+                    <button type="button" class="btn-cancel select-mode-only" onclick="exitActiveComplaintSelectMode()">Cancel</button>
                 </div>
                 
                 <div class="table-container">
@@ -1725,19 +1756,73 @@ require_once __DIR__ . '/db.php';
             window.clearTimeout(showToast._timer);
         }
 
-        function enterBlotterSelectMode() {
-            document.body.classList.add('blotter-select-mode');
+        function clearComplaintSelections() {
             const selectAll = document.getElementById('selectAllComplaints');
             if (selectAll) selectAll.checked = false;
             document.querySelectorAll('.complaint-select').forEach(cb => { cb.checked = false; });
+        }
+
+        function syncComplaintCheckboxAvailability() {
+            const exportMode = document.body.classList.contains('export-select-mode');
+            document.querySelectorAll('#complaintsTableBody tr[data-complaint-id]').forEach(row => {
+                const cb = row.querySelector('.complaint-select');
+                if (!cb) return;
+                const complaint = complaintData[row.getAttribute('data-complaint-id')];
+                cb.disabled = exportMode ? false : (complaint ? isComplaintForwarded(complaint) : false);
+            });
+        }
+
+        function onComplaintSelectChange() {
+            updateBlotterForwardButtonState();
+            updateComplaintExportButtonState();
+        }
+
+        function exitActiveComplaintSelectMode() {
+            if (document.body.classList.contains('export-select-mode')) {
+                exitComplaintExportSelectMode();
+            } else {
+                exitBlotterSelectMode();
+            }
+        }
+
+        function enterComplaintExportSelectMode() {
+            exitBlotterSelectMode();
+            document.body.classList.add('export-select-mode');
+            clearComplaintSelections();
+            syncComplaintCheckboxAvailability();
+            updateComplaintExportButtonState();
+        }
+
+        function exitComplaintExportSelectMode() {
+            document.body.classList.remove('export-select-mode');
+            clearComplaintSelections();
+            syncComplaintCheckboxAvailability();
+            updateComplaintExportButtonState();
+        }
+
+        function updateComplaintExportButtonState() {
+            const btn = document.getElementById('btnExportSelectedComplaints');
+            if (!btn) return;
+            const selected = getSelectedComplaintIds().length;
+            const active = document.body.classList.contains('export-select-mode');
+            btn.disabled = !active || selected === 0;
+            btn.innerHTML = selected > 0
+                ? ('<i class="fas fa-file-export"></i> Export Selected (' + selected + ')')
+                : '<i class="fas fa-file-export"></i> Export Selected';
+        }
+
+        function enterBlotterSelectMode() {
+            exitComplaintExportSelectMode();
+            document.body.classList.add('blotter-select-mode');
+            clearComplaintSelections();
+            syncComplaintCheckboxAvailability();
             updateBlotterForwardButtonState();
         }
 
         function exitBlotterSelectMode() {
             document.body.classList.remove('blotter-select-mode');
-            const selectAll = document.getElementById('selectAllComplaints');
-            if (selectAll) selectAll.checked = false;
-            document.querySelectorAll('.complaint-select').forEach(cb => { cb.checked = false; });
+            clearComplaintSelections();
+            syncComplaintCheckboxAvailability();
             updateBlotterForwardButtonState();
         }
 
@@ -1762,7 +1847,7 @@ require_once __DIR__ . '/db.php';
             document.querySelectorAll('.complaint-select:not(:disabled)').forEach(cb => {
                 cb.checked = checked;
             });
-            updateBlotterForwardButtonState();
+            onComplaintSelectChange();
         }
 
         function updateAssignedPatrolFieldVisibility(complaint) {
@@ -1841,7 +1926,7 @@ require_once __DIR__ . '/db.php';
                     const formattedTime = formatIncidentTime(c.incident_time);
                     
                     row.innerHTML = `
-                        <td class="col-select"><input type="checkbox" class="complaint-select" value="${Number(c.id)}" onchange="updateBlotterForwardButtonState()"${disabledAttr}></td>
+                        <td class="col-select"><input type="checkbox" class="complaint-select" value="${Number(c.id)}" onchange="onComplaintSelectChange()"${disabledAttr}></td>
                         <td>${c.complaint_id}</td>
                         <td>${c.complainant_name}</td>
                         <td>${c.defendant_name || '—'}</td>
@@ -1852,7 +1937,6 @@ require_once __DIR__ . '/db.php';
                         <td>
                             <div class="action-buttons">
                                 <button class="btn-view" onclick="viewComplaint('${c.complaint_id}')">View</button>
-                                <button class="btn-export" onclick="exportComplaint('${c.complaint_id}')"><i class="fas fa-file-export"></i> Export</button>
                                 ${String(c.status || '').toLowerCase() !== 'resolved'
                                     ? `<button class="btn-manage" onclick="manageComplaint('${c.complaint_id}')">Assign Patrol</button>`
                                     : ''}
@@ -1862,6 +1946,8 @@ require_once __DIR__ . '/db.php';
                     tbody.appendChild(row);
                 });
                 updateBlotterForwardButtonState();
+                updateComplaintExportButtonState();
+                syncComplaintCheckboxAvailability();
             } catch (e) {
                 console.error('Error loading complaints:', e);
             }
@@ -2005,79 +2091,97 @@ require_once __DIR__ . '/db.php';
             modal.classList.add('active');
         }
         
-        async function exportComplaint(complaintId) {
-            const complaint = complaintData[complaintId];
-            if (!complaint) {
-                alert('Complaint details not found for: ' + complaintId);
+        function complaintToExportSection(complaint) {
+            const incidentDate = new Date(complaint.incident_date);
+            const formattedIncidentDate = incidentDate.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'Asia/Manila' });
+            const formattedTime = formatIncidentTime(complaint.incident_time);
+            let lastUpdated = 'N/A';
+            if (complaint.submitted_at) {
+                lastUpdated = new Date(complaint.submitted_at).toLocaleString('en-US', {
+                    year: 'numeric', month: '2-digit', day: '2-digit',
+                    hour: '2-digit', minute: '2-digit', hour12: true
+                });
+            }
+
+            const fields = [
+                { label: 'Complaint ID', value: complaint.complaint_id },
+                { label: 'Status', value: complaint.status },
+                { label: "Complainant's Name", value: complaint.complainant_name },
+                { label: "Complainant's Address", value: complaint.address },
+                { label: "Complainant's Contact Number", value: complaint.contact_number },
+                { label: 'Date', value: formattedIncidentDate },
+                { label: 'Time', value: formattedTime },
+                { label: "Defendant's Name", value: complaint.defendant_name || 'N/A' },
+                { label: "Defendant's Address", value: complaint.defendant_address || 'N/A' },
+                { label: "Defendant's Contact Number", value: complaint.defendant_contact_number || 'N/A' },
+                { label: 'Complaint Type', value: formatComplaintTypeLabel(complaint) }
+            ];
+            if (!isComplaintForwarded(complaint)) {
+                fields.push({ label: 'Assigned To', value: complaint.assigned_to || 'Pending Assignment' });
+            }
+            if (complaint.resolved_at) {
+                fields.push({
+                    label: 'Resolved At',
+                    value: new Date(complaint.resolved_at).toLocaleString('en-US', {
+                        year: 'numeric', month: '2-digit', day: '2-digit',
+                        hour: '2-digit', minute: '2-digit', hour12: true
+                    })
+                });
+            }
+            if (complaint.blotter_reference_id) {
+                fields.push({ label: 'Digital Blotter Reference', value: complaint.blotter_reference_id });
+            }
+            if (complaint.forwarded_at) {
+                fields.push({
+                    label: 'Forwarded At',
+                    value: new Date(complaint.forwarded_at).toLocaleString('en-US', {
+                        year: 'numeric', month: '2-digit', day: '2-digit',
+                        hour: '2-digit', minute: '2-digit', hour12: true
+                    })
+                });
+            }
+            fields.push({ label: 'Last Updated', value: lastUpdated });
+
+            return {
+                fields: fields,
+                blocks: [
+                    { label: 'Description', value: complaint.description || '' },
+                    { label: 'BPSO Resolution', value: complaint.resolution_report || 'No BPSO resolution report yet.' }
+                ]
+            };
+        }
+
+        async function exportSelectedComplaints() {
+            if (!document.body.classList.contains('export-select-mode')) {
+                enterComplaintExportSelectMode();
+                return;
+            }
+            const ids = getSelectedComplaintIds();
+            if (!ids.length) {
+                alert('Please select at least one complaint to export.');
+                return;
+            }
+            const complaints = ids.map(id => Object.values(complaintData).find(c => Number(c.id) === Number(id))).filter(Boolean);
+            if (!complaints.length) {
+                alert('Selected complaints could not be found. Please refresh and try again.');
                 return;
             }
             if (!window.AlertaraReportExport) {
                 alert('Export helper not loaded. Please refresh the page.');
                 return;
             }
-
             try {
-                const incidentDate = new Date(complaint.incident_date);
-                const formattedIncidentDate = incidentDate.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'Asia/Manila' });
-                const formattedTime = formatIncidentTime(complaint.incident_time);
-                let lastUpdated = 'N/A';
-                if (complaint.submitted_at) {
-                    lastUpdated = new Date(complaint.submitted_at).toLocaleString('en-US', {
-                        year: 'numeric', month: '2-digit', day: '2-digit',
-                        hour: '2-digit', minute: '2-digit', hour12: true
-                    });
-                }
-
-                const fields = [
-                    { label: 'Complaint ID', value: complaint.complaint_id },
-                    { label: 'Status', value: complaint.status },
-                    { label: "Complainant's Name", value: complaint.complainant_name },
-                    { label: "Complainant's Address", value: complaint.address },
-                    { label: "Complainant's Contact Number", value: complaint.contact_number },
-                    { label: 'Date', value: formattedIncidentDate },
-                    { label: 'Time', value: formattedTime },
-                    { label: "Defendant's Name", value: complaint.defendant_name || 'N/A' },
-                    { label: "Defendant's Address", value: complaint.defendant_address || 'N/A' },
-                    { label: "Defendant's Contact Number", value: complaint.defendant_contact_number || 'N/A' },
-                    { label: 'Complaint Type', value: formatComplaintTypeLabel(complaint) }
-                ];
-                if (!isComplaintForwarded(complaint)) {
-                    fields.push({ label: 'Assigned To', value: complaint.assigned_to || 'Pending Assignment' });
-                }
-                if (complaint.resolved_at) {
-                    fields.push({
-                        label: 'Resolved At',
-                        value: new Date(complaint.resolved_at).toLocaleString('en-US', {
-                            year: 'numeric', month: '2-digit', day: '2-digit',
-                            hour: '2-digit', minute: '2-digit', hour12: true
-                        })
-                    });
-                }
-                if (complaint.blotter_reference_id) {
-                    fields.push({ label: 'Digital Blotter Reference', value: complaint.blotter_reference_id });
-                }
-                if (complaint.forwarded_at) {
-                    fields.push({
-                        label: 'Forwarded At',
-                        value: new Date(complaint.forwarded_at).toLocaleString('en-US', {
-                            year: 'numeric', month: '2-digit', day: '2-digit',
-                            hour: '2-digit', minute: '2-digit', hour12: true
-                        })
-                    });
-                }
-                fields.push({ label: 'Last Updated', value: lastUpdated });
-
-                const fileName = 'complaint_report_' + String(complaint.complaint_id || 'complaint').replace(/\s+/g, '_') + '.docx';
+                const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
+                const fileName = complaints.length === 1
+                    ? ('complaint_report_' + String(complaints[0].complaint_id || 'complaint').replace(/\s+/g, '_') + '.docx')
+                    : ('complaint_reports_' + complaints.length + '_' + stamp + '.docx');
                 await AlertaraReportExport.downloadReport({
-                    title: 'COMPLAINT REPORT',
+                    title: complaints.length > 1 ? 'COMPLAINT REPORTS' : 'COMPLAINT REPORT',
                     fileName: fileName,
-                    fields: fields,
-                    blocks: [
-                        { label: 'Description', value: complaint.description || '' },
-                        { label: 'BPSO Resolution', value: complaint.resolution_report || 'No BPSO resolution report yet.' }
-                    ]
+                    sections: complaints.map(complaintToExportSection)
                 });
-                alert('Complaint exported successfully as ' + fileName + '!');
+                exitComplaintExportSelectMode();
+                alert('Complaint export saved as ' + fileName + '!');
             } catch (error) {
                 console.error('Error generating DOCX:', error);
                 alert(error.message || 'Error generating DOCX file. Please try again.');

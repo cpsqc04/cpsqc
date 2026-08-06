@@ -400,10 +400,33 @@ require_once __DIR__ . '/db.php';
         .theme-checks label { font-weight: 500; display: flex; align-items: center; gap: 0.4rem; }
         .selected-report-list { max-height: 160px; overflow: auto; border: 1px solid var(--border-color); border-radius: 8px; padding: 0.75rem; background: #f8fafc; font-size: 0.9rem; }
         #logsTable th.col-select, #logsTable td.col-select { width: 42px; text-align: center; }
-        body:not(.campaign-select-mode) #logsTable .col-select { display: none; }
+        body:not(.campaign-select-mode):not(.export-select-mode) #logsTable .col-select { display: none; }
         body:not(.campaign-select-mode) .campaign-select-only { display: none !important; }
-        body.campaign-select-mode .campaign-enter-only { display: none !important; }
-        body.campaign-select-mode #logsTable tbody tr:not(.empty-row):hover { background: #f0fdfa; }
+        body:not(.export-select-mode) .export-select-only { display: none !important; }
+        body:not(.campaign-select-mode):not(.export-select-mode) .select-mode-only { display: none !important; }
+        body.campaign-select-mode .campaign-enter-only,
+        body.export-select-mode .campaign-enter-only,
+        body.campaign-select-mode .export-enter-only,
+        body.export-select-mode .export-enter-only { display: none !important; }
+        body.campaign-select-mode #logsTable tbody tr:not(.empty-row):hover,
+        body.export-select-mode #logsTable tbody tr:not(.empty-row):hover { background: #f0fdfa; }
+        .logs-toolbar .btn-export {
+            padding: 0.75rem 1.25rem;
+            background: var(--primary-color);
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            white-space: nowrap;
+            flex-shrink: 0;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .logs-toolbar .btn-export:hover:not(:disabled) { background: #4ca8a6; }
+        .logs-toolbar .btn-export:disabled { opacity: 0.55; cursor: not-allowed; }
         .log-photo {
             max-width: 280px;
             max-height: 200px;
@@ -443,7 +466,7 @@ require_once __DIR__ . '/db.php';
             body.sidebar-collapsed .main-wrapper { margin-left: 80px; }
             .modal-content { width: 95%; margin: 10% auto; padding: 1.5rem; }
             .logs-toolbar { flex-direction: column; align-items: stretch; }
-            .btn-campaign, .btn-cancel { width: 100%; justify-content: center; }
+            .btn-campaign, .btn-export, .btn-cancel { width: 100%; justify-content: center; }
         }
     </style>
     <link rel="stylesheet" href="css/mobile-responsive.css">
@@ -610,9 +633,15 @@ require_once __DIR__ . '/db.php';
                     <div class="search-box">
                         <input type="text" id="searchInput" placeholder="Search patrol logs by date, BPSO personnel, or incident..." onkeyup="filterLogs()">
                     </div>
+                    <button type="button" class="btn-export export-enter-only" id="btnEnterLogExportSelect" onclick="enterLogExportSelectMode()">
+                        <i class="fas fa-file-export"></i> Export
+                    </button>
+                    <button type="button" class="btn-export export-select-only" id="btnExportSelectedLogs" onclick="exportSelectedLogs()" disabled>
+                        <i class="fas fa-file-export"></i> Export Selected
+                    </button>
                     <button type="button" class="btn-campaign campaign-enter-only" id="btnEnterCampaignSelect" onclick="enterCampaignSelectMode()">Send to Campaign</button>
                     <button type="button" class="btn-campaign campaign-select-only" id="btnOpenCampaignForward" onclick="openCampaignForwardModal()" disabled>Send to Campaign</button>
-                    <button type="button" class="btn-cancel campaign-select-only" onclick="exitCampaignSelectMode()">Cancel</button>
+                    <button type="button" class="btn-cancel select-mode-only" onclick="exitActiveLogSelectMode()">Cancel</button>
                 </div>
                 <div class="table-container">
                     <table id="logsTable">
@@ -795,21 +824,75 @@ require_once __DIR__ . '/db.php';
             return total >= (22 * 60) || total < (8 * 60);
         }
 
-        function enterCampaignSelectMode() {
-            campaignSelectMode = true;
-            document.body.classList.add('campaign-select-mode');
+        function clearLogSelections() {
             const master = document.getElementById('selectAllLogs');
             if (master) master.checked = false;
             document.querySelectorAll('.log-select').forEach(function(cb) { cb.checked = false; });
+        }
+
+        function syncLogCheckboxAvailability() {
+            const exportMode = document.body.classList.contains('export-select-mode');
+            document.querySelectorAll('#logsTableBody tr[data-log-id]').forEach(function(row) {
+                const cb = row.querySelector('.log-select');
+                if (!cb) return;
+                const log = patrolLogData[row.getAttribute('data-log-id')];
+                cb.disabled = exportMode ? false : !!(log && log.campaign_forwarded_at);
+            });
+        }
+
+        function onLogSelectChange() {
+            updateCampaignButtonState();
+            updateLogExportButtonState();
+        }
+
+        function exitActiveLogSelectMode() {
+            if (document.body.classList.contains('export-select-mode')) {
+                exitLogExportSelectMode();
+            } else {
+                exitCampaignSelectMode();
+            }
+        }
+
+        function enterLogExportSelectMode() {
+            exitCampaignSelectMode();
+            document.body.classList.add('export-select-mode');
+            clearLogSelections();
+            syncLogCheckboxAvailability();
+            updateLogExportButtonState();
+        }
+
+        function exitLogExportSelectMode() {
+            document.body.classList.remove('export-select-mode');
+            clearLogSelections();
+            syncLogCheckboxAvailability();
+            updateLogExportButtonState();
+        }
+
+        function updateLogExportButtonState() {
+            const btn = document.getElementById('btnExportSelectedLogs');
+            if (!btn) return;
+            const selected = getSelectedLogIds().length;
+            const active = document.body.classList.contains('export-select-mode');
+            btn.disabled = !active || selected === 0;
+            btn.innerHTML = selected > 0
+                ? ('<i class="fas fa-file-export"></i> Export Selected (' + selected + ')')
+                : '<i class="fas fa-file-export"></i> Export Selected';
+        }
+
+        function enterCampaignSelectMode() {
+            exitLogExportSelectMode();
+            campaignSelectMode = true;
+            document.body.classList.add('campaign-select-mode');
+            clearLogSelections();
+            syncLogCheckboxAvailability();
             updateCampaignButtonState();
         }
 
         function exitCampaignSelectMode() {
             campaignSelectMode = false;
             document.body.classList.remove('campaign-select-mode');
-            const master = document.getElementById('selectAllLogs');
-            if (master) master.checked = false;
-            document.querySelectorAll('.log-select').forEach(function(cb) { cb.checked = false; });
+            clearLogSelections();
+            syncLogCheckboxAvailability();
             updateCampaignButtonState();
         }
 
@@ -825,7 +908,7 @@ require_once __DIR__ . '/db.php';
             document.querySelectorAll('.log-select:not(:disabled)').forEach(function(cb) {
                 cb.checked = master.checked;
             });
-            updateCampaignButtonState();
+            onLogSelectChange();
         }
 
         function getSelectedLogIds() {
@@ -876,7 +959,7 @@ require_once __DIR__ . '/db.php';
                         + (alreadySent ? '<span class="badge-sent">Sent to Campaign</span>' : '');
                     const disabledAttr = alreadySent ? ' disabled' : '';
                     return `<tr data-log-id="${row.id}">
-                        <td class="col-select"><input type="checkbox" class="log-select" value="${row.id}" onchange="updateCampaignButtonState()"${disabledAttr}></td>
+                        <td class="col-select"><input type="checkbox" class="log-select" value="${row.id}" onchange="onLogSelectChange()"${disabledAttr}></td>
                         <td>${escapeHtml(dateTime)}${badges}</td>
                         <td>${escapeHtml(row.personnel_name)}</td>
                         <td>${escapeHtml(row.route)}</td>
@@ -885,12 +968,13 @@ require_once __DIR__ . '/db.php';
                         <td>
                             <div class="action-buttons">
                                 <button class="btn-view" onclick="viewLog('${row.id}')">View</button>
-                                <button class="btn-export" onclick="exportLog('${row.id}')"><i class="fas fa-file-export"></i> Export</button>
                             </div>
                         </td>
                     </tr>`;
                 }).join('');
                 updateCampaignButtonState();
+                updateLogExportButtonState();
+                syncLogCheckboxAvailability();
             } catch (e) {
                 console.error('Error loading patrol logs:', e);
                 tableBody.innerHTML = '<tr class="empty-row"><td colspan="7" style="text-align:center;padding:2rem;color:#666;">Error loading patrol logs.</td></tr>';
@@ -1084,39 +1168,57 @@ require_once __DIR__ . '/db.php';
             }
         }
 
-        async function exportLog(id) {
-            const log = patrolLogData[id];
-            if (!log) {
-                alert('Log not found');
+        function logToExportSection(log) {
+            return {
+                fields: [
+                    { label: 'Date', value: log.date },
+                    { label: 'Time', value: log.time },
+                    { label: 'Officer', value: log.personnel_name },
+                    { label: 'Route', value: log.route },
+                    { label: 'Location', value: log.location },
+                    { label: 'Status', value: log.status },
+                    { label: 'Incidents', value: log.incidents || 'None' }
+                ],
+                blocks: [
+                    { label: 'Details', value: log.details || '' }
+                ],
+                images: [
+                    { label: 'Documentation Photo', src: log.documentation_photo || '' }
+                ]
+            };
+        }
+
+        async function exportSelectedLogs() {
+            if (!document.body.classList.contains('export-select-mode')) {
+                enterLogExportSelectMode();
+                return;
+            }
+            const ids = getSelectedLogIds();
+            if (!ids.length) {
+                alert('Please select at least one patrol log to export.');
+                return;
+            }
+            const logs = ids.map(function(id) { return patrolLogData[id]; }).filter(Boolean);
+            if (!logs.length) {
+                alert('Selected logs could not be found. Please refresh and try again.');
                 return;
             }
             if (!window.AlertaraReportExport) {
                 alert('Export helper not loaded. Please refresh the page.');
                 return;
             }
-
             try {
-                const fileName = 'patrol_log_' + String(log.personnel_name || 'officer').replace(/\s+/g, '_') + '_' + log.date + '.docx';
+                const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
+                const fileName = logs.length === 1
+                    ? ('patrol_log_' + String(logs[0].personnel_name || 'officer').replace(/\s+/g, '_') + '_' + logs[0].date + '.docx')
+                    : ('patrol_logs_' + logs.length + '_' + stamp + '.docx');
                 await AlertaraReportExport.downloadReport({
-                    title: 'PATROL LOG REPORT',
+                    title: logs.length > 1 ? 'PATROL LOG REPORTS' : 'PATROL LOG REPORT',
                     fileName: fileName,
-                    fields: [
-                        { label: 'Date', value: log.date },
-                        { label: 'Time', value: log.time },
-                        { label: 'Officer', value: log.personnel_name },
-                        { label: 'Route', value: log.route },
-                        { label: 'Location', value: log.location },
-                        { label: 'Status', value: log.status },
-                        { label: 'Incidents', value: log.incidents || 'None' }
-                    ],
-                    blocks: [
-                        { label: 'Details', value: log.details || '' }
-                    ],
-                    images: [
-                        { label: 'Documentation Photo', src: log.documentation_photo || '' }
-                    ]
+                    sections: logs.map(logToExportSection)
                 });
-                alert('Patrol log exported successfully as ' + fileName + '!');
+                exitLogExportSelectMode();
+                alert('Patrol log export saved as ' + fileName + '!');
             } catch (error) {
                 console.error('Error generating DOCX:', error);
                 alert(error.message || 'Error generating DOCX file. Please try again.');

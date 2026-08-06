@@ -1,5 +1,6 @@
 /**
- * Shared Alertara QC branded DOCX export (logo header + report layout).
+ * Shared Alertara QC branded DOCX export.
+ * Layout: circular logo (left) + centered brand/address, title, fields, watermark, Generated on.
  * Requires JSZip (global).
  */
 (function (global) {
@@ -9,9 +10,12 @@
     var BRAND_ADDRESS = 'Patnubay Street, Barangay San Agustin, Novaliches Quezon City, District 5, Quezon City';
     var BRAND_LOCATION = 'Barangay San Agustin, Quezon City';
     var LOGO_URL = 'images/alertara-export-logo.png';
+    var WATERMARK_URL = 'images/alertara-export-watermark.png';
+    var BRAND_COLOR = '5B9AA8';
     var NL = '\n';
 
     var logoCache = null;
+    var watermarkCache = null;
 
     function escapeXml(value) {
         if (value === null || value === undefined) return '';
@@ -26,9 +30,9 @@
     function fieldXml(label, value) {
         return (
             '        <w:p>' + NL +
-            '            <w:pPr><w:spacing w:after="80"/></w:pPr>' + NL +
-            '            <w:r><w:rPr><w:b/></w:rPr><w:t>' + escapeXml(label) + ':</w:t></w:r>' + NL +
-            '            <w:r><w:t xml:space="preserve"> ' + escapeXml(value == null || value === '' ? '—' : value) + '</w:t></w:r>' + NL +
+            '            <w:pPr><w:spacing w:after="60" w:line="276" w:lineRule="auto"/></w:pPr>' + NL +
+            '            <w:r><w:rPr><w:b/><w:sz w:val="22"/><w:szCs w:val="22"/></w:rPr><w:t>' + escapeXml(label) + ':</w:t></w:r>' + NL +
+            '            <w:r><w:rPr><w:sz w:val="22"/><w:szCs w:val="22"/></w:rPr><w:t xml:space="preserve"> ' + escapeXml(value == null || value === '' ? '—' : value) + '</w:t></w:r>' + NL +
             '        </w:p>' + NL
         );
     }
@@ -36,12 +40,12 @@
     function blockXml(label, value) {
         return (
             '        <w:p>' + NL +
-            '            <w:pPr><w:spacing w:before="280" w:after="80"/></w:pPr>' + NL +
-            '            <w:r><w:rPr><w:b/></w:rPr><w:t>' + escapeXml(label) + ':</w:t></w:r>' + NL +
+            '            <w:pPr><w:spacing w:before="360" w:after="120"/></w:pPr>' + NL +
+            '            <w:r><w:rPr><w:b/><w:sz w:val="22"/><w:szCs w:val="22"/></w:rPr><w:t>' + escapeXml(label) + ':</w:t></w:r>' + NL +
             '        </w:p>' + NL +
             '        <w:p>' + NL +
-            '            <w:pPr><w:spacing w:after="120"/></w:pPr>' + NL +
-            '            <w:r><w:t>' + escapeXml(value == null || value === '' ? '—' : value) + '</w:t></w:r>' + NL +
+            '            <w:pPr><w:spacing w:after="120" w:line="276" w:lineRule="auto"/></w:pPr>' + NL +
+            '            <w:r><w:rPr><w:sz w:val="22"/><w:szCs w:val="22"/></w:rPr><w:t>' + escapeXml(value == null || value === '' ? '—' : value) + '</w:t></w:r>' + NL +
             '        </w:p>' + NL
         );
     }
@@ -72,49 +76,67 @@
             '        <w:p>' + NL +
             '            <w:pPr>' + NL +
             '                <w:pBdr>' + NL +
-            '                    <w:bottom w:val="single" w:sz="12" w:space="1" w:color="B0B0B0"/>' + NL +
+            '                    <w:bottom w:val="single" w:sz="8" w:space="1" w:color="A0A0A0"/>' + NL +
             '                </w:pBdr>' + NL +
-            '                <w:spacing w:before="120" w:after="320"/>' + NL +
+            '                <w:spacing w:before="80" w:after="280"/>' + NL +
             '            </w:pPr>' + NL +
             '            <w:r><w:t></w:t></w:r>' + NL +
             '        </w:p>' + NL
         );
     }
 
-    function inlineImageXml(rId, name, cx, cy) {
+    function pictureDrawing(rId, name, cx, cy, docPrId, behindDoc) {
+        var wrap = behindDoc
+            ? (
+                '                    <wp:anchor distT="0" distB="0" distL="0" distR="0" simplePos="0" relativeHeight="0" behindDoc="1" locked="0" layoutInCell="1" allowOverlap="1">' + NL +
+                '                        <wp:simplePos x="0" y="0"/>' + NL +
+                '                        <wp:positionH relativeFrom="page"><wp:align>center</wp:align></wp:positionH>' + NL +
+                '                        <wp:positionV relativeFrom="page"><wp:align>center</wp:align></wp:positionV>' + NL +
+                '                        <wp:extent cx="' + cx + '" cy="' + cy + '"/>' + NL +
+                '                        <wp:effectExtent l="0" t="0" r="0" b="0"/>' + NL +
+                '                        <wp:wrapNone/>' + NL +
+                '                        <wp:docPr id="' + docPrId + '" name="' + escapeXml(name) + '"/>' + NL +
+                '                        <a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">' + NL +
+                '                            <a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">' + NL +
+                '                                <pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture">' + NL +
+                '                                    <pic:nvPicPr><pic:cNvPr id="0" name="' + escapeXml(name) + '"/><pic:cNvPicPr/></pic:nvPicPr>' + NL +
+                '                                    <pic:blipFill><a:blip r:embed="' + rId + '"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill>' + NL +
+                '                                    <pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="' + cx + '" cy="' + cy + '"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr>' + NL +
+                '                                </pic:pic>' + NL +
+                '                            </a:graphicData>' + NL +
+                '                        </a:graphic>' + NL +
+                '                    </wp:anchor>'
+            )
+            : (
+                '                    <wp:inline distT="0" distB="0" distL="0" distR="0">' + NL +
+                '                        <wp:extent cx="' + cx + '" cy="' + cy + '"/>' + NL +
+                '                        <wp:docPr id="' + docPrId + '" name="' + escapeXml(name) + '"/>' + NL +
+                '                        <a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">' + NL +
+                '                            <a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">' + NL +
+                '                                <pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture">' + NL +
+                '                                    <pic:nvPicPr><pic:cNvPr id="0" name="' + escapeXml(name) + '"/><pic:cNvPicPr/></pic:nvPicPr>' + NL +
+                '                                    <pic:blipFill><a:blip r:embed="' + rId + '"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill>' + NL +
+                '                                    <pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="' + cx + '" cy="' + cy + '"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr>' + NL +
+                '                                </pic:pic>' + NL +
+                '                            </a:graphicData>' + NL +
+                '                        </a:graphic>' + NL +
+                '                    </wp:inline>'
+            );
+
         return (
             '        <w:p>' + NL +
+            '            <w:pPr><w:spacing w:before="0" w:after="0"/></w:pPr>' + NL +
             '            <w:r>' + NL +
             '                <w:drawing>' + NL +
-            '                    <wp:inline distT="0" distB="0" distL="0" distR="0">' + NL +
-            '                        <wp:extent cx="' + cx + '" cy="' + cy + '"/>' + NL +
-            '                        <wp:docPr id="' + Math.floor(Math.random() * 9000 + 100) + '" name="' + escapeXml(name) + '"/>' + NL +
-            '                        <a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">' + NL +
-            '                            <a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">' + NL +
-            '                                <pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture">' + NL +
-            '                                    <pic:nvPicPr>' + NL +
-            '                                        <pic:cNvPr id="0" name="' + escapeXml(name) + '"/>' + NL +
-            '                                        <pic:cNvPicPr/>' + NL +
-            '                                    </pic:nvPicPr>' + NL +
-            '                                    <pic:blipFill>' + NL +
-            '                                        <a:blip r:embed="' + rId + '"/>' + NL +
-            '                                        <a:stretch><a:fillRect/></a:stretch>' + NL +
-            '                                    </pic:blipFill>' + NL +
-            '                                    <pic:spPr>' + NL +
-            '                                        <a:xfrm>' + NL +
-            '                                            <a:off x="0" y="0"/>' + NL +
-            '                                            <a:ext cx="' + cx + '" cy="' + cy + '"/>' + NL +
-            '                                        </a:xfrm>' + NL +
-            '                                        <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>' + NL +
-            '                                    </pic:spPr>' + NL +
-            '                                </pic:pic>' + NL +
-            '                            </a:graphicData>' + NL +
-            '                        </a:graphic>' + NL +
-            '                    </wp:inline>' + NL +
+            wrap + NL +
             '                </w:drawing>' + NL +
             '            </w:r>' + NL +
             '        </w:p>' + NL
         );
+    }
+
+    function inlineImageXml(rId, name, cx, cy) {
+        return pictureDrawing(rId, name, cx, cy, Math.floor(Math.random() * 9000 + 100), false);
     }
 
     function bytesFromBase64(b64) {
@@ -127,7 +149,7 @@
     }
 
     async function fetchAsBytes(url) {
-        var response = await fetch(url);
+        var response = await fetch(url + (url.indexOf('?') >= 0 ? '&' : '?') + 'v=' + Date.now());
         if (!response.ok) throw new Error('Failed to load ' + url);
         var buffer = await response.arrayBuffer();
         return new Uint8Array(buffer);
@@ -141,15 +163,34 @@
                 bytes: bytes,
                 ext: 'png',
                 mime: 'image/png',
-                // ~0.85 inch square
-                cx: 777240,
-                cy: 777240
+                // ~0.95 inch circle
+                cx: 868680,
+                cy: 868680
             };
         } catch (e) {
             console.warn('Alertara export logo unavailable:', e);
             logoCache = null;
         }
         return logoCache;
+    }
+
+    async function loadWatermarkPart() {
+        if (watermarkCache) return watermarkCache;
+        try {
+            var bytes = await fetchAsBytes(WATERMARK_URL);
+            watermarkCache = {
+                bytes: bytes,
+                ext: 'png',
+                mime: 'image/png',
+                // ~4.2 inch watermark
+                cx: 3840480,
+                cy: 3840480
+            };
+        } catch (e) {
+            console.warn('Alertara export watermark unavailable:', e);
+            watermarkCache = null;
+        }
+        return watermarkCache;
     }
 
     async function decodeDataImage(src) {
@@ -181,7 +222,7 @@
             heightPx = dims.height;
         } catch (e) { /* defaults */ }
 
-        var maxWidthEmu = 5486400; // 6 inches
+        var maxWidthEmu = 5486400;
         var ratio = heightPx / Math.max(widthPx, 1);
         return {
             bytes: bytes,
@@ -193,32 +234,13 @@
     }
 
     function buildHeaderXml(logoRId, logoCx, logoCy) {
-        var brandCell =
-            '                    <w:tc>' + NL +
-            '                        <w:tcPr><w:tcW w:w="7200" w:type="dxa"/></w:tcPr>' + NL +
-            '                        <w:p>' + NL +
-            '                            <w:pPr><w:jc w:val="center"/><w:spacing w:after="40"/></w:pPr>' + NL +
-            '                            <w:r>' + NL +
-            '                                <w:rPr><w:b/><w:color w:val="5B9BD5"/><w:sz w:val="36"/><w:szCs w:val="36"/></w:rPr>' + NL +
-            '                                <w:t>' + escapeXml(BRAND_NAME) + '</w:t>' + NL +
-            '                            </w:r>' + NL +
-            '                        </w:p>' + NL +
-            '                        <w:p>' + NL +
-            '                            <w:pPr><w:jc w:val="center"/><w:spacing w:after="0"/></w:pPr>' + NL +
-            '                            <w:r>' + NL +
-            '                                <w:rPr><w:color w:val="666666"/><w:sz w:val="16"/><w:szCs w:val="16"/></w:rPr>' + NL +
-            '                                <w:t>' + escapeXml(BRAND_ADDRESS) + '</w:t>' + NL +
-            '                            </w:r>' + NL +
-            '                        </w:p>' + NL +
-            '                    </w:tc>' + NL;
-
         var logoCell;
         if (logoRId) {
             logoCell =
                 '                    <w:tc>' + NL +
-                '                        <w:tcPr><w:tcW w:w="1200" w:type="dxa"/><w:vAlign w:val="center"/></w:tcPr>' + NL +
+                '                        <w:tcPr><w:tcW w:w="1400" w:type="dxa"/><w:vAlign w:val="center"/></w:tcPr>' + NL +
                 '                        <w:p>' + NL +
-                '                            <w:pPr><w:jc w:val="left"/></w:pPr>' + NL +
+                '                            <w:pPr><w:jc w:val="center"/><w:spacing w:before="0" w:after="0"/></w:pPr>' + NL +
                 '                            <w:r>' + NL +
                 '                                <w:drawing>' + NL +
                 '                                    <wp:inline distT="0" distB="0" distL="0" distR="0">' + NL +
@@ -241,14 +263,33 @@
         } else {
             logoCell =
                 '                    <w:tc>' + NL +
-                '                        <w:tcPr><w:tcW w:w="1200" w:type="dxa"/></w:tcPr>' + NL +
+                '                        <w:tcPr><w:tcW w:w="1400" w:type="dxa"/></w:tcPr>' + NL +
                 '                        <w:p><w:r><w:t></w:t></w:r></w:p>' + NL +
                 '                    </w:tc>' + NL;
         }
 
+        var brandCell =
+            '                    <w:tc>' + NL +
+            '                        <w:tcPr><w:tcW w:w="6800" w:type="dxa"/><w:vAlign w:val="center"/></w:tcPr>' + NL +
+            '                        <w:p>' + NL +
+            '                            <w:pPr><w:jc w:val="center"/><w:spacing w:after="40"/></w:pPr>' + NL +
+            '                            <w:r>' + NL +
+            '                                <w:rPr><w:b/><w:color w:val="' + BRAND_COLOR + '"/><w:sz w:val="40"/><w:szCs w:val="40"/></w:rPr>' + NL +
+            '                                <w:t>' + escapeXml(BRAND_NAME) + '</w:t>' + NL +
+            '                            </w:r>' + NL +
+            '                        </w:p>' + NL +
+            '                        <w:p>' + NL +
+            '                            <w:pPr><w:jc w:val="center"/><w:spacing w:after="0"/></w:pPr>' + NL +
+            '                            <w:r>' + NL +
+            '                                <w:rPr><w:color w:val="777777"/><w:sz w:val="16"/><w:szCs w:val="16"/></w:rPr>' + NL +
+            '                                <w:t>' + escapeXml(BRAND_ADDRESS) + '</w:t>' + NL +
+            '                            </w:r>' + NL +
+            '                        </w:p>' + NL +
+            '                    </w:tc>' + NL;
+
         var spacerCell =
             '                    <w:tc>' + NL +
-            '                        <w:tcPr><w:tcW w:w="1200" w:type="dxa"/></w:tcPr>' + NL +
+            '                        <w:tcPr><w:tcW w:w="1400" w:type="dxa"/></w:tcPr>' + NL +
             '                        <w:p><w:r><w:t></w:t></w:r></w:p>' + NL +
             '                    </w:tc>' + NL;
 
@@ -261,7 +302,7 @@
             '                    <w:insideH w:val="nil"/><w:insideV w:val="nil"/>' + NL +
             '                </w:tblBorders>' + NL +
             '            </w:tblPr>' + NL +
-            '            <w:tblGrid><w:gridCol w:w="1200"/><w:gridCol w:w="7200"/><w:gridCol w:w="1200"/></w:tblGrid>' + NL +
+            '            <w:tblGrid><w:gridCol w:w="1400"/><w:gridCol w:w="6800"/><w:gridCol w:w="1400"/></w:tblGrid>' + NL +
             '            <w:tr>' + NL +
             logoCell +
             brandCell +
@@ -272,11 +313,8 @@
         );
     }
 
-    function sectionBodyXml(section, mediaRelsStart) {
+    function sectionBodyXml(section) {
         var xml = '';
-        var mediaParts = [];
-        var relId = mediaRelsStart;
-
         if (section.fields && section.fields.length) {
             section.fields.forEach(function (f) {
                 xml += fieldXml(f.label, f.value);
@@ -287,13 +325,10 @@
                 xml += blockXml(b.label, b.value);
             });
         }
-
-        // Images are resolved async before this; pass prebuilt imageXml via section._imageXml
         if (section._imageXml) {
             xml += section._imageXml;
         }
-
-        return { xml: xml, mediaParts: mediaParts, nextRelId: relId };
+        return { xml: xml };
     }
 
     async function prepareSectionImages(section, startRelNum) {
@@ -301,8 +336,8 @@
         var mediaFiles = [];
         var rels = [];
         var n = startRelNum;
-
         var images = section.images || [];
+
         for (var i = 0; i < images.length; i++) {
             var img = images[i];
             var label = img.label || 'Attachment';
@@ -313,8 +348,7 @@
                 '            <w:r><w:rPr><w:b/></w:rPr><w:t>' + escapeXml(label) + ':</w:t></w:r>' + NL +
                 '        </w:p>' + NL;
             if (!part) {
-                imageXml +=
-                    '        <w:p><w:r><w:t>No photo uploaded</w:t></w:r></w:p>' + NL;
+                imageXml += '        <w:p><w:r><w:t>No photo uploaded</w:t></w:r></w:p>' + NL;
                 continue;
             }
             var rId = 'rIdImg' + n;
@@ -339,16 +373,6 @@
         URL.revokeObjectURL(link.href);
     }
 
-    /**
-     * @param {Object} options
-     * @param {string} options.title - Main report title (e.g. PATROL LOG REPORT)
-     * @param {string} [options.subtitle]
-     * @param {string} options.fileName
-     * @param {Array<{label:string,value:string}>} [options.fields]
-     * @param {Array<{label:string,value:string}>} [options.blocks]
-     * @param {Array<{label:string,src:string}>} [options.images]
-     * @param {Array<Object>} [options.sections] - Multiple reports in one file
-     */
     async function downloadReport(options) {
         if (typeof JSZip === 'undefined') {
             throw new Error('Export library not loaded. Please refresh the page.');
@@ -369,6 +393,7 @@
 
         var zip = new JSZip();
         var logo = await loadLogoPart();
+        var watermark = await loadWatermarkPart();
         var mediaFiles = [];
         var imageRels = [];
         var contentTypeDefaults = {};
@@ -377,6 +402,11 @@
         if (logo) {
             mediaFiles.push({ path: 'word/media/logo.png', bytes: logo.bytes, ext: 'png', mime: 'image/png' });
             imageRels.push({ id: 'rIdLogo', target: 'media/logo.png' });
+            contentTypeDefaults.png = 'image/png';
+        }
+        if (watermark) {
+            mediaFiles.push({ path: 'word/media/watermark.png', bytes: watermark.bytes, ext: 'png', mime: 'image/png' });
+            imageRels.push({ id: 'rIdWatermark', target: 'media/watermark.png' });
             contentTypeDefaults.png = 'image/png';
         }
 
@@ -392,9 +422,13 @@
             });
         }
 
-        var body = buildHeaderXml(logo ? 'rIdLogo' : null, logo ? logo.cx : 0, logo ? logo.cy : 0);
-        body += centeredPara(title, { bold: true, size: 32, after: 120, color: '000000' });
-        body += centeredPara(subtitle, { size: 20, after: 400, color: '333333' });
+        var body = '';
+        if (watermark) {
+            body += pictureDrawing('rIdWatermark', 'Watermark', watermark.cx, watermark.cy, 99, true);
+        }
+        body += buildHeaderXml(logo ? 'rIdLogo' : null, logo ? logo.cx : 0, logo ? logo.cy : 0);
+        body += centeredPara(title, { bold: true, size: 36, after: 80, before: 80, color: '000000' });
+        body += centeredPara(subtitle, { size: 20, after: 360, color: '333333' });
 
         for (var i = 0; i < sections.length; i++) {
             if (i > 0) {
@@ -407,14 +441,13 @@
             if (sections[i].heading) {
                 body += centeredPara(sections[i].heading, { bold: true, size: 24, after: 200 });
             }
-            var built = sectionBodyXml(sections[i], 0);
-            body += built.xml;
+            body += sectionBodyXml(sections[i]).xml;
         }
 
         body +=
             '        <w:p>' + NL +
-            '            <w:pPr><w:jc w:val="right"/><w:spacing w:before="600"/></w:pPr>' + NL +
-            '            <w:r><w:rPr><w:b/></w:rPr><w:t>Generated on: ' + escapeXml(new Date().toLocaleString()) + '</w:t></w:r>' + NL +
+            '            <w:pPr><w:jc w:val="right"/><w:spacing w:before="720"/></w:pPr>' + NL +
+            '            <w:r><w:rPr><w:b/><w:sz w:val="20"/><w:szCs w:val="20"/></w:rPr><w:t>Generated on: ' + escapeXml(new Date().toLocaleString()) + '</w:t></w:r>' + NL +
             '        </w:p>' + NL;
 
         var xmlDecl = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' + NL;
@@ -441,7 +474,7 @@
             body +
             '        <w:sectPr>' + NL +
             '            <w:pgSz w:w="12240" w:h="15840"/>' + NL +
-            '            <w:pgMar w:top="720" w:right="720" w:bottom="720" w:left="720"/>' + NL +
+            '            <w:pgMar w:top="720" w:right="864" w:bottom="720" w:left="864"/>' + NL +
             '        </w:sectPr>' + NL +
             '    </w:body>' + NL +
             '</w:document>';
@@ -449,7 +482,10 @@
         var stylesXml =
             xmlDecl +
             '<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">' + NL +
-            '    <w:style w:type="paragraph" w:styleId="Normal">' + NL +
+            '    <w:docDefaults>' + NL +
+            '        <w:rPrDefault><w:rPr><w:rFonts w:ascii="Calibri" w:hAnsi="Calibri" w:cs="Calibri"/><w:sz w:val="22"/><w:szCs w:val="22"/></w:rPr></w:rPrDefault>' + NL +
+            '    </w:docDefaults>' + NL +
+            '    <w:style w:type="paragraph" w:styleId="Normal" w:default="1">' + NL +
             '        <w:name w:val="Normal"/><w:qFormat/>' + NL +
             '    </w:style>' + NL +
             '</w:styles>';
