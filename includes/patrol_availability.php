@@ -108,9 +108,12 @@ function resolvePatrolAvailabilityStatus(PDO $pdo, int $patrolId, ?string $store
     }
 
     // Partner simulation lifecycle sets On Patrol while a drill is ongoing.
-    // Preserve it — do not let scheduled routes / stale cleanup overwrite it.
+    // Only keep it when this officer is still on an open (non-completed) request.
     if ($stored === 'On Patrol') {
-        return 'On Patrol';
+        if (patrolHasOpenAssignedRequest($pdo, $patrolId)) {
+            return 'On Patrol';
+        }
+        // Stale On Patrol with no in-progress schedule and no open request → fall through.
     }
 
     // After simulation complete: stay On Reporting until this officer submits a report.
@@ -119,7 +122,10 @@ function resolvePatrolAvailabilityStatus(PDO $pdo, int $patrolId, ?string $store
     }
 
     if ($stored === 'Assigned to Simulation') {
-        return 'Assigned to Simulation';
+        if (patrolHasOpenAssignedRequest($pdo, $patrolId)) {
+            return 'Assigned to Simulation';
+        }
+        // Stale simulation assignment → fall through.
     }
 
     // Upcoming / open scheduled patrol assignment
@@ -172,12 +178,51 @@ function resolvePatrolAvailabilityStatus(PDO $pdo, int $patrolId, ?string $store
         // ignore
     }
 
-    if ($stored === 'Assigned') {
-        // Stale Assigned with no live work → Available
+    if (in_array($stored, ['Assigned', 'On Patrol', 'Assigned to Simulation'], true)) {
+        // Stale status with no live work → Available
         return 'Available';
     }
 
     return $stored === 'Available' ? 'Available' : $stored;
+}
+
+/**
+ * True when this patrol is assigned to an open partner request (simulation / event).
+ */
+function patrolHasOpenAssignedRequest(PDO $pdo, int $patrolId): bool
+{
+    if ($patrolId <= 0) {
+        return false;
+    }
+
+    try {
+        $stmt = $pdo->query(
+            "SELECT assigned_patrol_ids FROM patrol_requests
+             WHERE status NOT IN ('Completed', 'Cancelled', 'Rejected', 'Closed')"
+        );
+        if (!$stmt) {
+            return false;
+        }
+        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+            $raw = $row['assigned_patrol_ids'] ?? '';
+            if ($raw === '' || $raw === null) {
+                continue;
+            }
+            $ids = json_decode((string) $raw, true);
+            if (!is_array($ids)) {
+                continue;
+            }
+            foreach ($ids as $id) {
+                if ((int) $id === $patrolId) {
+                    return true;
+                }
+            }
+        }
+    } catch (PDOException $e) {
+        return false;
+    }
+
+    return false;
 }
 
 /**
