@@ -70,9 +70,15 @@ Triggered in admin **Track Complaint → Forward**.
 | | |
 |---|---|
 | Partner URL env | `INCIDENT_REPORTING_API_URL` (legacy: `BLOTTER_API_URL`) |
-| API key | `INCIDENT_REPORTING_API_KEY` (legacy: `BLOTTER_API_KEY`) |
+| Live partner URL | `https://report.alertaraqc.com/api/api.php?action=create_blotter` |
+| API key | `INCIDENT_REPORTING_API_KEY` (legacy: `BLOTTER_API_KEY`; optional if their endpoint is open) |
 | Payload builder | `includes/blotter_forward.php` |
 | Local test receiver | `POST /api/blotter_receive.php` |
+
+Required by their `create_blotter` action: `complainant_name`, `incident_type`.  
+AlertaraQC also sends nested + flat complaint fields (location, description/narrative, defendant, contacts, source ids).
+
+Their success response uses `status: "success"` (and often `blotter_no`); AlertaraQC also accepts `success: true` / `blotter_reference_id`.
 
 Fields sent: complainant name/address/contact, date & time, defendant name/address/contact, complaint type, specify type, status description, notes.
 
@@ -169,9 +175,12 @@ AlertaraQC **sends** tips to Incident Reporting when admin clicks send.
 | | |
 |---|---|
 | Partner URL env | `INCIDENT_REPORTING_TIP_API_URL` (falls back to `INCIDENT_REPORTING_API_URL`; legacy: `TIP_BLOTTER_API_URL` / `BLOTTER_API_URL`) |
+| Live partner URL | `https://report.alertaraqc.com/api/api.php?action=create_blotter` (no dedicated tip write action yet) |
 | API key | `INCIDENT_REPORTING_API_KEY` |
 | Trigger | Admin Review Tip → Send to Incident Reporting (`api/send_to_incident_reporting.php`) |
 | Local test receiver | `POST /api/tip_incident_receive.php` |
+
+Tips are logged on IR as blotters with `incident_type: "Community Tip"` plus `complainant_name` / `location` / `narrative`.
 
 Outbound fields include: Tip ID, Date & Time, Location, Tip Description, Status, Outcome, and photo evidence:
 

@@ -4,8 +4,10 @@
  * Forward CCTV evidence packages to Incident Reporting.
  *
  * Configure in .env (preferred + legacy):
- *   CCTV_EVIDENCE_API_URL=   (optional; falls back to INCIDENT_REPORTING_API_URL / BLOTTER_API_URL)
+ *   CCTV_EVIDENCE_API_URL=   (required for CCTV evidence outbound; IR has not published a receive action yet)
  *   INCIDENT_REPORTING_API_KEY= (legacy: BLOTTER_API_KEY)
+ *
+ * Do not point this at action=create_blotter — that endpoint expects complainant_name / incident_type.
  */
 
 require_once __DIR__ . '/../api/recordings_helpers.php';
@@ -169,7 +171,7 @@ function forwardCctvEvidenceToIncidentReporting(array $request): array
     if ($config['url'] === '') {
         return [
             'success' => false,
-            'message' => 'CCTV Evidence API is not configured. Set CCTV_EVIDENCE_API_URL or INCIDENT_REPORTING_API_URL in .env.',
+            'message' => 'CCTV Evidence API is not configured. Set CCTV_EVIDENCE_API_URL in .env (Incident Reporting must publish a dedicated evidence receive endpoint).',
         ];
     }
 
@@ -234,7 +236,7 @@ function forwardCctvEvidenceToIncidentReporting(array $request): array
         ];
     }
 
-    if (empty($decoded['success'])) {
+    if (!partnerApiResponseSucceeded($decoded)) {
         return [
             'success' => false,
             'message' => trim($decoded['message'] ?? $decoded['error'] ?? 'CCTV Evidence API rejected the package.'),
@@ -242,9 +244,7 @@ function forwardCctvEvidenceToIncidentReporting(array $request): array
         ];
     }
 
-    $referenceId = trim(
-        (string) ($decoded['evidence_reference_id'] ?? $decoded['blotter_reference_id'] ?? $decoded['reference_id'] ?? $decoded['id'] ?? '')
-    );
+    $referenceId = partnerApiReferenceId($decoded, ['evidence_reference_id']);
 
     return [
         'success' => true,

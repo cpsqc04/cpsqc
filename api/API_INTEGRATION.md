@@ -94,10 +94,24 @@ Inbound partner APIs on AlertaraQC are **public** (no keys). Configure outbound 
 | `INCIDENT_REPORTING_API_KEY` | Shared key when AlertaraQC calls Incident Reporting (legacy: `BLOTTER_API_KEY`) |
 | `INCIDENT_REPORTING_API_URL` | AlertaraQC → Incident Reporting complaint (legacy: `BLOTTER_API_URL`) |
 | `INCIDENT_REPORTING_TIP_API_URL` | AlertaraQC → Incident Reporting tip (legacy: `TIP_BLOTTER_API_URL`) |
+| `CCTV_EVIDENCE_API_URL` | AlertaraQC → Incident Reporting CCTV evidence (no blotter-URL fallback) |
 | `EMERGENCY_RESPONSE_API_KEY` | Emergency Response police backup (legacy: `GROUP3_API_KEY`) |
 | `EMERGENCY_RESPONSE_API_URL` | AlertaraQC → Emergency Response (legacy: `GROUP3_API_URL`) |
 | `INCIDENT_REPORTING_API_TIMEOUT` | Outbound timeout seconds (default 30; legacy: `BLOTTER_API_TIMEOUT`) |
 | `EMERGENCY_RESPONSE_API_TIMEOUT` | Outbound timeout seconds (default 30; legacy: `GROUP3_API_TIMEOUT`) |
+
+### Production Incident Reporting (`report.alertaraqc.com`)
+
+| Flow | URL |
+|------|-----|
+| Catalog / dump | `GET https://report.alertaraqc.com/api/api.php?action=all` |
+| Modules | `GET https://report.alertaraqc.com/api/api.php?action=modules` |
+| Digital Blotter create | `POST https://report.alertaraqc.com/api/api.php?action=create_blotter` |
+| Tips (interim) | Same `create_blotter` URL (`incident_type=Community Tip`) |
+| CCTV evidence return | Not published yet — set `CCTV_EVIDENCE_API_URL` when IR provides it |
+| CCTV request (inbound to us) | They call our `POST /api/cctv_requests_receive.php` |
+
+`create_blotter` requires `complainant_name` and `incident_type`. Responses use `status: "success"` and often `blotter_no` (AlertaraQC also accepts `success: true` / `blotter_reference_id`).
 
 ### Local testing example
 
@@ -105,6 +119,7 @@ Inbound partner APIs on AlertaraQC are **public** (no keys). Configure outbound 
 INCIDENT_REPORTING_API_KEY=test-incident-reporting-key
 INCIDENT_REPORTING_API_URL=http://localhost/cpsqc-main/api/blotter_receive.php
 INCIDENT_REPORTING_TIP_API_URL=http://localhost/cpsqc-main/api/tip_incident_receive.php
+CCTV_EVIDENCE_API_URL=http://localhost/cpsqc-main/api/cctv_evidence_receive.php
 
 EMERGENCY_RESPONSE_API_KEY=test-emergency-response-key
 EMERGENCY_RESPONSE_API_URL=http://localhost/cpsqc-main/api/coordination_receive.php
@@ -433,7 +448,7 @@ When a CCTV request is approved, BPSO admin can send matching recording segments
 | | |
 |---|---|
 | **Admin trigger** | `POST /api/send_cctv_to_incident_reporting.php` (admin session) |
-| **Outbound URL** | `CCTV_EVIDENCE_API_URL` (falls back to `INCIDENT_REPORTING_API_URL`) |
+| **Outbound URL** | `CCTV_EVIDENCE_API_URL` (required; no blotter-URL fallback) |
 | **API key** | `INCIDENT_REPORTING_API_KEY` |
 | **Reference receiver (local test)** | `POST /api/cctv_evidence_receive.php` |
 | **Partner download** | `GET /api/cctv_evidence_download.php?request_id=...&file=...&api_key=...` |
@@ -935,7 +950,7 @@ Matches Emergency Response `anonymous_tip.php`-style fields. Tip photo is sent i
 | CCTV partner | Partner → AlertaraQC (list) | `GET /api/cctv_requests.php` | Public |
 | Incident Reporting (tips) | AlertaraQC → Partner | Partner hosts URL (`INCIDENT_REPORTING_TIP_API_URL`) | `INCIDENT_REPORTING_API_KEY` |
 | Incident Reporting (complaints) | AlertaraQC → Partner | Partner hosts URL (`INCIDENT_REPORTING_API_URL`) | `INCIDENT_REPORTING_API_KEY` |
-| Incident Reporting (CCTV evidence) | AlertaraQC → Partner | Partner hosts URL (`CCTV_EVIDENCE_API_URL` or `INCIDENT_REPORTING_API_URL`) | `INCIDENT_REPORTING_API_KEY` |
+| Incident Reporting (CCTV evidence) | AlertaraQC → Partner | Partner hosts URL (`CCTV_EVIDENCE_API_URL`) | `INCIDENT_REPORTING_API_KEY` |
 | Incident Reporting (CCTV download) | Partner → AlertaraQC | `GET /api/cctv_evidence_download.php` | `INCIDENT_REPORTING_API_KEY` |
 | Emergency Response (backup) | AlertaraQC → Partner | Partner hosts URL (`EMERGENCY_RESPONSE_API_URL`) | `EMERGENCY_RESPONSE_API_KEY` |
 | Crime Analytics (alerts) | Partner → AlertaraQC | `POST /api/crime_analytics_alerts_receive.php` | Public |

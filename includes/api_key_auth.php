@@ -77,6 +77,7 @@ function partnerEnvKeyCandidates(string $partner): array
 function getIncidentReportingApiConfig(): array
 {
     return [
+        // Live IR write API: https://report.alertaraqc.com/api/api.php?action=create_blotter
         'url' => envFirst('INCIDENT_REPORTING_API_URL', 'BLOTTER_API_URL'),
         'tip_url' => envFirst(
             'INCIDENT_REPORTING_TIP_API_URL',
@@ -84,14 +85,58 @@ function getIncidentReportingApiConfig(): array
             'INCIDENT_REPORTING_API_URL',
             'BLOTTER_API_URL'
         ),
-        'cctv_evidence_url' => envFirst(
-            'CCTV_EVIDENCE_API_URL',
-            'INCIDENT_REPORTING_API_URL',
-            'BLOTTER_API_URL'
-        ),
+        // Do not fall back to blotter URL — create_blotter rejects CCTV evidence payloads.
+        'cctv_evidence_url' => envFirst('CCTV_EVIDENCE_API_URL'),
         'api_key' => envFirst('INCIDENT_REPORTING_API_KEY', 'BLOTTER_API_KEY'),
         'timeout' => max(5, (int) envFirst('INCIDENT_REPORTING_API_TIMEOUT', 'BLOTTER_API_TIMEOUT', '30')),
     ];
+}
+
+/**
+ * Partner APIs may return success:true (AlertaraQC contract) or status:"success" (report.alertaraqc.com).
+ */
+function partnerApiResponseSucceeded(array $decoded): bool
+{
+    if (!empty($decoded['success'])) {
+        return true;
+    }
+
+    $status = strtolower(trim((string) ($decoded['status'] ?? '')));
+
+    return in_array($status, ['success', 'ok', 'true'], true);
+}
+
+/**
+ * Extract a partner reference id from common top-level or data{} keys.
+ */
+function partnerApiReferenceId(array $decoded, array $extraKeys = []): string
+{
+    $keys = array_merge([
+        'blotter_reference_id',
+        'incident_reference_id',
+        'evidence_reference_id',
+        'reference_id',
+        'blotter_no',
+        'case_no',
+        'id',
+    ], $extraKeys);
+
+    $sources = [$decoded];
+    if (isset($decoded['data']) && is_array($decoded['data'])) {
+        $sources[] = $decoded['data'];
+    }
+
+    foreach ($sources as $source) {
+        foreach ($keys as $key) {
+            if (!array_key_exists($key, $source) || $source[$key] === null || $source[$key] === '') {
+                continue;
+            }
+
+            return trim((string) $source[$key]);
+        }
+    }
+
+    return '';
 }
 
 function getEmergencyResponseApiConfig(): array

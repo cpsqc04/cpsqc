@@ -4,13 +4,15 @@
  * Forward complaints from AlertaraQC to Incident Reporting (Digital Blotter) via HTTP API.
  *
  * Configure in .env (preferred + legacy):
- *   INCIDENT_REPORTING_API_URL=https://partner.example.com/api/blotter/receive
- *   INCIDENT_REPORTING_API_KEY=shared-secret-key
+ *   INCIDENT_REPORTING_API_URL=https://report.alertaraqc.com/api/api.php?action=create_blotter
+ *   INCIDENT_REPORTING_API_KEY=shared-secret-key (optional if their endpoint is open)
  *   INCIDENT_REPORTING_API_TIMEOUT=30
  *   Legacy: BLOTTER_API_URL, BLOTTER_API_KEY, BLOTTER_API_TIMEOUT
  *
- * Expected response (JSON):
+ * Their create_blotter requires: complainant_name, incident_type
+ * Accepted response shapes:
  *   { "success": true, "blotter_reference_id": "DB-2026-001", "message": "..." }
+ *   { "status": "success", "data": { "blotter_no": "BLT-..." }, "message": "..." }
  */
 
 require_once __DIR__ . '/../api/complaints_schema.php';
@@ -75,11 +77,19 @@ function buildBlotterForwardPayload(array $complaint): array
         'priority' => $complaint['priority'] ?? 'Low',
         'notes' => $notes,
         'submitted_at' => $complaint['submitted_at'] ?? null,
-        // Flat module labels for partner mapping (Track Complaint outbound)
+        // Flat fields for report.alertaraqc.com action=create_blotter
         'complainant_name' => $complaint['complainant_name'] ?? '',
         'complainant_address' => $complaint['address'] ?? '',
         'complainant_contact_number' => $complaint['contact_number'] ?? '',
+        'contact_number' => $complaint['contact_number'] ?? '',
+        'address' => $complaint['address'] ?? '',
+        'location' => $complaint['location'] ?? '',
+        'incident_type' => $complaintType !== '' ? $complaintType : 'Other',
+        'incident_date' => $date,
+        'incident_time' => $time,
         'date_time' => trim($date . ' ' . $time),
+        'description' => $statusDescription,
+        'narrative' => $statusDescription,
         'defendant_name' => $complaint['defendant_name'] ?? '',
         'defendant_address' => $complaint['defendant_address'] ?? '',
         'defendant_contact_number' => $complaint['defendant_contact_number'] ?? '',
@@ -161,8 +171,7 @@ function forwardComplaintToBlotter(array $complaint): array
         ];
     }
 
-    $success = !empty($decoded['success']);
-    if (!$success) {
+    if (!partnerApiResponseSucceeded($decoded)) {
         return [
             'success' => false,
             'message' => trim($decoded['message'] ?? $decoded['error'] ?? 'Digital Blotter API rejected the complaint.'),
@@ -170,9 +179,7 @@ function forwardComplaintToBlotter(array $complaint): array
         ];
     }
 
-    $referenceId = trim(
-        (string) ($decoded['blotter_reference_id'] ?? $decoded['reference_id'] ?? $decoded['id'] ?? '')
-    );
+    $referenceId = partnerApiReferenceId($decoded);
 
     return [
         'success' => true,

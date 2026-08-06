@@ -4,7 +4,8 @@
  * Forward BPSO tips to Incident Reporting (tips / incident logging).
  *
  * Configure in .env (preferred + legacy):
- *   INCIDENT_REPORTING_TIP_API_URL=   (optional; falls back to INCIDENT_REPORTING_API_URL / TIP_BLOTTER_API_URL / BLOTTER_API_URL)
+ *   INCIDENT_REPORTING_TIP_API_URL=https://report.alertaraqc.com/api/api.php?action=create_blotter
+ *     (IR has no dedicated tip write action yet — tips are logged via create_blotter)
  *   INCIDENT_REPORTING_API_KEY=       (legacy: BLOTTER_API_KEY)
  *   INCIDENT_REPORTING_API_TIMEOUT=30
  */
@@ -37,21 +38,30 @@ function buildTipIncidentPayload(array $tip): array
     $photo = prepareTipOutboundPhoto($tip['photo_data'] ?? null);
     $hasPhoto = !empty($photo['has_photo']);
     $photoData = $hasPhoto ? (string) $photo['photo_data'] : null;
+    $contact = trim((string) ($tip['contact_number'] ?? ''));
+    $location = trim((string) ($tip['location'] ?? ''));
+    $description = trim((string) ($tip['description'] ?? ''));
+    $tipId = trim((string) ($tip['tip_id'] ?? ''));
+    $complainantName = $contact !== '' ? ('Tip reporter (' . $contact . ')') : 'Anonymous Tip';
+    $narrative = $description;
+    if ($tipId !== '') {
+        $narrative = '[' . $tipId . '] ' . $description;
+    }
 
     return [
         'source' => 'alertaraqc',
         'record_type' => 'tip',
-        'source_tip_id' => $tip['tip_id'] ?? '',
+        'source_tip_id' => $tipId,
         // Nested structure (existing contract)
         'incident' => [
-            'location' => $tip['location'] ?? '',
-            'description' => $tip['description'] ?? '',
+            'location' => $location,
+            'description' => $description,
             'submitted_at' => $submittedAt,
             'classification' => 'community_tip',
         ],
         'reporter' => [
-            'contact_number' => $tip['contact_number'] ?? null,
-            'anonymous' => empty($tip['contact_number']),
+            'contact_number' => $contact !== '' ? $contact : null,
+            'anonymous' => $contact === '',
         ],
         'review' => [
             'status' => $tip['status'] ?? 'New',
@@ -67,11 +77,16 @@ function buildTipIncidentPayload(array $tip): array
             'photo_data' => $photoData,
             'available' => $hasPhoto,
         ],
-        // Flat module labels for partner mapping (Review Tip outbound)
-        'tip_id' => $tip['tip_id'] ?? '',
+        // Flat fields for report.alertaraqc.com action=create_blotter (no dedicated tip write action yet)
+        'complainant_name' => $complainantName,
+        'contact_number' => $contact,
+        'location' => $location,
+        'incident_type' => 'Community Tip',
+        'description' => $narrative,
+        'narrative' => $narrative,
+        'tip_id' => $tipId,
         'date_time' => $submittedAt,
-        'location' => $tip['location'] ?? '',
-        'tip_description' => $tip['description'] ?? '',
+        'tip_description' => $description,
         'status' => $tip['status'] ?? 'New',
         'outcome' => $tip['outcome'] ?? 'No Outcome Yet',
         'assigned_to' => $tip['assigned_to'] ?? null,
@@ -80,6 +95,7 @@ function buildTipIncidentPayload(array $tip): array
             'forwarded_by' => 'alertaraqc_bpso_admin',
             'forwarded_at' => date('c'),
             'has_photo' => $hasPhoto,
+            'record_type' => 'tip',
         ],
     ];
 }
@@ -154,7 +170,7 @@ function forwardTipToIncidentReporting(array $tip): array
         ];
     }
 
-    if (empty($decoded['success'])) {
+    if (!partnerApiResponseSucceeded($decoded)) {
         return [
             'success' => false,
             'message' => trim($decoded['message'] ?? $decoded['error'] ?? 'Incident Reporting API rejected the tip.'),
@@ -162,9 +178,7 @@ function forwardTipToIncidentReporting(array $tip): array
         ];
     }
 
-    $referenceId = trim(
-        (string) ($decoded['blotter_reference_id'] ?? $decoded['incident_reference_id'] ?? $decoded['reference_id'] ?? $decoded['id'] ?? '')
-    );
+    $referenceId = partnerApiReferenceId($decoded);
 
     return [
         'success' => true,
