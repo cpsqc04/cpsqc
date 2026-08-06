@@ -388,7 +388,6 @@ require_once __DIR__ . '/db.php';
         }
         .btn-campaign:hover { background: #4ca8a6; }
         .btn-campaign:disabled { opacity: 0.55; cursor: not-allowed; }
-        .badge-youth { display: inline-block; margin-left: 0.35rem; padding: 0.1rem 0.45rem; border-radius: 999px; background: #fef3c7; color: #92400e; font-size: 0.7rem; font-weight: 700; }
         .badge-sent { display: inline-block; margin-left: 0.35rem; padding: 0.1rem 0.45rem; border-radius: 999px; background: #d1fae5; color: #065f46; font-size: 0.7rem; font-weight: 700; }
         .campaign-field { margin-bottom: 1rem; }
         .campaign-field label { display: block; font-weight: 600; margin-bottom: 0.4rem; color: var(--text-color); }
@@ -793,37 +792,6 @@ require_once __DIR__ . '/db.php';
             return 'status-scheduled';
         }
 
-        function looksYouthRelated(log) {
-            const haystack = [
-                log.incidents || '',
-                log.details || '',
-                log.location || '',
-                log.route || ''
-            ].join(' ').toLowerCase();
-            const keywords = ['youth', 'minor', 'minors', 'loiter', 'loitering', 'curfew', '17 below', 'under 18', 'underage', 'bata', 'kabataan', 'estudyante', 'student', 'teenager', 'teen'];
-            return keywords.some(function(k) { return haystack.indexOf(k) !== -1; });
-        }
-
-        function inCurfewWindow(timeRaw) {
-            if (!timeRaw) return false;
-            const raw = String(timeRaw).trim();
-            let hours = null;
-            let minutes = 0;
-            const ampm = raw.match(/^(\d{1,2}):(\d{2})(?::\d{2})?\s*(AM|PM)$/i);
-            const h24 = raw.match(/^(\d{1,2}):(\d{2})(?::\d{2})?$/);
-            if (ampm) {
-                hours = parseInt(ampm[1], 10) % 12;
-                if (String(ampm[3]).toUpperCase() === 'PM') hours += 12;
-                minutes = parseInt(ampm[2], 10);
-            } else if (h24) {
-                hours = parseInt(h24[1], 10);
-                minutes = parseInt(h24[2], 10);
-            }
-            if (hours === null || Number.isNaN(hours)) return false;
-            const total = hours * 60 + minutes;
-            return total >= (22 * 60) || total < (8 * 60);
-        }
-
         function clearLogSelections() {
             const master = document.getElementById('selectAllLogs');
             if (master) master.checked = false;
@@ -953,10 +921,8 @@ require_once __DIR__ . '/db.php';
                         campaign_reference_id: row.campaign_reference_id || ''
                     };
                     const dateTime = `${row.date}${row.time ? ' ' + row.time : ''}`;
-                    const youth = looksYouthRelated(patrolLogData[row.id]) || inCurfewWindow(row.time);
                     const alreadySent = !!row.campaign_forwarded_at;
-                    const badges = (youth ? '<span class="badge-youth">Youth/Curfew</span>' : '')
-                        + (alreadySent ? '<span class="badge-sent">Sent to Campaign</span>' : '');
+                    const badges = alreadySent ? '<span class="badge-sent">Sent to Campaign</span>' : '';
                     const disabledAttr = alreadySent ? ' disabled' : '';
                     return `<tr data-log-id="${row.id}">
                         <td class="col-select"><input type="checkbox" class="log-select" value="${row.id}" onchange="onLogSelectChange()"${disabledAttr}></td>
