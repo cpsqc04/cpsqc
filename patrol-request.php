@@ -398,8 +398,31 @@ $patrolNavActive = 'patrol-request';
             <div id="viewDetails"></div>
             <div class="form-actions" id="viewRequestActions" style="display:none;">
                 <button type="button" class="btn-decline" id="declineRequestBtn" onclick="declineRequest()">Decline</button>
-                <button type="button" class="btn-assign" id="assignPersonnelBtn" onclick="assignPersonnelFromRequest()">Assign Personnel</button>
+                <button type="button" class="btn-assign" id="assignPersonnelBtn" onclick="openAssignPatrolModal()">Assign Personnel</button>
             </div>
+        </div>
+    </div>
+
+    <div id="assignModal" class="modal">
+        <div class="modal-content" style="max-width:560px;">
+            <div class="modal-header">
+                <h2>Assign Patrol</h2>
+                <button class="close-modal" onclick="closeAssignPatrolModal()">&times;</button>
+            </div>
+            <p class="manage-request-ref" id="assignRequestRef" style="margin:0 0 0.35rem;color:var(--tertiary-color);font-weight:600;"></p>
+            <p id="assignRequestMeta" style="margin:0 0 1rem;color:var(--text-secondary);font-size:0.92rem;line-height:1.5;"></p>
+            <form id="assignPatrolForm" onsubmit="savePatrolRequestAssignment(event)">
+                <input type="hidden" id="assignRequestDbId" value="">
+                <div class="form-group">
+                    <label for="assignPatrolSelect">Assign BPSO Personnel</label>
+                    <select id="assignPatrolSelect" multiple></select>
+                    <small id="assignPatrolHint">Only personnel currently at the barangay hall (timed in today) are shown. Hold Ctrl/Cmd to select multiple.</small>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn-cancel" onclick="closeAssignPatrolModal()">Cancel</button>
+                    <button type="submit" class="btn-save" id="assignSaveBtn">Assign</button>
+                </div>
+            </form>
         </div>
     </div>
 
@@ -562,39 +585,176 @@ $patrolNavActive = 'patrol-request';
             currentViewRequestId = null;
         }
 
-        function assignPersonnelFromRequest() {
+        function getRemainingAssignSlots(item) {
+            const needed = Number(item.patrols_needed || 0);
+            const alreadyAssigned = Array.isArray(item.assigned_patrol_ids)
+                ? item.assigned_patrol_ids.length
+                : Number(item.patrols_assigned || 0);
+            if (needed <= 0) return 1;
+            return Math.max(needed - alreadyAssigned, 0);
+        }
+
+        async function openAssignPatrolModal() {
             const item = requestData[currentViewRequestId];
             if (!item) return;
+            if (!canActOnRequest(item)) {
+                alert('This patrol request can no longer be assigned.');
+                return;
+            }
 
-            const needed = Number(item.patrols_needed || 0);
-            const alreadyAssigned = Array.isArray(item.assigned_patrol_ids) ? item.assigned_patrol_ids.length : Number(item.patrols_assigned || 0);
-            const remaining = needed > 0 ? Math.max(needed - alreadyAssigned, 0) : 0;
-
-            if (needed > 0 && remaining <= 0) {
+            const remaining = getRemainingAssignSlots(item);
+            if (Number(item.patrols_needed || 0) > 0 && remaining <= 0) {
                 alert('All required patrol personnel for this request have already been assigned.');
                 return;
             }
 
-            const params = new URLSearchParams({
-                assign: '1',
-                request_id: item.request_id,
-                pr_id: String(item.id),
-                zone: item.event_location || '',
-                route: item.event_location || '',
-                date: String(item.event_date || '').slice(0, 10),
-                patrols_needed: String(needed),
-                already_assigned: String(alreadyAssigned),
-                slots: String(remaining || needed || 1),
-                assigned_ids: Array.isArray(item.assigned_patrol_ids) ? item.assigned_patrol_ids.join(',') : '',
-                notes: [
-                    'Patrol request: ' + item.request_id,
-                    item.event_name ? 'Event: ' + item.event_name : '',
-                    item.event_start_time ? 'Start: ' + String(item.event_start_time).slice(0, 5) : '',
-                    item.special_instructions ? 'Instructions: ' + item.special_instructions : ''
-                ].filter(Boolean).join('\n')
+            document.getElementById('assignRequestDbId').value = item.id;
+            document.getElementById('assignRequestRef').textContent = 'Request ID: ' + item.request_id;
+            const alreadyAssigned = Array.isArray(item.assigned_patrol_ids) ? item.assigned_patrol_ids.length : Number(item.patrols_assigned || 0);
+            document.getElementById('assignRequestMeta').textContent = [
+                item.event_name ? ('Event: ' + item.event_name) : '',
+                'Needed: ' + (item.patrols_needed || 0),
+                'Already assigned: ' + alreadyAssigned,
+                'Remaining slots: ' + remaining
+            ].filter(Boolean).join(' · ');
+
+            document.getElementById('assignPatrolHint').textContent = remaining > 1
+                ? ('Only personnel currently at the barangay hall (timed in today) are shown. Select up to ' + remaining + ' personnel (Ctrl/Cmd + click).')
+                : 'Only personnel currently at the barangay hall (timed in today) are shown.';
+
+            await loadAssignPersonnelOptions(item, remaining);
+            closeViewModal();
+            document.getElementById('assignModal').classList.add('active');
+        }
+
+        function closeAssignPatrolModal() {
+            document.getElementById('assignModal').classList.remove('active');
+            document.getElementById('assignPatrolForm').reset();
+            document.getElementById('assignRequestDbId').value = '';
+        }
+
+        async function loadAssignPersonnelOptions(item, remainingSlots) {
+            const select = document.getElementById('assignPatrolSelect');
+            select.innerHTML = '';
+            select.size = Math.min(Math.max(remainingSlots + 2, 4), 10);
+
+            const alreadyAssigned = new Set(
+                (Array.isArray(item.assigned_patrol_ids) ? item.assigned_patrol_ids : [])
+                    .map(function(id) { return String(id); })
+            );
+
+            try {
+                const [patrolResponse, hallResponse] = await Promise.all([
+                    fetch('api/patrols.php'),
+                    fetch('api/bpso_attendance.php?view=at_hall')
+                ]);
+                const result = await patrolResponse.json();
+                const hallResult = await hallResponse.json();
+                if (!result.success || !result.data) {
+                    select.innerHTML = '<option value="" disabled>No personnel available</option>';
+                    return;
+                }
+
+                const atHallIds = new Set(
+                    (hallResult.success ? (hallResult.data || []) : [])
+                        .map(function(row) { return String(row.patrol_id); })
+                );
+
+                const available = result.data.filter(function(p) {
+                    return atHallIds.has(String(p.id)) && !alreadyAssigned.has(String(p.id));
+                });
+
+                if (!available.length) {
+                    select.innerHTML = '<option value="" disabled>No personnel currently at the barangay hall</option>';
+                    return;
+                }
+
+                available.forEach(function(personnel) {
+                    const option = document.createElement('option');
+                    option.value = personnel.id;
+                    option.textContent = personnel.bpso_personnel_id + ' - ' + personnel.personnel_name + ' (At Hall)';
+                    select.appendChild(option);
+                });
+
+                select.onchange = function() {
+                    const selected = Array.from(select.selectedOptions);
+                    if (selected.length > remainingSlots) {
+                        selected.slice(remainingSlots).forEach(function(opt) { opt.selected = false; });
+                        alert('You can select up to ' + remainingSlots + ' more personnel for this request.');
+                    }
+                };
+            } catch (e) {
+                console.error('Error loading BPSO personnel:', e);
+                select.innerHTML = '<option value="" disabled>Failed to load personnel</option>';
+            }
+        }
+
+        async function savePatrolRequestAssignment(event) {
+            event.preventDefault();
+            const dbId = parseInt(document.getElementById('assignRequestDbId').value, 10);
+            const item = allRequests.find(function(r) { return Number(r.id) === dbId; });
+            if (!item || !dbId) {
+                alert('Patrol request not found.');
+                return;
+            }
+
+            const select = document.getElementById('assignPatrolSelect');
+            const newlySelected = Array.from(select.selectedOptions)
+                .map(function(opt) { return parseInt(opt.value, 10); })
+                .filter(function(id) { return id > 0; });
+
+            if (!newlySelected.length) {
+                alert('Please select at least one BPSO personnel to assign.');
+                return;
+            }
+
+            const remaining = getRemainingAssignSlots(item);
+            if (newlySelected.length > remaining) {
+                alert('You can assign at most ' + remaining + ' more personnel for this request.');
+                return;
+            }
+
+            const assigned = Array.isArray(item.assigned_patrol_ids)
+                ? item.assigned_patrol_ids.map(Number)
+                : [];
+            newlySelected.forEach(function(id) {
+                if (!assigned.includes(id)) assigned.push(id);
             });
 
-            window.location.href = 'patrol-schedule.php?' + params.toString();
+            const needed = Number(item.patrols_needed || 0);
+            const status = (needed > 0 && assigned.length >= needed) ? 'Scheduled' : 'Approved';
+            const saveBtn = document.getElementById('assignSaveBtn');
+            saveBtn.disabled = true;
+            saveBtn.textContent = 'Assigning...';
+
+            try {
+                const res = await fetch('api/patrol_requests.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        action: 'manage',
+                        id: dbId,
+                        status: status,
+                        assigned_patrol_ids: assigned,
+                        review_notes: item.review_notes || ('Assigned from Patrol Request for ' + item.request_id + '.'),
+                        scheduling_notes: 'Assigned in Patrol Request module for ' + item.request_id
+                    })
+                });
+                const result = await res.json();
+                if (!result.success) {
+                    throw new Error(result.message || 'Failed to assign personnel.');
+                }
+                closeAssignPatrolModal();
+                await loadRequests();
+                alert(status === 'Scheduled'
+                    ? 'All required personnel assigned. Request marked as Scheduled.'
+                    : 'Personnel assigned successfully.');
+            } catch (err) {
+                alert(err.message || 'Failed to assign personnel.');
+            } finally {
+                saveBtn.disabled = false;
+                saveBtn.textContent = 'Assign';
+            }
         }
 
         async function declineRequest() {
@@ -628,6 +788,7 @@ $patrolNavActive = 'patrol-request';
 
         window.onclick = function(event) {
             if (event.target === document.getElementById('viewModal')) closeViewModal();
+            if (event.target === document.getElementById('assignModal')) closeAssignPatrolModal();
         };
 
         function toggleSidebar() {
