@@ -979,7 +979,6 @@ $personnelCode = htmlspecialchars(getBpsoPersonnelCode());
                     <textarea id="nwResolutionReport" required placeholder="Describe how you responded to the incident, actions taken, and outcome..."></textarea>
                 </div>
                 <div style="display:flex;gap:0.75rem;flex-wrap:wrap;">
-                    <button type="button" id="saveNwProgressBtn" class="btn-submit" style="background:#2563eb;" onclick="submitNwIncidentResolution('In Progress')">Save Progress</button>
                     <button type="submit" id="resolveNwIncidentBtn" class="btn-submit">Mark as Resolved</button>
                 </div>
             </form>
@@ -2533,7 +2532,6 @@ $personnelCode = htmlspecialchars(getBpsoPersonnelCode());
             `;
             const isResolved = report.status === 'Resolved' || report.status === 'Closed';
             document.getElementById('nwResolutionReport').readOnly = isResolved;
-            document.getElementById('saveNwProgressBtn').style.display = isResolved ? 'none' : '';
             document.getElementById('resolveNwIncidentBtn').style.display = isResolved ? 'none' : '';
             document.getElementById('nwIncidentResolutionModal').classList.add('active');
         }
@@ -2541,7 +2539,6 @@ $personnelCode = htmlspecialchars(getBpsoPersonnelCode());
         function closeNwIncidentModal() {
             document.getElementById('nwIncidentResolutionModal').classList.remove('active');
             document.getElementById('nwResolutionReport').readOnly = false;
-            document.getElementById('saveNwProgressBtn').style.display = '';
             document.getElementById('resolveNwIncidentBtn').style.display = '';
         }
 
