@@ -37,7 +37,7 @@
         var img = document.createElement('img');
         img.src = photoSrc;
         img.alt = altText || 'Photo';
-        img.style.cssText = 'max-width:95%;max-height:95%;border-radius:8px;object-fit:contain;box-shadow:0 10px 40px rgba(0,0,0,0.45);background:#fff;';
+        img.style.cssText = 'max-width:min(420px, 72vw);max-height:min(560px, 70vh);width:auto;height:auto;border-radius:8px;object-fit:contain;box-shadow:0 10px 40px rgba(0,0,0,0.45);background:#fff;';
         img.onclick = function (e) { e.stopPropagation(); };
         img.onerror = function () {
             alert('Failed to load photo.');
