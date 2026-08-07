@@ -63,24 +63,52 @@ function webrtcBuildResponse(array $stored): array
     $running = !empty($stored['running']);
     $updatedTs = isset($stored['updated_ts']) ? (float) $stored['updated_ts'] : 0.0;
     $age = $updatedTs > 0 ? max(0.0, microtime(true) - $updatedTs) : null;
-    // Stale agent heartbeat → treat as not running for remote UI.
     if ($age !== null && $age > 90) {
         $running = false;
     }
 
-    $enabled = $base !== '';
-    $player = $base !== ''
-        ? $base . '/stream.html?src=' . rawurlencode($stream) . '&mode=webrtc,mse,hls'
-        : '';
+    $bases = [];
+    if ($configured !== '') {
+        $bases[] = $configured;
+    }
+    if ($base !== '' && !in_array($base, $bases, true)) {
+        $bases[] = $base;
+    }
+    if (!empty($stored['base_urls']) && is_array($stored['base_urls'])) {
+        foreach ($stored['base_urls'] as $b) {
+            $b = rtrim((string) $b, '/');
+            if ($b !== '' && !in_array($b, $bases, true)) {
+                $bases[] = $b;
+            }
+        }
+    }
+    if (isLocalDetectionEnabled()) {
+        foreach (['http://127.0.0.1:1984'] as $local) {
+            if (!in_array($local, $bases, true)) {
+                array_unshift($bases, $local);
+            }
+        }
+    }
+
+    $primary = $bases[0] ?? '';
+    $enabled = $primary !== '';
+    $mkPlayer = static function (string $b) use ($stream): string {
+        return $b . '/stream.html?src=' . rawurlencode($stream) . '&mode=mse,webrtc';
+    };
+    $playerUrls = array_map($mkPlayer, $bases);
 
     return [
         'success' => true,
         'enabled' => $enabled,
         'running' => $running && $enabled,
         'stream' => $stream,
-        'base_url' => $base,
-        'player_url' => $player,
-        'webrtc_url' => $base !== '' ? ($base . '/api/webrtc?src=' . rawurlencode($stream)) : '',
+        'base_url' => $primary,
+        'base_urls' => $bases,
+        'player_url' => $primary !== '' ? $mkPlayer($primary) : '',
+        'player_urls' => $playerUrls,
+        'localhost_player_url' => $mkPlayer('http://127.0.0.1:1984'),
+        'lan_player_url' => (string) ($stored['lan_player_url'] ?? ''),
+        'webrtc_url' => $primary !== '' ? ($primary . '/api/webrtc?src=' . rawurlencode($stream)) : '',
         'camera_name' => $stored['camera_name'] ?? null,
         'camera_id' => $stored['camera_id'] ?? null,
         'error' => (string) ($stored['error'] ?? ''),
@@ -88,9 +116,9 @@ function webrtcBuildResponse(array $stored): array
         'feed_mode' => getCctvFeedMode(),
         'hint' => $enabled
             ? ($running
-                ? 'Low-latency WebRTC live view is available.'
+                ? 'Low-latency MSE/WebRTC live view is available (near Reolink app delay).'
                 : 'Waiting for on-site go2rtc (start_detection_agent.bat).')
-            : 'Set CCTV_WEBRTC_PUBLIC_URL (HTTPS tunnel) for remote WebRTC, or use local XAMPP.',
+            : 'Set CCTV_WEBRTC_PUBLIC_URL (HTTPS tunnel) for remote live view, or open the LAN player link.',
     ];
 }
 
