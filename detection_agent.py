@@ -464,6 +464,153 @@ def request_scan_poll_async(scan_url: str, api_key: str, min_interval: float = 1
     threading.Thread(target=_worker, name="camera-scan", daemon=True).start()
 
 
+_enc_lock = threading.Lock()
+_enc_in_flight = False
+_last_enc_poll_at = 0.0
+
+
+def process_encoding_job(encoding_url: str, api_key: str) -> None:
+    pending = api_request(
+        encoding_url + "?role=agent",
+        api_key,
+        method="GET",
+        timeout=4.0,
+    )
+    if not pending or not pending.get("success") or not pending.get("has_job"):
+        return
+
+    job = pending.get("job") or {}
+    job_id = job.get("id")
+    status = job.get("status")
+    if not job_id or status not in ("pending", "running"):
+        return
+
+    if status == "pending":
+        claimed = api_request(
+            encoding_url + "?role=agent",
+            api_key,
+            method="POST",
+            payload={"action": "claim", "id": job_id, "role": "agent"},
+            timeout=6.0,
+        )
+        if not claimed or not claimed.get("success"):
+            return
+        log(f"Claimed Reolink encoding probe job {job_id}")
+
+    # Load camera credentials from local cameras.json
+    cameras_path = ROOT / "cameras.json"
+    target_id = job.get("cameraId")
+    camera = None
+    try:
+        cameras = json.loads(cameras_path.read_text(encoding="utf-8"))
+        if isinstance(cameras, list):
+            for cam in cameras:
+                if target_id and str(cam.get("id")) != str(target_id) and str(cam.get("cameraId")) != str(target_id):
+                    continue
+                status_txt = str(cam.get("status") or "").lower()
+                if not target_id and status_txt and status_txt != "online":
+                    continue
+                camera = cam
+                if target_id:
+                    break
+            if camera is None and cameras:
+                camera = cameras[0]
+    except (OSError, json.JSONDecodeError, TypeError):
+        camera = None
+
+    if not camera:
+        api_request(
+            encoding_url + "?role=agent",
+            api_key,
+            method="POST",
+            payload={
+                "action": "complete",
+                "role": "agent",
+                "id": job_id,
+                "success": False,
+                "message": "No camera credentials found in local cameras.json",
+            },
+            timeout=8.0,
+        )
+        return
+
+    try:
+        from reolink_encoding import probe_reolink_encoding
+    except ImportError:
+        api_request(
+            encoding_url + "?role=agent",
+            api_key,
+            method="POST",
+            payload={
+                "action": "complete",
+                "role": "agent",
+                "id": job_id,
+                "success": False,
+                "message": "reolink_encoding.py missing on on-site PC",
+            },
+            timeout=8.0,
+        )
+        return
+
+    ip = str(camera.get("ipAddress") or "").strip()
+    user = str(camera.get("username") or "").strip()
+    password = str(camera.get("password") or "")
+    log(f"Probing Reolink encoding at {ip}…")
+    result = probe_reolink_encoding(ip, user, password, timeout=6.0)
+    payload = {
+        "action": "complete",
+        "role": "agent",
+        "id": job_id,
+        "success": bool(result.get("success")),
+        "message": result.get("message") or result.get("reason"),
+        "reason": result.get("reason") or result.get("message"),
+        "recommendedStream": result.get("recommendedStream"),
+        "mainStream": result.get("mainStream"),
+        "subStream": result.get("subStream"),
+        "displayQuality": result.get("displayQuality"),
+        "detectedAt": result.get("detectedAt"),
+        "elapsed_seconds": result.get("elapsed_seconds"),
+    }
+    done = api_request(
+        encoding_url + "?role=agent",
+        api_key,
+        method="POST",
+        payload=payload,
+        timeout=12.0,
+    )
+    if done and done.get("success"):
+        log(
+            f"Encoding synced: stream={result.get('recommendedStream')} "
+            f"({result.get('reason')})"
+        )
+    else:
+        log(f"Encoding probe finished with error: {payload.get('message')}")
+
+
+def request_encoding_poll_async(encoding_url: str, api_key: str, min_interval: float = 8.0) -> None:
+    global _enc_in_flight, _last_enc_poll_at
+    now = time.time()
+    if now - _last_enc_poll_at < min_interval:
+        return
+    with _enc_lock:
+        if _enc_in_flight:
+            return
+        _enc_in_flight = True
+        _last_enc_poll_at = now
+
+    def _worker() -> None:
+        global _enc_in_flight
+        try:
+            process_encoding_job(encoding_url, api_key)
+        except Exception as exc:  # noqa: BLE001
+            log_rate_limited("enc-handler", f"Encoding job handler error: {exc}", 60.0)
+        finally:
+            with _enc_lock:
+                _enc_in_flight = False
+
+    threading.Thread(target=_worker, name="encoding-probe", daemon=True).start()
+
+
 def main() -> int:
     file_env = load_env(ROOT / ".env")
     for key, value in file_env.items():
@@ -486,6 +633,11 @@ def main() -> int:
         file_env.get("CCTV_CAMERA_SCAN_URL", "")
         or os.environ.get("CCTV_CAMERA_SCAN_URL", "")
         or derive_api_url(frame_url, "cctv_camera_scan.php")
+    ).strip()
+    encoding_url = (
+        file_env.get("CCTV_ENCODING_SYNC_URL", "")
+        or os.environ.get("CCTV_ENCODING_SYNC_URL", "")
+        or derive_api_url(frame_url, "cctv_encoding_sync.php")
     ).strip()
     poll_seconds = float(
         file_env.get("CCTV_AGENT_POLL_SECONDS")
@@ -510,6 +662,7 @@ def main() -> int:
     log("Detection agent started.")
     log(f"  viewer: {status_url}")
     log(f"  scan:   {scan_url}")
+    log(f"  encode: {encoding_url}")
     log(f"  poll:   every {poll_seconds:.0f}s | stop grace: {stop_grace_seconds:.0f}s")
     log("detect.py starts ONLY while Open Surveillance is open; otherwise it stays stopped.")
 
@@ -523,6 +676,8 @@ def main() -> int:
     while True:
         if scan_url:
             request_scan_poll_async(scan_url, api_key, min_interval=15.0)
+        if encoding_url:
+            request_encoding_poll_async(encoding_url, api_key, min_interval=8.0)
 
         status = api_request(status_url, api_key, method="GET", timeout=5.0)
         if not status or not status.get("success"):

@@ -128,7 +128,11 @@ CAMERAS_CONFIG_FINGERPRINT = None
 CCTV_FRAME_UPLOAD_URL = ""
 CCTV_FRAME_UPLOAD_KEY = ""
 CCTV_CAMERAS_CONFIG_URL = ""
-CCTV_USE_MAIN_STREAM = False  # Force main stream (VLC-like clarity) when True
+CCTV_USE_MAIN_STREAM = False  # Force main stream when True
+CCTV_AUTO_ENCODING = True  # Probe Reolink GetEnc and sync stream/display quality
+CCTV_ENCODING_CACHE = "camera_encoding.json"
+_last_encoding_probe_at = 0.0
+ENCODING_PROBE_INTERVAL = 300  # Re-probe at most every 5 minutes unless forced
 # Live relay defaults (overridden by .env CCTV_FEED_QUALITY=vlc|lan|balanced|hostinger).
 CCTV_UPLOAD_MIN_INTERVAL = 0.12  # Faster LAN uploads
 CCTV_UPLOAD_JPEG_QUALITY = 92    # Clearer live JPEG
@@ -286,6 +290,128 @@ def build_rtsp_url(ip, port, username, password, stream_type):
     return f"rtsp://{ip}:{port}/{suffix}"
 
 
+def apply_display_quality_from_probe(display: dict):
+    """Adjust JPEG relay settings from Reolink stream resolution."""
+    global CCTV_UPLOAD_MIN_INTERVAL, CCTV_UPLOAD_JPEG_QUALITY, CCTV_UPLOAD_MAX_WIDTH, LIVE_JPEG_QUALITY
+    if not isinstance(display, dict):
+        return
+    try:
+        if display.get("interval") is not None:
+            CCTV_UPLOAD_MIN_INTERVAL = max(0.05, float(display["interval"]))
+        if display.get("jpegQuality") is not None:
+            CCTV_UPLOAD_JPEG_QUALITY = max(40, min(98, int(display["jpegQuality"])))
+        if display.get("maxWidth") is not None:
+            CCTV_UPLOAD_MAX_WIDTH = max(480, min(2560, int(display["maxWidth"])))
+        if display.get("liveJpegQuality") is not None:
+            LIVE_JPEG_QUALITY = max(40, min(98, int(display["liveJpegQuality"])))
+        print(
+            f"✓ Display quality synced from Reolink: "
+            f"preset={display.get('preset')}, max_w={CCTV_UPLOAD_MAX_WIDTH}, "
+            f"q={CCTV_UPLOAD_JPEG_QUALITY}, interval>={CCTV_UPLOAD_MIN_INTERVAL:.2f}s "
+            f"(source {display.get('sourceWidth')}x{display.get('sourceHeight')})"
+        )
+    except (TypeError, ValueError):
+        pass
+
+
+def probe_and_sync_reolink_encoding(camera_row, force=False):
+    """
+    Read Reolink GetEnc and return updated stream_type + encoding metadata.
+    Also adjusts live JPEG upload quality to match stream resolution.
+    """
+    global _last_encoding_probe_at
+    if not CCTV_AUTO_ENCODING and not CCTV_USE_MAIN_STREAM:
+        return None
+    now = time.time()
+    if not force and now - _last_encoding_probe_at < ENCODING_PROBE_INTERVAL:
+        # Use cached recommendation if fresh.
+        cache_path = Path(CCTV_ENCODING_CACHE)
+        if cache_path.is_file():
+            try:
+                cached = json.loads(cache_path.read_text(encoding="utf-8"))
+                if cached.get("success") and cached.get("recommendedStream"):
+                    apply_display_quality_from_probe(cached.get("displayQuality") or {})
+                    return cached
+            except Exception:
+                pass
+
+    ip = str((camera_row or {}).get("ipAddress") or "").strip()
+    username = str((camera_row or {}).get("username") or "").strip()
+    password = str((camera_row or {}).get("password") or "").strip()
+    if not ip or not username:
+        return None
+
+    try:
+        from reolink_encoding import probe_reolink_encoding
+    except ImportError:
+        print("⚠ reolink_encoding.py missing — skipping encoding auto-detect")
+        return None
+
+    print(f"Probing Reolink encoding at {ip}…")
+    result = probe_reolink_encoding(
+        ip,
+        username,
+        password,
+        force_main=CCTV_USE_MAIN_STREAM,
+        timeout=5.0,
+    )
+    _last_encoding_probe_at = now
+    try:
+        Path(CCTV_ENCODING_CACHE).write_text(
+            json.dumps(result, indent=2),
+            encoding="utf-8",
+        )
+    except OSError:
+        pass
+
+    if not result.get("success"):
+        print(f"⚠ Reolink encoding probe failed: {result.get('message')}")
+        return None
+
+    print(f"✓ Reolink encoding: {result.get('reason')}")
+    apply_display_quality_from_probe(result.get("displayQuality") or {})
+
+    # Persist recommendation onto local cameras.json for Camera Management sync.
+    try:
+        cameras_path = Path(CAMERAS_FILE)
+        if cameras_path.is_file():
+            cameras = json.loads(cameras_path.read_text(encoding="utf-8"))
+            if isinstance(cameras, list):
+                cam_id = str((camera_row or {}).get("id") or "")
+                for cam in cameras:
+                    if cam_id and str(cam.get("id")) != cam_id:
+                        continue
+                    if not cam_id and str(cam.get("ipAddress") or "") != ip:
+                        continue
+                    recommended = result.get("recommendedStream") or cam.get("streamType") or "sub"
+                    cam["streamType"] = recommended
+                    cam["rtspUrl"] = build_rtsp_url(
+                        ip,
+                        str(cam.get("port") or "554"),
+                        username,
+                        password,
+                        recommended,
+                    )
+                    cam["encoding"] = {
+                        "detectedAt": result.get("detectedAt"),
+                        "recommendedStream": recommended,
+                        "reason": result.get("reason"),
+                        "mainStream": result.get("mainStream"),
+                        "subStream": result.get("subStream"),
+                        "displayQuality": result.get("displayQuality"),
+                    }
+                    cam["updatedAt"] = time.strftime("%Y-%m-%d %H:%M:%S")
+                    break
+                cameras_path.write_text(
+                    json.dumps(cameras, indent=4, ensure_ascii=False) + "\n",
+                    encoding="utf-8",
+                )
+    except Exception as exc:
+        print(f"⚠ Could not write encoding into cameras.json: {exc}")
+
+    return result
+
+
 def load_active_camera_config():
     """Load first available camera from cameras.json and derive RTSP source."""
     cameras_path = Path(CAMERAS_FILE)
@@ -310,12 +436,24 @@ def load_active_camera_config():
         selected = cameras[0]
 
     stream_type = str(selected.get("streamType", "sub")).strip().lower()
-    # OpenCV/FFmpeg often cannot sustain Reolink main (HEVC) — 30s timeouts / empty frames.
-    # Keep sub (H.264) unless CCTV_USE_MAIN_STREAM=true is set explicitly.
+    encoding_meta = selected.get("encoding") if isinstance(selected.get("encoding"), dict) else {}
+
+    # 1) Explicit force main  2) auto GetEnc probe  3) saved recommendation  4) cameras.json
     if CCTV_USE_MAIN_STREAM:
         stream_type = "main"
-    else:
+    elif CCTV_AUTO_ENCODING:
+        probe = probe_and_sync_reolink_encoding(selected, force=False)
+        if probe and probe.get("recommendedStream") in {"main", "sub"}:
+            stream_type = probe["recommendedStream"]
+        elif encoding_meta.get("recommendedStream") in {"main", "sub"}:
+            stream_type = encoding_meta["recommendedStream"]
+            apply_display_quality_from_probe(encoding_meta.get("displayQuality") or {})
+    elif encoding_meta.get("recommendedStream") in {"main", "sub"}:
+        stream_type = encoding_meta["recommendedStream"]
+
+    if stream_type not in {"main", "sub"}:
         stream_type = "sub"
+
     ip = str(selected.get("ipAddress", "")).strip()
     port = str(selected.get("port", "554")).strip() or "554"
     username = str(selected.get("username", "")).strip()
@@ -332,7 +470,7 @@ def load_active_camera_config():
                 rtsp_url.replace("h264Preview_01_main", "h264Preview_01_sub")
                 .replace("Preview_01_main", "Preview_01_sub")
             )
-        elif CCTV_USE_MAIN_STREAM:
+        else:
             rtsp_url = (
                 rtsp_url.replace("h264Preview_01_sub", "h264Preview_01_main")
                 .replace("Preview_01_sub", "Preview_01_main")
@@ -341,19 +479,22 @@ def load_active_camera_config():
     return {
         "camera_id": selected.get("cameraId") or selected.get("id") or "CAMERA",
         "name": selected.get("name") or "Camera",
-        "stream_type": stream_type if stream_type in {"main", "sub"} else "sub",
+        "stream_type": stream_type,
         "rtsp_url": rtsp_url,
         "ipAddress": ip,
         "port": port,
         "username": username,
         "password": password,
+        "encoding": encoding_meta or None,
     }
 
 
 def configure_camera_source():
     """Set RTSP source from camera config file when available."""
-    global RTSP_URL, PREFER_SUB_STREAM, ACTIVE_CAMERA
+    global RTSP_URL, PREFER_SUB_STREAM, ACTIVE_CAMERA, _last_encoding_probe_at
 
+    # Allow a fresh GetEnc read when Camera Management changes the camera.
+    _last_encoding_probe_at = 0.0
     camera_cfg = load_active_camera_config()
     if not camera_cfg:
         print(f"Using fallback RTSP URL from script: {RTSP_URL}")
@@ -363,7 +504,8 @@ def configure_camera_source():
     RTSP_URL = camera_cfg["rtsp_url"]
     PREFER_SUB_STREAM = camera_cfg["stream_type"] != "main"
     print(f"Using camera {camera_cfg['camera_id']} ({camera_cfg['name']})")
-    print(f"Stream type: {camera_cfg['stream_type'].upper()}")
+    print(f"Stream type: {camera_cfg['stream_type'].upper()}"
+          + (" (auto from Reolink encoding)" if CCTV_AUTO_ENCODING else ""))
     print(f"RTSP source: {RTSP_URL}")
 
 
@@ -408,7 +550,7 @@ def init_cctv_upload_from_env():
     """Enable optional upload of live frames to Hostinger (on-site PC only)."""
     global CCTV_FRAME_UPLOAD_URL, CCTV_FRAME_UPLOAD_KEY, CCTV_CAMERAS_CONFIG_URL
     global CCTV_UPLOAD_MIN_INTERVAL, CCTV_UPLOAD_JPEG_QUALITY, CCTV_UPLOAD_MAX_WIDTH, LIVE_JPEG_QUALITY
-    global CCTV_USE_MAIN_STREAM
+    global CCTV_USE_MAIN_STREAM, CCTV_AUTO_ENCODING
     env = load_project_env()
     CCTV_FRAME_UPLOAD_URL = (
         env.get("CCTV_FRAME_UPLOAD_URL", "") or os.environ.get("CCTV_FRAME_UPLOAD_URL", "")
@@ -423,6 +565,10 @@ def init_cctv_upload_from_env():
         env.get("CCTV_USE_MAIN_STREAM", "") or os.environ.get("CCTV_USE_MAIN_STREAM", "") or ""
     ).strip().lower()
     CCTV_USE_MAIN_STREAM = use_main in {"1", "true", "yes", "on"}
+    auto_enc = (
+        env.get("CCTV_AUTO_ENCODING", "") or os.environ.get("CCTV_AUTO_ENCODING", "") or "true"
+    ).strip().lower()
+    CCTV_AUTO_ENCODING = auto_enc not in {"0", "false", "no", "off"}
 
     # Quality presets for same-LAN camera + on-site PC setups.
     # Individual CCTV_UPLOAD_* vars always override the preset.
