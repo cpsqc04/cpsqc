@@ -160,6 +160,25 @@ $cctvNavActive = 'camera-management';
         .toolbar { display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem; }
         .btn-primary { background: var(--primary-color); color: #fff; border: none; padding: 0.75rem 1.2rem; border-radius: 8px; cursor: pointer; font-weight: 600; }
         .btn-primary:hover { background: #4ca8a6; }
+        .btn-secondary { background: #fff; color: var(--primary-color); border: 1px solid var(--primary-color); padding: 0.75rem 1.2rem; border-radius: 8px; cursor: pointer; font-weight: 600; }
+        .btn-secondary:hover { background: rgba(76, 138, 137, 0.08); }
+        .btn-secondary:disabled { opacity: 0.6; cursor: not-allowed; }
+        .toolbar-actions { display: flex; gap: 0.75rem; flex-wrap: wrap; align-items: center; }
+        .scan-panel { margin-top: 1rem; padding: 1rem; border: 1px solid var(--border-color); border-radius: 10px; background: #f8fafc; display: none; }
+        .scan-panel.show { display: block; }
+        .scan-status { color: var(--text-secondary); font-size: 0.9rem; margin: 0 0 0.75rem; }
+        .scan-list { display: flex; flex-direction: column; gap: 0.5rem; }
+        .scan-item { display: flex; justify-content: space-between; align-items: center; gap: 0.75rem; padding: 0.75rem 0.9rem; background: #fff; border: 1px solid var(--border-color); border-radius: 8px; flex-wrap: wrap; }
+        .scan-item-meta { font-size: 0.85rem; color: var(--text-secondary); }
+        .scan-item strong { color: var(--text-color); font-size: 1rem; }
+        .btn-use-ip { background: var(--primary-color); color: #fff; border: none; padding: 0.45rem 0.85rem; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 0.85rem; }
+        .btn-use-ip:hover { background: #4ca8a6; }
+        .confidence-pill { display: inline-block; font-size: 0.75rem; font-weight: 600; padding: 0.15rem 0.5rem; border-radius: 999px; margin-left: 0.35rem; }
+        .confidence-high { background: #d1fae5; color: #065f46; }
+        .confidence-medium { background: #fef3c7; color: #92400e; }
+        .confidence-low { background: #e5e7eb; color: #374151; }
+        .ip-scan-row { display: flex; gap: 0.5rem; align-items: stretch; }
+        .ip-scan-row input { flex: 1; }
         .btn-edit, .btn-delete { padding: 0.45rem 0.85rem; border: none; border-radius: 6px; font-size: 0.85rem; cursor: pointer; color: #fff; }
         .btn-edit { background: var(--primary-color); margin-right: 0.35rem; }
         .btn-edit:hover { background: #4ca8a6; }
@@ -355,7 +374,14 @@ $cctvNavActive = 'camera-management';
                 <div class="section-block">
                     <div class="toolbar">
                         <h2 class="section-title" style="margin:0;"><i class="fas fa-video"></i> Registered Cameras</h2>
-                        <button type="button" class="btn-primary" onclick="openCameraModal()"><i class="fas fa-plus"></i> Add Camera</button>
+                        <div class="toolbar-actions">
+                            <button type="button" class="btn-secondary" id="scanLanBtn" onclick="startCameraScan()"><i class="fas fa-network-wired"></i> Scan LAN for Cameras</button>
+                            <button type="button" class="btn-primary" onclick="openCameraModal()"><i class="fas fa-plus"></i> Add Camera</button>
+                        </div>
+                    </div>
+                    <div class="scan-panel" id="scanPanel">
+                        <p class="scan-status" id="scanStatus">Ready to scan.</p>
+                        <div class="scan-list" id="scanList"></div>
                     </div>
                     <div class="table-container">
                         <table>
@@ -407,7 +433,11 @@ $cctvNavActive = 'camera-management';
                     </div>
                     <div class="form-group">
                         <label for="cameraIp">IP Address *</label>
-                        <input type="text" id="cameraIp" required placeholder="192.168.1.6">
+                        <div class="ip-scan-row">
+                            <input type="text" id="cameraIp" required placeholder="192.168.1.6">
+                            <button type="button" class="btn-secondary" style="padding:0.65rem 0.9rem;white-space:nowrap;" onclick="startCameraScan(true)" title="Scan LAN"><i class="fas fa-search"></i></button>
+                        </div>
+                        <div class="form-hint">Use <strong>Scan LAN</strong> to find connected cameras on the on-site network. Username/password still required.</div>
                     </div>
                     <div class="form-group">
                         <label for="cameraPort">RTSP Port</label>
@@ -471,9 +501,144 @@ $cctvNavActive = 'camera-management';
 
         let cameras = [];
         let deleteTargetId = null;
+        let scanPollTimer = null;
+        let lastScanCameras = [];
 
         function statusClass(status) {
             return String(status || 'offline').toLowerCase();
+        }
+
+        function showScanPanel() {
+            document.getElementById('scanPanel').classList.add('show');
+        }
+
+        function setScanStatus(message) {
+            document.getElementById('scanStatus').textContent = message;
+        }
+
+        function renderScanResults(list) {
+            const wrap = document.getElementById('scanList');
+            lastScanCameras = Array.isArray(list) ? list : [];
+            if (!lastScanCameras.length) {
+                wrap.innerHTML = '<div class="scan-item-meta">No camera candidates found on the scanned subnet(s).</div>';
+                return;
+            }
+            wrap.innerHTML = lastScanCameras.map(function(cam, index) {
+                const conf = String(cam.confidence || 'low').toLowerCase();
+                const ports = (cam.open_ports || []).join(', ');
+                const hint = cam.hint ? (' · ' + cam.hint) : '';
+                return `
+                    <div class="scan-item">
+                        <div>
+                            <strong>${escapeHtml(cam.ip)}</strong>
+                            <span class="confidence-pill confidence-${escapeHtml(conf)}">${escapeHtml(conf)}</span>
+                            <div class="scan-item-meta">ports ${escapeHtml(ports)}${escapeHtml(hint)}</div>
+                        </div>
+                        <button type="button" class="btn-use-ip" onclick="useDiscoveredCamera(${index})">Use IP</button>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function useDiscoveredCamera(index) {
+            const cam = lastScanCameras[index];
+            if (!cam) return;
+            openCameraModal();
+            document.getElementById('cameraIp').value = cam.ip || '';
+            document.getElementById('cameraPort').value = String(cam.rtsp_port || 554);
+            if (!document.getElementById('cameraUsername').value) {
+                document.getElementById('cameraUsername').value = 'admin';
+            }
+            if (!document.getElementById('cameraName').value) {
+                document.getElementById('cameraName').value = 'Camera ' + (cam.ip || '');
+            }
+            if (!document.getElementById('cameraLocation').value) {
+                document.getElementById('cameraLocation').value = 'Barangay San Agustin, Quezon City';
+            }
+            document.getElementById('cameraStatus').value = 'Online';
+        }
+
+        function stopScanPolling() {
+            if (scanPollTimer) {
+                clearInterval(scanPollTimer);
+                scanPollTimer = null;
+            }
+            const btn = document.getElementById('scanLanBtn');
+            if (btn) btn.disabled = false;
+        }
+
+        function applyScanJob(job) {
+            if (!job) return false;
+            const status = job.status || '';
+            if (status === 'pending' || status === 'running') {
+                setScanStatus(job.message || 'Scanning…');
+                return false;
+            }
+            if (status === 'done') {
+                setScanStatus(job.message || ('Found ' + (job.count || 0) + ' camera(s).'));
+                renderScanResults(job.cameras || []);
+                stopScanPolling();
+                return true;
+            }
+            if (status === 'error') {
+                setScanStatus(job.error || job.message || 'Scan failed.');
+                document.getElementById('scanList').innerHTML = '';
+                stopScanPolling();
+                return true;
+            }
+            return false;
+        }
+
+        async function pollCameraScan() {
+            try {
+                const res = await fetch('api/cctv_camera_scan.php', { cache: 'no-store' });
+                const result = await res.json();
+                if (result.job) {
+                    applyScanJob(result.job);
+                }
+            } catch (e) {
+                /* keep polling */
+            }
+        }
+
+        async function startCameraScan(fromModal) {
+            showScanPanel();
+            setScanStatus('Starting LAN scan…');
+            document.getElementById('scanList').innerHTML = '';
+            if (scanPollTimer) {
+                clearInterval(scanPollTimer);
+                scanPollTimer = null;
+            }
+            const btn = document.getElementById('scanLanBtn');
+            if (btn) btn.disabled = true;
+
+            try {
+                const res = await fetch('api/cctv_camera_scan.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'start' })
+                });
+                const result = await res.json();
+                if (!result.success && !result.job) {
+                    setScanStatus(result.message || 'Could not start scan.');
+                    if (btn) btn.disabled = false;
+                    return;
+                }
+                const job = result.job;
+                if (job && (job.status === 'done' || job.status === 'error')) {
+                    applyScanJob(job);
+                    return;
+                }
+                setScanStatus(
+                    (job && job.message)
+                        || (result.message)
+                        || 'Waiting for on-site PC to scan the network…'
+                );
+                scanPollTimer = setInterval(pollCameraScan, 2500);
+            } catch (e) {
+                setScanStatus('Network error while starting scan.');
+                if (btn) btn.disabled = false;
+            }
         }
 
         async function loadCameras() {

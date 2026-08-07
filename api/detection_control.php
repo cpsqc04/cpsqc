@@ -18,12 +18,17 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
 
 $root = dirname(__DIR__);
 $lockFile = $root . DIRECTORY_SEPARATOR . 'detect.lock';
-$heartbeatFile = $root . DIRECTORY_SEPARATOR . 'detection_heartbeat.json';
+$heartbeatFile = getDetectionHeartbeatPath();
 $logFile = $root . DIRECTORY_SEPARATOR . 'detection_control.log';
 
 $input = json_decode(file_get_contents('php://input'), true);
 if (!is_array($input)) {
     $input = [];
+}
+// sendBeacon may post as text/plain — accept raw JSON body already handled above;
+// also accept form-urlencoded action for beacon compatibility.
+if ($input === [] && isset($_POST['action'])) {
+    $input = ['action' => $_POST['action']];
 }
 $action = strtolower(trim($input['action'] ?? $_GET['action'] ?? 'status'));
 
@@ -59,12 +64,7 @@ function readDetectionPid(string $lockFile): ?int
 
 function writeDetectionHeartbeat(string $heartbeatFile, string $source = 'open-surveillance'): void
 {
-    $payload = [
-        'updated_at' => microtime(true),
-        'source' => $source,
-        'updated_iso' => date('c'),
-    ];
-    @file_put_contents($heartbeatFile, json_encode($payload), LOCK_EX);
+    writeDetectionViewerHeartbeat($source);
 }
 
 function stopDetectionProcesses(string $root, string $lockFile): int
@@ -140,6 +140,17 @@ if ($action === 'status') {
 }
 
 if ($action === 'stop') {
+    clearDetectionViewerHeartbeat('open-surveillance-stop');
+    if (!isLocalDetectionEnabled()) {
+        echo json_encode([
+            'success' => true,
+            'action' => 'stop',
+            'stopped' => true,
+            'feed_mode' => 'remote',
+            'message' => 'Viewer closed. On-site detection may keep recording.',
+        ]);
+        exit;
+    }
     $killed = stopDetectionProcesses($root, $lockFile);
     echo json_encode([
         'success' => true,
@@ -154,6 +165,7 @@ if ($action === 'start') {
     writeDetectionHeartbeat($heartbeatFile);
 
     if (!isLocalDetectionEnabled()) {
+        $viewer = getDetectionViewerStatus(90.0);
         echo json_encode([
             'success' => true,
             'action' => 'start',
@@ -162,7 +174,8 @@ if ($action === 'start') {
             'pid' => null,
             'local_detection_enabled' => false,
             'feed_mode' => 'remote',
-            'message' => 'Remote feed mode: detection runs on the on-site PC and uploads frames to this server.',
+            'viewer_active' => $viewer['active'],
+            'message' => 'Open Surveillance signaled. On-site detection agent will start detect.py automatically.',
         ]);
         exit;
     }

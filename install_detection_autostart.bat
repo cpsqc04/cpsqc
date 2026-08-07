@@ -3,15 +3,13 @@ echo ========================================
 echo Install IP Camera Detection Autostart
 echo ========================================
 echo.
-echo Autostart is NOT recommended.
-echo Detection now starts when you open Open Surveillance
-echo and stops when you leave (or after 10 minutes idle).
+echo Autostart Task Scheduler install is optional.
+echo Preferred: run start_detection_agent.bat on the on-site PC.
+echo When an admin opens Open Surveillance, detect.py starts automatically.
+echo Camera Management "Scan LAN" also runs through this agent.
 echo.
-echo This installer is disabled to prevent PC slowdown / 504 errors.
-echo.
-echo Use Open Surveillance in the admin panel instead.
-echo Manual start (optional): start_detection.bat
+echo Manual always-on start: start_detection.bat
 echo Manual stop: stop_detection.bat
 echo.
 pause
-exit /b 1
+exit /b 0

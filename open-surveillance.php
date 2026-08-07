@@ -514,9 +514,9 @@ $cctvFeedMode = getCctvFeedMode();
                                     <p>Loading IP camera feed...</p>
                                     <p id="cameraPlaceholderHint" style="font-size:0.9rem;margin-top:0.5rem;">
                                         <?php if ($localDetectionEnabled): ?>
-                                            Run <strong>start_detection.bat</strong> on this PC, or open this page to start detection automatically.
+                                            Starting detection automatically…
                                         <?php else: ?>
-                                            Live feed is uploaded from the <strong>on-site detection PC</strong>. Ensure <strong>start_detection.bat</strong> runs there with upload settings in <strong>.env</strong>.
+                                            Opening this page signals the on-site PC to start detection. Keep <strong>start_detection_agent.bat</strong> running there (once).
                                         <?php endif; ?>
                                     </p>
                                 </div>
@@ -545,7 +545,7 @@ $cctvFeedMode = getCctvFeedMode();
             ensureDetectionRunning();
             startCameraFeed();
             setInterval(pollDetections, 1000);
-            setInterval(sendDetectionHeartbeat, 30000);
+            setInterval(sendDetectionHeartbeat, 15000);
             initFullscreen();
             initDetectionLifecycle();
         });
@@ -562,10 +562,6 @@ $cctvFeedMode = getCctvFeedMode();
         }
 
         async function ensureDetectionRunning() {
-            if (!LOCAL_DETECTION_ENABLED) {
-                console.log('Detection: remote feed mode (Hostinger — no local Python).');
-                return;
-            }
             try {
                 const result = await detectionControl('start');
                 if (result && result.message) {
@@ -581,10 +577,10 @@ $cctvFeedMode = getCctvFeedMode();
 
         function getOfflineFeedMessage(status) {
             if (LOCAL_DETECTION_ENABLED) {
-                return 'Camera feed not available. Run start_detection.bat on this PC or open Camera Management to verify the camera IP.';
+                return 'Camera feed not available. Detection should start automatically when this page opens. Check Camera Management for the camera IP.';
             }
             if (status && status.feed_mode === 'remote') {
-                return 'Waiting for frames from the on-site detection PC. Run start_detection.bat there and set CCTV_FRAME_UPLOAD_URL in its .env file.';
+                return 'Waiting for frames from the on-site detection PC. Keep start_detection_agent.bat running there — opening this page starts detect.py automatically.';
             }
             return 'Camera feed not available. Check Camera Management and the on-site detection PC.';
         }
@@ -600,17 +596,12 @@ $cctvFeedMode = getCctvFeedMode();
         function initDetectionLifecycle() {
             document.addEventListener('visibilitychange', function() {
                 if (document.visibilityState === 'visible') {
-                    if (LOCAL_DETECTION_ENABLED) {
-                        ensureDetectionRunning();
-                    }
+                    ensureDetectionRunning();
                     sendDetectionHeartbeat();
                 }
             });
 
             const stopOnLeave = function() {
-                if (!LOCAL_DETECTION_ENABLED) {
-                    return;
-                }
                 try {
                     if (navigator.sendBeacon) {
                         const blob = new Blob([JSON.stringify({ action: 'stop' })], { type: 'application/json' });
