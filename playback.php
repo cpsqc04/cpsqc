@@ -504,7 +504,7 @@ $cctvNavActive = 'playback';
                 }
                 select.innerHTML = cameras.map(function(cam) {
                     const id = cam.cameraId || cam.camera_id || '';
-                    const label = (cam.name || id) + (cam.location ? ' — ' + cam.location : '');
+                    const label = cam.location || cam.name || id || 'Camera';
                     return '<option value="' + escapeHtml(id) + '">' + escapeHtml(label) + '</option>';
                 }).join('');
 

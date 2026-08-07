@@ -204,7 +204,6 @@ $cctvNavActive = 'camera-management';
         .btn-edit { background: var(--primary-color); margin-right: 0.35rem; }
         .btn-edit:hover { background: #4ca8a6; }
         .btn-delete { background: #dc3545; }
-        .stream-badge { display: inline-block; padding: 0.15rem 0.55rem; border-radius: 999px; font-size: 0.75rem; font-weight: 600; background: #e0f2fe; color: #0369a1; }
         .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 2000; align-items: center; justify-content: center; }
         .modal.active { display: flex; }
         .modal-content { background: var(--card-bg); border-radius: 12px; padding: 2rem; width: 92%; max-width: 720px; max-height: 90vh; overflow-y: auto; }
@@ -412,13 +411,12 @@ $cctvNavActive = 'camera-management';
                                     <th>Name</th>
                                     <th>Location</th>
                                     <th>Network</th>
-                                    <th>Stream</th>
                                     <th>Status</th>
                                     <th>Actions</th>
                                 </tr>
                             </thead>
                             <tbody id="camerasTableBody">
-                                <tr><td colspan="7" style="text-align:center;color:var(--text-secondary);">Loading cameras…</td></tr>
+                                <tr><td colspan="6" style="text-align:center;color:var(--text-secondary);">Loading cameras…</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -482,7 +480,6 @@ $cctvNavActive = 'camera-management';
                         <button type="button" class="btn-secondary" id="detectEncodingBtn" style="margin-top:0.55rem;" onclick="detectReolinkEncoding()">
                             <i class="fas fa-magic"></i> Detect Camera
                         </button>
-                        <div class="form-hint" id="encodingHint" style="margin-top:0.4rem;"></div>
                     </div>
                     <div class="form-group full" id="rtspUrlGroup" style="display:none;">
                         <label for="cameraRtspUrl">RTSP URL</label>
@@ -645,11 +642,11 @@ $cctvNavActive = 'camera-management';
             if (!document.getElementById('cameraUsername').value) {
                 document.getElementById('cameraUsername').value = 'admin';
             }
-            if (!document.getElementById('cameraName').value) {
-                document.getElementById('cameraName').value = 'Camera ' + (cam.ip || '');
-            }
             if (!document.getElementById('cameraLocation').value) {
                 document.getElementById('cameraLocation').value = 'Barangay San Agustin, Quezon City';
+            }
+            if (!document.getElementById('cameraName').value) {
+                document.getElementById('cameraName').value = document.getElementById('cameraLocation').value;
             }
             document.getElementById('cameraStatus').value = 'Online';
         }
@@ -740,10 +737,8 @@ $cctvNavActive = 'camera-management';
         let encodingPollTimer = null;
 
         async function detectReolinkEncoding(cameraId) {
-            const hint = document.getElementById('encodingHint');
             const btn = document.getElementById('detectEncodingBtn');
             const id = cameraId || (editingCamera && editingCamera.id) || (document.getElementById('cameraDbId').value) || '';
-            if (hint) hint.textContent = 'Detecting…';
             if (btn) btn.disabled = true;
             if (encodingPollTimer) {
                 clearInterval(encodingPollTimer);
@@ -758,11 +753,10 @@ $cctvNavActive = 'camera-management';
                 });
                 const result = await res.json();
                 if (!result.success) {
-                    if (hint) hint.textContent = result.message || 'Could not start encoding probe.';
+                    showToast(result.message || 'Could not start encoding probe.');
                     if (btn) btn.disabled = false;
                     return;
                 }
-                if (hint) hint.textContent = 'Detecting…';
                 let tries = 0;
                 encodingPollTimer = setInterval(async function() {
                     tries += 1;
@@ -776,7 +770,6 @@ $cctvNavActive = 'camera-management';
                             encodingPollTimer = null;
                             if (btn) btn.disabled = false;
                             const msg = job.message || (job.result && job.result.reason) || status;
-                            if (hint) hint.textContent = status === 'done' ? '' : msg;
                             if (status === 'error') {
                                 showToast('Detect failed: ' + msg);
                             }
@@ -787,7 +780,6 @@ $cctvNavActive = 'camera-management';
                                     editingCamera = updated;
                                     document.getElementById('cameraStreamType').value = updated.streamType || 'sub';
                                     refreshRtspPreview();
-                                    if (hint) hint.textContent = '';
                                 }
                             }
                             try {
@@ -798,16 +790,14 @@ $cctvNavActive = 'camera-management';
                             clearInterval(encodingPollTimer);
                             encodingPollTimer = null;
                             if (btn) btn.disabled = false;
-                            if (hint) hint.textContent = 'Timed out waiting for on-site agent. Is start_detection_agent.bat running?';
-                        } else if (hint) {
-                            hint.textContent = 'Detecting…';
+                            showToast('Timed out waiting for on-site agent. Is start_detection_agent.bat running?');
                         }
                     } catch (e) {
                         /* keep polling */
                     }
                 }, 2000);
             } catch (e) {
-                if (hint) hint.textContent = 'Network error while starting encoding probe.';
+                showToast('Network error while starting encoding probe.');
                 if (btn) btn.disabled = false;
             }
         }
@@ -821,37 +811,35 @@ $cctvNavActive = 'camera-management';
                 cameras = result.cameras || [];
                 renderCameras();
             } catch (e) {
-                tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#b91c1c;">Failed to load cameras.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#b91c1c;">Failed to load cameras.</td></tr>';
             }
+        }
+
+        function cameraDisplayName(cam) {
+            const name = String(cam.name || '').trim();
+            const ip = String(cam.ipAddress || '').trim();
+            const looksLikeIpName = !name
+                || /^Camera\s+\d{1,3}(?:\.\d{1,3}){3}$/i.test(name)
+                || (ip && name.toLowerCase() === ('camera ' + ip).toLowerCase());
+            if (looksLikeIpName) {
+                return cam.location || name || cam.cameraId || 'Camera';
+            }
+            return name;
         }
 
         function renderCameras() {
             const tbody = document.getElementById('camerasTableBody');
             if (!cameras.length) {
-                tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text-secondary);">No cameras registered yet.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-secondary);">No cameras registered yet.</td></tr>';
                 return;
             }
             tbody.innerHTML = cameras.map(function(cam) {
-                const streamLabel = cam.streamType === 'main' ? 'Main' : 'Sub';
-                const enc = cam.encoding || {};
-                const main = enc.mainStream || {};
-                const sub = enc.subStream || {};
-                const encTip = enc.reason
-                    ? escapeHtml(enc.reason)
-                    : 'Not probed yet — use Detect Camera';
-                const encMeta = (main.width || sub.width)
-                    ? ` · ${main.width || '?'}x${main.height || '?'} ${main.vType || ''}/${sub.width || '?'}x${sub.height || '?'} ${sub.vType || ''}`
-                    : '';
                 return `
                     <tr>
                         <td>${escapeHtml(cam.cameraId)}</td>
-                        <td>${escapeHtml(cam.name)}</td>
+                        <td>${escapeHtml(cameraDisplayName(cam))}</td>
                         <td>${escapeHtml(cam.location)}</td>
                         <td>${escapeHtml(cam.ipAddress)}:${escapeHtml(cam.port || '554')}</td>
-                        <td>
-                            <span class="stream-badge" title="${encTip}">${streamLabel}</span>
-                            <div class="scan-item-meta" style="margin-top:0.25rem;max-width:220px;" title="${encTip}">${escapeHtml(enc.detectedAt ? ('Detected ' + enc.detectedAt) : 'Encoding unknown')}${escapeHtml(encMeta)}</div>
-                        </td>
                         <td><span class="status-badge status-${statusClass(cam.status)}">${escapeHtml(cam.status || 'Offline')}</span></td>
                         <td>
                             <button type="button" class="btn-edit" onclick="editCamera('${cam.id}')">Edit</button>
@@ -891,13 +879,6 @@ $cctvNavActive = 'camera-management';
             document.getElementById('cameraStreamType').value = camera ? (camera.streamType || 'main') : 'main';
             document.getElementById('cameraStatus').value = camera ? (camera.status || 'Online') : 'Online';
             document.getElementById('cameraDescription').value = camera ? (camera.description || '') : '';
-            const encHint = document.getElementById('encodingHint');
-            if (encHint) {
-                const enc = camera && camera.encoding ? camera.encoding : null;
-                encHint.textContent = enc && enc.reason
-                    ? ('Last detect: ' + enc.reason)
-                    : '';
-            }
 
             const rtspGroup = document.getElementById('rtspUrlGroup');
             if (camera) {
@@ -926,7 +907,7 @@ $cctvNavActive = 'camera-management';
             const camera = cameras.find(function(item) { return String(item.id) === String(id); });
             if (!camera) return;
             deleteTargetId = id;
-            document.getElementById('deleteCameraLabel').textContent = camera.cameraId + ' — ' + camera.name;
+            document.getElementById('deleteCameraLabel').textContent = camera.cameraId + ' — ' + cameraDisplayName(camera);
             document.getElementById('deleteModal').classList.add('active');
         }
 
