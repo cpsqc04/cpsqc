@@ -129,6 +129,8 @@ CAMERAS_CONFIG_FINGERPRINT = None
 CCTV_FRAME_UPLOAD_URL = ""
 CCTV_FRAME_UPLOAD_KEY = ""
 CCTV_CAMERAS_CONFIG_URL = ""
+CCTV_RECORDING_UPLOAD_URL = ""
+CCTV_RECORDING_UPLOAD_CHUNK_BYTES = 3_500_000  # Hostinger-friendly chunk size
 CCTV_USE_MAIN_STREAM = False  # Force main stream when True
 CCTV_AUTO_ENCODING = True  # Probe Reolink GetEnc and sync stream/display quality
 CCTV_ENCODING_CACHE = "camera_encoding.json"
@@ -145,6 +147,10 @@ _last_detections_upload_at = 0.0
 _cctv_upload_lock = threading.Lock()
 _cctv_upload_pending = None  # (frame_bytes, detections_text_or_None)
 _cctv_upload_worker_started = False
+_recording_upload_lock = threading.Lock()
+_recording_upload_queue = []
+_recording_upload_pending = set()
+_recording_upload_worker_started = False
 _cameras_sync_lock = threading.Lock()
 _cameras_sync_in_flight = False
 _cameras_sync_backoff_until = 0.0
@@ -160,6 +166,7 @@ FRAME_FILE_TEMP = "current_frame_temp.jpg"  # Temporary file for atomic writes
 DETECTED_OBJECTS_DIR = "detected_objects"  # Directory for cropped detected object images
 LOCK_FILE = "detect.lock"  # Lock file to prevent multiple instances
 RECORDINGS_DIR = "recordings"  # Directory for recorded video files
+RECORDINGS_UPLOAD_MARKER_SUFFIX = ".uploaded"  # Sidecar marker after Hostinger sync
 # Display/recording target — use native camera resolution up to this cap (never upscale).
 MAX_DISPLAY_WIDTH = 1920
 MAX_DISPLAY_HEIGHT = 1080
@@ -563,6 +570,7 @@ def load_project_env():
 def init_cctv_upload_from_env():
     """Enable optional upload of live frames to Hostinger (on-site PC only)."""
     global CCTV_FRAME_UPLOAD_URL, CCTV_FRAME_UPLOAD_KEY, CCTV_CAMERAS_CONFIG_URL
+    global CCTV_RECORDING_UPLOAD_URL, CCTV_RECORDING_UPLOAD_CHUNK_BYTES
     global CCTV_UPLOAD_MIN_INTERVAL, CCTV_UPLOAD_JPEG_QUALITY, CCTV_UPLOAD_MAX_WIDTH, LIVE_JPEG_QUALITY
     global CCTV_USE_MAIN_STREAM, CCTV_AUTO_ENCODING
     env = load_project_env()
@@ -575,6 +583,28 @@ def init_cctv_upload_from_env():
     CCTV_CAMERAS_CONFIG_URL = (
         env.get("CCTV_CAMERAS_CONFIG_URL", "") or os.environ.get("CCTV_CAMERAS_CONFIG_URL", "")
     ).strip()
+    recording_url = (
+        env.get("CCTV_RECORDING_UPLOAD_URL", "") or os.environ.get("CCTV_RECORDING_UPLOAD_URL", "")
+    ).strip()
+    if not recording_url and CCTV_FRAME_UPLOAD_URL:
+        recording_url = CCTV_FRAME_UPLOAD_URL.replace(
+            "cctv_frame_upload.php", "cctv_recording_upload.php"
+        )
+        if recording_url == CCTV_FRAME_UPLOAD_URL:
+            # Fallback if URL path differs unexpectedly.
+            recording_url = CCTV_FRAME_UPLOAD_URL.rsplit("/", 1)[0] + "/cctv_recording_upload.php"
+    CCTV_RECORDING_UPLOAD_URL = recording_url
+    try:
+        CCTV_RECORDING_UPLOAD_CHUNK_BYTES = max(
+            512_000,
+            int(
+                env.get("CCTV_RECORDING_UPLOAD_CHUNK_BYTES", "")
+                or os.environ.get("CCTV_RECORDING_UPLOAD_CHUNK_BYTES", "")
+                or CCTV_RECORDING_UPLOAD_CHUNK_BYTES
+            ),
+        )
+    except ValueError:
+        pass
     use_main = (
         env.get("CCTV_USE_MAIN_STREAM", "") or os.environ.get("CCTV_USE_MAIN_STREAM", "") or ""
     ).strip().lower()
@@ -654,6 +684,8 @@ def init_cctv_upload_from_env():
             f"max_w={CCTV_UPLOAD_MAX_WIDTH}, q={CCTV_UPLOAD_JPEG_QUALITY}, "
             f"main_stream={CCTV_USE_MAIN_STREAM})"
         )
+    if CCTV_RECORDING_UPLOAD_URL:
+        print(f"✓ Remote recording upload enabled → {CCTV_RECORDING_UPLOAD_URL}")
     if CCTV_CAMERAS_CONFIG_URL:
         print(f"✓ Remote camera config sync enabled → {CCTV_CAMERAS_CONFIG_URL}")
 
@@ -971,6 +1003,188 @@ def maybe_upload_frame_file(frame_path):
             _last_cctv_upload_at = now
     except Exception:
         pass
+
+
+def recording_upload_marker_path(filepath):
+    return str(filepath) + RECORDINGS_UPLOAD_MARKER_SUFFIX
+
+
+def recording_already_uploaded(filepath):
+    return os.path.isfile(recording_upload_marker_path(filepath))
+
+
+def mark_recording_uploaded(filepath):
+    try:
+        with open(recording_upload_marker_path(filepath), "w", encoding="utf-8") as fh:
+            fh.write(datetime.now().isoformat())
+    except OSError:
+        pass
+
+
+def _ensure_recording_upload_worker():
+    global _recording_upload_worker_started
+    if _recording_upload_worker_started or not REQUESTS_AVAILABLE:
+        return
+    worker = threading.Thread(
+        target=_recording_upload_worker,
+        name="recording-upload",
+        daemon=True,
+    )
+    worker.start()
+    _recording_upload_worker_started = True
+
+
+def enqueue_recording_upload(filepath):
+    """Queue a finalized local MP4 for Hostinger Playback sync."""
+    if not CCTV_RECORDING_UPLOAD_URL or not CCTV_FRAME_UPLOAD_KEY or not REQUESTS_AVAILABLE:
+        return
+    if not filepath or not os.path.isfile(filepath):
+        return
+    name = os.path.basename(filepath)
+    if not (name.startswith("recording_") and name.endswith(RECORDING_EXTENSION)):
+        return
+    if recording_already_uploaded(filepath):
+        return
+    abs_path = os.path.abspath(filepath)
+    with _recording_upload_lock:
+        if abs_path in _recording_upload_pending:
+            return
+        _recording_upload_pending.add(abs_path)
+        _recording_upload_queue.append(abs_path)
+    _ensure_recording_upload_worker()
+
+
+def _upload_recording_whole(filepath, filename):
+    with open(filepath, "rb") as fh:
+        files = {"recording": (filename, fh, "video/mp4")}
+        data = {"filename": filename}
+        headers = {"X-CCTV-Upload-Key": CCTV_FRAME_UPLOAD_KEY}
+        resp = requests.post(
+            CCTV_RECORDING_UPLOAD_URL,
+            files=files,
+            data=data,
+            headers=headers,
+            timeout=180,
+        )
+    return resp
+
+
+def _upload_recording_chunked(filepath, filename):
+    size = os.path.getsize(filepath)
+    chunk_size = max(512_000, int(CCTV_RECORDING_UPLOAD_CHUNK_BYTES))
+    total = max(1, (size + chunk_size - 1) // chunk_size)
+    headers = {"X-CCTV-Upload-Key": CCTV_FRAME_UPLOAD_KEY}
+    with open(filepath, "rb") as fh:
+        for index in range(total):
+            blob = fh.read(chunk_size)
+            if not blob:
+                break
+            files = {"chunk": (f"{filename}.part{index}", blob, "application/octet-stream")}
+            data = {
+                "action": "chunk",
+                "filename": filename,
+                "chunk_index": str(index),
+                "chunk_total": str(total),
+            }
+            resp = requests.post(
+                CCTV_RECORDING_UPLOAD_URL,
+                files=files,
+                data=data,
+                headers=headers,
+                timeout=120,
+            )
+            if resp.status_code != 200:
+                return resp
+            try:
+                payload = resp.json()
+            except Exception:
+                payload = {}
+            if index == total - 1 and not payload.get("success"):
+                return resp
+    return resp
+
+
+def upload_recording_file(filepath):
+    """Upload one recording to Hostinger. Returns True on success."""
+    if not CCTV_RECORDING_UPLOAD_URL or not CCTV_FRAME_UPLOAD_KEY or not REQUESTS_AVAILABLE:
+        return False
+    if not os.path.isfile(filepath):
+        return False
+    if recording_already_uploaded(filepath):
+        return True
+
+    filename = os.path.basename(filepath)
+    size = os.path.getsize(filepath)
+    if size < 1024:
+        return False
+
+    try:
+        # Prefer chunked for typical Hostinger upload_max_filesize limits.
+        if size > CCTV_RECORDING_UPLOAD_CHUNK_BYTES:
+            resp = _upload_recording_chunked(filepath, filename)
+        else:
+            resp = _upload_recording_whole(filepath, filename)
+            if resp is not None and resp.status_code in (413, 400):
+                # Fall back to chunked if the host rejected the whole body.
+                resp = _upload_recording_chunked(filepath, filename)
+
+        if resp is None:
+            return False
+        if resp.status_code == 200:
+            try:
+                payload = resp.json()
+            except Exception:
+                payload = {"success": True}
+            if payload.get("success"):
+                mark_recording_uploaded(filepath)
+                print(f"✓ Uploaded recording to Hostinger Playback: {filename}")
+                return True
+        print(
+            f"⚠ Recording upload failed ({resp.status_code}): {filename} "
+            f"{(resp.text or '')[:160]}"
+        )
+    except Exception as exc:
+        print(f"⚠ Recording upload error for {filename}: {exc}")
+    return False
+
+
+def _recording_upload_worker():
+    while True:
+        filepath = None
+        with _recording_upload_lock:
+            if _recording_upload_queue:
+                filepath = _recording_upload_queue.pop(0)
+        if filepath is None:
+            time.sleep(0.5)
+            continue
+        try:
+            upload_recording_file(filepath)
+        finally:
+            with _recording_upload_lock:
+                _recording_upload_pending.discard(filepath)
+
+
+def queue_pending_recording_uploads():
+    """On startup, sync any finalized local recordings not yet on Hostinger."""
+    if not CCTV_RECORDING_UPLOAD_URL or not CCTV_FRAME_UPLOAD_KEY:
+        return
+    if not os.path.isdir(RECORDINGS_DIR):
+        return
+    queued = 0
+    for name in sorted(os.listdir(RECORDINGS_DIR)):
+        if not (name.startswith("recording_") and name.endswith(RECORDING_EXTENSION)):
+            continue
+        path = os.path.join(RECORDINGS_DIR, name)
+        if not os.path.isfile(path):
+            continue
+        if recording_already_uploaded(path):
+            continue
+        if os.path.getsize(path) < 1024:
+            continue
+        enqueue_recording_upload(path)
+        queued += 1
+    if queued:
+        print(f"✓ Queued {queued} recording(s) for Hostinger Playback upload")
 
 
 def init_camera_config_fingerprint():
@@ -3349,6 +3563,7 @@ def finalize_video_writer(writer_info, discard_short=True):
         print(f"⚠ Warning: {os.path.basename(filename)} may not play in browsers (missing moov / 0:00 duration)")
 
     print(f"✓ Completed recording: {filename} ({duration:.0f}s wall-clock, {frame_count} frames @ {write_fps:.2f} fps)")
+    enqueue_recording_upload(filename)
 
 
 def cleanup_short_recordings(min_duration=MIN_RECORDING_DURATION):
@@ -3513,6 +3728,12 @@ def cleanup_old_recordings(retention_days=RECORDING_RETENTION_DAYS):
             if expired or empty:
                 try:
                     os.remove(filepath)
+                    marker = recording_upload_marker_path(filepath)
+                    if os.path.isfile(marker):
+                        try:
+                            os.remove(marker)
+                        except OSError:
+                            pass
                     removed += 1
                     if expired:
                         days_old = int(age_seconds // 86400)
@@ -4065,8 +4286,9 @@ def main():
             print(f"✓ Recordings directory ready: {RECORDINGS_DIR}")
             cleanup_short_recordings()
             cleanup_old_recordings()
-            print(f"✓ Recording policy: {RECORDING_CHUNK_DURATION // 60}-min segments, min {MIN_RECORDING_DURATION // 60} min kept")
+            print(f"✓ Recording policy: {RECORDING_CHUNK_DURATION // 60}-min segments, min {MIN_RECORDING_DURATION}s kept")
             print(f"✓ Retention policy: auto-delete after {RECORDING_RETENTION_DAYS} days")
+            queue_pending_recording_uploads()
             print(f"✓ Idle recording: full rate for {RECORD_ACTIVITY_HOLD_SECONDS}s after motion/detection; else 1/{IDLE_RECORD_EVERY_N} frames")
             print(f"  HTTP recording: {HTTP_RECORDING_FPS:.2f} fps (snapshot every {HTTP_SNAPSHOT_INTERVAL:.1f}s)")
             print(f"  RTSP recording: {RECORDING_FPS} fps")

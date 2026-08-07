@@ -576,7 +576,7 @@ $cctvNavActive = 'playback';
                 renderSegments(result.data || [], autoPlayFirst);
 
                 if (showEmptyError && (!result.data || !result.data.length)) {
-                    showPlaybackError('No recordings found for the selected date and time. Make sure the detection script is running during that period.');
+                    showPlaybackError('No recordings found for the selected date and time. Keep start_detection_agent.bat running so clips are recorded and uploaded to Playback.');
                 }
             } catch (e) {
                 tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#b91c1c;">Failed to load recordings.</td></tr>';
