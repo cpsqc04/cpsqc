@@ -170,9 +170,9 @@ RECORDING_FPS = 10  # Declared MP4 FPS — must match actual write pacing for co
 HTTP_SNAPSHOT_INTERVAL = 0.35  # Seconds between HTTP snapshots (fallback mode)
 HTTP_RECORDING_FPS = 1.0 / HTTP_SNAPSHOT_INTERVAL  # Match snapshot rate for recording duration
 LIVE_JPEG_QUALITY = 90  # Local preview file (upload uses CCTV_UPLOAD_JPEG_QUALITY)
-RECORDING_CHUNK_DURATION = 300  # Record in 5-minute chunks (seconds)
-MIN_RECORDING_DURATION = 60  # Keep clips of at least 1 minute (discard shorter fragments)
-RECORDING_BUCKET_SECONDS = 300  # Align filenames to 5-minute windows
+RECORDING_CHUNK_DURATION = 120  # Max 2-minute recording segments (seconds)
+MIN_RECORDING_DURATION = 30  # Discard very short fragments
+RECORDING_BUCKET_SECONDS = 120  # Align filenames to 2-minute windows
 RECORDING_CODEC = 'avc1'  # H.264 for browser playback (fallback: mp4v)
 RECORDING_EXTENSION = '.mp4'  # File extension for recordings
 RECORDING_RETENTION_DAYS = 30  # Auto-delete recordings older than N days
@@ -3134,14 +3134,14 @@ def save_frame_atomic(frame, filepath):
         return False
 
 def get_recording_bucket_start(dt=None):
-    """Floor a timestamp to the current 5-minute recording bucket."""
+    """Floor a timestamp to the current recording bucket (2-minute windows)."""
     dt = dt or datetime.now()
     bucket_minute = (dt.minute // (RECORDING_BUCKET_SECONDS // 60)) * (RECORDING_BUCKET_SECONDS // 60)
     return dt.replace(minute=bucket_minute, second=0, microsecond=0)
 
 
 def get_recording_filename(dt=None):
-    """Generate filename for the current 5-minute recording bucket."""
+    """Generate filename for the current recording bucket."""
     bucket = get_recording_bucket_start(dt)
     timestamp = bucket.strftime("%Y%m%d_%H%M%S")
     filename = f"recording_{timestamp}{RECORDING_EXTENSION}"
@@ -3356,7 +3356,7 @@ def init_video_writer(width, height, fps=None):
         writer = create_video_writer(filename, width, height, write_fps)
 
         if writer is not None:
-            print(f"✓ Started recording ({write_fps:.2f} fps, 5-min bucket): {os.path.basename(filename)}")
+            print(f"✓ Started recording ({write_fps:.2f} fps, 2-min bucket): {os.path.basename(filename)}")
             return writer, filename, time.time(), 0, write_fps
         else:
             print(f"✗ Failed to initialize video writer for: {filename}")

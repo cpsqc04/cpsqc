@@ -400,9 +400,6 @@ $cctvNavActive = 'camera-management';
                             <button type="button" class="btn-primary" onclick="openCameraModal()"><i class="fas fa-plus"></i> Add Camera</button>
                         </div>
                     </div>
-                    <p style="margin:0 0 1rem;color:var(--text-secondary);font-size:0.9rem;">
-                        Edit camera IP, credentials, and stream here. Changes save to <strong>cameras.json</strong> on the server right away; the on-site PC syncs them automatically (do not edit the JSON file by hand).
-                    </p>
                     <div class="scan-panel" id="scanPanel">
                         <p class="scan-status" id="scanStatus">Ready to scan.</p>
                         <div class="scan-list" id="scanList"></div>
@@ -482,9 +479,8 @@ $cctvNavActive = 'camera-management';
                             <option value="main">Main stream (Clear)</option>
                             <option value="sub">Sub stream (Fluent)</option>
                         </select>
-                        <div class="form-hint">Auto-detect reads Reolink’s saved encoding (H.264/H.265, resolution) and picks the OpenCV-safe stream. Main H.265 usually falls back to Sub.</div>
                         <button type="button" class="btn-secondary" id="detectEncodingBtn" style="margin-top:0.55rem;" onclick="detectReolinkEncoding()">
-                            <i class="fas fa-magic"></i> Auto-detect from Reolink
+                            <i class="fas fa-magic"></i> Detect Camera
                         </button>
                         <div class="form-hint" id="encodingHint" style="margin-top:0.4rem;"></div>
                     </div>
@@ -732,7 +728,7 @@ $cctvNavActive = 'camera-management';
                 setScanStatus(
                     (job && job.message)
                         || (result.message)
-                        || 'Waiting for on-site PC to scan the network…'
+                        || 'Scanning LAN Camera'
                 );
                 scanPollTimer = setInterval(pollCameraScan, 2500);
             } catch (e) {
@@ -747,7 +743,7 @@ $cctvNavActive = 'camera-management';
             const hint = document.getElementById('encodingHint');
             const btn = document.getElementById('detectEncodingBtn');
             const id = cameraId || (editingCamera && editingCamera.id) || (document.getElementById('cameraDbId').value) || '';
-            if (hint) hint.textContent = 'Queuing Reolink encoding probe on the on-site PC…';
+            if (hint) hint.textContent = 'Detecting…';
             if (btn) btn.disabled = true;
             if (encodingPollTimer) {
                 clearInterval(encodingPollTimer);
@@ -766,7 +762,7 @@ $cctvNavActive = 'camera-management';
                     if (btn) btn.disabled = false;
                     return;
                 }
-                if (hint) hint.textContent = result.message || 'Waiting for on-site agent…';
+                if (hint) hint.textContent = 'Detecting…';
                 let tries = 0;
                 encodingPollTimer = setInterval(async function() {
                     tries += 1;
@@ -780,8 +776,10 @@ $cctvNavActive = 'camera-management';
                             encodingPollTimer = null;
                             if (btn) btn.disabled = false;
                             const msg = job.message || (job.result && job.result.reason) || status;
-                            if (hint) hint.textContent = msg;
-                            showToast(status === 'done' ? 'Encoding synced from Reolink' : ('Encoding probe: ' + msg));
+                            if (hint) hint.textContent = status === 'done' ? '' : msg;
+                            if (status === 'error') {
+                                showToast('Detect failed: ' + msg);
+                            }
                             await loadCameras();
                             if (editingCamera && editingCamera.id) {
                                 const updated = cameras.find(function(c) { return c.id === editingCamera.id; });
@@ -789,9 +787,7 @@ $cctvNavActive = 'camera-management';
                                     editingCamera = updated;
                                     document.getElementById('cameraStreamType').value = updated.streamType || 'sub';
                                     refreshRtspPreview();
-                                    if (hint && updated.encoding && updated.encoding.reason) {
-                                        hint.textContent = updated.encoding.reason;
-                                    }
+                                    if (hint) hint.textContent = '';
                                 }
                             }
                             try {
@@ -803,8 +799,8 @@ $cctvNavActive = 'camera-management';
                             encodingPollTimer = null;
                             if (btn) btn.disabled = false;
                             if (hint) hint.textContent = 'Timed out waiting for on-site agent. Is start_detection_agent.bat running?';
-                        } else if (hint && job.message) {
-                            hint.textContent = job.message;
+                        } else if (hint) {
+                            hint.textContent = 'Detecting…';
                         }
                     } catch (e) {
                         /* keep polling */
@@ -842,7 +838,7 @@ $cctvNavActive = 'camera-management';
                 const sub = enc.subStream || {};
                 const encTip = enc.reason
                     ? escapeHtml(enc.reason)
-                    : 'Not probed yet — use Auto-detect from Reolink';
+                    : 'Not probed yet — use Detect Camera';
                 const encMeta = (main.width || sub.width)
                     ? ` · ${main.width || '?'}x${main.height || '?'} ${main.vType || ''}/${sub.width || '?'}x${sub.height || '?'} ${sub.vType || ''}`
                     : '';
@@ -859,7 +855,7 @@ $cctvNavActive = 'camera-management';
                         <td><span class="status-badge status-${statusClass(cam.status)}">${escapeHtml(cam.status || 'Offline')}</span></td>
                         <td>
                             <button type="button" class="btn-edit" onclick="editCamera('${cam.id}')">Edit</button>
-                            <button type="button" class="btn-secondary" style="padding:0.4rem 0.65rem;font-size:0.8rem;" onclick="detectReolinkEncoding('${cam.id}')" title="Auto-detect Reolink encoding">Detect</button>
+                            <button type="button" class="btn-secondary" style="padding:0.4rem 0.65rem;font-size:0.8rem;" onclick="detectReolinkEncoding('${cam.id}')" title="Detect Camera">Detect</button>
                             <button type="button" class="btn-delete" onclick="deleteCamera('${cam.id}')">Delete</button>
                         </td>
                     </tr>

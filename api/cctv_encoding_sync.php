@@ -323,13 +323,13 @@ if ($method === 'POST' && $action === 'start') {
             'status' => (string) ($selected['status'] ?? 'Online'),
         ],
         'created_at' => date('c'),
-        'message' => 'Waiting for on-site PC to probe Reolink encoding…',
+        'message' => 'Detecting…',
     ];
     encodingJobWrite($jobPath, $job);
     echo json_encode([
         'success' => true,
         'job' => $job,
-        'message' => 'Encoding probe queued. Keep start_detection_agent.bat running on the on-site PC.',
+        'message' => 'Detect Camera queued.',
     ]);
     exit;
 }

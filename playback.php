@@ -636,7 +636,7 @@ $cctvNavActive = 'playback';
 
             if (!segment.playable) {
                 if (segment.status === 'recording') {
-                    showPlaybackError('This segment is still recording. Wait until the 5-minute chunk finishes, then play again.');
+                    showPlaybackError('This segment is still recording. Wait until the 2-minute chunk finishes, then play again.');
                 } else if (segment.legacy_codec) {
                     showPlaybackError('This recording needs conversion first. Run: py api/convert_recordings.py');
                 } else {

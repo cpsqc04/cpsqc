@@ -153,13 +153,21 @@ ensureLocalDetectionStarted();
         .video-shell { background: #0f172a; border-radius: 12px; overflow: hidden; border: 1px solid var(--border-color); width: 100%; aspect-ratio: 16 / 9; max-height: 75vh; display: flex; align-items: center; justify-content: center; position: relative; }
         .video-shell .camera-feed { width: 100%; height: 100%; display: none; background: #000; object-fit: contain; object-position: center; image-rendering: auto; }
         .video-shell .camera-feed.active { display: block; }
-        .video-shell .webrtc-frame { width: 100%; height: 100%; border: 0; display: none; background: #000; }
+        .video-shell .webrtc-frame {
+            width: 100%;
+            height: 100%;
+            border: 0;
+            display: none;
+            background: #000;
+            pointer-events: none; /* no video chrome / hover controls */
+        }
         .video-shell .webrtc-frame.active { display: block; }
         .video-shell:fullscreen .webrtc-frame,
         .video-shell:-webkit-full-screen .webrtc-frame { width: 100%; height: 100%; }
+        .fullscreen-btn { pointer-events: auto; }
         .live-mode-chip { display: inline-flex; align-items: center; gap: 0.35rem; margin-left: 0.5rem; padding: 0.2rem 0.55rem; border-radius: 999px; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.02em; background: rgba(15, 23, 42, 0.08); color: var(--text-secondary); }
         .live-mode-chip.webrtc { background: rgba(76, 138, 137, 0.15); color: #0f766e; }
-        .live-mode-chip.jpeg { background: rgba(245, 158, 11, 0.15); color: #b45309; }
+        .live-mode-chip.jpeg { display: none; } /* JPEG relay disabled for live view */
         .video-shell:fullscreen,
         .video-shell:-webkit-full-screen { border-radius: 0; border: none; aspect-ratio: auto; max-height: none; min-height: 100vh; width: 100vw; height: 100vh; background: #000; }
         .video-shell:fullscreen .camera-feed,
@@ -518,10 +526,10 @@ ensureLocalDetectionStarted();
                                 </button>
                                 <iframe id="webrtcFeed" class="webrtc-frame" title="Low-latency live camera" allow="autoplay; fullscreen" referrerpolicy="no-referrer"></iframe>
                                 <img id="cameraFeed" class="camera-feed" alt="Live surveillance feed with YOLO detection">
-                                <div class="feed-overlay feed-overlay-camera" id="feedCameraName">Surveillance</div>
+                                <div class="feed-overlay feed-overlay-camera" id="feedCameraName">Location</div>
                                 <div class="video-placeholder" id="cameraPlaceholder">
                                     <i class="fas fa-camera"></i>
-                                    <p>Connecting to camera…</p>
+                                    <p id="cameraPlaceholderText">Connecting to camera…</p>
                                 </div>
                             </div>
                         </div>
@@ -546,7 +554,7 @@ ensureLocalDetectionStarted();
             setInterval(updateDateTime, 1000);
             loadFeedCameraName();
             setCameraUiState('connecting');
-            // Prefer low-latency WebRTC (go2rtc); fall back to JPEG relay.
+            // Prefer low-latency WebRTC (go2rtc); never use JPEG relay for live view.
             startLiveView();
             ensureDetectionRunning();
             setInterval(pollDetections, 1000);
@@ -555,6 +563,16 @@ ensureLocalDetectionStarted();
             setInterval(ensureDetectionRunning, 15000);
             initFullscreen();
             initDetectionLifecycle();
+            window.addEventListener('storage', function(e) {
+                if (e.key === 'cameraConfigUpdated') {
+                    startLiveView();
+                    loadFeedCameraName();
+                }
+            });
+            window.addEventListener('camera-config-updated', function() {
+                startLiveView();
+                loadFeedCameraName();
+            });
         });
 
         async function detectionControl(action) {
@@ -662,7 +680,8 @@ ensureLocalDetectionStarted();
         }
 
         let feedErrors = 0;
-        let liveTransport = 'connecting'; // webrtc | jpeg | connecting
+        let liveTransport = 'connecting'; // webrtc | none | connecting
+        let activeCamera = null;
 
         function setLiveModeChip(mode) {
             const chip = document.getElementById('liveModeChip');
@@ -672,10 +691,9 @@ ensureLocalDetectionStarted();
                 chip.textContent = 'WebRTC · low latency';
                 chip.classList.add('webrtc');
                 chip.title = 'Direct camera stream via go2rtc (near Reolink app delay)';
-            } else if (mode === 'jpeg') {
-                chip.textContent = 'JPEG relay';
-                chip.classList.add('jpeg');
-                chip.title = 'Hostinger JPEG relay (higher delay; used when WebRTC is unreachable)';
+            } else if (mode === 'missing') {
+                chip.textContent = 'No camera';
+                chip.title = '';
             } else {
                 chip.textContent = 'Connecting…';
                 chip.title = '';
@@ -683,9 +701,10 @@ ensureLocalDetectionStarted();
         }
 
         function setCameraUiState(state) {
-            // state: true/'live' | false/'offline' | 'connecting'
+            // state: true/'live' | false/'offline' | 'connecting' | 'missing'
             const badge = document.getElementById('liveBadge');
             const placeholder = document.getElementById('cameraPlaceholder');
+            const placeholderText = document.getElementById('cameraPlaceholderText');
             const feed = document.getElementById('cameraFeed');
             const webrtc = document.getElementById('webrtcFeed');
             const cameraOverlay = document.getElementById('feedCameraName');
@@ -696,11 +715,37 @@ ensureLocalDetectionStarted();
 
             const isLive = mode === 'live';
             const isConnecting = mode === 'connecting';
-            const showingFeed = (feed && feed.classList.contains('active'))
-                || (webrtc && webrtc.classList.contains('active'));
+            const isMissing = mode === 'missing';
+            const showingFeed = (webrtc && webrtc.classList.contains('active'));
 
             badge.classList.toggle('active', isLive);
-            badge.innerHTML = '<span class="dot"></span> ' + (isLive ? 'Live' : (isConnecting ? 'Connecting' : 'Offline'));
+            badge.innerHTML = '<span class="dot"></span> ' + (
+                isMissing ? 'Camera not found'
+                    : (isLive ? 'Live' : (isConnecting ? 'Connecting' : 'Offline'))
+            );
+
+            if (isMissing) {
+                if (placeholderText) placeholderText.textContent = 'Camera not found';
+                placeholder.classList.remove('hidden');
+                if (feed) {
+                    feed.classList.remove('active');
+                    feed.removeAttribute('src');
+                }
+                if (webrtc) {
+                    webrtc.classList.remove('active');
+                    webrtc.removeAttribute('src');
+                }
+                if (cameraOverlay) {
+                    cameraOverlay.textContent = 'Camera not found';
+                    cameraOverlay.classList.add('visible');
+                }
+                setLiveModeChip('missing');
+                return;
+            }
+
+            if (placeholderText) {
+                placeholderText.textContent = isConnecting ? 'Connecting to camera…' : 'Camera offline';
+            }
 
             if (isLive || (isConnecting && showingFeed)) {
                 placeholder.classList.add('hidden');
@@ -708,7 +753,56 @@ ensureLocalDetectionStarted();
                 placeholder.classList.remove('hidden');
             }
 
-            if (cameraOverlay) cameraOverlay.classList.toggle('visible', isLive || showingFeed);
+            if (cameraOverlay) cameraOverlay.classList.toggle('visible', isLive || showingFeed || isMissing);
+        }
+
+        function stopLiveFeeds() {
+            const webrtc = document.getElementById('webrtcFeed');
+            const jpeg = document.getElementById('cameraFeed');
+            if (webrtc) {
+                webrtc.classList.remove('active');
+                webrtc.removeAttribute('src');
+            }
+            if (jpeg) {
+                jpeg.classList.remove('active');
+                jpeg.removeAttribute('src');
+            }
+        }
+
+        async function fetchActiveCamera() {
+            try {
+                const res = await fetch('api/cameras.php?t=' + Date.now(), { cache: 'no-store', credentials: 'same-origin' });
+                const result = await res.json();
+                const cameras = result.cameras || result.data || [];
+                if (!Array.isArray(cameras) || cameras.length === 0) {
+                    return null;
+                }
+                return cameras.find(function(cam) {
+                    return String(cam.status || '').toLowerCase() === 'online';
+                }) || cameras[0];
+            } catch (e) {
+                return null;
+            }
+        }
+
+        function applyLocationOverlay(camera) {
+            const el = document.getElementById('feedCameraName');
+            if (!el) return;
+            if (!camera) {
+                el.textContent = 'Camera not found';
+                return;
+            }
+            el.textContent = camera.location || camera.name || camera.cameraId || 'Location';
+        }
+
+        function buildCleanEmbedUrl(baseUrl, streamName) {
+            const base = String(baseUrl || '').replace(/\/$/, '');
+            if (!base) return '';
+            const params = new URLSearchParams({
+                base: base,
+                src: streamName || 'alertara_live',
+            });
+            return 'live-embed.php?' + params.toString();
         }
 
         async function tryStartWebRtcFeed() {
@@ -727,71 +821,41 @@ ensureLocalDetectionStarted();
 
                 const pageHttps = window.location.protocol === 'https:';
                 const hostLocal = /^(localhost|127\.0\.0\.1)$/i.test(window.location.hostname);
-                let candidates = [];
-                if (data.tunnel_url) {
-                    candidates.push(String(data.tunnel_url).replace(/\/$/, '') + '/stream.html?src=' + encodeURIComponent(data.stream || 'alertara_live') + '&mode=mse,webrtc');
+                let bases = [];
+                if (data.tunnel_url) bases.push(String(data.tunnel_url).replace(/\/$/, ''));
+                if (Array.isArray(data.base_urls)) {
+                    data.base_urls.forEach(function(b) { bases.push(String(b).replace(/\/$/, '')); });
                 }
-                if (Array.isArray(data.player_urls)) candidates = candidates.concat(data.player_urls);
-                if (data.player_url) candidates.push(data.player_url);
-                if (hostLocal && data.localhost_player_url) {
-                    candidates.unshift(data.localhost_player_url);
-                }
-                candidates = candidates.filter(Boolean).filter(function(url, idx, arr) {
+                if (data.base_url) bases.push(String(data.base_url).replace(/\/$/, ''));
+                if (hostLocal) bases.unshift('http://127.0.0.1:1984');
+                bases = bases.filter(Boolean).filter(function(url, idx, arr) {
                     return arr.indexOf(url) === idx;
                 });
 
-                // Prefer HTTPS embeds on HTTPS pages (Cloudflare tunnel); localhost on local XAMPP.
-                let embeddable = candidates.filter(function(url) {
+                let embeddableBases = bases.filter(function(url) {
                     if (pageHttps && String(url).indexOf('http://') === 0) return false;
                     return true;
                 });
-                if (!embeddable.length && !pageHttps) {
-                    embeddable = candidates;
+                if (!embeddableBases.length && !pageHttps) {
+                    embeddableBases = bases;
                 }
-                if (!embeddable.length) {
+                if (!embeddableBases.length) {
                     return false;
                 }
 
+                const streamName = data.stream || 'alertara_live';
+                const embedUrl = buildCleanEmbedUrl(embeddableBases[0], streamName);
                 liveTransport = 'webrtc';
                 setLiveModeChip('webrtc');
                 if (jpeg) {
                     jpeg.classList.remove('active');
                     jpeg.removeAttribute('src');
                 }
-                webrtc.src = embeddable[0];
+                webrtc.src = embedUrl;
                 webrtc.classList.add('active');
                 document.getElementById('cameraPlaceholder').classList.add('hidden');
                 setCameraUiState('live');
-                if (data.camera_name) {
-                    const el = document.getElementById('feedCameraName');
-                    if (el) el.textContent = data.camera_name;
-                }
-                setInterval(async function() {
-                    if (liveTransport !== 'webrtc') return;
-                    try {
-                        const check = await fetch('api/cctv_webrtc_status.php?t=' + Date.now(), {
-                            cache: 'no-store',
-                            credentials: 'same-origin',
-                        });
-                        const st = await check.json();
-                        if (!st || !st.running) {
-                            liveTransport = 'connecting';
-                            webrtc.classList.remove('active');
-                            webrtc.removeAttribute('src');
-                            setLiveModeChip('connecting');
-                            setCameraUiState('connecting');
-                            startCameraFeed();
-                            return;
-                        }
-                        // Hot-swap to HTTPS tunnel URL when agent publishes it.
-                        if (pageHttps && st.tunnel_url) {
-                            const next = String(st.tunnel_url).replace(/\/$/, '') + '/stream.html?src=' + encodeURIComponent(st.stream || 'alertara_live') + '&mode=mse,webrtc';
-                            if (webrtc.src.indexOf(st.tunnel_url) === -1) {
-                                webrtc.src = next;
-                            }
-                        }
-                    } catch (e) { /* keep current */ }
-                }, 12000);
+                applyLocationOverlay(activeCamera);
                 return true;
             } catch (e) {
                 console.warn('WebRTC status check failed', e);
@@ -801,172 +865,57 @@ ensureLocalDetectionStarted();
 
         async function startLiveView() {
             setLiveModeChip('connecting');
+            setCameraUiState('connecting');
+            activeCamera = await fetchActiveCamera();
+            if (!activeCamera) {
+                liveTransport = 'none';
+                stopLiveFeeds();
+                setCameraUiState('missing');
+                return;
+            }
+            applyLocationOverlay(activeCamera);
             const ok = await tryStartWebRtcFeed();
             if (!ok) {
-                startCameraFeed();
+                // WebRTC only — do not fall back to JPEG relay.
+                liveTransport = 'connecting';
+                stopLiveFeeds();
+                setCameraUiState('connecting');
+                setTimeout(startLiveView, 5000);
             }
         }
 
         async function loadFeedCameraName() {
-            const el = document.getElementById('feedCameraName');
-            if (!el) return;
-            try {
-                const res = await fetch('api/cameras.php');
-                const result = await res.json();
-                const cameras = result.cameras || result.data || [];
-                const online = cameras.find(function(cam) {
-                    return String(cam.status || '').toLowerCase() === 'online';
-                }) || cameras[0];
-                if (online) {
-                    el.textContent = online.name || online.cameraId || 'Surveillance';
-                }
-            } catch (e) {
-                el.textContent = 'Surveillance';
+            activeCamera = await fetchActiveCamera();
+            applyLocationOverlay(activeCamera);
+            if (!activeCamera) {
+                liveTransport = 'none';
+                stopLiveFeeds();
+                setCameraUiState('missing');
             }
         }
 
+        // JPEG relay disabled — kept as no-op so older callers don't break.
         function startCameraFeed() {
-            if (liveTransport === 'webrtc') return;
-            liveTransport = 'jpeg';
-            setLiveModeChip('jpeg');
-            const feed = document.getElementById('cameraFeed');
-            const webrtc = document.getElementById('webrtcFeed');
-            if (webrtc) {
-                webrtc.classList.remove('active');
-                webrtc.removeAttribute('src');
-            }
-            let hasShownFrame = false;
-            let lastFrameUpdatedAt = '';
-            let frameLoading = false;
-            let pollTimer = null;
-            let cameraRevision = '';
-            let cameraJustUpdatedUntil = 0;
-            const startedAt = Date.now();
-            const LIVE_POLL_MS = 120;
-            const WARM_POLL_MS = 250;
-
-            const schedulePoll = (delayMs) => {
-                if (pollTimer) clearTimeout(pollTimer);
-                pollTimer = setTimeout(pollCameraFrame, delayMs);
-            };
-
-            const markCameraUpdated = () => {
-                cameraJustUpdatedUntil = Date.now() + 90000;
-                setCameraUiState('connecting');
-                loadFeedCameraName();
-                ensureDetectionRunning();
-                sendDetectionHeartbeat();
-                schedulePoll(100);
-            };
-
-            window.addEventListener('storage', function(e) {
-                if (e.key === 'cameraConfigUpdated') {
-                    markCameraUpdated();
-                }
-            });
-
-            // Same-tab updates from Camera Management after save (if opened in same window flow)
-            window.addEventListener('camera-config-updated', markCameraUpdated);
-
-            const showFrame = (updatedAt, isLive) => {
-                frameLoading = true;
-                feed.onload = function() {
-                    frameLoading = false;
-                    lastFrameUpdatedAt = updatedAt || lastFrameUpdatedAt;
-                    feedErrors = 0;
-                    hasShownFrame = true;
-                    feed.classList.add('active');
-                    document.getElementById('cameraPlaceholder').classList.add('hidden');
-                    setCameraUiState(isLive ? 'live' : 'connecting');
-                    schedulePoll(isLive ? LIVE_POLL_MS : WARM_POLL_MS);
-                };
-                feed.onerror = function() {
-                    frameLoading = false;
-                    feedErrors += 1;
-                    schedulePoll(WARM_POLL_MS);
-                };
-                feed.src = 'api/current_frame.php?t=' + encodeURIComponent(updatedAt || Date.now()) + '&r=' + Date.now();
-            };
-
-            const pollCameraConfig = async () => {
-                try {
-                    const res = await fetch('api/cameras.php?t=' + Date.now(), { cache: 'no-store' });
-                    const result = await res.json();
-                    const revision = String(result.revision || result.updated_at || '');
-                    if (revision && cameraRevision && revision !== cameraRevision) {
-                        markCameraUpdated();
-                    }
-                    if (revision) cameraRevision = revision;
-                } catch (e) {
-                    /* ignore */
-                }
-            };
-
-            const pollCameraFrame = async () => {
-                if (liveTransport === 'webrtc') return;
-                try {
-                    await pollCameraConfig();
-                    const res = await fetch('api/camera_status.php?t=' + Date.now(), { cache: 'no-store' });
-                    const status = await res.json();
-                    const warmUp = (Date.now() - startedAt) < 60000;
-                    const cameraUpdating = Date.now() < cameraJustUpdatedUntil;
-                    const age = typeof status.age_seconds === 'number' ? status.age_seconds : null;
-
-                    if (status.available) {
-                        cameraJustUpdatedUntil = 0;
-                        if (frameLoading) {
-                            schedulePoll(100);
-                            return;
-                        }
-                        if (status.updated_at === lastFrameUpdatedAt) {
-                            setCameraUiState('live');
-                            schedulePoll(LIVE_POLL_MS);
-                            return;
-                        }
-                        showFrame(status.updated_at, true);
-                        return;
-                    }
-
-                    // After Camera Management edit / reconnect gap: keep showing recent frame.
-                    const staleLimit = cameraUpdating ? 60 : (warmUp ? 25 : 12);
-                    if (status.has_frame && age !== null && age < staleLimit) {
-                        if (!frameLoading && status.updated_at !== lastFrameUpdatedAt) {
-                            showFrame(status.updated_at, false);
-                            return;
-                        }
-                        if (hasShownFrame) {
-                            feed.classList.add('active');
-                            document.getElementById('cameraPlaceholder').classList.add('hidden');
-                            setCameraUiState(cameraUpdating || warmUp ? 'connecting' : 'live');
-                            schedulePoll(WARM_POLL_MS);
-                            return;
-                        }
-                    }
-
-                    if (!hasShownFrame) {
-                        feed.classList.remove('active');
-                        setCameraUiState(warmUp || cameraUpdating ? 'connecting' : 'offline');
-                    } else {
-                        setCameraUiState(cameraUpdating ? 'connecting' : 'offline');
-                    }
-                    schedulePoll(WARM_POLL_MS);
-                } catch (e) {
-                    feedErrors += 1;
-                    schedulePoll(WARM_POLL_MS);
-                }
-            };
-
-            schedulePoll(50);
-            // Opportunistically promote to WebRTC if it becomes available.
-            setInterval(async function() {
-                if (liveTransport === 'webrtc') return;
-                const ok = await tryStartWebRtcFeed();
-                if (ok && pollTimer) {
-                    clearTimeout(pollTimer);
-                    pollTimer = null;
-                }
-            }, 15000);
+            return;
         }
+
+        // Re-check camera list + promote/repair WebRTC periodically.
+        setInterval(async function() {
+            const cam = await fetchActiveCamera();
+            if (!cam) {
+                if (liveTransport !== 'none') {
+                    liveTransport = 'none';
+                    stopLiveFeeds();
+                    setCameraUiState('missing');
+                }
+                return;
+            }
+            activeCamera = cam;
+            applyLocationOverlay(activeCamera);
+            if (liveTransport !== 'webrtc') {
+                await tryStartWebRtcFeed();
+            }
+        }, 8000);
 
         function escapeHtml(value) {
             return String(value ?? '')
@@ -1088,6 +1037,16 @@ ensureLocalDetectionStarted();
 
         async function pollDetections() {
             try {
+                if (!activeCamera || liveTransport === 'none') {
+                    const list = document.getElementById('detectionList');
+                    const banner = document.getElementById('suspiciousBanner');
+                    if (list) list.innerHTML = '<p class="detection-empty">Camera not found — detection paused.</p>';
+                    if (banner) {
+                        banner.textContent = '';
+                        banner.classList.remove('show');
+                    }
+                    return;
+                }
                 const res = await fetch('api/get_detections.php?t=' + Date.now());
                 const data = await res.json();
                 const detections = data.detections || [];

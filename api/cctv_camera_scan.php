@@ -147,7 +147,7 @@ if ($role === 'agent') {
         }
         $job['status'] = 'running';
         $job['started_at'] = date('c');
-        $job['message'] = 'On-site PC is scanning the LAN…';
+        $job['message'] = 'Scanning LAN Camera';
         writeCameraScanJob($job);
         echo json_encode(['success' => true, 'job' => ['id' => $job['id'], 'status' => 'running']]);
         exit;
