@@ -9,6 +9,7 @@ import cv2
 import json
 import time
 import os
+import base64
 from datetime import datetime
 from pathlib import Path
 import numpy as np
@@ -2812,11 +2813,60 @@ def get_color_for_category(category):
     }
     return colors.get(category, (255, 255, 255))
 
+def detection_thumb_data_url(image_path, max_side=140, quality=72):
+    """Compact JPEG data-URL so Hostinger UI can show crops without separate file sync."""
+    try:
+        if not image_path or not os.path.isfile(image_path):
+            return None
+        img = cv2.imread(image_path)
+        if img is None or img.size == 0:
+            return None
+        h, w = img.shape[:2]
+        scale = min(1.0, float(max_side) / float(max(h, w, 1)))
+        if scale < 1.0:
+            img = cv2.resize(
+                img,
+                (max(1, int(round(w * scale))), max(1, int(round(h * scale)))),
+                interpolation=cv2.INTER_AREA,
+            )
+        ok, buf = cv2.imencode(".jpg", img, [cv2.IMWRITE_JPEG_QUALITY, int(quality)])
+        if not ok:
+            return None
+        return "data:image/jpeg;base64," + base64.b64encode(buf.tobytes()).decode("ascii")
+    except Exception:
+        return None
+
+
+def attach_detection_thumbnails(detections):
+    """Embed small thumbnails in detections for remote Open Surveillance UI."""
+    for det in detections:
+        if not isinstance(det, dict):
+            continue
+        if det.get("image_data"):
+            continue
+        path = det.get("image")
+        if not path:
+            continue
+        # Prefer relative path under project root
+        candidates = [path]
+        if not os.path.isabs(path):
+            candidates.append(os.path.join(os.getcwd(), path))
+        data_url = None
+        for candidate in candidates:
+            data_url = detection_thumb_data_url(candidate)
+            if data_url:
+                break
+        if data_url:
+            det["image_data"] = data_url
+    return detections
+
+
 def save_detections(detections):
     """Save detections to JSON file atomically with better Windows file lock handling"""
     temp_file = DETECTIONS_FILE + ".tmp"
     
     try:
+        attach_detection_thumbnails(detections)
         detection_data = {
             "timestamp": datetime.now().isoformat(),
             "detections": detections,

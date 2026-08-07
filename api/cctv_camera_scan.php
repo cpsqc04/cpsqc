@@ -147,7 +147,7 @@ if ($role === 'agent') {
         }
         $job['status'] = 'running';
         $job['started_at'] = date('c');
-        $job['message'] = 'Scanning LAN Camera';
+        $job['message'] = 'Scanning LAN camera...';
         writeCameraScanJob($job);
         echo json_encode(['success' => true, 'job' => ['id' => $job['id'], 'status' => 'running']]);
         exit;
@@ -227,9 +227,7 @@ if ($method === 'POST' && $action === 'start') {
         'requested_at' => date('c'),
         'started_at' => null,
         'finished_at' => null,
-        'message' => isLocalDetectionEnabled()
-            ? 'Scanning local network…'
-            : 'Waiting for on-site detection agent to run the LAN scan…',
+        'message' => 'Scanning LAN camera...',
         'cameras' => [],
         'count' => 0,
         'scanned_subnets' => [],
@@ -240,7 +238,7 @@ if ($method === 'POST' && $action === 'start') {
     if (isLocalDetectionEnabled()) {
         $job['status'] = 'running';
         $job['started_at'] = date('c');
-        $job['message'] = 'Scanning local network…';
+        $job['message'] = 'Scanning LAN camera...';
         writeCameraScanJob($job);
 
         $result = runLocalCameraScan($root);

@@ -143,7 +143,7 @@ ensureLocalDetectionStarted();
         .section-block:last-child { margin-bottom: 0; }
         .section-title { margin: 0 0 1rem; font-size: 1.15rem; font-weight: 600; color: var(--tertiary-color); display: flex; align-items: center; gap: 0.5rem; }
         .surveillance-panel { display: grid; gap: 1.25rem; }
-        .surveillance-layout { display: grid; grid-template-columns: minmax(300px, 360px) minmax(0, 1fr); gap: 1.25rem; align-items: start; }
+        .surveillance-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(300px, 400px); gap: 1.25rem; align-items: start; }
         .surveillance-meta { display: flex; flex-wrap: wrap; gap: 1rem; align-items: center; justify-content: space-between; }
         .live-badge { display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.35rem 0.75rem; border-radius: 999px; font-size: 0.85rem; font-weight: 600; background: #e9ecef; color: #6c757d; }
         .live-badge.active { background: #d1e7dd; color: #0f5132; }
@@ -192,6 +192,7 @@ ensureLocalDetectionStarted();
             display: flex;
             flex-direction: column;
             min-height: 420px;
+            min-width: 0;
         }
         .detection-panel h3 {
             margin: 0 0 0.85rem;
@@ -211,6 +212,7 @@ ensureLocalDetectionStarted();
             border: 1px solid var(--border-color);
             border-radius: 10px;
             padding: 0.85rem;
+            overflow: hidden;
         }
         .detection-card-header {
             display: flex;
@@ -259,17 +261,18 @@ ensureLocalDetectionStarted();
         .suspicious-banner.show { display: block; }
         .detection-card-body {
             display: grid;
-            grid-template-columns: 92px 1fr;
+            grid-template-columns: 88px minmax(0, 1fr);
             gap: 0.85rem;
             align-items: start;
         }
         .detection-thumb {
-            width: 92px;
-            height: 118px;
+            width: 88px;
+            height: 110px;
             border-radius: 8px;
             object-fit: cover;
             background: #e2e8f0;
             border: 1px solid var(--border-color);
+            display: block;
         }
         .detection-thumb.placeholder {
             display: flex;
@@ -277,27 +280,45 @@ ensureLocalDetectionStarted();
             justify-content: center;
             color: #94a3b8;
             font-size: 1.5rem;
+            height: 110px;
         }
         .detection-attrs {
             display: grid;
-            gap: 0.28rem;
+            gap: 0.4rem;
             font-size: 0.82rem;
-            line-height: 1.35;
+            line-height: 1.4;
+            min-width: 0;
         }
         .detection-attr {
             display: grid;
-            grid-template-columns: 1fr auto;
-            gap: 0.75rem;
+            grid-template-columns: 7.5rem minmax(0, 1fr);
+            gap: 0.55rem;
             color: var(--text-color);
+            align-items: start;
+        }
+        .detection-attr.wide {
+            grid-template-columns: 1fr;
+            gap: 0.2rem;
+            padding: 0.45rem 0.55rem;
+            background: rgba(15, 23, 42, 0.03);
+            border-radius: 6px;
         }
         .detection-attr .label {
             color: var(--text-secondary);
-            font-weight: 500;
+            font-weight: 600;
         }
         .detection-attr .value {
             font-weight: 600;
-            text-align: right;
+            text-align: left;
+            word-break: break-word;
+            overflow-wrap: anywhere;
+        }
+        .detection-attr .value.capitalize {
             text-transform: capitalize;
+        }
+        .detection-attr.wide .value {
+            font-weight: 500;
+            color: var(--text-color);
         }
         .detection-empty {
             margin: 0;
@@ -511,14 +532,6 @@ ensureLocalDetectionStarted();
                     </div>
 
                     <div class="surveillance-layout">
-                        <div class="detection-panel">
-                            <p id="suspiciousBanner" class="suspicious-banner"></p>
-                            <h3><i class="fas fa-list"></i> Detected Objects</h3>
-                            <div class="detection-cards" id="detectionList">
-                                <p class="detection-empty">No objects detected yet.</p>
-                            </div>
-                        </div>
-
                         <div class="video-column">
                             <div class="video-shell" id="videoShell">
                                 <button type="button" class="fullscreen-btn" id="fullscreenBtn" title="Full screen" aria-label="Toggle full screen">
@@ -531,6 +544,14 @@ ensureLocalDetectionStarted();
                                     <i class="fas fa-camera"></i>
                                     <p id="cameraPlaceholderText">Connecting to camera…</p>
                                 </div>
+                            </div>
+                        </div>
+
+                        <div class="detection-panel">
+                            <p id="suspiciousBanner" class="suspicious-banner"></p>
+                            <h3><i class="fas fa-list"></i> Detected Objects</h3>
+                            <div class="detection-cards" id="detectionList">
+                                <p class="detection-empty">No objects detected yet.</p>
                             </div>
                         </div>
                     </div>
@@ -682,6 +703,14 @@ ensureLocalDetectionStarted();
         let feedErrors = 0;
         let liveTransport = 'connecting'; // webrtc | none | connecting
         let activeCamera = null;
+        window.__detectionThumbFallback = function(img) {
+            if (!img || !img.parentNode) return;
+            const ph = document.createElement('div');
+            ph.className = 'detection-thumb placeholder';
+            ph.setAttribute('aria-hidden', 'true');
+            ph.innerHTML = '<i class="fas fa-image"></i>';
+            img.replaceWith(ph);
+        };
 
         function setLiveModeChip(mode) {
             const chip = document.getElementById('liveModeChip');
@@ -956,9 +985,11 @@ ensureLocalDetectionStarted();
             const cat = item.category || 'object';
             const confidence = ((item.confidence || 0) * 100).toFixed(1) + '%';
             const detectedAt = formatDetectedTime(item.timestamp);
+            const wideLabels = { Reason: true };
 
+            let rows;
             if (cat === 'person') {
-                return [
+                rows = [
                     ['Gender', item.gender || 'Unknown'],
                     ['Expression', item.expression || 'Calm'],
                     ['Mask', item.mask || 'No'],
@@ -969,10 +1000,8 @@ ensureLocalDetectionStarted();
                     ['Confidence', confidence],
                     ['Detected', detectedAt]
                 ];
-            }
-
-            if (cat === 'group' || cat === 'crowd') {
-                const rows = [
+            } else if (cat === 'group' || cat === 'crowd') {
+                rows = [
                     ['People Count', String(item.people_count || item.group_size || '—')],
                     ['Confidence', confidence],
                     ['Detected', detectedAt]
@@ -981,11 +1010,8 @@ ensureLocalDetectionStarted();
                     rows.unshift(['Activity', item.activity || 'Suspicious']);
                     rows.splice(1, 0, ['Reason', item.suspicious_reason]);
                 }
-                return rows;
-            }
-
-            if (cat === 'backpack' || cat === 'suitcase') {
-                const rows = [
+            } else if (cat === 'backpack' || cat === 'suitcase') {
+                rows = [
                     ['Type', item.class || categoryLabel(cat)],
                     ['Items Detected', item.items_detected || item.class || 'None'],
                     ['Confidence', confidence],
@@ -995,31 +1021,50 @@ ensureLocalDetectionStarted();
                     rows.unshift(['Activity', item.activity || 'Suspicious']);
                     rows.splice(1, 0, ['Reason', item.suspicious_reason]);
                 }
-                return rows;
+            } else {
+                rows = [
+                    ['Type', item.class || categoryLabel(cat)],
+                    ['Items Detected', item.items_detected || item.class || 'None'],
+                    ['Confidence', confidence],
+                    ['Detected', detectedAt]
+                ];
             }
 
-            return [
-                ['Type', item.class || categoryLabel(cat)],
-                ['Items Detected', item.items_detected || item.class || 'None'],
-                ['Confidence', confidence],
-                ['Detected', detectedAt]
-            ];
+            return rows.map(function(pair) {
+                return {
+                    label: pair[0],
+                    value: pair[1],
+                    wide: !!wideLabels[pair[0]]
+                };
+            });
+        }
+
+        function detectionThumbHtml(item, cat) {
+            const alt = escapeHtml(categoryLabel(cat));
+            const placeholder = `<div class="detection-thumb placeholder" aria-hidden="true"><i class="fas fa-image"></i></div>`;
+            const src = item.image_data || item.image || '';
+            if (!src) return placeholder;
+            const safeSrc = escapeHtml(src);
+            const cacheBust = src.indexOf('data:image/') === 0
+                ? ''
+                : ((src.indexOf('?') >= 0 ? '&' : '?') + 't=' + Date.now());
+            return `<img class="detection-thumb" src="${safeSrc}${cacheBust}" alt="${alt}" loading="lazy" onerror="window.__detectionThumbFallback && window.__detectionThumbFallback(this)">`;
         }
 
         function renderDetectionCard(item) {
             const cat = item.category || item.class || 'object';
             const tagClass = ['plant', 'phone', 'backpack', 'suitcase', 'group', 'crowd', 'person', 'vehicle', 'animal'].includes(cat) ? cat : '';
             const attrs = renderDetectionAttributes(item);
-            const thumb = item.image
-                ? `<img class="detection-thumb" src="${escapeHtml(item.image)}?t=${Date.now()}" alt="${escapeHtml(categoryLabel(cat))}">`
-                : `<div class="detection-thumb placeholder"><i class="fas fa-image"></i></div>`;
+            const thumb = detectionThumbHtml(item, cat);
 
-            const attrHtml = attrs.map(([label, value]) => `
-                <div class="detection-attr">
-                    <span class="label">${escapeHtml(label)}:</span>
-                    <span class="value">${escapeHtml(value)}</span>
-                </div>
-            `).join('');
+            const attrHtml = attrs.map(function(row) {
+                const valueClass = row.wide ? 'value' : 'value capitalize';
+                return `
+                <div class="detection-attr${row.wide ? ' wide' : ''}">
+                    <span class="label">${escapeHtml(row.label)}:</span>
+                    <span class="${valueClass}">${escapeHtml(row.value)}</span>
+                </div>`;
+            }).join('');
 
             return `
                 <article class="detection-card${item.suspicious ? ' suspicious' : ''}">

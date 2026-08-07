@@ -664,7 +664,7 @@ $cctvNavActive = 'camera-management';
             if (!job) return false;
             const status = job.status || '';
             if (status === 'pending' || status === 'running') {
-                setScanStatus(job.message || 'Scanning…');
+                setScanStatus(job.message || 'Scanning LAN camera...');
                 return false;
             }
             if (status === 'done') {
@@ -696,7 +696,7 @@ $cctvNavActive = 'camera-management';
 
         async function startCameraScan(fromModal) {
             showScanPanel();
-            setScanStatus('Starting LAN scan…');
+            setScanStatus('Scanning LAN camera...');
             document.getElementById('scanList').innerHTML = '';
             if (scanPollTimer) {
                 clearInterval(scanPollTimer);
@@ -725,7 +725,7 @@ $cctvNavActive = 'camera-management';
                 setScanStatus(
                     (job && job.message)
                         || (result.message)
-                        || 'Scanning LAN Camera'
+                        || 'Scanning LAN camera...'
                 );
                 scanPollTimer = setInterval(pollCameraScan, 2500);
             } catch (e) {
@@ -843,7 +843,6 @@ $cctvNavActive = 'camera-management';
                         <td><span class="status-badge status-${statusClass(cam.status)}">${escapeHtml(cam.status || 'Offline')}</span></td>
                         <td>
                             <button type="button" class="btn-edit" onclick="editCamera('${cam.id}')">Edit</button>
-                            <button type="button" class="btn-secondary" style="padding:0.4rem 0.65rem;font-size:0.8rem;" onclick="detectReolinkEncoding('${cam.id}')" title="Detect Camera">Detect</button>
                             <button type="button" class="btn-delete" onclick="deleteCamera('${cam.id}')">Delete</button>
                         </td>
                     </tr>
