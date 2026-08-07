@@ -338,6 +338,15 @@ def probe_and_sync_reolink_encoding(camera_row, force=False):
     ip = str((camera_row or {}).get("ipAddress") or "").strip()
     username = str((camera_row or {}).get("username") or "").strip()
     password = str((camera_row or {}).get("password") or "").strip()
+    if not password:
+        rtsp = str((camera_row or {}).get("rtspUrl") or "")
+        try:
+            parsed = urlparse(rtsp)
+            if parsed.password:
+                from urllib.parse import unquote as _unquote
+                password = _unquote(parsed.password)
+        except Exception:
+            pass
     if not ip or not username:
         return None
 

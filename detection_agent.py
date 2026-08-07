@@ -469,6 +469,24 @@ _enc_in_flight = False
 _last_enc_poll_at = 0.0
 
 
+def password_from_camera(camera: dict) -> str:
+    """Prefer explicit password; fall back to RTSP URL userinfo."""
+    pwd = str((camera or {}).get("password") or "")
+    if pwd.strip():
+        return pwd
+    rtsp = str((camera or {}).get("rtspUrl") or "")
+    if "://" in rtsp and "@" in rtsp:
+        try:
+            from urllib.parse import unquote, urlparse
+
+            parsed = urlparse(rtsp)
+            if parsed.password:
+                return unquote(parsed.password)
+        except Exception:
+            pass
+    return ""
+
+
 def process_encoding_job(encoding_url: str, api_key: str) -> None:
     pending = api_request(
         encoding_url + "?role=agent",
@@ -497,7 +515,29 @@ def process_encoding_job(encoding_url: str, api_key: str) -> None:
             return
         log(f"Claimed Reolink encoding probe job {job_id}")
 
-    # Load camera credentials from local cameras.json
+    # Prefer latest Camera Management credentials from Hostinger when available.
+    file_env = load_env(ROOT / ".env")
+    config_url = (
+        file_env.get("CCTV_CAMERAS_CONFIG_URL", "")
+        or os.environ.get("CCTV_CAMERAS_CONFIG_URL", "")
+        or derive_api_url(
+            file_env.get("CCTV_FRAME_UPLOAD_URL", "") or os.environ.get("CCTV_FRAME_UPLOAD_URL", ""),
+            "cctv_cameras_config.php",
+        )
+    ).strip()
+    if config_url:
+        remote = api_request(config_url, api_key, method="GET", timeout=6.0, quiet=True)
+        cams = remote.get("cameras") if isinstance(remote, dict) else None
+        if isinstance(cams, list) and cams:
+            try:
+                (ROOT / "cameras.json").write_text(
+                    json.dumps(cams, indent=4, ensure_ascii=False) + "\n",
+                    encoding="utf-8",
+                )
+                log("Synced cameras.json from website before encoding probe")
+            except OSError:
+                pass
+
     cameras_path = ROOT / "cameras.json"
     target_id = job.get("cameraId")
     camera = None
@@ -554,9 +594,25 @@ def process_encoding_job(encoding_url: str, api_key: str) -> None:
 
     ip = str(camera.get("ipAddress") or "").strip()
     user = str(camera.get("username") or "").strip()
-    password = str(camera.get("password") or "")
-    log(f"Probing Reolink encoding at {ip}…")
-    result = probe_reolink_encoding(ip, user, password, timeout=6.0)
+    password = password_from_camera(camera)
+    if not password:
+        api_request(
+            encoding_url + "?role=agent",
+            api_key,
+            method="POST",
+            payload={
+                "action": "complete",
+                "role": "agent",
+                "id": job_id,
+                "success": False,
+                "message": "Camera password is empty on the on-site PC. Re-save the camera password in Camera Management.",
+            },
+            timeout=8.0,
+        )
+        return
+
+    log(f"Probing Reolink encoding at {ip} (user={user})…")
+    result = probe_reolink_encoding(ip, user, password, timeout=8.0)
     payload = {
         "action": "complete",
         "role": "agent",

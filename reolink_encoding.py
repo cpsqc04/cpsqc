@@ -2,15 +2,17 @@
 """
 Probe Reolink camera encoding (GetEnc) and recommend RTSP stream + display quality.
 
-Uses the camera LAN HTTP API:
-  Login → GetEnc (mainStream / subStream width, height, fps, vType)
+Uses the camera LAN HTTP API. Many Reolink firmwares accept the same
+user/password query style as Snap (already used by detect.py); newer ones
+use Login → token → GetEnc.
 """
 
 from __future__ import annotations
 
 import json
+import ssl
 import time
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote
 from urllib.request import Request, urlopen
@@ -22,64 +24,61 @@ try:
 except ImportError:
     HAS_REQUESTS = False
 
+# Avoid SSL verify failures on cameras with self-signed HTTPS certs.
+_SSL_CTX = ssl.create_default_context()
+_SSL_CTX.check_hostname = False
+_SSL_CTX.verify_mode = ssl.CERT_NONE
 
-def _http_json(
+
+def _http_exchange(
     url: str,
-    payload: Any,
+    payload: Any = None,
     timeout: float = 6.0,
-) -> Optional[Any]:
-    body = json.dumps(payload).encode("utf-8")
+    content_type: str = "application/json",
+    method: str = "POST",
+) -> Tuple[Optional[Any], str]:
+    """
+    Returns (parsed_json_or_None, detail).
+    detail is empty on success, otherwise a short error reason.
+    """
+    body = None
+    headers = {"Accept": "application/json, text/plain, */*"}
+    if payload is not None:
+        body = json.dumps(payload).encode("utf-8")
+        headers["Content-Type"] = content_type
+
     if HAS_REQUESTS:
         try:
-            resp = _requests.post(
+            resp = _requests.request(
+                method,
                 url,
                 data=body,
-                headers={"Content-Type": "application/json"},
+                headers=headers,
                 timeout=timeout,
                 verify=False,
             )
+            text = resp.text or ""
             if resp.status_code >= 400:
-                return None
-            return resp.json()
-        except Exception:
-            return None
+                return None, f"HTTP {resp.status_code}"
+            try:
+                return resp.json(), ""
+            except Exception:
+                return None, f"non-JSON response ({text[:80]!r})"
+        except Exception as exc:
+            return None, f"{type(exc).__name__}: {exc}"
+
     try:
-        req = Request(
-            url,
-            data=body,
-            headers={"Content-Type": "application/json"},
-            method="POST",
-        )
-        with urlopen(req, timeout=timeout) as resp:
-            return json.loads(resp.read().decode("utf-8", errors="replace"))
-    except (HTTPError, URLError, TimeoutError, OSError, json.JSONDecodeError, ValueError):
-        return None
-
-
-def reolink_login(ip: str, username: str, password: str, timeout: float = 6.0) -> Optional[str]:
-    """Return API token name, or None."""
-    ip = (ip or "").strip()
-    if not ip:
-        return None
-    user = quote(str(username or ""), safe="")
-    pwd = quote(str(password or ""), safe="")
-    # Try CGI path variants used across Reolink firmware generations.
-    for base in (
-        f"http://{ip}/cgi-bin/api.cgi?cmd=Login",
-        f"http://{ip}/api.cgi?cmd=Login",
-        f"http://{user}:{pwd}@{ip}/cgi-bin/api.cgi?cmd=Login",
-    ):
-        payload = [
-            {
-                "cmd": "Login",
-                "param": {"User": {"userName": username or "admin", "password": password or ""}},
-            }
-        ]
-        data = _http_json(base, payload, timeout=timeout)
-        token = _extract_token(data)
-        if token:
-            return token
-    return None
+        req = Request(url, data=body, headers=headers, method=method)
+        with urlopen(req, timeout=timeout, context=_SSL_CTX) as resp:
+            raw = resp.read().decode("utf-8", errors="replace")
+            try:
+                return json.loads(raw), ""
+            except json.JSONDecodeError:
+                return None, f"non-JSON response ({raw[:80]!r})"
+    except HTTPError as exc:
+        return None, f"HTTP {exc.code}"
+    except Exception as exc:
+        return None, f"{type(exc).__name__}: {exc}"
 
 
 def _extract_token(data: Any) -> Optional[str]:
@@ -88,12 +87,15 @@ def _extract_token(data: Any) -> Optional[str]:
     row = data[0] if isinstance(data[0], dict) else None
     if not row:
         return None
+    # Failed login
+    code = row.get("code")
+    if code is not None and int(code) != 0:
+        return None
     value = row.get("value") if isinstance(row.get("value"), dict) else {}
     token_obj = value.get("Token") if isinstance(value.get("Token"), dict) else {}
     name = token_obj.get("name") or token_obj.get("token")
     if name:
         return str(name)
-    # Some firmwares return token at top level
     if row.get("token"):
         return str(row["token"])
     return None
@@ -116,46 +118,23 @@ def _stream_info(block: Any) -> Dict[str, Any]:
     }
 
 
-def reolink_get_enc(
-    ip: str,
-    username: str,
-    password: str,
-    channel: int = 0,
-    timeout: float = 6.0,
-) -> Optional[Dict[str, Any]]:
-    """
-    Return {
-      mainStream: {...}, subStream: {...}, channel, raw
-    } or None.
-    """
-    token = reolink_login(ip, username, password, timeout=timeout)
-    if not token:
-        return None
-
-    payload = [{"cmd": "GetEnc", "action": 1, "param": {"channel": int(channel)}}]
-    for base in (
-        f"http://{ip}/cgi-bin/api.cgi?cmd=GetEnc&token={quote(token, safe='')}",
-        f"http://{ip}/api.cgi?cmd=GetEnc&token={quote(token, safe='')}",
-    ):
-        data = _http_json(base, payload, timeout=timeout)
-        enc = _extract_enc(data)
-        if enc:
-            return enc
-    return None
-
-
 def _extract_enc(data: Any) -> Optional[Dict[str, Any]]:
     if not isinstance(data, list) or not data:
         return None
     row = data[0] if isinstance(data[0], dict) else None
-    if not row or int(row.get("code", -1)) not in (0,):
-        # Some cameras omit code on success
-        if not row:
-            return None
+    if not isinstance(row, dict):
+        return None
+    code = row.get("code")
+    if code is not None and int(code) != 0:
+        return None
+
     value = row.get("value") if isinstance(row.get("value"), dict) else {}
     enc = value.get("Enc") if isinstance(value.get("Enc"), dict) else None
     if enc is None and isinstance(row.get("initial"), dict):
         enc = row["initial"].get("Enc") if isinstance(row["initial"].get("Enc"), dict) else None
+    # Some firmwares nest under range/value differently
+    if enc is None and isinstance(value.get("enc"), dict):
+        enc = value["enc"]
     if not isinstance(enc, dict):
         return None
     return {
@@ -164,6 +143,114 @@ def _extract_enc(data: Any) -> Optional[Dict[str, Any]]:
         "mainStream": _stream_info(enc.get("mainStream")),
         "subStream": _stream_info(enc.get("subStream")),
     }
+
+
+def _cgi_bases(ip: str) -> List[str]:
+    return [
+        f"http://{ip}/cgi-bin/api.cgi",
+        f"http://{ip}/api.cgi",
+        f"https://{ip}/cgi-bin/api.cgi",
+        f"https://{ip}/api.cgi",
+    ]
+
+
+def reolink_login(ip: str, username: str, password: str, timeout: float = 6.0) -> Tuple[Optional[str], str]:
+    """Return (token, detail)."""
+    ip = (ip or "").strip()
+    if not ip:
+        return None, "missing IP"
+    payload = [
+        {
+            "cmd": "Login",
+            "action": 0,
+            "param": {"User": {"userName": username or "admin", "password": password or ""}},
+        }
+    ]
+    errors: List[str] = []
+    for base in _cgi_bases(ip):
+        for ctype in ("application/json", "application/octet-stream"):
+            data, err = _http_exchange(
+                f"{base}?cmd=Login",
+                payload=payload,
+                timeout=timeout,
+                content_type=ctype,
+            )
+            if err:
+                errors.append(f"Login {ctype} @ {base}: {err}")
+                continue
+            token = _extract_token(data)
+            if token:
+                return token, ""
+            errors.append(f"Login @ {base}: bad credentials or unexpected response")
+    return None, "; ".join(errors[:3]) or "Login failed"
+
+
+def reolink_get_enc(
+    ip: str,
+    username: str,
+    password: str,
+    channel: int = 0,
+    timeout: float = 6.0,
+) -> Tuple[Optional[Dict[str, Any]], str]:
+    """
+    Return (enc_dict, detail).
+    Tries Snap-style user/password query first (works on many Reolinks),
+    then Login+token.
+    """
+    ip = (ip or "").strip()
+    if not ip:
+        return None, "missing IP"
+    user_q = quote(str(username or ""), safe="")
+    pwd_q = quote(str(password or ""), safe="")
+    payload_variants = [
+        [{"cmd": "GetEnc", "action": 1, "param": {"channel": int(channel)}}],
+        [{"cmd": "GetEnc", "action": 0, "param": {"channel": int(channel)}}],
+        [{"cmd": "GetEnc", "param": {"channel": int(channel)}}],
+    ]
+    errors: List[str] = []
+
+    # 1) Direct GetEnc with credentials in query (same pattern as working Snap URLs).
+    for base in _cgi_bases(ip):
+        for auth_q in (
+            f"user={user_q}&password={pwd_q}",
+            f"user={user_q}&pwd={pwd_q}",
+            f"token=null&user={user_q}&password={pwd_q}",
+        ):
+            for payload in payload_variants:
+                url = f"{base}?cmd=GetEnc&{auth_q}"
+                data, err = _http_exchange(url, payload=payload, timeout=timeout)
+                if err:
+                    errors.append(f"GetEnc-query: {err}")
+                    continue
+                enc = _extract_enc(data)
+                if enc and (enc["mainStream"].get("width") or enc["subStream"].get("width")):
+                    return enc, ""
+                # Also accept GET without body
+            url_get = f"{base}?cmd=GetEnc&channel={int(channel)}&{auth_q}"
+            data, err = _http_exchange(url_get, payload=None, timeout=timeout, method="GET")
+            if not err:
+                enc = _extract_enc(data)
+                if enc and (enc["mainStream"].get("width") or enc["subStream"].get("width")):
+                    return enc, ""
+
+    # 2) Login → token → GetEnc
+    token, login_err = reolink_login(ip, username, password, timeout=timeout)
+    if not token:
+        errors.append(login_err or "Login failed")
+        return None, "; ".join([e for e in errors if e][:4])
+
+    for base in _cgi_bases(ip):
+        for payload in payload_variants:
+            url = f"{base}?cmd=GetEnc&token={quote(token, safe='')}"
+            data, err = _http_exchange(url, payload=payload, timeout=timeout)
+            if err:
+                errors.append(f"GetEnc-token: {err}")
+                continue
+            enc = _extract_enc(data)
+            if enc and (enc["mainStream"].get("width") or enc["subStream"].get("width")):
+                return enc, ""
+
+    return None, "; ".join([e for e in errors if e][:4]) or "GetEnc failed after Login"
 
 
 def is_h264(vtype: str) -> bool:
@@ -215,9 +302,7 @@ def recommend_stream(enc: Dict[str, Any], prefer_main_if_h264: bool = True) -> T
 
 
 def recommend_display_quality(stream: Dict[str, Any], stream_type: str) -> Dict[str, Any]:
-    """
-    Map camera stream resolution → website JPEG relay settings.
-    """
+    """Map camera stream resolution → website JPEG relay settings."""
     width = int((stream or {}).get("width") or 0)
     height = int((stream or {}).get("height") or 0)
     fps = int((stream or {}).get("frameRate") or 0)
@@ -233,7 +318,6 @@ def recommend_display_quality(stream: Dict[str, Any], stream_type: str) -> Dict[
         interval, quality, max_w, live_q = 0.20, 85, width, 90
     else:
         preset = "balanced"
-        # Sub is often 640x360 — keep native width, don't upscale.
         interval, quality, max_w, live_q = 0.15, 88, max(width, 640) if width else 960, 92
 
     return {
@@ -255,18 +339,27 @@ def probe_reolink_encoding(
     password: str,
     channel: int = 0,
     force_main: bool = False,
-    timeout: float = 6.0,
+    timeout: float = 8.0,
 ) -> Dict[str, Any]:
-    """
-    Full probe → recommendation payload for cameras.json / detect.py.
-    """
+    """Full probe → recommendation payload for cameras.json / detect.py."""
     started = time.time()
-    enc = reolink_get_enc(ip, username, password, channel=channel, timeout=timeout)
+    if not (password or "").strip():
+        return {
+            "success": False,
+            "message": "Camera password is empty — save the password in Camera Management first.",
+            "elapsed_seconds": round(time.time() - started, 2),
+        }
+
+    enc, detail = reolink_get_enc(ip, username, password, channel=channel, timeout=timeout)
     if not enc:
         return {
             "success": False,
-            "message": "Could not read Reolink encoding (Login/GetEnc failed). "
-            "Check LAN IP and camera credentials.",
+            "message": (
+                "Could not read Reolink encoding (Login/GetEnc failed). "
+                "Check LAN IP and camera credentials."
+                + (f" Detail: {detail}" if detail else "")
+            ),
+            "detail": detail,
             "elapsed_seconds": round(time.time() - started, 2),
         }
 
