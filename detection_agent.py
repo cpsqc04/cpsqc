@@ -5,7 +5,7 @@ On-site CCTV detection agent (leave this running once on the PC).
 Auto start/stop — no manual start_detection.bat / stop_detection.bat:
   • Opens Open Surveillance  → starts detect.py
   • Leaves Open Surveillance → stops detect.py (after a short grace)
-  • Also runs Camera Management LAN scans
+  • Also runs Camera Management LAN scans (non-blocking)
 
 Configure in .env (same as detect.py):
   CCTV_FRAME_UPLOAD_KEY=...
@@ -17,14 +17,23 @@ from __future__ import annotations
 import json
 import os
 import subprocess
+import threading
 import time
 from pathlib import Path
 from typing import Dict, Optional
+from urllib.error import URLError
 from urllib.request import Request, urlopen
 
 ROOT = Path(__file__).resolve().parent
 LOCK_FILE = ROOT / "detect.lock"
 LOG_FILE = ROOT / "detection_agent.log"
+
+_start_cooldown_until = 0.0
+_scan_lock = threading.Lock()
+_scan_in_flight = False
+_last_scan_poll_at = 0.0
+_last_scan_error_log_at = 0.0
+_last_api_error_log: Dict[str, float] = {}
 
 
 def load_env(path: Path) -> dict:
@@ -51,6 +60,50 @@ def log(msg: str) -> None:
         pass
 
 
+def log_rate_limited(key: str, msg: str, interval_sec: float = 60.0) -> None:
+    now = time.time()
+    last = _last_api_error_log.get(key, 0.0)
+    if now - last < interval_sec:
+        return
+    _last_api_error_log[key] = now
+    log(msg)
+
+
+def windows_hide_kwargs():
+    """Flags so child processes never open a Windows Terminal / console window."""
+    startupinfo = None
+    creationflags = 0
+    if os.name == "nt":
+        startupinfo = subprocess.STARTUPINFO()
+        startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+        startupinfo.wShowWindow = 0  # SW_HIDE
+        creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+    return {"startupinfo": startupinfo, "creationflags": creationflags}
+
+
+def resolve_pythonw() -> list:
+    """Prefer windowless Python (pyw/pythonw) so Open Surveillance never pops a console."""
+    if os.name != "nt":
+        return ["python3"]
+    for candidate in (
+        ["pyw", "-3"],
+        ["pythonw"],
+        ["py", "-3"],
+    ):
+        try:
+            subprocess.run(
+                candidate + ["-c", "pass"],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                timeout=5,
+                **windows_hide_kwargs(),
+            )
+            return candidate
+        except (OSError, subprocess.SubprocessError):
+            continue
+    return ["py", "-3"]
+
+
 def pid_alive(pid: int) -> bool:
     if pid <= 0:
         return False
@@ -60,15 +113,40 @@ def pid_alive(pid: int) -> bool:
                 ["tasklist", "/FI", f"PID eq {pid}", "/NH"],
                 stderr=subprocess.DEVNULL,
                 text=True,
-                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+                **windows_hide_kwargs(),
             )
-            return str(pid) in out
+            return str(pid) in out and "No tasks" not in out
         except (subprocess.CalledProcessError, OSError):
             return False
     try:
         os.kill(pid, 0)
         return True
     except OSError:
+        return False
+
+
+def detect_process_running() -> bool:
+    """True if any detect.py process is alive (even before/without lock file)."""
+    if os.name != "nt":
+        return read_detect_pid() is not None
+    try:
+        out = subprocess.check_output(
+            [
+                "powershell",
+                "-NoProfile",
+                "-WindowStyle",
+                "Hidden",
+                "-Command",
+                "(Get-CimInstance Win32_Process | "
+                "Where-Object { $_.CommandLine -match 'detect\\.py' }).Count",
+            ],
+            stderr=subprocess.DEVNULL,
+            text=True,
+            timeout=8,
+            **windows_hide_kwargs(),
+        )
+        return int((out or "0").strip() or "0") > 0
+    except (subprocess.CalledProcessError, OSError, ValueError):
         return False
 
 
@@ -80,6 +158,10 @@ def read_detect_pid() -> Optional[int]:
     except (OSError, ValueError):
         return None
     if not pid_alive(pid):
+        # Don't delete immediately — process may still be booting; only clear if
+        # no detect.py process exists at all.
+        if detect_process_running():
+            return pid if pid > 0 else None
         try:
             if LOCK_FILE.exists():
                 LOCK_FILE.unlink()
@@ -89,23 +171,28 @@ def read_detect_pid() -> Optional[int]:
     return pid
 
 
+def detection_is_running() -> bool:
+    return read_detect_pid() is not None or detect_process_running()
+
+
 def start_detect() -> None:
-    if read_detect_pid() is not None:
+    global _start_cooldown_until
+    now = time.time()
+    if now < _start_cooldown_until:
+        return
+    if detection_is_running():
         return
 
     env = os.environ.copy()
     env["CCTV_AGENT_MANAGED"] = "1"
-    creationflags = 0
     if os.name == "nt":
-        creationflags = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0) | getattr(
-            subprocess, "DETACHED_PROCESS", 0
-        )
-        # Prefer pythonw so no console window pops up for detect.py
-        cmd = ["py", "-3", "detect.py"]
+        cmd = resolve_pythonw() + ["detect.py"]
     else:
         cmd = ["python3", "detect.py"]
 
-    log("Auto-start: Open Surveillance is open → starting detect.py...")
+    log("Auto-start: Open Surveillance is open → starting detect.py (no console window)...")
+    # Cooldown prevents restart spam while YOLO/model boot is still writing the lock.
+    _start_cooldown_until = now + 90.0
     try:
         with open(ROOT / "detection_control.log", "a", encoding="utf-8") as log_fh:
             subprocess.Popen(
@@ -114,26 +201,29 @@ def start_detect() -> None:
                 env=env,
                 stdout=log_fh,
                 stderr=subprocess.STDOUT,
-                creationflags=creationflags,
-                close_fds=True,
+                stdin=subprocess.DEVNULL,
+                close_fds=(os.name != "nt"),
+                **windows_hide_kwargs(),
             )
     except OSError as exc:
         log(f"Failed to start detect.py: {exc}")
+        _start_cooldown_until = now + 15.0
         return
 
-    for _ in range(24):
+    for _ in range(40):
         time.sleep(0.25)
-        pid = read_detect_pid()
-        if pid is not None:
-            log(f"detect.py started (pid {pid})")
+        if detection_is_running():
+            pid = read_detect_pid()
+            log(f"detect.py started (pid {pid or 'booting'})")
             return
-    log("detect.py start requested (lock file not seen yet)")
+    log("detect.py start requested (still booting — will not spam-restart)")
 
 
 def stop_detect(reason: str = "Open Surveillance closed") -> None:
+    global _start_cooldown_until
+    running = detection_is_running()
     pid = read_detect_pid()
-    if pid is None:
-        # Also clear any orphan lock
+    if not running and pid is None:
         try:
             if LOCK_FILE.exists():
                 LOCK_FILE.unlink()
@@ -141,21 +231,24 @@ def stop_detect(reason: str = "Open Surveillance closed") -> None:
             pass
         return
 
-    log(f"Auto-stop: {reason} → stopping detect.py (pid {pid})...")
+    log(f"Auto-stop: {reason} → stopping detect.py...")
+    hide = windows_hide_kwargs()
     try:
         if os.name == "nt":
-            subprocess.run(
-                ["taskkill", "/F", "/PID", str(pid), "/T"],
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
-                check=False,
-            )
-            # Sweep any leftover detect.py processes started outside the lock.
+            if pid is not None:
+                subprocess.run(
+                    ["taskkill", "/F", "/PID", str(pid), "/T"],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    check=False,
+                    **hide,
+                )
             subprocess.run(
                 [
                     "powershell",
                     "-NoProfile",
+                    "-WindowStyle",
+                    "Hidden",
                     "-Command",
                     "Get-CimInstance Win32_Process | "
                     "Where-Object { $_.CommandLine -match 'detect\\.py' } | "
@@ -163,10 +256,10 @@ def stop_detect(reason: str = "Open Surveillance closed") -> None:
                 ],
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
-                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
                 check=False,
+                **hide,
             )
-        else:
+        elif pid is not None:
             try:
                 os.kill(pid, 15)
             except OSError:
@@ -179,6 +272,7 @@ def stop_detect(reason: str = "Open Surveillance closed") -> None:
             LOCK_FILE.unlink()
     except OSError:
         pass
+    _start_cooldown_until = 0.0
     log("detect.py stopped")
 
 
@@ -196,7 +290,8 @@ def api_request(
     api_key: str,
     method: str = "GET",
     payload: Optional[Dict] = None,
-    timeout: float = 30.0,
+    timeout: float = 8.0,
+    quiet: bool = False,
 ) -> Optional[Dict]:
     body = None
     headers = {
@@ -214,7 +309,17 @@ def api_request(
             data = json.loads(resp.read().decode("utf-8", errors="replace"))
             return data if isinstance(data, dict) else None
     except Exception as exc:  # noqa: BLE001
-        log(f"API {method} {url} failed: {exc}")
+        if not quiet:
+            # Timeouts on optional scan polls should not flood the console.
+            is_timeout = isinstance(exc, TimeoutError) or "timed out" in str(exc).lower()
+            if is_timeout or isinstance(exc, URLError):
+                log_rate_limited(
+                    f"{method}:{url}",
+                    f"API {method} {url} failed: {exc}",
+                    60.0,
+                )
+            else:
+                log(f"API {method} {url} failed: {exc}")
         return None
 
 
@@ -226,8 +331,22 @@ def run_camera_discover() -> Dict:
     except OSError:
         pass
 
-    py = "py" if os.name == "nt" else "python3"
-    cmd = [py, "camera_discover.py", "--json", "--out", str(out_file)]
+    py = "pyw" if os.name == "nt" else "python3"
+    # Fall back to py if pyw is missing.
+    if os.name == "nt":
+        try:
+            subprocess.run(
+                ["pyw", "-3", "-c", "pass"],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                timeout=5,
+                **windows_hide_kwargs(),
+            )
+            cmd = ["pyw", "-3", "camera_discover.py", "--json", "--out", str(out_file)]
+        except (OSError, subprocess.SubprocessError):
+            cmd = ["py", "-3", "camera_discover.py", "--json", "--out", str(out_file)]
+    else:
+        cmd = [py, "camera_discover.py", "--json", "--out", str(out_file)]
     try:
         completed = subprocess.run(
             cmd,
@@ -235,7 +354,7 @@ def run_camera_discover() -> Dict:
             capture_output=True,
             text=True,
             timeout=180,
-            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0) if os.name == "nt" else 0,
+            **windows_hide_kwargs(),
         )
     except Exception as exc:  # noqa: BLE001
         return {"success": False, "message": "Failed to run camera_discover.py: " + str(exc)}
@@ -264,7 +383,14 @@ def run_camera_discover() -> Dict:
 
 
 def process_scan_job(scan_url: str, api_key: str) -> None:
-    pending = api_request(scan_url + "?role=agent", api_key, method="GET", timeout=20)
+    # Short timeout — never block the agent loop for 20–30s on Hostinger blips.
+    pending = api_request(
+        scan_url + "?role=agent",
+        api_key,
+        method="GET",
+        timeout=4.0,
+        quiet=False,
+    )
     if not pending or not pending.get("success") or not pending.get("has_job"):
         return
 
@@ -280,7 +406,7 @@ def process_scan_job(scan_url: str, api_key: str) -> None:
             api_key,
             method="POST",
             payload={"action": "claim", "id": job_id, "role": "agent"},
-            timeout=20,
+            timeout=6.0,
         )
         if not claimed or not claimed.get("success"):
             return
@@ -299,12 +425,43 @@ def process_scan_job(scan_url: str, api_key: str) -> None:
         "note": result.get("note"),
         "message": result.get("message") or result.get("error"),
     }
-    done = api_request(scan_url + "?role=agent", api_key, method="POST", payload=payload, timeout=30)
+    done = api_request(
+        scan_url + "?role=agent",
+        api_key,
+        method="POST",
+        payload=payload,
+        timeout=15.0,
+    )
     if done and done.get("success"):
         count = len(payload["cameras"])
         log(f"Camera scan complete: {count} candidate(s)")
     else:
         log("Failed to upload camera scan results")
+
+
+def request_scan_poll_async(scan_url: str, api_key: str, min_interval: float = 15.0) -> None:
+    """Poll scan jobs on a background thread so timeouts never stall detect start/stop."""
+    global _scan_in_flight, _last_scan_poll_at
+    now = time.time()
+    if now - _last_scan_poll_at < min_interval:
+        return
+    with _scan_lock:
+        if _scan_in_flight:
+            return
+        _scan_in_flight = True
+        _last_scan_poll_at = now
+
+    def _worker() -> None:
+        global _scan_in_flight
+        try:
+            process_scan_job(scan_url, api_key)
+        except Exception as exc:  # noqa: BLE001
+            log_rate_limited("scan-handler", f"Scan job handler error: {exc}", 60.0)
+        finally:
+            with _scan_lock:
+                _scan_in_flight = False
+
+    threading.Thread(target=_worker, name="camera-scan", daemon=True).start()
 
 
 def main() -> int:
@@ -336,7 +493,6 @@ def main() -> int:
         or "2"
     )
     poll_seconds = max(1.5, poll_seconds)
-    # Stop almost immediately once Open Surveillance clears the viewer flag.
     stop_grace_seconds = float(
         file_env.get("CCTV_AGENT_STOP_GRACE_SECONDS")
         or os.environ.get("CCTV_AGENT_STOP_GRACE_SECONDS")
@@ -357,8 +513,7 @@ def main() -> int:
     log(f"  poll:   every {poll_seconds:.0f}s | stop grace: {stop_grace_seconds:.0f}s")
     log("detect.py starts ONLY while Open Surveillance is open; otherwise it stays stopped.")
 
-    # Never leave a leftover always-on detect.py running when the agent boots.
-    if read_detect_pid() is not None:
+    if detection_is_running():
         stop_detect("agent startup — waiting for Open Surveillance")
 
     idle_since: Optional[float] = None
@@ -367,23 +522,18 @@ def main() -> int:
 
     while True:
         if scan_url:
-            try:
-                process_scan_job(scan_url, api_key)
-            except Exception as exc:  # noqa: BLE001
-                log(f"Scan job handler error: {exc}")
+            request_scan_poll_async(scan_url, api_key, min_interval=15.0)
 
-        status = api_request(status_url, api_key, method="GET", timeout=8)
+        status = api_request(status_url, api_key, method="GET", timeout=5.0)
         if not status or not status.get("success"):
             api_fail_streak += 1
-            # Fail closed: never start without a confirmed Open Surveillance heartbeat.
-            # If we already lost contact, stop after a few failed polls.
-            if api_fail_streak >= 3 and read_detect_pid() is not None:
+            # Don't kill a healthy detect.py on a brief Hostinger blip.
+            if api_fail_streak >= 8 and detection_is_running():
                 stop_detect("viewer status unreachable — stopping detection")
             time.sleep(poll_seconds)
             continue
 
         api_fail_streak = 0
-        # Require an explicit true flag from the website (Open Surveillance open).
         should_run = bool(status.get("should_run") is True or status.get("viewer_active") is True)
 
         if last_should_run is None or should_run != last_should_run:
@@ -395,17 +545,17 @@ def main() -> int:
 
         if should_run:
             idle_since = None
-            if read_detect_pid() is None:
+            if not detection_is_running():
                 start_detect()
         else:
-            # Stop promptly when the page is not open (no always-on mode).
             if idle_since is None:
                 idle_since = time.time()
-            if read_detect_pid() is not None and (time.time() - idle_since) >= stop_grace_seconds:
+            if detection_is_running() and (time.time() - idle_since) >= stop_grace_seconds:
                 stop_detect("Open Surveillance is not open")
                 idle_since = time.time()
 
         time.sleep(poll_seconds)
+
 
 if __name__ == "__main__":
     try:

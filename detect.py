@@ -3635,47 +3635,49 @@ def connect_to_stream(url, timeout=STREAM_TIMEOUT):
 def check_and_create_lock():
     """Check if another instance is running, create lock file if not"""
     lock_path = Path(LOCK_FILE)
-    
-    # Check if lock file exists
+
+    def _pid_alive(pid: int) -> bool:
+        if pid <= 0:
+            return False
+        if sys.platform == "win32":
+            try:
+                out = subprocess.check_output(
+                    ["tasklist", "/FI", f"PID eq {pid}", "/NH"],
+                    stderr=subprocess.DEVNULL,
+                    text=True,
+                    creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+                )
+                return str(pid) in out and "No tasks" not in out
+            except (subprocess.CalledProcessError, OSError):
+                return False
+        try:
+            os.kill(pid, 0)
+            return True
+        except OSError:
+            return False
+
     if lock_path.exists():
         try:
-            # Read PID from lock file
-            with open(lock_path, 'r') as f:
+            with open(lock_path, "r", encoding="utf-8") as f:
                 old_pid = int(f.read().strip())
-            
-            # Check if process is still running (Windows)
-            if sys.platform == 'win32':
-                try:
-                    # Try to check if process exists (signal 0 doesn't kill)
-                    os.kill(old_pid, 0)
-                    # Process exists - another instance is running
-                    print(f"✗ Another instance of detect.py is already running (PID: {old_pid})")
-                    print("Please stop the existing instance before starting a new one.")
-                    print("You can use: stop_detection.bat")
-                    return False
-                except (ProcessLookupError, OSError):
-                    # Process doesn't exist - stale lock file, remove it
-                    lock_path.unlink()
-            else:
-                # Unix-like systems
-                try:
-                    os.kill(old_pid, 0)
-                    print(f"✗ Another instance of detect.py is already running (PID: {old_pid})")
-                    return False
-                except (ProcessLookupError, OSError):
-                    lock_path.unlink()
-        except (ValueError, IOError):
-            # Lock file is corrupted, remove it
+            if _pid_alive(old_pid):
+                print(f"✗ Another instance of detect.py is already running (PID: {old_pid})")
+                print("Open Surveillance / detection agent manages start/stop automatically.")
+                return False
             lock_path.unlink()
-    
-    # Create lock file with current PID
+        except (ValueError, OSError):
+            try:
+                lock_path.unlink()
+            except OSError:
+                pass
+
     try:
-        with open(lock_path, 'w') as f:
+        with open(lock_path, "w", encoding="utf-8") as f:
             f.write(str(os.getpid()))
         return True
     except Exception as e:
         print(f"Warning: Could not create lock file: {e}")
-        return True  # Continue anyway
+        return True
 
 def remove_lock():
     """Remove lock file on exit"""

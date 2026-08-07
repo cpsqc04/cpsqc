@@ -82,9 +82,17 @@ function startDetectionProcess(?string $root = null, ?string $logFile = null): b
     }
 
     if (strncasecmp(PHP_OS, 'WIN', 3) === 0) {
-        $cmd = 'cd /d ' . escapeshellarg($root)
-            . ' && (py detect.py >> ' . escapeshellarg($logFile) . ' 2>&1)';
-        pclose(popen('start /B cmd /C ' . escapeshellarg($cmd), 'r'));
+        // Use windowless pythonw/pyw so Windows Terminal does not pop open.
+        $ps = 'Set-Location -LiteralPath ' . escapeshellarg($root) . '; '
+            . '$log = ' . escapeshellarg($logFile) . '; '
+            . '$pyw = Get-Command pyw -ErrorAction SilentlyContinue; '
+            . 'if ($pyw) { $exe = "pyw"; $args = @("-3","detect.py") } '
+            . 'else { $exe = "pythonw"; $args = @("detect.py") }; '
+            . 'Start-Process -FilePath $exe -ArgumentList $args -WorkingDirectory '
+            . escapeshellarg($root)
+            . ' -WindowStyle Hidden -RedirectStandardOutput $log -RedirectStandardError $log -ErrorAction SilentlyContinue';
+        $cmd = 'powershell -NoProfile -WindowStyle Hidden -Command ' . escapeshellarg($ps);
+        pclose(popen($cmd, 'r'));
         return true;
     }
 
