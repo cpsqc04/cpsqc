@@ -193,10 +193,9 @@ IDLE_AUTO_STOP_ENABLED = (
 )
 CONFIDENCE_THRESHOLD = 0.35
 PLANT_CONFIDENCE_THRESHOLD = 0.20  # Potted plants are often lower-confidence in YOLO
-PHONE_CONFIDENCE_THRESHOLD = 0.18  # Phones are small / often partially occluded / held close-up
-PHONE_YOLO_SCAN_CONF = 0.05  # Low conf for dedicated phone scan passes
-PHONE_CONTOUR_CONFIDENCE = 0.42  # Estimated confidence for shape-based phone hits
-PHONE_CLOSEUP_CONFIDENCE = 0.55  # Phone held very close to the lens (fills most of the frame)
+PHONE_CONFIDENCE_THRESHOLD = 0.30  # YOLO cell-phone detections only (avoid room false positives)
+PHONE_YOLO_SCAN_CONF = 0.08  # Low conf for dedicated phone scan passes
+PHONE_CONTOUR_CONFIDENCE = 0.45  # Contour assist only near a detected person
 PHONE_SCAN_IMGSZ = 1280
 ENABLE_PHONE_SECONDARY_SCAN = True
 PHONE_MODEL_CANDIDATES = ('phone_yolov8.pt', 'yolov8s.pt', 'yolov8m.pt', 'yolov8n.pt')
@@ -1237,8 +1236,7 @@ def scan_contour_phones_in_crop(frame, offset_x, offset_y, crop):
     best = None
     best_score = 0.0
     min_area = max(250, int(ch * cw * 0.004))
-    # Allow large phone bodies / close-ups (previously capped at 35% and missed lens-filling phones).
-    max_area = int(ch * cw * 0.92)
+    max_area = int(ch * cw * 0.35)
 
     for contour in contours:
         area = cv2.contourArea(contour)
@@ -1327,80 +1325,8 @@ def dedupe_phone_hits(phone_hits, min_iou=0.25):
         kept_boxes.append(bbox)
     return kept
 
-def scan_closeup_phone_frame(frame):
-    """
-    Detect a cellphone held close to the camera (often fills most of the view).
-    COCO 'cell phone' usually fails on extreme close-ups / screen-facing shots.
-    """
-    hits = []
-    if frame is None or getattr(frame, 'size', 0) == 0:
-        return hits
-
-    h, w = frame.shape[:2]
-    if h < 80 or w < 80:
-        return hits
-
-    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-    blur = cv2.GaussianBlur(gray, (5, 5), 0)
-    edges = cv2.Canny(blur, 35, 120)
-    edge_density = float(np.count_nonzero(edges)) / float(max(1, h * w))
-    std_dev = float(np.std(gray))
-
-    # Digital screens / phone UI have visible structure; reject near-blank frames.
-    if edge_density < 0.012 or std_dev < 10:
-        return hits
-
-    # Prefer a centered large rectangle (phone body / screen).
-    margin_x = int(w * 0.04)
-    margin_y = int(h * 0.04)
-    x1, y1 = margin_x, margin_y
-    x2, y2 = w - margin_x, h - margin_y
-
-    # Refine with largest rectangular contour if available.
-    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (5, 5))
-    closed = cv2.morphologyEx(edges, cv2.MORPH_CLOSE, kernel, iterations=2)
-    contours, _ = cv2.findContours(closed, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    frame_area = float(h * w)
-    best = None
-    best_area = 0.0
-    for contour in contours:
-        area = float(cv2.contourArea(contour))
-        if area < frame_area * 0.12 or area > frame_area * 0.98:
-            continue
-        rx, ry, rw, rh = cv2.boundingRect(contour)
-        if rw < w * 0.25 or rh < h * 0.25:
-            continue
-        aspect = max(rw, rh) / float(max(1, min(rw, rh)))
-        if aspect > 3.2:
-            continue
-        if area > best_area:
-            best_area = area
-            best = (rx, ry, rx + rw, ry + rh)
-
-    if best is not None:
-        x1, y1, x2, y2 = best
-
-    # Require the candidate to occupy a meaningful share of the frame (close-up).
-    box_area = float(max(1, (x2 - x1) * (y2 - y1)))
-    if box_area / frame_area < 0.18:
-        return hits
-
-    hits.append({
-        'bbox': {
-            'x1': int(x1),
-            'y1': int(y1),
-            'x2': int(x2),
-            'y2': int(y2),
-        },
-        'confidence': PHONE_CLOSEUP_CONFIDENCE,
-        'class_name': 'cell phone',
-        'source': 'closeup_phone_scan',
-    })
-    return hits
-
-
 def enhance_phone_detections(frame, model, detections):
-    """Run extra phone passes because COCO phone class is often missed on CCTV footage."""
+    """Extra YOLO phone passes. Boxes only for real model hits (no room heuristics)."""
     if not ENABLE_PHONE_SECONDARY_SCAN or not USE_ULTRALYTICS:
         return detections
 
@@ -1425,6 +1351,7 @@ def enhance_phone_detections(frame, model, detections):
                 phone_hits.append(yolo_hits[0])
                 continue
 
+            # Contour assist only around people (never full-frame — false-triggers on rooms).
             contour_hits = []
             for region in person_phone_scan_regions(person_bbox, frame_width, frame_height):
                 crop = frame[region['y1']:region['y2'], region['x1']:region['x2']]
@@ -1437,13 +1364,14 @@ def enhance_phone_detections(frame, model, detections):
             if contour_hits:
                 phone_hits.append(contour_hits[0])
 
-    # Always also scan the full frame (hand-held / close-to-lens phones are often missed
-    # when we only search around person boxes).
+    # Full-frame YOLO cell-phone class only (real model detections).
     phone_hits.extend(scan_yolo_phones_in_crop(frame, scan_model, 0, 0, frame))
-    phone_hits.extend(scan_contour_phones_in_crop(frame, 0, 0, frame))
 
     for hit in dedupe_phone_hits(phone_hits):
-        if hit['confidence'] < PHONE_CONFIDENCE_THRESHOLD:
+        min_conf = PHONE_CONFIDENCE_THRESHOLD
+        if hit.get('source') == 'contour_phone_scan':
+            min_conf = PHONE_CONTOUR_CONFIDENCE
+        if hit['confidence'] < min_conf:
             continue
         append_phone_detection(
             detections,
@@ -1451,22 +1379,11 @@ def enhance_phone_detections(frame, model, detections):
             hit['bbox'],
             hit['confidence'],
             hit.get('class_name', 'cell phone'),
-            hit.get('source', 'scan'),
+            hit.get('source', 'yolo_phone_scan'),
         )
 
-    # Extreme close-ups (phone filling the lens) are frequently missed by COCO/YOLO.
-    if not any(d.get('category') == 'phone' for d in detections):
-        for hit in scan_closeup_phone_frame(frame):
-            append_phone_detection(
-                detections,
-                frame,
-                hit['bbox'],
-                hit['confidence'],
-                hit.get('class_name', 'cell phone'),
-                hit.get('source', 'closeup_phone_scan'),
-            )
-
     return detections
+
 
 def map_bag_class_to_category(class_name):
     class_lower = str(class_name or '').lower()
