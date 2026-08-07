@@ -122,10 +122,10 @@ CAMERAS_CONFIG_FINGERPRINT = None
 CCTV_FRAME_UPLOAD_URL = ""
 CCTV_FRAME_UPLOAD_KEY = ""
 CCTV_CAMERAS_CONFIG_URL = ""
-# Hostinger-safe live relay: modest rate + small JPEG (lower latency without spiking shared CPU).
-CCTV_UPLOAD_MIN_INTERVAL = 0.35  # ~2.8 uploads/sec max; server also rate-limits
-CCTV_UPLOAD_JPEG_QUALITY = 68    # smaller payload than local preview quality
-CCTV_UPLOAD_MAX_WIDTH = 960      # downscale before upload (CPU cost is on-site PC, not Hostinger)
+# Live relay defaults (overridden by .env CCTV_FEED_QUALITY=lan|balanced|hostinger).
+CCTV_UPLOAD_MIN_INTERVAL = 0.20  # Faster LAN uploads
+CCTV_UPLOAD_JPEG_QUALITY = 88    # Clearer live JPEG
+CCTV_UPLOAD_MAX_WIDTH = 1600     # Near-HD for Open Surveillance
 _last_cctv_upload_at = 0.0
 _last_cameras_sync_at = 0.0
 _last_detections_upload_at = 0.0
@@ -148,7 +148,7 @@ ENABLE_RECORDING = True  # Set to False to disable recording
 RECORDING_FPS = 10  # Declared MP4 FPS — must match actual write pacing for correct duration
 HTTP_SNAPSHOT_INTERVAL = 0.35  # Seconds between HTTP snapshots (fallback mode)
 HTTP_RECORDING_FPS = 1.0 / HTTP_SNAPSHOT_INTERVAL  # Match snapshot rate for recording duration
-LIVE_JPEG_QUALITY = 80  # Local preview file (upload uses CCTV_UPLOAD_JPEG_QUALITY)
+LIVE_JPEG_QUALITY = 90  # Local preview file (upload uses CCTV_UPLOAD_JPEG_QUALITY)
 RECORDING_CHUNK_DURATION = 300  # Record in 5-minute chunks (seconds)
 MIN_RECORDING_DURATION = 60  # Keep clips of at least 1 minute (discard shorter fragments)
 RECORDING_BUCKET_SECONDS = 300  # Align filenames to 5-minute windows
@@ -372,7 +372,7 @@ def load_project_env():
 def init_cctv_upload_from_env():
     """Enable optional upload of live frames to Hostinger (on-site PC only)."""
     global CCTV_FRAME_UPLOAD_URL, CCTV_FRAME_UPLOAD_KEY, CCTV_CAMERAS_CONFIG_URL
-    global CCTV_UPLOAD_MIN_INTERVAL, CCTV_UPLOAD_JPEG_QUALITY, CCTV_UPLOAD_MAX_WIDTH
+    global CCTV_UPLOAD_MIN_INTERVAL, CCTV_UPLOAD_JPEG_QUALITY, CCTV_UPLOAD_MAX_WIDTH, LIVE_JPEG_QUALITY
     env = load_project_env()
     CCTV_FRAME_UPLOAD_URL = (
         env.get("CCTV_FRAME_UPLOAD_URL", "") or os.environ.get("CCTV_FRAME_UPLOAD_URL", "")
@@ -383,31 +383,69 @@ def init_cctv_upload_from_env():
     CCTV_CAMERAS_CONFIG_URL = (
         env.get("CCTV_CAMERAS_CONFIG_URL", "") or os.environ.get("CCTV_CAMERAS_CONFIG_URL", "")
     ).strip()
+
+    # Quality presets for same-LAN camera + on-site PC setups.
+    # Individual CCTV_UPLOAD_* vars always override the preset.
+    quality = (
+        env.get("CCTV_FEED_QUALITY", "") or os.environ.get("CCTV_FEED_QUALITY", "") or "lan"
+    ).strip().lower()
+    presets = {
+        "lan": {"interval": 0.15, "quality": 92, "width": 1920, "live_q": 95},
+        "high": {"interval": 0.15, "quality": 92, "width": 1920, "live_q": 95},
+        "balanced": {"interval": 0.25, "quality": 82, "width": 1280, "live_q": 88},
+        "hostinger": {"interval": 0.35, "quality": 68, "width": 960, "live_q": 80},
+        "low": {"interval": 0.35, "quality": 68, "width": 960, "live_q": 80},
+    }
+    preset = presets.get(quality, presets["lan"])
+    CCTV_UPLOAD_MIN_INTERVAL = float(preset["interval"])
+    CCTV_UPLOAD_JPEG_QUALITY = int(preset["quality"])
+    CCTV_UPLOAD_MAX_WIDTH = int(preset["width"])
+    LIVE_JPEG_QUALITY = int(preset["live_q"])
+
     try:
         CCTV_UPLOAD_MIN_INTERVAL = max(
-            0.3,
-            float(env.get("CCTV_UPLOAD_MIN_INTERVAL", "") or os.environ.get("CCTV_UPLOAD_MIN_INTERVAL", "") or CCTV_UPLOAD_MIN_INTERVAL),
+            0.08,
+            float(
+                env.get("CCTV_UPLOAD_MIN_INTERVAL", "")
+                or os.environ.get("CCTV_UPLOAD_MIN_INTERVAL", "")
+                or CCTV_UPLOAD_MIN_INTERVAL
+            ),
         )
     except ValueError:
         pass
     try:
         CCTV_UPLOAD_JPEG_QUALITY = max(
             40,
-            min(85, int(env.get("CCTV_UPLOAD_JPEG_QUALITY", "") or os.environ.get("CCTV_UPLOAD_JPEG_QUALITY", "") or CCTV_UPLOAD_JPEG_QUALITY)),
+            min(
+                95,
+                int(
+                    env.get("CCTV_UPLOAD_JPEG_QUALITY", "")
+                    or os.environ.get("CCTV_UPLOAD_JPEG_QUALITY", "")
+                    or CCTV_UPLOAD_JPEG_QUALITY
+                ),
+            ),
         )
     except ValueError:
         pass
     try:
         CCTV_UPLOAD_MAX_WIDTH = max(
             480,
-            min(1280, int(env.get("CCTV_UPLOAD_MAX_WIDTH", "") or os.environ.get("CCTV_UPLOAD_MAX_WIDTH", "") or CCTV_UPLOAD_MAX_WIDTH)),
+            min(
+                2560,
+                int(
+                    env.get("CCTV_UPLOAD_MAX_WIDTH", "")
+                    or os.environ.get("CCTV_UPLOAD_MAX_WIDTH", "")
+                    or CCTV_UPLOAD_MAX_WIDTH
+                ),
+            ),
         )
     except ValueError:
         pass
     if CCTV_FRAME_UPLOAD_URL:
         print(
             f"✓ Remote frame upload enabled → {CCTV_FRAME_UPLOAD_URL} "
-            f"(interval>={CCTV_UPLOAD_MIN_INTERVAL:.2f}s, max_w={CCTV_UPLOAD_MAX_WIDTH}, q={CCTV_UPLOAD_JPEG_QUALITY})"
+            f"(quality={quality}, interval>={CCTV_UPLOAD_MIN_INTERVAL:.2f}s, "
+            f"max_w={CCTV_UPLOAD_MAX_WIDTH}, q={CCTV_UPLOAD_JPEG_QUALITY})"
         )
     if CCTV_CAMERAS_CONFIG_URL:
         print(f"✓ Remote camera config sync enabled → {CCTV_CAMERAS_CONFIG_URL}")

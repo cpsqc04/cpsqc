@@ -42,10 +42,13 @@ if ($providedKey === '' || !hash_equals($expectedKey, $providedKey)) {
     exit;
 }
 
-// Hostinger-safe rate limit: ~3 uploads/sec max (client should stay >= 0.30s)
+// Live upload rate / size (LAN high-quality allowed; clamp for shared hosting safety)
 $rateFile = dirname(__DIR__) . DIRECTORY_SEPARATOR . 'cctv_upload_rate.tmp';
 $now = microtime(true);
-$minInterval = 0.32;
+$minInterval = (float) ($_ENV['CCTV_UPLOAD_SERVER_MIN_INTERVAL'] ?? getenv('CCTV_UPLOAD_SERVER_MIN_INTERVAL') ?: 0.12);
+if ($minInterval < 0.08) {
+    $minInterval = 0.08;
+}
 if (is_file($rateFile)) {
     $last = (float) @file_get_contents($rateFile);
     if ($last > 0 && ($now - $last) < $minInterval) {
@@ -70,8 +73,12 @@ if (($upload['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
 }
 
 $size = (int) ($upload['size'] ?? 0);
-// Keep payload small on shared hosting (prefer downscaled live frames from detect.py).
-if ($size < 500 || $size > 1_500_000) {
+// Allow clearer LAN frames (up to ~3.5MB JPEG). Override via env if needed.
+$maxBytes = (int) ($_ENV['CCTV_UPLOAD_MAX_BYTES'] ?? getenv('CCTV_UPLOAD_MAX_BYTES') ?: 3_500_000);
+if ($maxBytes < 500_000) {
+    $maxBytes = 500_000;
+}
+if ($size < 500 || $size > $maxBytes) {
     http_response_code(400);
     echo json_encode(['success' => false, 'message' => 'Invalid frame size']);
     exit;

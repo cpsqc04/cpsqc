@@ -437,7 +437,7 @@ $cctvNavActive = 'camera-management';
                             <input type="text" id="cameraIp" required placeholder="192.168.1.6">
                             <button type="button" class="btn-secondary" style="padding:0.65rem 0.9rem;white-space:nowrap;" onclick="startCameraScan(true)" title="Scan LAN"><i class="fas fa-search"></i></button>
                         </div>
-                        <div class="form-hint">Use <strong>Scan LAN</strong> to find connected cameras on the on-site network. Username/password still required.</div>
+                        <div class="form-hint">Camera stays on the router; this PC uses the same Wi‑Fi/LAN (no direct camera cable needed). Use <strong>Scan LAN</strong> to find the IP.</div>
                     </div>
                     <div class="form-group">
                         <label for="cameraPort">RTSP Port</label>
@@ -455,9 +455,10 @@ $cctvNavActive = 'camera-management';
                     <div class="form-group">
                         <label for="cameraStreamType">Stream Type</label>
                         <select id="cameraStreamType">
-                            <option value="sub">Sub stream (recommended — lower delay)</option>
-                            <option value="main">Main stream (higher quality, more delay)</option>
+                            <option value="main">Main stream (clear quality — recommended on LAN)</option>
+                            <option value="sub">Sub stream (lower bandwidth)</option>
                         </select>
+                        <div class="form-hint">Camera and this PC should be on the same router. Use Main for original clarity.</div>
                     </div>
                     <div class="form-group full">
                         <label for="cameraDescription">Description</label>
@@ -699,7 +700,7 @@ $cctvNavActive = 'camera-management';
             document.getElementById('cameraPassword').value = '';
             document.getElementById('cameraPassword').required = !camera;
             document.getElementById('passwordHint').style.display = camera ? 'block' : 'none';
-            document.getElementById('cameraStreamType').value = camera ? (camera.streamType || 'sub') : 'sub';
+            document.getElementById('cameraStreamType').value = camera ? (camera.streamType || 'main') : 'main';
             document.getElementById('cameraStatus').value = camera ? (camera.status || 'Online') : 'Online';
             document.getElementById('cameraDescription').value = camera ? (camera.description || '') : '';
             document.getElementById('cameraModal').classList.add('active');

@@ -24,8 +24,8 @@ if (!file_exists($camerasFile)) {
             'port' => '554',
             'username' => 'admin',
             'password' => 'admin123',
-            'streamType' => 'sub', // main or sub
-            'rtspUrl' => 'rtsp://admin:admin123@172.22.0.187:554/h264Preview_01_sub',
+            'streamType' => 'main',
+            'rtspUrl' => 'rtsp://admin:admin123@172.22.0.187:554/Preview_01_main',
             'status' => 'Online',
             'description' => 'Main entrance surveillance camera',
             'createdAt' => date('Y-m-d H:i:s'),
@@ -97,7 +97,10 @@ if ($method === 'GET') {
     $port = $data['port'] ?? '554';
     $username = $data['username'] ?? '';
     $password = $data['password'] ?? '';
-    $streamType = $data['streamType'] ?? 'sub';
+    $streamType = $data['streamType'] ?? 'main';
+    if (!in_array($streamType, ['main', 'sub'], true)) {
+        $streamType = 'main';
+    }
     $rtspUrl = buildRtspUrl($ip, $port, $username, $password, $streamType);
     
     $newCamera = [

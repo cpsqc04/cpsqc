@@ -8,10 +8,10 @@
         "port": "554",
         "username": "admin",
         "password": "your-camera-password",
-        "streamType": "sub",
-        "rtspUrl": "rtsp://admin:your-camera-password@192.168.1.100:554/Preview_01_sub",
+        "streamType": "main",
+        "rtspUrl": "rtsp://admin:your-camera-password@192.168.1.100:554/Preview_01_main",
         "status": "Online",
-        "description": "Configure IP and credentials in Camera Management after deploy.",
+        "description": "Same-router LAN. Prefer Main stream for clear quality. Configure IP and credentials in Camera Management.",
         "createdAt": "2026-01-01 00:00:00",
         "updatedAt": "2026-01-01 00:00:00"
     }

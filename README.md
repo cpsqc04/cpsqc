@@ -30,7 +30,7 @@ AlertaraQC supports BPSO patrol scheduling and monitoring, neighborhood watch co
 - **Frontend:** HTML, CSS, JavaScript
 - **Local stack:** XAMPP (Apache + MySQL)
 - **Email:** PHPMailer (Composer)
-- **CCTV detection (optional):** Python (`detect.py`) on the on-site PC. Open Surveillance auto-signals start; keep `start_detection_agent.bat` running there (or `start_detection.bat` for always-on). Camera Management **Scan LAN** discovers camera IPs on that PC’s network. Recordings stay in `recordings/` for 30 days.
+- **CCTV detection (optional):** Python (`detect.py`) on the on-site PC (same router LAN as the camera — no direct camera cable needed). Keep `start_detection_agent.bat` running. Use **Main stream** + `CCTV_FEED_QUALITY=lan` for clear live view. Camera Management **Scan LAN** finds camera IPs. Recordings stay in `recordings/` for 30 days.
 
 ---
 
