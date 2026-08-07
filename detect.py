@@ -679,13 +679,62 @@ def sync_cameras_json_from_server(force=False):
             return False
         payload = resp.json()
         cameras = payload.get("cameras") if isinstance(payload, dict) else None
-        if not isinstance(cameras, list):
+        if not isinstance(cameras, list) or not cameras:
+            # Never wipe a working local cameras.json with an empty Hostinger list.
             return False
+
+        # Preserve local passwords when remote rows omit them.
+        local_cams = []
+        cameras_path = Path(CAMERAS_FILE)
+        if cameras_path.is_file():
+            try:
+                decoded = json.loads(cameras_path.read_text(encoding="utf-8"))
+                if isinstance(decoded, list):
+                    local_cams = decoded
+            except (OSError, json.JSONDecodeError, TypeError):
+                local_cams = []
+        if local_cams:
+            local_by_key = {}
+            for cam in local_cams:
+                if not isinstance(cam, dict):
+                    continue
+                for key in (cam.get("id"), cam.get("cameraId"), cam.get("ipAddress")):
+                    if key:
+                        local_by_key[str(key)] = cam
+            merged = []
+            for cam in cameras:
+                if not isinstance(cam, dict):
+                    continue
+                row = dict(cam)
+                pwd = str(row.get("password") or "").strip()
+                if not pwd:
+                    local = None
+                    for key in (row.get("id"), row.get("cameraId"), row.get("ipAddress")):
+                        if key and str(key) in local_by_key:
+                            local = local_by_key[str(key)]
+                            break
+                    if local:
+                        local_pwd = str(local.get("password") or "").strip()
+                        if not local_pwd:
+                            rtsp = str(local.get("rtspUrl") or "")
+                            if "://" in rtsp and "@" in rtsp:
+                                try:
+                                    from urllib.parse import unquote, urlparse
+                                    parsed = urlparse(rtsp)
+                                    if parsed.password:
+                                        local_pwd = unquote(parsed.password)
+                                except Exception:
+                                    pass
+                        if local_pwd:
+                            row["password"] = local_pwd
+                        if not str(row.get("rtspUrl") or "").strip() and local.get("rtspUrl"):
+                            row["rtspUrl"] = local.get("rtspUrl")
+                merged.append(row)
+            cameras = merged
 
         revision = str(payload.get("revision") or payload.get("updated_at") or "")
         new_text = json.dumps(cameras, indent=4, ensure_ascii=False) + "\n"
         old_text = ""
-        cameras_path = Path(CAMERAS_FILE)
         if cameras_path.is_file():
             try:
                 old_text = cameras_path.read_text(encoding="utf-8")

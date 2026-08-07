@@ -486,6 +486,106 @@ def password_from_camera(camera: dict) -> str:
     return ""
 
 
+def load_local_cameras() -> list:
+    cameras_path = ROOT / "cameras.json"
+    try:
+        cameras = json.loads(cameras_path.read_text(encoding="utf-8"))
+        return cameras if isinstance(cameras, list) else []
+    except (OSError, json.JSONDecodeError, TypeError):
+        return []
+
+
+def merge_camera_passwords(remote_cams: list, local_cams: list) -> list:
+    """Keep local passwords when Hostinger rows arrive with blank password fields."""
+    local_by_id = {}
+    for cam in local_cams:
+        if not isinstance(cam, dict):
+            continue
+        for key in (cam.get("id"), cam.get("cameraId"), cam.get("ipAddress")):
+            if key:
+                local_by_id[str(key)] = cam
+
+    merged = []
+    for cam in remote_cams:
+        if not isinstance(cam, dict):
+            continue
+        row = dict(cam)
+        if not password_from_camera(row):
+            local = None
+            for key in (row.get("id"), row.get("cameraId"), row.get("ipAddress")):
+                if key and str(key) in local_by_id:
+                    local = local_by_id[str(key)]
+                    break
+            if local:
+                local_pwd = password_from_camera(local)
+                if local_pwd:
+                    row["password"] = local_pwd
+                if not str(row.get("rtspUrl") or "").strip() and local.get("rtspUrl"):
+                    row["rtspUrl"] = local.get("rtspUrl")
+        merged.append(row)
+    return merged
+
+
+def sync_cameras_from_website(api_key: str) -> None:
+    """Pull Camera Management config without wiping local credentials on empty sync."""
+    file_env = load_env(ROOT / ".env")
+    config_url = (
+        file_env.get("CCTV_CAMERAS_CONFIG_URL", "")
+        or os.environ.get("CCTV_CAMERAS_CONFIG_URL", "")
+        or derive_api_url(
+            file_env.get("CCTV_FRAME_UPLOAD_URL", "") or os.environ.get("CCTV_FRAME_UPLOAD_URL", ""),
+            "cctv_cameras_config.php",
+        )
+    ).strip()
+    if not config_url:
+        return
+
+    remote = api_request(config_url, api_key, method="GET", timeout=6.0, quiet=True)
+    cams = remote.get("cameras") if isinstance(remote, dict) else None
+    if not isinstance(cams, list) or not cams:
+        # Never overwrite a good local file with [] from Hostinger.
+        return
+
+    local = load_local_cameras()
+    merged = merge_camera_passwords(cams, local)
+    try:
+        (ROOT / "cameras.json").write_text(
+            json.dumps(merged, indent=4, ensure_ascii=False) + "\n",
+            encoding="utf-8",
+        )
+        log("Synced cameras.json from website before encoding probe")
+    except OSError:
+        pass
+
+
+def camera_from_job_or_local(job: dict) -> Optional[dict]:
+    """Prefer credentials embedded in the job; fall back to local cameras.json."""
+    embedded = job.get("camera") if isinstance(job.get("camera"), dict) else None
+    if embedded and (
+        str(embedded.get("ipAddress") or "").strip()
+        and (password_from_camera(embedded) or str(embedded.get("username") or "").strip())
+    ):
+        return embedded
+
+    target_id = job.get("cameraId")
+    cameras = load_local_cameras()
+    camera = None
+    for cam in cameras:
+        if not isinstance(cam, dict):
+            continue
+        if target_id and str(cam.get("id")) != str(target_id) and str(cam.get("cameraId")) != str(target_id):
+            continue
+        status_txt = str(cam.get("status") or "").lower()
+        if not target_id and status_txt and status_txt != "online":
+            continue
+        camera = cam
+        if target_id:
+            break
+    if camera is None and cameras:
+        camera = cameras[0] if isinstance(cameras[0], dict) else None
+    return camera
+
+
 def process_encoding_job(encoding_url: str, api_key: str) -> None:
     pending = api_request(
         encoding_url + "?role=agent",
@@ -513,49 +613,12 @@ def process_encoding_job(encoding_url: str, api_key: str) -> None:
         if not claimed or not claimed.get("success"):
             return
         log(f"Claimed Reolink encoding probe job {job_id}")
+        # Prefer claimed job payload (includes embedded camera credentials).
+        if isinstance(claimed.get("job"), dict):
+            job = claimed["job"]
 
-    # Prefer latest Camera Management credentials from Hostinger when available.
-    file_env = load_env(ROOT / ".env")
-    config_url = (
-        file_env.get("CCTV_CAMERAS_CONFIG_URL", "")
-        or os.environ.get("CCTV_CAMERAS_CONFIG_URL", "")
-        or derive_api_url(
-            file_env.get("CCTV_FRAME_UPLOAD_URL", "") or os.environ.get("CCTV_FRAME_UPLOAD_URL", ""),
-            "cctv_cameras_config.php",
-        )
-    ).strip()
-    if config_url:
-        remote = api_request(config_url, api_key, method="GET", timeout=6.0, quiet=True)
-        cams = remote.get("cameras") if isinstance(remote, dict) else None
-        if isinstance(cams, list) and cams:
-            try:
-                (ROOT / "cameras.json").write_text(
-                    json.dumps(cams, indent=4, ensure_ascii=False) + "\n",
-                    encoding="utf-8",
-                )
-                log("Synced cameras.json from website before encoding probe")
-            except OSError:
-                pass
-
-    cameras_path = ROOT / "cameras.json"
-    target_id = job.get("cameraId")
-    camera = None
-    try:
-        cameras = json.loads(cameras_path.read_text(encoding="utf-8"))
-        if isinstance(cameras, list):
-            for cam in cameras:
-                if target_id and str(cam.get("id")) != str(target_id) and str(cam.get("cameraId")) != str(target_id):
-                    continue
-                status_txt = str(cam.get("status") or "").lower()
-                if not target_id and status_txt and status_txt != "online":
-                    continue
-                camera = cam
-                if target_id:
-                    break
-            if camera is None and cameras:
-                camera = cameras[0]
-    except (OSError, json.JSONDecodeError, TypeError):
-        camera = None
+    sync_cameras_from_website(api_key)
+    camera = camera_from_job_or_local(job)
 
     if not camera:
         api_request(
@@ -567,7 +630,10 @@ def process_encoding_job(encoding_url: str, api_key: str) -> None:
                 "role": "agent",
                 "id": job_id,
                 "success": False,
-                "message": "No camera credentials found in local cameras.json",
+                "message": (
+                    "No camera credentials available. "
+                    "Add/save the camera in Camera Management, then retry Auto-detect."
+                ),
             },
             timeout=8.0,
         )

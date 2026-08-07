@@ -241,10 +241,87 @@ if ($method === 'GET') {
 
 if ($method === 'POST' && $action === 'start') {
     $cameraId = trim((string) ($input['cameraId'] ?? $input['id'] ?? ''));
+    $cameras = [];
+    if (is_file($camerasFile)) {
+        $decoded = json_decode((string) file_get_contents($camerasFile), true);
+        if (is_array($decoded)) {
+            $cameras = $decoded;
+        }
+    }
+    if ($cameras === []) {
+        http_response_code(400);
+        echo json_encode([
+            'success' => false,
+            'message' => 'No cameras saved yet. Add a camera in Camera Management first.',
+        ]);
+        exit;
+    }
+
+    $selected = null;
+    foreach ($cameras as $cam) {
+        if (!is_array($cam)) {
+            continue;
+        }
+        if ($cameraId !== '') {
+            if ((string) ($cam['id'] ?? '') === $cameraId || (string) ($cam['cameraId'] ?? '') === $cameraId) {
+                $selected = $cam;
+                break;
+            }
+            continue;
+        }
+        $statusTxt = strtolower(trim((string) ($cam['status'] ?? '')));
+        if ($statusTxt === '' || $statusTxt === 'online') {
+            $selected = $cam;
+            break;
+        }
+    }
+    if ($selected === null) {
+        $selected = is_array($cameras[0] ?? null) ? $cameras[0] : null;
+    }
+    if ($selected === null) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'message' => 'Target camera not found.']);
+        exit;
+    }
+
+    $ip = trim((string) ($selected['ipAddress'] ?? ''));
+    $user = trim((string) ($selected['username'] ?? ''));
+    $pass = (string) ($selected['password'] ?? '');
+    if ($pass === '' && !empty($selected['rtspUrl'])) {
+        $parts = parse_url((string) $selected['rtspUrl']);
+        if (is_array($parts) && isset($parts['pass'])) {
+            $pass = rawurldecode((string) $parts['pass']);
+        }
+    }
+    if ($ip === '' || $user === '' || $pass === '') {
+        http_response_code(400);
+        echo json_encode([
+            'success' => false,
+            'message' => 'Camera IP/username/password missing. Re-save the camera password in Camera Management.',
+        ]);
+        exit;
+    }
+
+    $jobCameraId = trim((string) ($selected['id'] ?? ''));
+    if ($jobCameraId === '') {
+        $jobCameraId = $cameraId;
+    }
+
     $job = [
         'id' => encodingJobNewId(),
         'status' => 'pending',
-        'cameraId' => $cameraId !== '' ? $cameraId : null,
+        'cameraId' => $jobCameraId !== '' ? $jobCameraId : null,
+        'camera' => [
+            'id' => (string) ($selected['id'] ?? ''),
+            'cameraId' => (string) ($selected['cameraId'] ?? ''),
+            'ipAddress' => $ip,
+            'port' => trim((string) ($selected['port'] ?? '554')) ?: '554',
+            'username' => $user,
+            'password' => $pass,
+            'rtspUrl' => (string) ($selected['rtspUrl'] ?? ''),
+            'streamType' => (string) ($selected['streamType'] ?? 'sub'),
+            'status' => (string) ($selected['status'] ?? 'Online'),
+        ],
         'created_at' => date('c'),
         'message' => 'Waiting for on-site PC to probe Reolink encoding…',
     ];
