@@ -17,6 +17,7 @@ logs/
 # Environment variables
 .env
 .env.local
+.env.onsite
 
 # Dependencies (if using package managers)
 node_modules/
