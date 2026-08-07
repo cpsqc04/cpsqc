@@ -162,7 +162,6 @@ ensureLocalDetectionStarted();
         .fullscreen-btn:focus-visible { outline: 2px solid #4c8a89; outline-offset: 2px; }
         .feed-overlay { position: absolute; z-index: 3; pointer-events: none; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.9), 0 0 8px rgba(0,0,0,0.7); font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; opacity: 0; transition: opacity 0.2s ease; }
         .feed-overlay.visible { opacity: 1; }
-        .feed-overlay-datetime { top: 0.85rem; left: 50%; transform: translateX(-50%); font-size: clamp(1rem, 2.2vw, 1.45rem); font-weight: 700; letter-spacing: 0.03em; white-space: nowrap; background: rgba(0,0,0,0.45); padding: 0.35rem 0.85rem; border-radius: 8px; }
         .feed-overlay-camera { bottom: 0.85rem; right: 0.85rem; font-size: clamp(0.95rem, 1.8vw, 1.25rem); font-weight: 700; background: rgba(0,0,0,0.5); padding: 0.4rem 0.85rem; border-radius: 8px; max-width: min(70%, 420px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .video-placeholder { display: flex; flex-direction: column; align-items: center; justify-content: center; color: rgba(255,255,255,0.75); text-align: center; padding: 2rem; position: absolute; inset: 0; z-index: 2; }
         .video-placeholder.hidden { display: none; }
@@ -508,7 +507,6 @@ ensureLocalDetectionStarted();
                                     <i class="fas fa-expand"></i>
                                 </button>
                                 <img id="cameraFeed" class="camera-feed" alt="Live surveillance feed with YOLO detection">
-                                <div class="feed-overlay feed-overlay-datetime" id="feedDateTime">—</div>
                                 <div class="feed-overlay feed-overlay-camera" id="feedCameraName">Surveillance</div>
                                 <div class="video-placeholder" id="cameraPlaceholder">
                                     <i class="fas fa-camera"></i>
@@ -541,7 +539,9 @@ ensureLocalDetectionStarted();
             startCameraFeed();
             ensureDetectionRunning();
             setInterval(pollDetections, 1000);
-            setInterval(sendDetectionHeartbeat, 10000);
+            // Keep heartbeat fresh so the on-site agent keeps detect.py running.
+            setInterval(sendDetectionHeartbeat, 5000);
+            setInterval(ensureDetectionRunning, 15000);
             initFullscreen();
             initDetectionLifecycle();
         });
@@ -576,6 +576,31 @@ ensureLocalDetectionStarted();
             }
         }
 
+        function signalDetectionStop() {
+            try {
+                const payload = JSON.stringify({ action: 'stop' });
+                if (navigator.sendBeacon) {
+                    const blob = new Blob([payload], { type: 'application/json' });
+                    navigator.sendBeacon('api/detection_control.php', blob);
+                    return;
+                }
+            } catch (e) {
+                /* fall through */
+            }
+            try {
+                fetch('api/detection_control.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'stop' }),
+                    credentials: 'same-origin',
+                    keepalive: true,
+                    cache: 'no-store',
+                });
+            } catch (e) {
+                /* ignore */
+            }
+        }
+
         function initDetectionLifecycle() {
             document.addEventListener('visibilitychange', function() {
                 if (document.visibilityState === 'visible') {
@@ -584,17 +609,9 @@ ensureLocalDetectionStarted();
                 }
             });
 
-            const stopOnLeave = function() {
-                try {
-                    if (navigator.sendBeacon) {
-                        const blob = new Blob([JSON.stringify({ action: 'stop' })], { type: 'application/json' });
-                        navigator.sendBeacon('api/detection_control.php', blob);
-                    }
-                } catch (e) {
-                    /* ignore */
-                }
-            };
-            window.addEventListener('pagehide', stopOnLeave);
+            // Auto-stop when leaving Open Surveillance (no manual stop button).
+            window.addEventListener('pagehide', signalDetectionStop);
+            window.addEventListener('beforeunload', signalDetectionStop);
         }
 
         function initFullscreen() {
@@ -641,7 +658,6 @@ ensureLocalDetectionStarted();
             const badge = document.getElementById('liveBadge');
             const placeholder = document.getElementById('cameraPlaceholder');
             const feed = document.getElementById('cameraFeed');
-            const datetimeOverlay = document.getElementById('feedDateTime');
             const cameraOverlay = document.getElementById('feedCameraName');
 
             let mode = state;
@@ -661,19 +677,7 @@ ensureLocalDetectionStarted();
                 placeholder.classList.remove('hidden');
             }
 
-            if (datetimeOverlay) datetimeOverlay.classList.toggle('visible', isLive || showingFeed);
             if (cameraOverlay) cameraOverlay.classList.toggle('visible', isLive || showingFeed);
-        }
-
-        function formatFrameTimestamp(iso) {
-            if (!iso) return '—';
-            const dt = new Date(iso);
-            if (Number.isNaN(dt.getTime())) return '—';
-            const pad = (n) => String(n).padStart(2, '0');
-            const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-            return pad(dt.getMonth() + 1) + '/' + pad(dt.getDate()) + '/' + dt.getFullYear() +
-                '  ' + pad(dt.getHours()) + ':' + pad(dt.getMinutes()) + ':' + pad(dt.getSeconds()) +
-                '  ' + days[dt.getDay()];
         }
 
         async function loadFeedCameraName() {
@@ -696,7 +700,6 @@ ensureLocalDetectionStarted();
 
         function startCameraFeed() {
             const feed = document.getElementById('cameraFeed');
-            const feedDateTime = document.getElementById('feedDateTime');
             let hasShownFrame = false;
             let lastFrameUpdatedAt = '';
             let frameLoading = false;
@@ -704,6 +707,8 @@ ensureLocalDetectionStarted();
             let cameraRevision = '';
             let cameraJustUpdatedUntil = 0;
             const startedAt = Date.now();
+            const LIVE_POLL_MS = 120;
+            const WARM_POLL_MS = 250;
 
             const schedulePoll = (delayMs) => {
                 if (pollTimer) clearTimeout(pollTimer);
@@ -737,14 +742,13 @@ ensureLocalDetectionStarted();
                     hasShownFrame = true;
                     feed.classList.add('active');
                     document.getElementById('cameraPlaceholder').classList.add('hidden');
-                    if (feedDateTime) feedDateTime.textContent = formatFrameTimestamp(updatedAt);
                     setCameraUiState(isLive ? 'live' : 'connecting');
-                    schedulePoll(isLive ? 250 : 400);
+                    schedulePoll(isLive ? LIVE_POLL_MS : WARM_POLL_MS);
                 };
                 feed.onerror = function() {
                     frameLoading = false;
                     feedErrors += 1;
-                    schedulePoll(400);
+                    schedulePoll(WARM_POLL_MS);
                 };
                 feed.src = 'api/current_frame.php?t=' + encodeURIComponent(updatedAt || Date.now()) + '&r=' + Date.now();
             };
@@ -775,13 +779,12 @@ ensureLocalDetectionStarted();
                     if (status.available) {
                         cameraJustUpdatedUntil = 0;
                         if (frameLoading) {
-                            schedulePoll(200);
+                            schedulePoll(100);
                             return;
                         }
                         if (status.updated_at === lastFrameUpdatedAt) {
                             setCameraUiState('live');
-                            if (feedDateTime) feedDateTime.textContent = formatFrameTimestamp(status.updated_at);
-                            schedulePoll(250);
+                            schedulePoll(LIVE_POLL_MS);
                             return;
                         }
                         showFrame(status.updated_at, true);
@@ -800,7 +803,7 @@ ensureLocalDetectionStarted();
                             document.getElementById('cameraPlaceholder').classList.add('hidden');
                         }
                         setCameraUiState('connecting');
-                        schedulePoll(cameraUpdating ? 300 : 500);
+                        schedulePoll(cameraUpdating ? 200 : 350);
                         return;
                     }
 
@@ -811,12 +814,12 @@ ensureLocalDetectionStarted();
                             lastFrameUpdatedAt = '';
                         }
                         setCameraUiState((warmUp || cameraUpdating) ? 'connecting' : 'offline');
-                        schedulePoll((warmUp || cameraUpdating) ? 400 : 1200);
+                        schedulePoll((warmUp || cameraUpdating) ? 300 : 1200);
                         return;
                     }
 
                     setCameraUiState('connecting');
-                    schedulePoll(800);
+                    schedulePoll(600);
                 } catch (e) {
                     schedulePoll(1000);
                 }
@@ -1038,7 +1041,6 @@ ensureLocalDetectionStarted();
             const timeEl = document.getElementById('currentTime');
             if (dateEl) dateEl.textContent = dateStr;
             if (timeEl) timeEl.textContent = timeStr;
-            // Feed overlay timestamp is driven by the actual frame updated_at (see startCameraFeed).
         }
     </script>
     <?php require __DIR__ . '/includes/admin_notifications_script.php'; ?>

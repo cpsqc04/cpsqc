@@ -45,9 +45,9 @@ if ($providedKey === '' || !hash_equals($expectedKey, $providedKey)) {
 // Live upload rate / size (LAN high-quality allowed; clamp for shared hosting safety)
 $rateFile = dirname(__DIR__) . DIRECTORY_SEPARATOR . 'cctv_upload_rate.tmp';
 $now = microtime(true);
-$minInterval = (float) ($_ENV['CCTV_UPLOAD_SERVER_MIN_INTERVAL'] ?? getenv('CCTV_UPLOAD_SERVER_MIN_INTERVAL') ?: 0.12);
-if ($minInterval < 0.08) {
-    $minInterval = 0.08;
+$minInterval = (float) ($_ENV['CCTV_UPLOAD_SERVER_MIN_INTERVAL'] ?? getenv('CCTV_UPLOAD_SERVER_MIN_INTERVAL') ?: 0.08);
+if ($minInterval < 0.05) {
+    $minInterval = 0.05;
 }
 if (is_file($rateFile)) {
     $last = (float) @file_get_contents($rateFile);
@@ -74,7 +74,7 @@ if (($upload['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
 
 $size = (int) ($upload['size'] ?? 0);
 // Allow clearer LAN frames (up to ~3.5MB JPEG). Override via env if needed.
-$maxBytes = (int) ($_ENV['CCTV_UPLOAD_MAX_BYTES'] ?? getenv('CCTV_UPLOAD_MAX_BYTES') ?: 3_500_000);
+$maxBytes = (int) ($_ENV['CCTV_UPLOAD_MAX_BYTES'] ?? getenv('CCTV_UPLOAD_MAX_BYTES') ?: 5_000_000);
 if ($maxBytes < 500_000) {
     $maxBytes = 500_000;
 }

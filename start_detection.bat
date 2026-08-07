@@ -1,31 +1,20 @@
-@echo Open
-echo ========================================
-echo Starting YOLO IP Camera Detection
-echo ========================================
-echo.
+@echo off
+REM Manual wrapper kept for compatibility.
+REM Preferred: start_detection_agent.bat (auto start/stop with Open Surveillance).
 cd /d "%~dp0"
-set "PATH=%~dp0;%PATH%"
-echo Current directory: %CD%
+echo ========================================
+echo AlertaraQC — use the Detection Agent
+echo ========================================
 echo.
-echo Starting IP camera detection script...
-echo Press Ctrl+C to stop
+echo Do NOT run detect.py manually.
+echo Open Surveillance starts and stops detection automatically.
 echo.
-py detect.py
-pause
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+echo Starting detection_agent.py now...
+echo Leave this window open.
+echo.
+py detection_agent.py
+if errorlevel 1 (
+  echo.
+  echo Agent exited with an error. Check .env CCTV settings.
+  pause
+)

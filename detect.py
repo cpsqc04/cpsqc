@@ -19,6 +19,7 @@ import warnings
 import subprocess
 import contextlib
 import atexit
+import threading
 from urllib.parse import quote, urlparse
 try:
     import requests
@@ -38,28 +39,33 @@ os.environ['GST_DEBUG_NO_COLOR'] = '1'
 # Redirect stderr globally to suppress ALL FFmpeg H.264 decoding errors
 # This prevents error spam in console while still allowing important errors through
 class StderrFilter:
-    """Filter stderr to suppress H.264 decoding errors but allow important messages"""
+    """Filter stderr to suppress H.264/HEVC decoding noise but allow important messages"""
     def __init__(self, original_stderr):
         self.original_stderr = original_stderr
         self.error_count = 0
     
     def write(self, message):
-        # Filter out ALL H.264 decoding errors and related FFmpeg noise
+        # Filter out codec / RTSP noise that OpenCV prints during live decode
         if isinstance(message, str):
             msg_lower = message.lower()
-            # Suppress H.264 decoding errors
             if 'h264' in msg_lower and ('error while decoding' in msg_lower or 'error' in msg_lower):
                 return
-            # Suppress cabac decode errors
             if 'cabac decode' in msg_lower and 'failed' in msg_lower:
                 return
-            # Suppress any [h264 @ ...] messages (all H.264 related errors)
-            if '[h264 @' in message:
+            if '[h264 @' in message or '[hevc @' in message or '[rtsp @' in message:
                 return
-            # Suppress bytestream errors
             if 'bytestream' in msg_lower and 'error' in msg_lower:
                 return
-        # Write everything else to original stderr
+            if 'could not find ref with poc' in msg_lower:
+                return
+            if 'bad cseq' in msg_lower:
+                return
+            if 'stream timeout triggered' in msg_lower:
+                return
+            if 'picture does not contain data' in msg_lower:
+                return
+            if 'error while decoding mb' in msg_lower:
+                return
         self.original_stderr.write(message)
     
     def flush(self):
@@ -114,7 +120,7 @@ except ImportError:
 # REOLINK cameras use Preview_01_sub (not h264Preview_01_sub)
 RTSP_URL = "rtsp://127.0.0.1:554/Preview_01_sub"
 PREFER_SUB_STREAM = True  # Sub-stream = lower latency, fewer decode errors on Reolink
-RTSP_FLUSH_GRABS = 5  # Drop buffered frames when reading RTSP (reduces lag)
+RTSP_FLUSH_GRABS = 3  # Drop a few buffered frames without long grab stalls
 MAX_DECODE_FAILURES_BEFORE_RECONNECT = 8
 CAMERAS_FILE = "cameras.json"
 ACTIVE_CAMERA = None
@@ -122,15 +128,25 @@ CAMERAS_CONFIG_FINGERPRINT = None
 CCTV_FRAME_UPLOAD_URL = ""
 CCTV_FRAME_UPLOAD_KEY = ""
 CCTV_CAMERAS_CONFIG_URL = ""
-# Live relay defaults (overridden by .env CCTV_FEED_QUALITY=lan|balanced|hostinger).
-CCTV_UPLOAD_MIN_INTERVAL = 0.20  # Faster LAN uploads
-CCTV_UPLOAD_JPEG_QUALITY = 88    # Clearer live JPEG
-CCTV_UPLOAD_MAX_WIDTH = 1600     # Near-HD for Open Surveillance
+CCTV_USE_MAIN_STREAM = False  # Force main stream (VLC-like clarity) when True
+# Live relay defaults (overridden by .env CCTV_FEED_QUALITY=vlc|lan|balanced|hostinger).
+CCTV_UPLOAD_MIN_INTERVAL = 0.12  # Faster LAN uploads
+CCTV_UPLOAD_JPEG_QUALITY = 92    # Clearer live JPEG
+CCTV_UPLOAD_MAX_WIDTH = 1920     # HD for Open Surveillance
 _last_cctv_upload_at = 0.0
 _last_cameras_sync_at = 0.0
 _last_cameras_revision = ""
 _last_detections_upload_at = 0.0
-CAMERAS_SYNC_INTERVAL = 1  # Pull Camera Management edits from Hostinger immediately
+_cctv_upload_lock = threading.Lock()
+_cctv_upload_pending = None  # (frame_bytes, detections_text_or_None)
+_cctv_upload_worker_started = False
+_cameras_sync_lock = threading.Lock()
+_cameras_sync_in_flight = False
+_cameras_sync_backoff_until = 0.0
+_cameras_sync_fail_count = 0
+_last_sync_error_log_at = 0.0
+CAMERAS_SYNC_INTERVAL = 2  # Pull Camera Management edits (non-blocking)
+CAMERAS_SYNC_FAIL_BACKOFF = 20  # Seconds to wait after Hostinger timeout before retry
 DETECTIONS_UPLOAD_INTERVAL = 1.5  # don't POST detections JSON on every frame
 DETECTIONS_FILE = "detections.json"
 FRAME_FILE = "current_frame.jpg"  # Frame saved for web display
@@ -159,14 +175,14 @@ RECORDING_RETENTION_DAYS = 30  # Auto-delete recordings older than N days
 # Idle / activity-aware recording (saves disk + CPU when nothing is happening)
 RECORD_ACTIVITY_HOLD_SECONDS = 45  # Full-rate record this long after motion/detection
 IDLE_RECORD_EVERY_N = 5  # legacy; recording now uses wall-clock pacing at RECORDING_FPS
-IDLE_CPU_SLEEP = 0.04  # Extra sleep per frame while idle (reduces PC load)
+IDLE_CPU_SLEEP = 0.0  # Keep RTSP loop tight for low-latency live relay
 MOTION_MEAN_DIFF_THRESHOLD = 12.0  # Mean abs grayscale frame-diff for "motion"
 MOTION_CHANGED_RATIO = 0.015  # Min share of pixels that changed
 # Optional: stop detect.py when Open Surveillance stops sending heartbeats.
-# Disabled so continuous recording keeps running via start_detection / autostart.
+# Enabled as a safety net; the detection agent also auto-stops when the viewer leaves.
 HEARTBEAT_FILE = "detection_heartbeat.json"
-IDLE_AUTO_STOP_SECONDS = 600  # Used only when IDLE_AUTO_STOP_ENABLED is True
-IDLE_AUTO_STOP_ENABLED = False
+IDLE_AUTO_STOP_SECONDS = 120  # Stop ~2 min after last Open Surveillance heartbeat
+IDLE_AUTO_STOP_ENABLED = True
 CONFIDENCE_THRESHOLD = 0.35
 PLANT_CONFIDENCE_THRESHOLD = 0.20  # Potted plants are often lower-confidence in YOLO
 PHONE_CONFIDENCE_THRESHOLD = 0.25  # Phones are small / often partially occluded
@@ -188,7 +204,9 @@ MAX_OTHER_DETECTIONS = 15
 MAX_RECONNECT_ATTEMPTS = 10
 RECONNECT_DELAY = 3  # seconds
 FRAME_READ_TIMEOUT = 5  # seconds
-STREAM_TIMEOUT = 30  # seconds for initial connection
+STREAM_TIMEOUT = 12  # seconds for initial connection (fail fast, then retry)
+RTSP_READ_TIMEOUT = 2.5  # never block the live loop for OpenCV's ~30s default
+MAX_URL_CONNECT_ATTEMPTS = 8  # try a shortlist first; avoid 30s hangs on dead URLs
 MAX_DETECTED_OBJECT_IMAGES = 20  # Maximum number of object images to keep
 FRAME_PROCESS_DELAY = 0.0  # No delay for lowest latency
 DETECTION_INTERVAL = 15  # Run detection more often so boxes stay visible
@@ -292,6 +310,12 @@ def load_active_camera_config():
         selected = cameras[0]
 
     stream_type = str(selected.get("streamType", "sub")).strip().lower()
+    # OpenCV/FFmpeg often cannot sustain Reolink main (HEVC) — 30s timeouts / empty frames.
+    # Keep sub (H.264) unless CCTV_USE_MAIN_STREAM=true is set explicitly.
+    if CCTV_USE_MAIN_STREAM:
+        stream_type = "main"
+    else:
+        stream_type = "sub"
     ip = str(selected.get("ipAddress", "")).strip()
     port = str(selected.get("port", "554")).strip() or "554"
     username = str(selected.get("username", "")).strip()
@@ -303,6 +327,16 @@ def load_active_camera_config():
         rtsp_url = str(selected.get("rtspUrl", "")).strip()
         if not rtsp_url:
             return None
+        if stream_type == "sub":
+            rtsp_url = (
+                rtsp_url.replace("h264Preview_01_main", "h264Preview_01_sub")
+                .replace("Preview_01_main", "Preview_01_sub")
+            )
+        elif CCTV_USE_MAIN_STREAM:
+            rtsp_url = (
+                rtsp_url.replace("h264Preview_01_sub", "h264Preview_01_main")
+                .replace("Preview_01_sub", "Preview_01_main")
+            )
 
     return {
         "camera_id": selected.get("cameraId") or selected.get("id") or "CAMERA",
@@ -374,6 +408,7 @@ def init_cctv_upload_from_env():
     """Enable optional upload of live frames to Hostinger (on-site PC only)."""
     global CCTV_FRAME_UPLOAD_URL, CCTV_FRAME_UPLOAD_KEY, CCTV_CAMERAS_CONFIG_URL
     global CCTV_UPLOAD_MIN_INTERVAL, CCTV_UPLOAD_JPEG_QUALITY, CCTV_UPLOAD_MAX_WIDTH, LIVE_JPEG_QUALITY
+    global CCTV_USE_MAIN_STREAM
     env = load_project_env()
     CCTV_FRAME_UPLOAD_URL = (
         env.get("CCTV_FRAME_UPLOAD_URL", "") or os.environ.get("CCTV_FRAME_UPLOAD_URL", "")
@@ -384,6 +419,10 @@ def init_cctv_upload_from_env():
     CCTV_CAMERAS_CONFIG_URL = (
         env.get("CCTV_CAMERAS_CONFIG_URL", "") or os.environ.get("CCTV_CAMERAS_CONFIG_URL", "")
     ).strip()
+    use_main = (
+        env.get("CCTV_USE_MAIN_STREAM", "") or os.environ.get("CCTV_USE_MAIN_STREAM", "") or ""
+    ).strip().lower()
+    CCTV_USE_MAIN_STREAM = use_main in {"1", "true", "yes", "on"}
 
     # Quality presets for same-LAN camera + on-site PC setups.
     # Individual CCTV_UPLOAD_* vars always override the preset.
@@ -391,8 +430,10 @@ def init_cctv_upload_from_env():
         env.get("CCTV_FEED_QUALITY", "") or os.environ.get("CCTV_FEED_QUALITY", "") or "lan"
     ).strip().lower()
     presets = {
-        "lan": {"interval": 0.15, "quality": 92, "width": 1920, "live_q": 95},
-        "high": {"interval": 0.15, "quality": 92, "width": 1920, "live_q": 95},
+        # Closest practical match to VLC over the website JPEG relay
+        "vlc": {"interval": 0.08, "quality": 95, "width": 1920, "live_q": 97},
+        "lan": {"interval": 0.10, "quality": 93, "width": 1920, "live_q": 95},
+        "high": {"interval": 0.10, "quality": 93, "width": 1920, "live_q": 95},
         "balanced": {"interval": 0.25, "quality": 82, "width": 1280, "live_q": 88},
         "hostinger": {"interval": 0.35, "quality": 68, "width": 960, "live_q": 80},
         "low": {"interval": 0.35, "quality": 68, "width": 960, "live_q": 80},
@@ -402,10 +443,14 @@ def init_cctv_upload_from_env():
     CCTV_UPLOAD_JPEG_QUALITY = int(preset["quality"])
     CCTV_UPLOAD_MAX_WIDTH = int(preset["width"])
     LIVE_JPEG_QUALITY = int(preset["live_q"])
+    # Prefer Reolink sub-stream for OpenCV (usually H.264). Main is often HEVC and
+    # causes 30s stream timeouts / empty frames — VLC can decode it; OpenCV often cannot.
+    if use_main == "":
+        CCTV_USE_MAIN_STREAM = False
 
     try:
         CCTV_UPLOAD_MIN_INTERVAL = max(
-            0.08,
+            0.05,
             float(
                 env.get("CCTV_UPLOAD_MIN_INTERVAL", "")
                 or os.environ.get("CCTV_UPLOAD_MIN_INTERVAL", "")
@@ -418,7 +463,7 @@ def init_cctv_upload_from_env():
         CCTV_UPLOAD_JPEG_QUALITY = max(
             40,
             min(
-                95,
+                98,
                 int(
                     env.get("CCTV_UPLOAD_JPEG_QUALITY", "")
                     or os.environ.get("CCTV_UPLOAD_JPEG_QUALITY", "")
@@ -446,7 +491,8 @@ def init_cctv_upload_from_env():
         print(
             f"✓ Remote frame upload enabled → {CCTV_FRAME_UPLOAD_URL} "
             f"(quality={quality}, interval>={CCTV_UPLOAD_MIN_INTERVAL:.2f}s, "
-            f"max_w={CCTV_UPLOAD_MAX_WIDTH}, q={CCTV_UPLOAD_JPEG_QUALITY})"
+            f"max_w={CCTV_UPLOAD_MAX_WIDTH}, q={CCTV_UPLOAD_JPEG_QUALITY}, "
+            f"main_stream={CCTV_USE_MAIN_STREAM})"
         )
     if CCTV_CAMERAS_CONFIG_URL:
         print(f"✓ Remote camera config sync enabled → {CCTV_CAMERAS_CONFIG_URL}")
@@ -455,16 +501,22 @@ def init_cctv_upload_from_env():
 def sync_cameras_json_from_server(force=False):
     """Pull cameras.json from Hostinger so Camera Management changes apply on-site."""
     global _last_cameras_sync_at, _last_cameras_revision
+    global _cameras_sync_backoff_until, _cameras_sync_fail_count, _last_sync_error_log_at
     if not CCTV_CAMERAS_CONFIG_URL or not CCTV_FRAME_UPLOAD_KEY or not REQUESTS_AVAILABLE:
         return False
     now = time.time()
     if not force and now - _last_cameras_sync_at < CAMERAS_SYNC_INTERVAL:
         return False
+    if not force and now < _cameras_sync_backoff_until:
+        return False
     _last_cameras_sync_at = now
     try:
         headers = {"X-CCTV-Upload-Key": CCTV_FRAME_UPLOAD_KEY}
-        resp = requests.get(CCTV_CAMERAS_CONFIG_URL, headers=headers, timeout=10)
+        # Short connect/read timeouts so a dead Hostinger link never freezes RTSP.
+        resp = requests.get(CCTV_CAMERAS_CONFIG_URL, headers=headers, timeout=(2.0, 3.0))
         if resp.status_code != 200:
+            _cameras_sync_fail_count += 1
+            _cameras_sync_backoff_until = now + min(60, CAMERAS_SYNC_FAIL_BACKOFF * _cameras_sync_fail_count)
             return False
         payload = resp.json()
         cameras = payload.get("cameras") if isinstance(payload, dict) else None
@@ -486,24 +538,56 @@ def sync_cameras_json_from_server(force=False):
         if not content_changed and not revision_changed and not force:
             if revision:
                 _last_cameras_revision = revision
+            _cameras_sync_fail_count = 0
+            _cameras_sync_backoff_until = 0.0
             return False
 
         cameras_path.write_text(new_text, encoding="utf-8")
         if revision:
             _last_cameras_revision = revision
+        _cameras_sync_fail_count = 0
+        _cameras_sync_backoff_until = 0.0
         print("✓ cameras.json synced from Camera Management (website).")
         return content_changed or revision_changed or force
     except Exception as exc:
-        print(f"⚠ cameras.json sync failed: {exc}")
+        _cameras_sync_fail_count += 1
+        backoff = min(60, CAMERAS_SYNC_FAIL_BACKOFF * max(1, _cameras_sync_fail_count))
+        _cameras_sync_backoff_until = now + backoff
+        # Avoid spamming the console every second when Hostinger is unreachable.
+        if now - _last_sync_error_log_at >= 30:
+            print(
+                f"⚠ cameras.json sync failed ({type(exc).__name__}); "
+                f"using local cameras.json, retry in {backoff}s"
+            )
+            _last_sync_error_log_at = now
         return False
 
 
-def check_camera_config_hot_reload():
-    """Sync from website and reconnect RTSP when Camera Management settings change."""
-    changed = sync_cameras_json_from_server()
-    reloaded = reload_camera_source_if_changed()
-    return changed or reloaded
+def request_cameras_sync_async(force=False):
+    """Kick Hostinger sync on a daemon thread so the RTSP loop never blocks."""
+    global _cameras_sync_in_flight
+    if not CCTV_CAMERAS_CONFIG_URL or not CCTV_FRAME_UPLOAD_KEY or not REQUESTS_AVAILABLE:
+        return
+    with _cameras_sync_lock:
+        if _cameras_sync_in_flight:
+            return
+        _cameras_sync_in_flight = True
 
+    def _worker():
+        global _cameras_sync_in_flight
+        try:
+            sync_cameras_json_from_server(force=force)
+        finally:
+            with _cameras_sync_lock:
+                _cameras_sync_in_flight = False
+
+    threading.Thread(target=_worker, name="cameras-sync", daemon=True).start()
+
+
+def check_camera_config_hot_reload():
+    """Sync from website (async) and reconnect RTSP when Camera Management settings change."""
+    request_cameras_sync_async(force=False)
+    return reload_camera_source_if_changed()
 
 def get_camera_config_fingerprint():
     """Fingerprint active camera settings for hot-reload."""
@@ -576,46 +660,77 @@ def _encode_upload_jpeg(frame):
         return None
 
 
+def _cctv_upload_worker():
+    """Background uploader so RTSP read loop never waits on Hostinger HTTP."""
+    global _last_cctv_upload_at, _last_detections_upload_at, _cctv_upload_pending
+    while True:
+        payload = None
+        with _cctv_upload_lock:
+            payload = _cctv_upload_pending
+            _cctv_upload_pending = None
+        if payload is None:
+            time.sleep(0.02)
+            continue
+        frame_bytes, detections_text = payload
+        try:
+            files = {"frame": ("frame.jpg", frame_bytes, "image/jpeg")}
+            data = {}
+            if detections_text:
+                data["detections"] = detections_text
+            headers = {"X-CCTV-Upload-Key": CCTV_FRAME_UPLOAD_KEY}
+            resp = requests.post(
+                CCTV_FRAME_UPLOAD_URL,
+                files=files,
+                data=data,
+                headers=headers,
+                timeout=4,
+            )
+            now = time.time()
+            if resp.status_code in (200, 429):
+                _last_cctv_upload_at = now
+                if detections_text and resp.status_code == 200:
+                    _last_detections_upload_at = now
+        except Exception:
+            pass
+
+
+def _ensure_cctv_upload_worker():
+    global _cctv_upload_worker_started
+    if _cctv_upload_worker_started or not REQUESTS_AVAILABLE:
+        return
+    worker = threading.Thread(target=_cctv_upload_worker, name="cctv-upload", daemon=True)
+    worker.start()
+    _cctv_upload_worker_started = True
+
+
 def maybe_upload_live_frame(frame):
-    """Upload a compact JPEG to production (rate-limited; Hostinger-safe payload)."""
-    global _last_cctv_upload_at, _last_detections_upload_at
+    """Queue a compact JPEG for async upload (rate-limited; never blocks RTSP)."""
+    global _last_cctv_upload_at, _last_detections_upload_at, _cctv_upload_pending
     if not CCTV_FRAME_UPLOAD_URL or not CCTV_FRAME_UPLOAD_KEY or not REQUESTS_AVAILABLE:
         return
     now = time.time()
     if now - _last_cctv_upload_at < CCTV_UPLOAD_MIN_INTERVAL:
         return
+    with _cctv_upload_lock:
+        if _cctv_upload_pending is not None:
+            # Still uploading previous frame — drop this one to stay on newest.
+            return
     frame_bytes = _encode_upload_jpeg(frame)
     if not frame_bytes:
         return
-    try:
-        files = {"frame": ("frame.jpg", frame_bytes, "image/jpeg")}
-        data = {}
-        # Attach detections less often to keep PHP work light on shared hosting.
-        if now - _last_detections_upload_at >= DETECTIONS_UPLOAD_INTERVAL:
-            det_path = Path(DETECTIONS_FILE)
-            if det_path.is_file():
-                try:
-                    data["detections"] = det_path.read_text(encoding="utf-8")
-                except Exception:
-                    pass
-        headers = {"X-CCTV-Upload-Key": CCTV_FRAME_UPLOAD_KEY}
-        resp = requests.post(
-            CCTV_FRAME_UPLOAD_URL,
-            files=files,
-            data=data,
-            headers=headers,
-            timeout=6,
-        )
-        if resp.status_code == 200:
-            _last_cctv_upload_at = now
-            if "detections" in data:
-                _last_detections_upload_at = now
-        elif resp.status_code == 429:
-            # Back off briefly when Hostinger rate-limits us.
-            _last_cctv_upload_at = now
-    except Exception:
-        pass
-
+    detections_text = None
+    if now - _last_detections_upload_at >= DETECTIONS_UPLOAD_INTERVAL:
+        det_path = Path(DETECTIONS_FILE)
+        if det_path.is_file():
+            try:
+                detections_text = det_path.read_text(encoding="utf-8")
+            except Exception:
+                detections_text = None
+    _ensure_cctv_upload_worker()
+    # Reserve the slot immediately so the loop doesn't stack uploads.
+    _last_cctv_upload_at = now
+    with _cctv_upload_lock:
+        _cctv_upload_pending = (frame_bytes, detections_text)
 
 def maybe_upload_frame_file(frame_path):
     """Legacy helper: upload an existing JPEG file (still rate-limited)."""
@@ -2607,28 +2722,35 @@ def save_live_frame(frame, frame_count):
 
 
 def read_latest_rtsp_frame(cap, flush_grabs=RTSP_FLUSH_GRABS):
-    """Drop buffered RTSP frames and return the newest decodable one."""
+    """Drop buffered RTSP frames and return the newest decodable one (fail-fast)."""
     ret = False
     frame = None
-    with open(os.devnull, 'w') as devnull:
-        old_stderr = sys.stderr
-        try:
-            sys.stderr = devnull
-            for _ in range(max(1, flush_grabs)):
-                if not cap.grab():
-                    break
-            for _ in range(3):
-                ret, frame = cap.retrieve()
-                if ret and frame is not None and is_valid_frame(frame):
-                    break
-                if not cap.grab():
-                    break
-            if not ret or frame is None or not is_valid_frame(frame):
-                ret, frame = cap.read()
-        finally:
-            sys.stderr = old_stderr
-    return ret, frame
+    with suppress_stderr():
+        for _ in range(max(1, flush_grabs)):
+            grabbed = {"ok": False}
 
+            def _grab():
+                try:
+                    grabbed["ok"] = bool(cap.grab())
+                except Exception:
+                    grabbed["ok"] = False
+
+            worker = threading.Thread(target=_grab, name="rtsp-grab", daemon=True)
+            worker.start()
+            worker.join(RTSP_READ_TIMEOUT)
+            if worker.is_alive() or not grabbed["ok"]:
+                break
+
+        for _ in range(2):
+            ret, frame = read_frame_with_timeout(cap, RTSP_READ_TIMEOUT)
+            if ret and frame is not None and is_valid_frame(frame):
+                break
+            # retrieve may be empty; try another grab+read cycle
+            ret, frame = read_frame_with_timeout(cap, RTSP_READ_TIMEOUT)
+            if ret and frame is not None and is_valid_frame(frame):
+                break
+
+    return ret, frame
 
 def save_frame_atomic(frame, filepath):
     """Save frame atomically to prevent corruption"""
@@ -3278,185 +3400,149 @@ def try_http_snapshot_fallback():
     
     return None
 
+def read_frame_with_timeout(cap, timeout_sec=None):
+    """Read one frame without waiting for OpenCV's ~30s FFmpeg interrupt."""
+    if timeout_sec is None:
+        timeout_sec = RTSP_READ_TIMEOUT
+    result = {"ret": False, "frame": None}
+
+    def _read():
+        with suppress_stderr():
+            try:
+                result["ret"], result["frame"] = cap.read()
+            except Exception:
+                result["ret"], result["frame"] = False, None
+
+    worker = threading.Thread(target=_read, name="rtsp-read", daemon=True)
+    worker.start()
+    worker.join(timeout_sec)
+    if worker.is_alive():
+        return False, None
+    return bool(result["ret"]), result["frame"]
+
+
 def connect_to_stream(url, timeout=STREAM_TIMEOUT):
     """Connect to RTSP stream with optimized settings for HEVC/H.264"""
     print(f"Connecting to camera stream: {url}")
     print("  Trying RTSP first for lowest live-view latency...")
     
-    # Build comprehensive list of REOLINK RTSP URL variants
-    # REOLINK cameras support multiple URL formats - try all common ones
-    # Note: Some formats may need authentication in URL, others may need separate auth
+    # Build a short, prioritized list — long variant lists caused 30s hangs per dead URL.
     url_variants = []
     base_rtsp, base_rtsp_no_auth = get_rtsp_bases(url)
-    
-    # REOLINK common formats (try most common first)
-    # Try URLs without auth in URL first (some cameras prefer auth via RTSP DESCRIBE)
+    seen = set()
+
+    def add_url(candidate):
+        if candidate and candidate not in seen:
+            seen.add(candidate)
+            url_variants.append(candidate)
+
+    # Always try the configured URL first (as saved / forced).
+    add_url(url)
+    add_url(f"{url}?transport=tcp" if "transport=" not in url else url)
+
     if PREFER_SUB_STREAM:
-        url_variants = [
-            # Try without auth in URL first (auth via RTSP)
-            f"{base_rtsp_no_auth}/Preview_01_sub?transport=tcp",  # From ONVIF test
-            f"{base_rtsp_no_auth}/Preview_01_sub",
-            # REOLINK cam/realmonitor format (most common for newer models)
-            f"{base_rtsp}/cam/realmonitor?channel=1&subtype=1&transport=tcp",  # Sub-stream with TCP
-            f"{base_rtsp}/cam/realmonitor?channel=1&subtype=1",  # Sub-stream without TCP
-            f"{base_rtsp_no_auth}/cam/realmonitor?channel=1&subtype=1&transport=tcp",
-            f"{base_rtsp_no_auth}/cam/realmonitor?channel=1&subtype=1",
-            # REOLINK Streaming/Channels format
-            f"{base_rtsp}/Streaming/Channels/102?transport=tcp",  # Sub-stream (channel 102)
-            f"{base_rtsp}/Streaming/Channels/102",  # Sub-stream without TCP
-            f"{base_rtsp_no_auth}/Streaming/Channels/102?transport=tcp",
-            f"{base_rtsp_no_auth}/Streaming/Channels/102",
-            # REOLINK Preview format (from ONVIF - these should work)
-            f"{base_rtsp}/Preview_01_sub?transport=tcp",
-            f"{base_rtsp}/Preview_01_sub",
-            # REOLINK h264Preview format (older models)
+        for candidate in (
             f"{base_rtsp}/h264Preview_01_sub?transport=tcp",
             f"{base_rtsp}/h264Preview_01_sub",
-            # Provided URL
-            url,
-            f"{url}?transport=tcp",
-            # Main stream as last resort
-            f"{base_rtsp_no_auth}/Preview_01_main?transport=tcp",
-            f"{base_rtsp_no_auth}/Preview_01_main",
-            f"{base_rtsp}/cam/realmonitor?channel=1&subtype=0&transport=tcp",  # Main stream with TCP
-            f"{base_rtsp}/cam/realmonitor?channel=1&subtype=0",
-            f"{base_rtsp}/Streaming/Channels/101?transport=tcp",  # Main stream (channel 101)
-            f"{base_rtsp}/Streaming/Channels/101",
+            f"{base_rtsp}/Preview_01_sub?transport=tcp",
+            f"{base_rtsp}/Preview_01_sub",
+            f"{base_rtsp}/cam/realmonitor?channel=1&subtype=1&transport=tcp",
+            f"{base_rtsp_no_auth}/h264Preview_01_sub?transport=tcp",
+            # Main only as last resorts (often HEVC → OpenCV timeouts)
+            f"{base_rtsp}/h264Preview_01_main?transport=tcp",
+            f"{base_rtsp}/Preview_01_main?transport=tcp",
+        ):
+            add_url(candidate)
+    else:
+        for candidate in (
+            f"{base_rtsp}/h264Preview_01_main?transport=tcp",
+            f"{base_rtsp}/h264Preview_01_main",
             f"{base_rtsp}/Preview_01_main?transport=tcp",
             f"{base_rtsp}/Preview_01_main",
-            f"{base_rtsp}/h264Preview_01_main?transport=tcp",
-            f"{base_rtsp}/h264Preview_01_main",
-        ]
-    else:
-        # Try main stream FIRST for higher quality
-        url_variants = [
-            # Try ONVIF-discovered formats FIRST (these are confirmed to exist)
-            f"{base_rtsp_no_auth}/Preview_01_main?transport=tcp",  # From ONVIF test - main stream with TCP
-            f"{base_rtsp_no_auth}/Preview_01_main",  # From ONVIF test - main stream
-            f"{base_rtsp}/Preview_01_main?transport=tcp",  # With auth in URL
-            f"{base_rtsp}/Preview_01_main",  # With auth in URL
-            # REOLINK cam/realmonitor format (most common for newer models)
-            f"{base_rtsp_no_auth}/cam/realmonitor?channel=1&subtype=0&transport=tcp",  # No auth, TCP
-            f"{base_rtsp_no_auth}/cam/realmonitor?channel=1&subtype=0",  # No auth
-            f"{base_rtsp}/cam/realmonitor?channel=1&subtype=0&transport=tcp",  # Main stream with TCP
-            f"{base_rtsp}/cam/realmonitor?channel=1&subtype=0",  # Main stream without TCP
-            # REOLINK Streaming/Channels format
-            f"{base_rtsp_no_auth}/Streaming/Channels/101?transport=tcp",  # No auth, TCP
-            f"{base_rtsp_no_auth}/Streaming/Channels/101",  # No auth
-            f"{base_rtsp}/Streaming/Channels/101?transport=tcp",  # Main stream (channel 101)
-            f"{base_rtsp}/Streaming/Channels/101",  # Main stream without TCP
-            # REOLINK h264Preview format
-            f"{base_rtsp}/h264Preview_01_main?transport=tcp",
-            f"{base_rtsp}/h264Preview_01_main",
-            # Provided URL
-            url,
-            f"{url}?transport=tcp",
-            # Sub-stream as fallback
-            f"{base_rtsp}/cam/realmonitor?channel=1&subtype=1&transport=tcp",  # Sub-stream with TCP
-            f"{base_rtsp}/cam/realmonitor?channel=1&subtype=1",
-            f"{base_rtsp}/Streaming/Channels/102?transport=tcp",
-            f"{base_rtsp}/Streaming/Channels/102",
-            f"{base_rtsp}/Preview_01_sub?transport=tcp",
-            f"{base_rtsp}/Preview_01_sub",
+            f"{base_rtsp}/cam/realmonitor?channel=1&subtype=0&transport=tcp",
+            # Fall back to H.264 sub-stream quickly if main/HEVC stalls
             f"{base_rtsp}/h264Preview_01_sub?transport=tcp",
             f"{base_rtsp}/h264Preview_01_sub",
-        ]
+            f"{base_rtsp}/Preview_01_sub?transport=tcp",
+            f"{base_rtsp}/Preview_01_sub",
+        ):
+            add_url(candidate)
+
+    url_variants = url_variants[:MAX_URL_CONNECT_ATTEMPTS]
     
-    # Set environment variable for FFmpeg options (optimized for REOLINK cameras)
-    # Use TCP transport for reliability, longer timeouts for connection
+    # Fail fast: 2s socket timeouts (microseconds). Prevents OpenCV's ~30s hang.
     os.environ['OPENCV_FFMPEG_CAPTURE_OPTIONS'] = (
         'rtsp_transport;tcp|'
-        'timeout;5000000|'
-        'stimeout;5000000|'
-        'max_delay;0|'
+        'rw_timeout;2000000|'
+        'stimeout;2000000|'
+        'timeout;2000000|'
+        'max_delay;500000|'
         'fflags;nobuffer|'
         'flags;low_delay|'
         'err_detect;ignore_err|'
-        'error;0|'
-        'thread_queue_size;64|'
+        'thread_queue_size;2|'
         'reorder_queue_size;0|'
         'probesize;32768|'
         'analyzeduration;0'
     )
     
-    # Suppress FFmpeg verbose output
-    os.environ['OPENCV_FFMPEG_READ_ATTEMPTS'] = '3'  # Try 3 times
-    os.environ['OPENCV_FFMPEG_READ_ATTEMPT_MS'] = '2000'  # 2 seconds per attempt
+    os.environ['OPENCV_FFMPEG_READ_ATTEMPTS'] = '1'
+    os.environ['OPENCV_FFMPEG_READ_ATTEMPT_MS'] = '1500'
     
-    # Try connecting with FFmpeg backend - try multiple URL formats
-    # Suppress stderr to hide H.264 decoding errors during connection
     cap = None
     working_url = None
+    connect_deadline = time.time() + max(6.0, float(timeout))
     
-    print("  Trying different RTSP URL formats (VLC and OpenCV may need different paths)...")
+    print("  Trying RTSP URL formats (fail-fast; sub-stream preferred for OpenCV)...")
     for idx, test_url in enumerate(url_variants, 1):
+        if time.time() > connect_deadline:
+            print("  ⏱ Connect deadline reached — stopping URL search")
+            break
         try:
             print(f"  [{idx}/{len(url_variants)}] Trying: {test_url}")
             with suppress_stderr():
-                # Try with FFmpeg backend
                 cap = cv2.VideoCapture(test_url, cv2.CAP_FFMPEG)
                 
-                # For URLs without auth, try to set credentials via environment or properties
                 if "@" not in test_url:
                     _, rtsp_user, rtsp_pass = get_active_camera_credentials()
                     try:
                         cap.set(cv2.CAP_PROP_USERNAME, rtsp_user)
                         cap.set(cv2.CAP_PROP_PASSWORD, rtsp_pass)
                     except Exception:
-                        pass  # Not all backends support this
+                        pass
             
-            # Set properties for absolute lowest latency
-            cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)  # Minimal buffer for lowest latency (1 frame)
-            cap.set(cv2.CAP_PROP_FPS, TARGET_FPS)  # Set to 120 FPS
-            # Additional low-latency optimizations
             try:
-                cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'H264'))  # Use H264 codec for efficiency
-            except:
+                cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+            except Exception:
                 pass
-            # Disable auto-focus and auto-exposure to prevent zoom/focus changes
-            try:
-                cap.set(cv2.CAP_PROP_AUTOFOCUS, 0)  # Disable auto-focus
-                cap.set(cv2.CAP_PROP_AUTO_EXPOSURE, 0.25)  # Disable auto-exposure (prevents zoom)
-            except:
-                pass  # Some cameras don't support these properties
             
-            # Quick test read (with timeout and stderr suppression)
-            if cap.isOpened():
-                # Try reading a frame (aggressively suppress ALL H.264 decoding errors)
-                # Give it a few attempts to read a valid frame
+            if cap is not None and cap.isOpened():
                 ret = False
                 test_frame = None
-                for read_attempt in range(3):
-                    with open(os.devnull, 'w') as devnull:
-                        old_stderr = sys.stderr
-                        try:
-                            sys.stderr = devnull
-                            ret, test_frame = cap.read()
-                            if ret and test_frame is not None and is_valid_frame(test_frame):
-                                break
-                            time.sleep(0.2)  # Brief pause between read attempts
-                        except:
-                            pass
-                        finally:
-                            sys.stderr = old_stderr
+                for _ in range(2):
+                    ret, test_frame = read_frame_with_timeout(cap, RTSP_READ_TIMEOUT)
+                    if ret and test_frame is not None and is_valid_frame(test_frame):
+                        break
                 
                 if ret and test_frame is not None and is_valid_frame(test_frame):
                     print(f"  ✓ Found working URL: {test_url}")
                     print(f"  ✓ Using RTSP live stream (low latency)")
                     working_url = test_url
                     break
-                else:
-                    if cap:
-                        cap.release()
-                    cap = None
-            else:
-                if cap:
+
+            if cap is not None:
+                try:
                     cap.release()
-                cap = None
-            time.sleep(0.3)  # Brief pause between URL attempts
-        except Exception as e:
-            if cap:
-                cap.release()
+                except Exception:
+                    pass
+            cap = None
+            time.sleep(0.05)
+        except Exception:
+            if cap is not None:
+                try:
+                    cap.release()
+                except Exception:
+                    pass
             cap = None
             continue
     
@@ -3470,7 +3556,6 @@ def connect_to_stream(url, timeout=STREAM_TIMEOUT):
             snap_url, test_img = http_result
             print(f"\n  ✓ Using HTTP snapshot fallback mode")
             print(f"  Note: ~{HTTP_SNAPSHOT_INTERVAL:.2f}s between frames (RTSP unavailable)")
-            # Return a special marker to indicate HTTP mode
             return "HTTP_SNAPSHOT_MODE"
         
         print(f"\n  ✗ All connection methods failed (RTSP and HTTP)")
@@ -3503,57 +3588,46 @@ def connect_to_stream(url, timeout=STREAM_TIMEOUT):
     # Set buffer to minimum for real-time feed
     cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
     
-    # Try to read and discard initial frames (they may be corrupted or outdated)
+    # Discard a few frames quickly (fail-fast reads — never wait ~30s)
     print("Initializing stream (discarding first few frames to get fresh data)...")
     start_time = time.time()
     connected = False
     frames_discarded = 0
     valid_frames_found = 0
+    init_timeout = min(8.0, float(timeout))
     
-    while time.time() - start_time < timeout:
-        # Suppress H.264 errors during frame read
-        with open(os.devnull, 'w') as devnull:
-            old_stderr = sys.stderr
-            try:
-                sys.stderr = devnull
-                ret, test_frame = cap.read()
-            finally:
-                sys.stderr = old_stderr
-        
-        if ret:
-            frames_discarded += 1
-            
-            # Discard first 5-10 frames as they often have HEVC reference frame errors
-            if frames_discarded < 5:
-                continue
-                
-            # Check if frame is valid (not corrupted)
-            if is_valid_frame(test_frame):
-                valid_frames_found += 1
-                # Need at least 2 valid frames to confirm stable connection
-                if valid_frames_found >= 2:
-                    connected = True
-                    print(f"✓ Stream connected successfully")
-                    print(f"  (Discarded {frames_discarded} initial frames, found {valid_frames_found} valid frames)")
-                    break
-            elif frames_discarded > 20:
-                # If we've read 20+ frames and none are valid, something is wrong
-                print("  Warning: Many corrupted frames detected, but continuing...")
+    while time.time() - start_time < init_timeout:
+        ret, test_frame = read_frame_with_timeout(cap, RTSP_READ_TIMEOUT)
+        if not ret:
+            # Stream stalled — abandon this connection and let outer loop retry
+            break
+
+        frames_discarded += 1
+        if frames_discarded < 3:
+            continue
+
+        if is_valid_frame(test_frame):
+            valid_frames_found += 1
+            if valid_frames_found >= 1:
+                connected = True
+                print(f"✓ Stream connected successfully")
+                print(f"  (Discarded {frames_discarded} initial frames, found {valid_frames_found} valid frames)")
                 break
-        else:
-            # If read fails, wait and retry
-            time.sleep(0.3)
-            
+        elif frames_discarded > 12:
+            break
+    
     if not connected:
-        cap.release()
+        try:
+            cap.release()
+        except Exception:
+            pass
         print("✗ Failed to establish stable stream connection")
         print("  Troubleshooting steps:")
         print("  1. Check camera is powered on and accessible")
         print("  2. Verify RTSP URL is correct:", RTSP_URL)
         print("  3. Test RTSP stream in VLC: File > Open Network Stream")
-        print("  4. Camera may need H.264 encoding instead of HEVC/H.265")
+        print("  4. Prefer Sub stream in Camera Management (OpenCV; main is often HEVC)")
         print("  5. Check network connection stability")
-        print("  6. See TROUBLESHOOTING_HEVC.md for more solutions")
         return None
     
     return cap
@@ -3688,8 +3762,11 @@ def main():
     
     print("Initializing...")
     init_cctv_upload_from_env()
+    # Short timeout; if Hostinger is unreachable we keep local cameras.json and continue.
     if sync_cameras_json_from_server(force=True):
         print("✓ Loaded camera config from server")
+    else:
+        print("✓ Using local cameras.json (server sync deferred / unavailable)")
     configure_camera_source()
     init_camera_config_fingerprint()
     
@@ -3724,7 +3801,8 @@ def main():
 
     write_detection_heartbeat(source="detect.py-start")
     if IDLE_AUTO_STOP_ENABLED:
-        print(f"✓ Idle auto-stop: exit after {IDLE_AUTO_STOP_SECONDS // 60} min without Open Surveillance heartbeat")
+        mins = max(1, IDLE_AUTO_STOP_SECONDS // 60)
+        print(f"✓ Idle auto-stop: exit after ~{mins} min without Open Surveillance heartbeat")
     
     # Initialize video writer (will be created when stream connects)
     video_writer_info = None
@@ -3780,7 +3858,7 @@ def main():
                 http_mode = True
                 cap = None  # No VideoCapture object for HTTP mode
                 print("Starting HTTP snapshot detection loop...")
-                print("Press Ctrl+C to stop")
+                print("Auto-managed: closes when Open Surveillance closes")
                 print("-" * 60)
             else:
                 cap = None
@@ -3814,7 +3892,7 @@ def main():
         
         if not http_mode:
             print("Starting RTSP detection loop...")
-            print("Press Ctrl+C to stop")
+            print("Auto-managed: closes when Open Surveillance closes")
             print("-" * 60)
         
         reconnect_count = 0

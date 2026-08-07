@@ -62,7 +62,7 @@ function writeDetectionViewerHeartbeat(string $source = 'open-surveillance'): vo
 
 /**
  * Clear viewer-active flag when the admin leaves Open Surveillance.
- * On-site agent may keep detect.py running for continuous recording.
+ * On-site agent auto-stops detect.py shortly after this.
  */
 function clearDetectionViewerHeartbeat(string $source = 'open-surveillance-leave'): void
 {

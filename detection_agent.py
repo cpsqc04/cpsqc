@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """
-On-site CCTV detection agent.
+On-site CCTV detection agent (leave this running once on the PC).
 
-1) Polls viewer status — starts detect.py when Open Surveillance is open.
-2) Polls camera scan jobs — runs camera_discover.py when Camera Management requests a LAN scan.
+Auto start/stop — no manual start_detection.bat / stop_detection.bat:
+  • Opens Open Surveillance  → starts detect.py
+  • Leaves Open Surveillance → stops detect.py (after a short grace)
+  • Also runs Camera Management LAN scans
 
 Configure in .env (same as detect.py):
   CCTV_FRAME_UPLOAD_KEY=...
@@ -89,20 +91,21 @@ def read_detect_pid() -> Optional[int]:
 
 def start_detect() -> None:
     if read_detect_pid() is not None:
-        log("detect.py already running")
         return
 
     env = os.environ.copy()
+    env["CCTV_AGENT_MANAGED"] = "1"
     creationflags = 0
     if os.name == "nt":
         creationflags = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0) | getattr(
             subprocess, "DETACHED_PROCESS", 0
         )
-        cmd = ["py", "detect.py"]
+        # Prefer pythonw so no console window pops up for detect.py
+        cmd = ["py", "-3", "detect.py"]
     else:
         cmd = ["python3", "detect.py"]
 
-    log("Starting detect.py (Open Surveillance is open)...")
+    log("Auto-start: Open Surveillance is open → starting detect.py...")
     try:
         with open(ROOT / "detection_control.log", "a", encoding="utf-8") as log_fh:
             subprocess.Popen(
@@ -118,12 +121,65 @@ def start_detect() -> None:
         log(f"Failed to start detect.py: {exc}")
         return
 
-    for _ in range(20):
+    for _ in range(24):
         time.sleep(0.25)
-        if read_detect_pid() is not None:
-            log(f"detect.py started (pid {read_detect_pid()})")
+        pid = read_detect_pid()
+        if pid is not None:
+            log(f"detect.py started (pid {pid})")
             return
     log("detect.py start requested (lock file not seen yet)")
+
+
+def stop_detect(reason: str = "Open Surveillance closed") -> None:
+    pid = read_detect_pid()
+    if pid is None:
+        # Also clear any orphan lock
+        try:
+            if LOCK_FILE.exists():
+                LOCK_FILE.unlink()
+        except OSError:
+            pass
+        return
+
+    log(f"Auto-stop: {reason} → stopping detect.py (pid {pid})...")
+    try:
+        if os.name == "nt":
+            subprocess.run(
+                ["taskkill", "/F", "/PID", str(pid), "/T"],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+                check=False,
+            )
+            # Sweep any leftover detect.py processes started outside the lock.
+            subprocess.run(
+                [
+                    "powershell",
+                    "-NoProfile",
+                    "-Command",
+                    "Get-CimInstance Win32_Process | "
+                    "Where-Object { $_.CommandLine -match 'detect\\.py' } | "
+                    "ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }",
+                ],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+                check=False,
+            )
+        else:
+            try:
+                os.kill(pid, 15)
+            except OSError:
+                pass
+    except OSError as exc:
+        log(f"Failed to stop detect.py: {exc}")
+
+    try:
+        if LOCK_FILE.exists():
+            LOCK_FILE.unlink()
+    except OSError:
+        pass
+    log("detect.py stopped")
 
 
 def derive_api_url(frame_upload_url: str, filename: str) -> str:
@@ -277,9 +333,16 @@ def main() -> int:
     poll_seconds = float(
         file_env.get("CCTV_AGENT_POLL_SECONDS")
         or os.environ.get("CCTV_AGENT_POLL_SECONDS")
-        or "3"
+        or "2"
     )
-    poll_seconds = max(2.0, poll_seconds)
+    poll_seconds = max(1.5, poll_seconds)
+    # Stop shortly after the viewer leaves (heartbeat max age on server is ~90s).
+    stop_grace_seconds = float(
+        file_env.get("CCTV_AGENT_STOP_GRACE_SECONDS")
+        or os.environ.get("CCTV_AGENT_STOP_GRACE_SECONDS")
+        or "20"
+    )
+    stop_grace_seconds = max(5.0, stop_grace_seconds)
 
     if not api_key or not status_url:
         log(
@@ -288,16 +351,14 @@ def main() -> int:
         )
         return 1
 
-    log(f"Detection agent started. Polling every {poll_seconds:.0f}s")
+    log("Detection agent started (auto start/stop — no manual bat files needed).")
     log(f"  viewer: {status_url}")
     log(f"  scan:   {scan_url}")
-    log("Keeping detect.py running so Open Surveillance has a live feed immediately.")
-    log("Leave this window open. Ctrl+C stops the agent only.")
+    log(f"  poll:   every {poll_seconds:.0f}s | stop grace: {stop_grace_seconds:.0f}s")
+    log("Leave this window open. Open Surveillance will start/stop detection by itself.")
 
-    # Start camera detection immediately so frames are already uploading
-    # before an admin opens Open Surveillance.
-    if read_detect_pid() is None:
-        start_detect()
+    idle_since: Optional[float] = None
+    last_should_run: Optional[bool] = None
 
     while True:
         if scan_url:
@@ -306,13 +367,28 @@ def main() -> int:
             except Exception as exc:  # noqa: BLE001
                 log(f"Scan job handler error: {exc}")
 
-        # Keep detect.py alive continuously (auto-restart if it exits).
-        if read_detect_pid() is None:
-            log("detect.py not running — restarting for live feed readiness")
-            start_detect()
+        status = api_request(status_url, api_key, method="GET", timeout=8)
+        should_run = bool(status and (status.get("should_run") or status.get("viewer_active")))
 
-        # Still refresh viewer heartbeat awareness (optional logging).
-        api_request(status_url, api_key, method="GET", timeout=15)
+        if last_should_run is None or should_run != last_should_run:
+            if should_run:
+                log("Viewer active — detection should run")
+            else:
+                log("Viewer idle — detection will stop after grace period")
+            last_should_run = should_run
+
+        if should_run:
+            idle_since = None
+            if read_detect_pid() is None:
+                start_detect()
+        else:
+            if idle_since is None:
+                idle_since = time.time()
+            elif time.time() - idle_since >= stop_grace_seconds:
+                if read_detect_pid() is not None:
+                    stop_detect("Open Surveillance closed / heartbeat expired")
+                idle_since = time.time()  # avoid spam; re-check next cycles
+
         time.sleep(poll_seconds)
 
 
@@ -320,5 +396,6 @@ if __name__ == "__main__":
     try:
         raise SystemExit(main())
     except KeyboardInterrupt:
-        log("Detection agent stopped.")
+        log("Detection agent stopped by user — stopping detect.py too...")
+        stop_detect("agent exiting")
         raise SystemExit(0)

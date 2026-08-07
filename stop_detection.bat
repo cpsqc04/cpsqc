@@ -1,45 +1,17 @@
 @echo off
+cd /d "%~dp0"
 echo ========================================
-echo Stopping CCTV Detection Processes
+echo Stopping CCTV detection (auto mode)
 echo ========================================
 echo.
+echo Signaling viewer closed and stopping detect.py...
+py -c "from detection_agent import stop_detect; stop_detect('manual stop_detection.bat')" 2>nul
 
-REM Kill all Python processes running detect.py
-echo Stopping all detection processes...
-taskkill /F /FI "WINDOWTITLE eq detect.py*" /T 2>nul
-taskkill /F /IM python.exe /FI "COMMANDLINE eq *detect.py*" 2>nul
-taskkill /F /IM pythonw.exe /FI "COMMANDLINE eq *detect.py*" 2>nul
-
-REM Also try to find and kill by process command line
-for /f "tokens=2" %%a in ('tasklist /FI "IMAGENAME eq python.exe" /FO LIST ^| findstr /I "PID"') do (
-    wmic process where "ProcessId=%%a" get CommandLine 2>nul | findstr /I "detect.py" >nul
-    if not errorlevel 1 (
-        echo Stopping process %%a...
-        taskkill /F /PID %%a 2>nul
-    )
-)
+powershell -NoProfile -Command "Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -match 'detect\\.py' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }" 2>nul
+if exist detect.lock del /f /q detect.lock >nul 2>&1
 
 echo.
-echo ✓ Detection processes stopped.
-echo.
-echo To start again, run: start_detection.bat
-echo Or use: install_detection_autostart.bat
+echo Detection stopped.
+echo The agent (if still running) will auto-start again when you open Open Surveillance.
 echo.
 pause
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

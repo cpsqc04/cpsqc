@@ -1,24 +1,13 @@
 @echo off
+setlocal
+cd /d "%~dp0"
 echo ========================================
-echo Remove IP Camera Detection Autostart
+echo Uninstall Detection Agent Autostart
 echo ========================================
-
-set "TASK_NAME=CPSQC IP Camera YOLO Detection"
-set "STARTUP_LINK=%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup\%TASK_NAME%.lnk"
-
-if exist "%STARTUP_LINK%" (
-    del /f "%STARTUP_LINK%"
-    echo Removed Startup shortcut.
-) else (
-    echo Startup shortcut not found.
-)
-
-schtasks /Query /TN "%TASK_NAME%" >nul 2>&1
-if not errorlevel 1 (
-    schtasks /Delete /TN "%TASK_NAME%" /F >nul
-    echo Removed Task Scheduler entry.
-)
-
 echo.
-echo Autostart removed.
+schtasks /Delete /TN "AlertaraQC_DetectionAgent" /F >nul 2>&1
+echo Scheduled task removed (if it existed).
+echo.
+echo Tip: close any open start_detection_agent.bat window to fully stop the agent.
 pause
+exit /b 0
