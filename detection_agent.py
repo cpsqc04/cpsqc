@@ -277,9 +277,9 @@ def main() -> int:
     poll_seconds = float(
         file_env.get("CCTV_AGENT_POLL_SECONDS")
         or os.environ.get("CCTV_AGENT_POLL_SECONDS")
-        or "8"
+        or "3"
     )
-    poll_seconds = max(3.0, poll_seconds)
+    poll_seconds = max(2.0, poll_seconds)
 
     if not api_key or not status_url:
         log(
@@ -291,7 +291,13 @@ def main() -> int:
     log(f"Detection agent started. Polling every {poll_seconds:.0f}s")
     log(f"  viewer: {status_url}")
     log(f"  scan:   {scan_url}")
+    log("Keeping detect.py running so Open Surveillance has a live feed immediately.")
     log("Leave this window open. Ctrl+C stops the agent only.")
+
+    # Start camera detection immediately so frames are already uploading
+    # before an admin opens Open Surveillance.
+    if read_detect_pid() is None:
+        start_detect()
 
     while True:
         if scan_url:
@@ -300,10 +306,13 @@ def main() -> int:
             except Exception as exc:  # noqa: BLE001
                 log(f"Scan job handler error: {exc}")
 
-        data = api_request(status_url, api_key, method="GET", timeout=15)
-        if data and data.get("success") and (data.get("should_run") or data.get("viewer_active")):
-            if read_detect_pid() is None:
-                start_detect()
+        # Keep detect.py alive continuously (auto-restart if it exits).
+        if read_detect_pid() is None:
+            log("detect.py not running — restarting for live feed readiness")
+            start_detect()
+
+        # Still refresh viewer heartbeat awareness (optional logging).
+        api_request(status_url, api_key, method="GET", timeout=15)
         time.sleep(poll_seconds)
 
 

@@ -7,11 +7,14 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
 }
 require_once __DIR__ . '/includes/admin_auth.php';
 require_once __DIR__ . '/db.php';
-require_once __DIR__ . '/includes/detection_env.php';
+require_once __DIR__ . '/includes/detection_process.php';
 
 $cctvNavActive = 'open-surveillance';
 $localDetectionEnabled = isLocalDetectionEnabled();
 $cctvFeedMode = getCctvFeedMode();
+
+// Start detection immediately when Open Surveillance is opened.
+ensureLocalDetectionStarted();
 
 ?>
 <!doctype html>
@@ -487,10 +490,8 @@ $cctvFeedMode = getCctvFeedMode();
                         <div>
                             <h2 class="section-title" style="margin-bottom:0.35rem;"><i class="fas fa-video"></i> Open Surveillance</h2>
                         </div>
-                        <span class="live-badge" id="liveBadge"><span class="dot"></span> Offline</span>
+                        <span class="live-badge" id="liveBadge"><span class="dot"></span> Connecting</span>
                     </div>
-
-                    <p class="surveillance-error" id="cameraError"></p>
 
                     <div class="surveillance-layout">
                         <div class="detection-panel">
@@ -511,14 +512,7 @@ $cctvFeedMode = getCctvFeedMode();
                                 <div class="feed-overlay feed-overlay-camera" id="feedCameraName">Surveillance</div>
                                 <div class="video-placeholder" id="cameraPlaceholder">
                                     <i class="fas fa-camera"></i>
-                                    <p>Loading IP camera feed...</p>
-                                    <p id="cameraPlaceholderHint" style="font-size:0.9rem;margin-top:0.5rem;">
-                                        <?php if ($localDetectionEnabled): ?>
-                                            Starting detection automatically…
-                                        <?php else: ?>
-                                            Opening this page signals the on-site PC to start detection. Keep <strong>start_detection_agent.bat</strong> running there (once).
-                                        <?php endif; ?>
-                                    </p>
+                                    <p>Connecting to camera…</p>
                                 </div>
                             </div>
                         </div>
@@ -542,10 +536,12 @@ $cctvFeedMode = getCctvFeedMode();
             updateDateTime();
             setInterval(updateDateTime, 1000);
             loadFeedCameraName();
-            ensureDetectionRunning();
+            setCameraUiState('connecting');
+            // Pull frames immediately while detection start runs in parallel.
             startCameraFeed();
+            ensureDetectionRunning();
             setInterval(pollDetections, 1000);
-            setInterval(sendDetectionHeartbeat, 15000);
+            setInterval(sendDetectionHeartbeat, 10000);
             initFullscreen();
             initDetectionLifecycle();
         });
@@ -567,22 +563,9 @@ $cctvFeedMode = getCctvFeedMode();
                 if (result && result.message) {
                     console.log('Detection:', result.message);
                 }
-                if (result && result.success === false) {
-                    showCameraError(result.message || 'Could not start CCTV detection.');
-                }
             } catch (e) {
                 console.warn('Detection start failed', e);
             }
-        }
-
-        function getOfflineFeedMessage(status) {
-            if (LOCAL_DETECTION_ENABLED) {
-                return 'Camera feed not available. Detection should start automatically when this page opens. Check Camera Management for the camera IP.';
-            }
-            if (status && status.feed_mode === 'remote') {
-                return 'Waiting for frames from the on-site detection PC. Keep start_detection_agent.bat running there — opening this page starts detect.py automatically.';
-            }
-            return 'Camera feed not available. Check Camera Management and the on-site detection PC.';
         }
 
         async function sendDetectionHeartbeat() {
@@ -653,19 +636,33 @@ $cctvFeedMode = getCctvFeedMode();
 
         let feedErrors = 0;
 
-        function setCameraUiState(isLive) {
+        function setCameraUiState(state) {
+            // state: true/'live' | false/'offline' | 'connecting'
             const badge = document.getElementById('liveBadge');
             const placeholder = document.getElementById('cameraPlaceholder');
             const feed = document.getElementById('cameraFeed');
             const datetimeOverlay = document.getElementById('feedDateTime');
             const cameraOverlay = document.getElementById('feedCameraName');
 
+            let mode = state;
+            if (state === true) mode = 'live';
+            if (state === false) mode = 'offline';
+
+            const isLive = mode === 'live';
+            const showingFeed = feed.classList.contains('active') || isLive;
+
             badge.classList.toggle('active', isLive);
-            badge.innerHTML = '<span class="dot"></span> ' + (isLive ? 'Live' : 'Offline');
-            placeholder.classList.toggle('hidden', isLive);
-            feed.classList.toggle('active', isLive);
-            if (datetimeOverlay) datetimeOverlay.classList.toggle('visible', isLive);
-            if (cameraOverlay) cameraOverlay.classList.toggle('visible', isLive);
+            badge.innerHTML = '<span class="dot"></span> ' + (isLive ? 'Live' : (mode === 'connecting' ? 'Connecting' : 'Offline'));
+            if (isLive) {
+                feed.classList.add('active');
+                placeholder.classList.add('hidden');
+            } else if (showingFeed) {
+                placeholder.classList.add('hidden');
+            } else {
+                placeholder.classList.remove('hidden');
+            }
+            if (datetimeOverlay) datetimeOverlay.classList.toggle('visible', showingFeed || isLive);
+            if (cameraOverlay) cameraOverlay.classList.toggle('visible', showingFeed || isLive);
         }
 
         async function loadFeedCameraName() {
@@ -686,74 +683,74 @@ $cctvFeedMode = getCctvFeedMode();
             }
         }
 
-        function showCameraError(message) {
-            const errorEl = document.getElementById('cameraError');
-            errorEl.textContent = message;
-            errorEl.classList.add('show');
-        }
-
-        function clearCameraError() {
-            const errorEl = document.getElementById('cameraError');
-            errorEl.textContent = '';
-            errorEl.classList.remove('show');
-        }
-
         function startCameraFeed() {
             const feed = document.getElementById('cameraFeed');
             let hasShownFrame = false;
             let lastFrameUpdatedAt = '';
             let frameLoading = false;
             let pollTimer = null;
+            const startedAt = Date.now();
 
             const schedulePoll = (delayMs) => {
                 if (pollTimer) clearTimeout(pollTimer);
                 pollTimer = setTimeout(pollCameraFrame, delayMs);
             };
 
+            const showFrame = (updatedAt) => {
+                frameLoading = true;
+                feed.onload = function() {
+                    frameLoading = false;
+                    lastFrameUpdatedAt = updatedAt || lastFrameUpdatedAt;
+                    feedErrors = 0;
+                    hasShownFrame = true;
+                    feed.classList.add('active');
+                    document.getElementById('cameraPlaceholder').classList.add('hidden');
+                    setCameraUiState('live');
+                    schedulePoll(250);
+                };
+                feed.onerror = function() {
+                    frameLoading = false;
+                    feedErrors += 1;
+                    schedulePoll(400);
+                };
+                feed.src = 'api/current_frame.php?t=' + Date.now();
+            };
+
             const pollCameraFrame = async () => {
                 try {
                     const res = await fetch('api/camera_status.php?t=' + Date.now(), { cache: 'no-store' });
                     const status = await res.json();
+                    const warmUp = (Date.now() - startedAt) < 45000;
 
-                    if (!status.available) {
-                        if (!hasShownFrame) {
-                            setCameraUiState(false);
+                    // Fresh live frame
+                    if (status.available || status.has_frame) {
+                        if (frameLoading || status.updated_at === lastFrameUpdatedAt) {
+                            if (status.available && hasShownFrame) {
+                                setCameraUiState('live');
+                            }
+                            schedulePoll(status.available ? 250 : 400);
+                            return;
                         }
-                        if (status.age_seconds > 5) {
-                            showCameraError(getOfflineFeedMessage(status));
-                        }
-                        // Offline: poll slowly to protect Hostinger CPU
-                        schedulePoll(1500);
+                        showFrame(status.updated_at);
                         return;
                     }
 
-                    if (frameLoading || status.updated_at === lastFrameUpdatedAt) {
-                        // No new frame yet — avoid hammering camera_status.php
-                        schedulePoll(300);
-                        return;
+                    if (!hasShownFrame) {
+                        setCameraUiState('connecting');
                     }
-
-                    frameLoading = true;
-                    feed.onload = function() {
-                        frameLoading = false;
-                        lastFrameUpdatedAt = status.updated_at;
-                        feedErrors = 0;
-                        clearCameraError();
-                        hasShownFrame = true;
-                        setCameraUiState(true);
-                        schedulePoll(250);
-                    };
-                    feed.onerror = function() {
-                        frameLoading = false;
-                        feedErrors += 1;
-                        schedulePoll(500);
-                    };
-                    feed.src = 'api/current_frame.php?t=' + Date.now();
+                    schedulePoll(warmUp ? 500 : 1500);
                 } catch (e) {
-                    schedulePoll(1000);
+                    schedulePoll(800);
                 }
             };
 
+            // Try to show any existing frame immediately
+            feed.src = 'api/current_frame.php?t=' + Date.now();
+            feed.onload = function() {
+                hasShownFrame = true;
+                feed.classList.add('active');
+                setCameraUiState('connecting');
+            };
             schedulePoll(0);
         }
 

@@ -3,8 +3,9 @@ echo ========================================
 echo AlertaraQC CCTV Detection Agent
 echo ========================================
 echo.
-echo This agent watches Open Surveillance on the web server.
-echo When an admin opens CCTV surveillance, detect.py starts automatically.
+echo This agent keeps detect.py running so Open Surveillance
+echo shows the live camera feed immediately when opened.
+echo It also handles LAN camera scans from Camera Management.
 echo.
 cd /d "%~dp0"
 set "PATH=%~dp0;%PATH%"

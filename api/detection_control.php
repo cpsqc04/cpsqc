@@ -8,7 +8,7 @@
 session_start();
 header('Content-Type: application/json; charset=utf-8');
 
-require_once __DIR__ . '/../includes/detection_env.php';
+require_once __DIR__ . '/../includes/detection_process.php';
 
 if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
     http_response_code(401);
@@ -17,100 +17,22 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
 }
 
 $root = dirname(__DIR__);
-$lockFile = $root . DIRECTORY_SEPARATOR . 'detect.lock';
+$lockFile = getDetectionLockPath();
 $heartbeatFile = getDetectionHeartbeatPath();
-$logFile = $root . DIRECTORY_SEPARATOR . 'detection_control.log';
+$logFile = getDetectionControlLogPath();
 
 $input = json_decode(file_get_contents('php://input'), true);
 if (!is_array($input)) {
     $input = [];
 }
-// sendBeacon may post as text/plain — accept raw JSON body already handled above;
-// also accept form-urlencoded action for beacon compatibility.
 if ($input === [] && isset($_POST['action'])) {
     $input = ['action' => $_POST['action']];
 }
 $action = strtolower(trim($input['action'] ?? $_GET['action'] ?? 'status'));
 
-function detectionPidIsAlive(int $pid): bool
-{
-    if ($pid <= 0) {
-        return false;
-    }
-    if (strncasecmp(PHP_OS, 'WIN', 3) === 0) {
-        $out = [];
-        exec('tasklist /FI "PID eq ' . $pid . '" /NH 2>nul', $out);
-        $joined = implode(' ', $out);
-        return strpos($joined, (string) $pid) !== false;
-    }
-    return function_exists('posix_kill') ? @posix_kill($pid, 0) : file_exists("/proc/{$pid}");
-}
-
-function readDetectionPid(string $lockFile): ?int
-{
-    if (!is_file($lockFile)) {
-        return null;
-    }
-    $pid = (int) trim((string) @file_get_contents($lockFile));
-    if ($pid <= 0) {
-        return null;
-    }
-    if (!detectionPidIsAlive($pid)) {
-        @unlink($lockFile);
-        return null;
-    }
-    return $pid;
-}
-
 function writeDetectionHeartbeat(string $heartbeatFile, string $source = 'open-surveillance'): void
 {
     writeDetectionViewerHeartbeat($source);
-}
-
-function stopDetectionProcesses(string $root, string $lockFile): int
-{
-    $killed = 0;
-    $pid = readDetectionPid($lockFile);
-    if ($pid !== null) {
-        if (strncasecmp(PHP_OS, 'WIN', 3) === 0) {
-            exec('taskkill /F /PID ' . $pid . ' /T 2>nul', $out, $code);
-            if ($code === 0) {
-                $killed++;
-            }
-        } else {
-            @posix_kill($pid, 15);
-            $killed++;
-        }
-    }
-
-    if (strncasecmp(PHP_OS, 'WIN', 3) === 0) {
-        // Fallback: kill any remaining detect.py via WMIC/PowerShell
-        exec('powershell -NoProfile -Command "Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -match \'detect\\.py\' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }" 2>nul');
-    }
-
-    @unlink($lockFile);
-    return $killed;
-}
-
-function startDetectionProcess(string $root, string $logFile): bool
-{
-    $detectScript = $root . DIRECTORY_SEPARATOR . 'detect.py';
-    if (!is_file($detectScript)) {
-        return false;
-    }
-
-    if (strncasecmp(PHP_OS, 'WIN', 3) === 0) {
-        $cmd = 'cd /d ' . escapeshellarg($root)
-            . ' && (py detect.py >> ' . escapeshellarg($logFile) . ' 2>&1)';
-        // start /B runs without a new console window attached to Apache
-        pclose(popen('start /B cmd /C ' . escapeshellarg($cmd), 'r'));
-        return true;
-    }
-
-    $cmd = 'cd ' . escapeshellarg($root) . ' && nohup python3 detect.py >> '
-        . escapeshellarg($logFile) . ' 2>&1 &';
-    exec($cmd);
-    return true;
 }
 
 $pid = readDetectionPid($lockFile);
@@ -147,7 +69,7 @@ if ($action === 'stop') {
             'action' => 'stop',
             'stopped' => true,
             'feed_mode' => 'remote',
-            'message' => 'Viewer closed. On-site detection may keep recording.',
+            'message' => 'Viewer closed.',
         ]);
         exit;
     }
@@ -175,7 +97,7 @@ if ($action === 'start') {
             'local_detection_enabled' => false,
             'feed_mode' => 'remote',
             'viewer_active' => $viewer['active'],
-            'message' => 'Open Surveillance signaled. On-site detection agent will start detect.py automatically.',
+            'message' => 'Detection signaled.',
         ]);
         exit;
     }
@@ -192,7 +114,6 @@ if ($action === 'start') {
     }
 
     $started = startDetectionProcess($root, $logFile);
-    // Brief wait for lock file
     usleep(800000);
     $pid = readDetectionPid($lockFile);
 
