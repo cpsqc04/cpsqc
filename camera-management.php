@@ -468,12 +468,12 @@ $cctvNavActive = 'camera-management';
                         <input type="text" id="cameraPort" value="554" placeholder="554">
                     </div>
                     <div class="form-group">
-                        <label for="cameraUsername">Username *</label>
-                        <input type="text" id="cameraUsername" required placeholder="admin">
+                        <label for="cameraUsername">Camera Username *</label>
+                        <input type="text" id="cameraUsername" required placeholder="admin" autocomplete="username">
                     </div>
                     <div class="form-group">
-                        <label for="cameraPassword">Password *</label>
-                        <input type="password" id="cameraPassword" placeholder="Required for new camera">
+                        <label for="cameraPassword">Camera Password *</label>
+                        <input type="password" id="cameraPassword" placeholder="Camera login password" autocomplete="current-password">
                         <div class="form-hint" id="passwordHint" style="display:none;">Leave blank to keep the current password.</div>
                     </div>
                     <div class="form-group">
@@ -483,6 +483,11 @@ $cctvNavActive = 'camera-management';
                             <option value="sub">Sub stream (lower bandwidth)</option>
                         </select>
                         <div class="form-hint">Camera and this PC should be on the same router. Use Main for original clarity.</div>
+                    </div>
+                    <div class="form-group full" id="rtspUrlGroup" style="display:none;">
+                        <label for="cameraRtspUrl">RTSP URL</label>
+                        <input type="text" id="cameraRtspUrl" readonly placeholder="Auto-filled from IP, port, username, password, and stream">
+                        <div class="form-hint">Auto-generated for the on-site PC. Updates as you change IP / credentials / stream.</div>
                     </div>
                     <div class="form-group full">
                         <label for="cameraDescription">Description</label>
@@ -531,6 +536,7 @@ $cctvNavActive = 'camera-management';
         let scanPollTimer = null;
         let lastScanCameras = [];
         let toastTimer = null;
+        let editingCamera = null;
 
         function showToast(message) {
             const el = document.getElementById('toastPopup');
@@ -541,6 +547,57 @@ $cctvNavActive = 'camera-management';
             toastTimer = setTimeout(function() {
                 el.classList.remove('show');
             }, 2200);
+        }
+
+        function buildRtspUrl(ip, port, username, password, streamType) {
+            const safeIp = String(ip || '').trim();
+            const safePort = String(port || '554').trim() || '554';
+            const user = encodeURIComponent(String(username || '').trim());
+            const pass = encodeURIComponent(String(password || ''));
+            const path = String(streamType || 'main') === 'sub' ? 'h264Preview_01_sub' : 'h264Preview_01_main';
+            if (!safeIp) return '';
+            if (username) {
+                return 'rtsp://' + user + ':' + pass + '@' + safeIp + ':' + safePort + '/' + path;
+            }
+            return 'rtsp://' + safeIp + ':' + safePort + '/' + path;
+        }
+
+        function refreshRtspPreview() {
+            const rtspInput = document.getElementById('cameraRtspUrl');
+            const group = document.getElementById('rtspUrlGroup');
+            if (!rtspInput || !group || group.style.display === 'none') return;
+
+            const ip = document.getElementById('cameraIp').value.trim();
+            const port = document.getElementById('cameraPort').value.trim() || '554';
+            const username = document.getElementById('cameraUsername').value.trim();
+            const typedPassword = document.getElementById('cameraPassword').value;
+            const streamType = document.getElementById('cameraStreamType').value;
+            const password = typedPassword !== ''
+                ? typedPassword
+                : (editingCamera ? (editingCamera.password || '') : '');
+
+            if (editingCamera && typedPassword === '' && editingCamera.rtspUrl && ip === (editingCamera.ipAddress || '')) {
+                // Keep saved URL until IP/credentials fields change enough to rebuild.
+                const sameUser = username === (editingCamera.username || '');
+                const samePort = port === String(editingCamera.port || '554');
+                const sameStream = streamType === (editingCamera.streamType || 'main');
+                if (sameUser && samePort && sameStream) {
+                    rtspInput.value = editingCamera.rtspUrl;
+                    return;
+                }
+            }
+
+            rtspInput.value = buildRtspUrl(ip, port, username, password, streamType);
+        }
+
+        function bindRtspPreviewInputs() {
+            ['cameraIp', 'cameraPort', 'cameraUsername', 'cameraPassword', 'cameraStreamType'].forEach(function(id) {
+                const el = document.getElementById(id);
+                if (!el || el.dataset.rtspBound === '1') return;
+                el.dataset.rtspBound = '1';
+                el.addEventListener('input', refreshRtspPreview);
+                el.addEventListener('change', refreshRtspPreview);
+            });
         }
 
         function statusClass(status) {
@@ -728,23 +785,40 @@ $cctvNavActive = 'camera-management';
         }
 
         function openCameraModal(camera) {
+            editingCamera = camera || null;
+            bindRtspPreviewInputs();
             document.getElementById('cameraModalTitle').textContent = camera ? 'Edit Camera' : 'Add Camera';
             document.getElementById('cameraDbId').value = camera ? camera.id : '';
             document.getElementById('cameraName').value = camera ? camera.name : '';
             document.getElementById('cameraLocation').value = camera ? camera.location : '';
             document.getElementById('cameraIp').value = camera ? camera.ipAddress : '';
             document.getElementById('cameraPort').value = camera ? (camera.port || '554') : '554';
-            document.getElementById('cameraUsername').value = camera ? camera.username : '';
+            document.getElementById('cameraUsername').value = camera ? (camera.username || 'admin') : 'admin';
             document.getElementById('cameraPassword').value = '';
             document.getElementById('cameraPassword').required = !camera;
+            document.getElementById('cameraPassword').placeholder = camera
+                ? 'Leave blank to keep current password'
+                : 'Camera login password';
             document.getElementById('passwordHint').style.display = camera ? 'block' : 'none';
             document.getElementById('cameraStreamType').value = camera ? (camera.streamType || 'main') : 'main';
             document.getElementById('cameraStatus').value = camera ? (camera.status || 'Online') : 'Online';
             document.getElementById('cameraDescription').value = camera ? (camera.description || '') : '';
+
+            const rtspGroup = document.getElementById('rtspUrlGroup');
+            if (camera) {
+                rtspGroup.style.display = 'block';
+                document.getElementById('cameraRtspUrl').value = camera.rtspUrl || '';
+                refreshRtspPreview();
+            } else {
+                rtspGroup.style.display = 'none';
+                document.getElementById('cameraRtspUrl').value = '';
+            }
+
             document.getElementById('cameraModal').classList.add('active');
         }
 
         function closeCameraModal() {
+            editingCamera = null;
             document.getElementById('cameraModal').classList.remove('active');
         }
 
