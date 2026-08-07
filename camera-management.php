@@ -891,6 +891,12 @@ $cctvNavActive = 'camera-management';
                 if (!result.success) throw new Error(result.error || 'Save failed');
                 closeCameraModal();
                 await loadCameras();
+                try {
+                    localStorage.setItem('cameraConfigUpdated', String(Date.now()));
+                    window.dispatchEvent(new Event('camera-config-updated'));
+                } catch (e) {
+                    /* ignore */
+                }
                 showToast(id ? 'Camera updated' : 'Camera added');
             } catch (e) {
                 alert(e.message || 'Failed to save camera.');

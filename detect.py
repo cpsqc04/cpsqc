@@ -128,8 +128,9 @@ CCTV_UPLOAD_JPEG_QUALITY = 88    # Clearer live JPEG
 CCTV_UPLOAD_MAX_WIDTH = 1600     # Near-HD for Open Surveillance
 _last_cctv_upload_at = 0.0
 _last_cameras_sync_at = 0.0
+_last_cameras_revision = ""
 _last_detections_upload_at = 0.0
-CAMERAS_SYNC_INTERVAL = 3  # Pull Camera Management edits from Hostinger quickly
+CAMERAS_SYNC_INTERVAL = 1  # Pull Camera Management edits from Hostinger immediately
 DETECTIONS_UPLOAD_INTERVAL = 1.5  # don't POST detections JSON on every frame
 DETECTIONS_FILE = "detections.json"
 FRAME_FILE = "current_frame.jpg"  # Frame saved for web display
@@ -453,7 +454,7 @@ def init_cctv_upload_from_env():
 
 def sync_cameras_json_from_server(force=False):
     """Pull cameras.json from Hostinger so Camera Management changes apply on-site."""
-    global _last_cameras_sync_at
+    global _last_cameras_sync_at, _last_cameras_revision
     if not CCTV_CAMERAS_CONFIG_URL or not CCTV_FRAME_UPLOAD_KEY or not REQUESTS_AVAILABLE:
         return False
     now = time.time()
@@ -470,6 +471,7 @@ def sync_cameras_json_from_server(force=False):
         if not isinstance(cameras, list):
             return False
 
+        revision = str(payload.get("revision") or payload.get("updated_at") or "")
         new_text = json.dumps(cameras, indent=4, ensure_ascii=False) + "\n"
         old_text = ""
         cameras_path = Path(CAMERAS_FILE)
@@ -479,15 +481,28 @@ def sync_cameras_json_from_server(force=False):
             except OSError:
                 old_text = ""
 
-        if new_text == old_text:
+        revision_changed = bool(revision) and revision != _last_cameras_revision
+        content_changed = new_text != old_text
+        if not content_changed and not revision_changed and not force:
+            if revision:
+                _last_cameras_revision = revision
             return False
 
         cameras_path.write_text(new_text, encoding="utf-8")
+        if revision:
+            _last_cameras_revision = revision
         print("✓ cameras.json synced from Camera Management (website).")
-        return True
+        return content_changed or revision_changed or force
     except Exception as exc:
         print(f"⚠ cameras.json sync failed: {exc}")
         return False
+
+
+def check_camera_config_hot_reload():
+    """Sync from website and reconnect RTSP when Camera Management settings change."""
+    changed = sync_cameras_json_from_server()
+    reloaded = reload_camera_source_if_changed()
+    return changed or reloaded
 
 
 def get_camera_config_fingerprint():
@@ -3771,6 +3786,11 @@ def main():
                 cap = None
         
         if cap is None and not http_mode:
+            # Still pick up Camera Management edits while waiting to reconnect.
+            if check_camera_config_hot_reload():
+                print("↻ Camera settings updated while offline — trying new RTSP URL now...")
+                reconnect_count = 0
+                continue
             reconnect_count += 1
             if reconnect_count >= MAX_RECONNECT_ATTEMPTS:
                 print(f"\n✗ Maximum reconnection attempts ({MAX_RECONNECT_ATTEMPTS}) reached.")
@@ -3779,8 +3799,12 @@ def main():
                 print("  2. RTSP URL is correct:", RTSP_URL)
                 print("  3. Camera credentials are correct")
                 print("  4. Network connection to camera")
-                print("\nWaiting 30 seconds before retrying...")
-                time.sleep(30)
+                print("\nWaiting 10 seconds before retrying...")
+                for _ in range(10):
+                    if check_camera_config_hot_reload():
+                        print("↻ Camera settings updated — retrying immediately...")
+                        break
+                    time.sleep(1)
                 reconnect_count = 0
                 continue
             else:
@@ -3931,13 +3955,13 @@ def main():
                 
                 current_time = time.time()
 
-                # Viewer heartbeat: exit when Open Surveillance is closed / idle
-                if current_time - last_heartbeat_check >= 5.0:
+                # Hot-reload camera settings from Camera Management (~1s)
+                if current_time - last_heartbeat_check >= 1.0:
                     last_heartbeat_check = current_time
-                    if sync_cameras_json_from_server():
-                        print("↻ Camera config synced from server.")
-                    if reload_camera_source_if_changed():
-                        print("\n↻ cameras.json changed — reconnecting with updated camera settings...")
+                    if check_camera_config_hot_reload():
+                        print("\n↻ Camera Management update detected — reconnecting live feed now...")
+                        http_mode = False
+                        http_snapshot_url = None
                         break
                     if should_idle_auto_stop():
                         print(f"\n⏹ Idle auto-stop: no viewer heartbeat for {IDLE_AUTO_STOP_SECONDS // 60} minutes.")

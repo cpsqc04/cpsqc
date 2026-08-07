@@ -701,12 +701,32 @@ ensureLocalDetectionStarted();
             let lastFrameUpdatedAt = '';
             let frameLoading = false;
             let pollTimer = null;
+            let cameraRevision = '';
+            let cameraJustUpdatedUntil = 0;
             const startedAt = Date.now();
 
             const schedulePoll = (delayMs) => {
                 if (pollTimer) clearTimeout(pollTimer);
                 pollTimer = setTimeout(pollCameraFrame, delayMs);
             };
+
+            const markCameraUpdated = () => {
+                cameraJustUpdatedUntil = Date.now() + 90000;
+                setCameraUiState('connecting');
+                loadFeedCameraName();
+                ensureDetectionRunning();
+                sendDetectionHeartbeat();
+                schedulePoll(100);
+            };
+
+            window.addEventListener('storage', function(e) {
+                if (e.key === 'cameraConfigUpdated') {
+                    markCameraUpdated();
+                }
+            });
+
+            // Same-tab updates from Camera Management after save (if opened in same window flow)
+            window.addEventListener('camera-config-updated', markCameraUpdated);
 
             const showFrame = (updatedAt, isLive) => {
                 frameLoading = true;
@@ -719,26 +739,41 @@ ensureLocalDetectionStarted();
                     document.getElementById('cameraPlaceholder').classList.add('hidden');
                     if (feedDateTime) feedDateTime.textContent = formatFrameTimestamp(updatedAt);
                     setCameraUiState(isLive ? 'live' : 'connecting');
-                    schedulePoll(isLive ? 250 : 500);
+                    schedulePoll(isLive ? 250 : 400);
                 };
                 feed.onerror = function() {
                     frameLoading = false;
                     feedErrors += 1;
                     schedulePoll(400);
                 };
-                // Cache-bust with frame mtime so the browser never reuses a stale image.
                 feed.src = 'api/current_frame.php?t=' + encodeURIComponent(updatedAt || Date.now()) + '&r=' + Date.now();
+            };
+
+            const pollCameraConfig = async () => {
+                try {
+                    const res = await fetch('api/cameras.php?t=' + Date.now(), { cache: 'no-store' });
+                    const result = await res.json();
+                    const revision = String(result.revision || result.updated_at || '');
+                    if (revision && cameraRevision && revision !== cameraRevision) {
+                        markCameraUpdated();
+                    }
+                    if (revision) cameraRevision = revision;
+                } catch (e) {
+                    /* ignore */
+                }
             };
 
             const pollCameraFrame = async () => {
                 try {
+                    await pollCameraConfig();
                     const res = await fetch('api/camera_status.php?t=' + Date.now(), { cache: 'no-store' });
                     const status = await res.json();
                     const warmUp = (Date.now() - startedAt) < 60000;
+                    const cameraUpdating = Date.now() < cameraJustUpdatedUntil;
                     const age = typeof status.age_seconds === 'number' ? status.age_seconds : null;
 
-                    // Only treat as Live when the frame is fresh from the on-site camera.
                     if (status.available) {
+                        cameraJustUpdatedUntil = 0;
                         if (frameLoading) {
                             schedulePoll(200);
                             return;
@@ -753,23 +788,30 @@ ensureLocalDetectionStarted();
                         return;
                     }
 
-                    // Brief warm-up: may show a recent frame as Connecting, never as Live.
-                    if (status.has_frame && age !== null && age < 20 && warmUp) {
+                    // After Camera Management edit / reconnect gap: keep showing recent frame.
+                    const staleLimit = cameraUpdating ? 60 : (warmUp ? 25 : 12);
+                    if (status.has_frame && age !== null && age < staleLimit) {
                         if (!frameLoading && status.updated_at !== lastFrameUpdatedAt) {
                             showFrame(status.updated_at, false);
                             return;
                         }
-                        setCameraUiState(hasShownFrame ? 'connecting' : 'connecting');
-                        schedulePoll(400);
+                        if (hasShownFrame) {
+                            feed.classList.add('active');
+                            document.getElementById('cameraPlaceholder').classList.add('hidden');
+                        }
+                        setCameraUiState('connecting');
+                        schedulePoll(cameraUpdating ? 300 : 500);
                         return;
                     }
 
-                    if (!status.has_frame || age === null || age > 20) {
-                        feed.classList.remove('active');
-                        hasShownFrame = false;
-                        lastFrameUpdatedAt = '';
-                        setCameraUiState(warmUp ? 'connecting' : 'offline');
-                        schedulePoll(warmUp ? 500 : 1200);
+                    if (!status.has_frame || age === null || age >= staleLimit) {
+                        if (!cameraUpdating) {
+                            feed.classList.remove('active');
+                            hasShownFrame = false;
+                            lastFrameUpdatedAt = '';
+                        }
+                        setCameraUiState((warmUp || cameraUpdating) ? 'connecting' : 'offline');
+                        schedulePoll((warmUp || cameraUpdating) ? 400 : 1200);
                         return;
                     }
 

@@ -71,9 +71,42 @@ function camerasSave(string $camerasFile, array $cameras): bool
     if (!@rename($temp, $camerasFile)) {
         $copied = @copy($temp, $camerasFile);
         @unlink($temp);
-        return $copied;
+        if (!$copied) {
+            return false;
+        }
     }
+
+    // Signal on-site detect.py / Open Surveillance to refresh immediately.
+    $revision = [
+        'revision' => (string) (int) round(microtime(true) * 1000),
+        'updated_at' => date('c'),
+        'count' => count($cameras),
+    ];
+    @file_put_contents(
+        dirname($camerasFile) . DIRECTORY_SEPARATOR . 'camera_config_revision.json',
+        json_encode($revision, JSON_PRETTY_PRINT),
+        LOCK_EX
+    );
+
     return true;
+}
+
+function camerasRevisionPayload(string $camerasFile): array
+{
+    $path = dirname($camerasFile) . DIRECTORY_SEPARATOR . 'camera_config_revision.json';
+    if (is_file($path)) {
+        $decoded = json_decode((string) file_get_contents($path), true);
+        if (is_array($decoded)) {
+            return [
+                'revision' => (string) ($decoded['revision'] ?? ''),
+                'updated_at' => (string) ($decoded['updated_at'] ?? (is_file($camerasFile) ? date('c', filemtime($camerasFile)) : '')),
+            ];
+        }
+    }
+    return [
+        'revision' => is_file($camerasFile) ? (string) filemtime($camerasFile) : '',
+        'updated_at' => is_file($camerasFile) ? date('c', filemtime($camerasFile)) : null,
+    ];
 }
 
 function buildRtspUrl(string $ip, string $port, string $username, string $password, string $streamType): string
@@ -152,7 +185,8 @@ function createCamera(string $camerasFile, array $data): array
         'success' => true,
         'camera' => $camera,
         'message' => 'Camera created. cameras.json updated.',
-        'updated_at' => date('c', filemtime($camerasFile) ?: time()),
+        'updated_at' => camerasRevisionPayload($camerasFile)['updated_at'],
+        'revision' => camerasRevisionPayload($camerasFile)['revision'],
     ];
 }
 
@@ -203,7 +237,8 @@ function updateCamera(string $camerasFile, array $data): array
         'success' => true,
         'camera' => $camera,
         'message' => 'Camera updated. cameras.json saved — on-site detection will pick this up within a few seconds.',
-        'updated_at' => date('c', filemtime($camerasFile) ?: time()),
+        'updated_at' => camerasRevisionPayload($camerasFile)['updated_at'],
+        'revision' => camerasRevisionPayload($camerasFile)['revision'],
     ];
 }
 
@@ -244,10 +279,12 @@ $action = strtolower(trim((string) ($input['action'] ?? $_GET['action'] ?? '')))
 
 if ($method === 'GET') {
     $cameras = camerasLoad($camerasFile);
+    $revision = camerasRevisionPayload($camerasFile);
     echo json_encode([
         'success' => true,
         'cameras' => $cameras,
-        'updated_at' => is_file($camerasFile) ? date('c', filemtime($camerasFile)) : null,
+        'updated_at' => $revision['updated_at'],
+        'revision' => $revision['revision'],
         'storage' => 'cameras.json',
     ]);
     exit;

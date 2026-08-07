@@ -50,4 +50,14 @@ echo json_encode([
     'success' => true,
     'cameras' => $cameras,
     'updated_at' => is_file($camerasFile) ? date('c', filemtime($camerasFile)) : null,
+    'revision' => (static function () use ($camerasFile) {
+        $path = dirname($camerasFile) . DIRECTORY_SEPARATOR . 'camera_config_revision.json';
+        if (is_file($path)) {
+            $decoded = json_decode((string) file_get_contents($path), true);
+            if (is_array($decoded) && isset($decoded['revision'])) {
+                return (string) $decoded['revision'];
+            }
+        }
+        return is_file($camerasFile) ? (string) filemtime($camerasFile) : '';
+    })(),
 ]);

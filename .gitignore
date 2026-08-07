@@ -43,6 +43,7 @@ detection_heartbeat.json
 detection_control.log
 camera_scan_job.json
 camera_scan_result_tmp.json
+camera_config_revision.json
 
 # ML model weights (large; download separately)
 *.pt
