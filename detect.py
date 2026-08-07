@@ -183,10 +183,13 @@ IDLE_CPU_SLEEP = 0.0  # Keep RTSP loop tight for low-latency live relay
 MOTION_MEAN_DIFF_THRESHOLD = 12.0  # Mean abs grayscale frame-diff for "motion"
 MOTION_CHANGED_RATIO = 0.015  # Min share of pixels that changed
 # Optional: stop detect.py when Open Surveillance stops sending heartbeats.
-# Enabled as a safety net; the detection agent also auto-stops when the viewer leaves.
+# Disabled by default — monitoring runs 24/7 via the detection agent.
 HEARTBEAT_FILE = "detection_heartbeat.json"
-IDLE_AUTO_STOP_SECONDS = 120  # Stop ~2 min after last Open Surveillance heartbeat
-IDLE_AUTO_STOP_ENABLED = True
+IDLE_AUTO_STOP_SECONDS = 120
+IDLE_AUTO_STOP_ENABLED = (
+    str(os.environ.get("CCTV_IDLE_AUTO_STOP", "false")).strip().lower()
+    in {"1", "true", "yes", "on"}
+)
 CONFIDENCE_THRESHOLD = 0.35
 PLANT_CONFIDENCE_THRESHOLD = 0.20  # Potted plants are often lower-confidence in YOLO
 PHONE_CONFIDENCE_THRESHOLD = 0.25  # Phones are small / often partially occluded
@@ -4016,7 +4019,7 @@ def main():
                 http_mode = True
                 cap = None  # No VideoCapture object for HTTP mode
                 print("Starting HTTP snapshot detection loop...")
-                print("Auto-managed: closes when Open Surveillance closes")
+                print("Always-on monitoring (managed by detection agent)")
                 print("-" * 60)
             else:
                 cap = None
@@ -4050,7 +4053,7 @@ def main():
         
         if not http_mode:
             print("Starting RTSP detection loop...")
-            print("Auto-managed: closes when Open Surveillance closes")
+            print("Always-on monitoring (managed by detection agent)")
             print("-" * 60)
         
         reconnect_count = 0

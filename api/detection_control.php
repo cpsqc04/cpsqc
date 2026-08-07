@@ -2,7 +2,7 @@
 
 /**
  * Start / stop / heartbeat for local YOLO detection (detect.py).
- * Used by Open Surveillance so detection runs only while the page is in use.
+ * Open Surveillance uses start/heartbeat for the live view; monitoring stays always-on via the agent.
  */
 
 session_start();

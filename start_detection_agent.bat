@@ -4,7 +4,7 @@ echo AlertaraQC CCTV Detection Agent
 echo ========================================
 echo.
 echo Starting HIDDEN in the background (no Terminal window).
-echo Open Surveillance will auto-start/stop detect.py.
+echo Keeps detect.py running continuously for 24/7 monitoring.
 echo Logs: detection_agent.log
 echo.
 cd /d "%~dp0"

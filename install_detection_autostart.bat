@@ -6,7 +6,7 @@ echo Install Detection Agent Autostart
 echo ========================================
 echo.
 echo Creates a Windows logon task that starts the agent HIDDEN
-echo (no blank Terminal window). Open Surveillance controls detect.py.
+echo (no blank Terminal window). Keeps detect.py running 24/7.
 echo.
 
 set "TASK_NAME=AlertaraQC_DetectionAgent"

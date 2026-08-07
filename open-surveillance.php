@@ -539,7 +539,7 @@ ensureLocalDetectionStarted();
             startCameraFeed();
             ensureDetectionRunning();
             setInterval(pollDetections, 1000);
-            // Keep heartbeat fresh so the on-site agent keeps detect.py running.
+            // Heartbeat keeps the live page fresh; detection itself runs always-on via the agent.
             setInterval(sendDetectionHeartbeat, 5000);
             setInterval(ensureDetectionRunning, 15000);
             initFullscreen();
@@ -608,10 +608,7 @@ ensureLocalDetectionStarted();
                     sendDetectionHeartbeat();
                 }
             });
-
-            // Auto-stop when leaving Open Surveillance (no manual stop button).
-            window.addEventListener('pagehide', signalDetectionStop);
-            window.addEventListener('beforeunload', signalDetectionStop);
+            // Detection stays running after leaving this page (always-on monitoring).
         }
 
         function initFullscreen() {

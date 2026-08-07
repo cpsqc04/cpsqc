@@ -12,6 +12,6 @@ if exist detect.lock del /f /q detect.lock >nul 2>&1
 
 echo.
 echo Detection stopped.
-echo The agent (if still running) will auto-start again when you open Open Surveillance.
+echo The agent (if still running) will restart detect.py shortly for continuous monitoring.
 echo.
 pause

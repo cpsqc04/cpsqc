@@ -2,10 +2,9 @@
 """
 On-site CCTV detection agent (leave this running once on the PC).
 
-Auto start/stop — no manual start_detection.bat / stop_detection.bat:
-  • Opens Open Surveillance  → starts detect.py
-  • Leaves Open Surveillance → stops detect.py (after a short grace)
-  • Also runs Camera Management LAN scans (non-blocking)
+Always-on monitoring:
+  • Keeps detect.py running continuously for 24/7 detection + uploads
+  • Also runs Camera Management LAN scans / encoding probes (non-blocking)
 
 Configure in .env (same as detect.py):
   CCTV_FRAME_UPLOAD_KEY=...
@@ -190,7 +189,7 @@ def start_detect() -> None:
     else:
         cmd = ["python3", "detect.py"]
 
-    log("Auto-start: Open Surveillance is open → starting detect.py (no console window)...")
+    log("Starting detect.py for continuous monitoring (no console window)...")
     # Cooldown prevents restart spam while YOLO/model boot is still writing the lock.
     _start_cooldown_until = now + 90.0
     try:
@@ -219,7 +218,7 @@ def start_detect() -> None:
     log("detect.py start requested (still booting — will not spam-restart)")
 
 
-def stop_detect(reason: str = "Open Surveillance closed") -> None:
+def stop_detect(reason: str = "agent request") -> None:
     global _start_cooldown_until
     running = detection_is_running()
     pid = read_detect_pid()
@@ -681,11 +680,6 @@ def main() -> int:
         file_env.get("CCTV_FRAME_UPLOAD_URL", "")
         or os.environ.get("CCTV_FRAME_UPLOAD_URL", "")
     ).strip()
-    status_url = (
-        file_env.get("CCTV_VIEWER_STATUS_URL", "")
-        or os.environ.get("CCTV_VIEWER_STATUS_URL", "")
-        or derive_api_url(frame_url, "cctv_viewer_status.php")
-    ).strip()
     scan_url = (
         file_env.get("CCTV_CAMERA_SCAN_URL", "")
         or os.environ.get("CCTV_CAMERA_SCAN_URL", "")
@@ -702,33 +696,19 @@ def main() -> int:
         or "2"
     )
     poll_seconds = max(1.5, poll_seconds)
-    stop_grace_seconds = float(
-        file_env.get("CCTV_AGENT_STOP_GRACE_SECONDS")
-        or os.environ.get("CCTV_AGENT_STOP_GRACE_SECONDS")
-        or "8"
-    )
-    stop_grace_seconds = max(3.0, stop_grace_seconds)
 
-    if not api_key or not status_url:
-        log(
-            "Missing CCTV_FRAME_UPLOAD_KEY or status URL. "
-            "Set CCTV_FRAME_UPLOAD_URL / CCTV_VIEWER_STATUS_URL in .env"
-        )
+    if not api_key:
+        log("Missing CCTV_FRAME_UPLOAD_KEY in .env")
         return 1
 
-    log("Detection agent started.")
-    log(f"  viewer: {status_url}")
-    log(f"  scan:   {scan_url}")
-    log(f"  encode: {encoding_url}")
-    log(f"  poll:   every {poll_seconds:.0f}s | stop grace: {stop_grace_seconds:.0f}s")
-    log("detect.py starts ONLY while Open Surveillance is open; otherwise it stays stopped.")
+    log("Detection agent started (always-on monitoring).")
+    log(f"  scan:   {scan_url or '(none)'}")
+    log(f"  encode: {encoding_url or '(none)'}")
+    log(f"  poll:   every {poll_seconds:.0f}s")
+    log("detect.py stays running continuously — Open Surveillance is view-only.")
 
-    if detection_is_running():
-        stop_detect("agent startup — waiting for Open Surveillance")
-
-    idle_since: Optional[float] = None
-    last_should_run: Optional[bool] = None
-    api_fail_streak = 0
+    if not detection_is_running():
+        start_detect()
 
     while True:
         if scan_url:
@@ -736,35 +716,9 @@ def main() -> int:
         if encoding_url:
             request_encoding_poll_async(encoding_url, api_key, min_interval=8.0)
 
-        status = api_request(status_url, api_key, method="GET", timeout=5.0)
-        if not status or not status.get("success"):
-            api_fail_streak += 1
-            # Don't kill a healthy detect.py on a brief Hostinger blip.
-            if api_fail_streak >= 8 and detection_is_running():
-                stop_detect("viewer status unreachable — stopping detection")
-            time.sleep(poll_seconds)
-            continue
-
-        api_fail_streak = 0
-        should_run = bool(status.get("should_run") is True or status.get("viewer_active") is True)
-
-        if last_should_run is None or should_run != last_should_run:
-            if should_run:
-                log("Open Surveillance is open — starting detection")
-            else:
-                log("Open Surveillance is closed — detection stays/stops off")
-            last_should_run = should_run
-
-        if should_run:
-            idle_since = None
-            if not detection_is_running():
-                start_detect()
-        else:
-            if idle_since is None:
-                idle_since = time.time()
-            if detection_is_running() and (time.time() - idle_since) >= stop_grace_seconds:
-                stop_detect("Open Surveillance is not open")
-                idle_since = time.time()
+        if not detection_is_running():
+            log("detect.py not running — restarting for continuous monitoring")
+            start_detect()
 
         time.sleep(poll_seconds)
 
