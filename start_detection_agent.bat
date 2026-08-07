@@ -3,9 +3,9 @@ echo ========================================
 echo AlertaraQC CCTV Detection Agent
 echo ========================================
 echo.
-echo Keep this window open once on the on-site PC.
-echo Open Surveillance will AUTO-START and AUTO-STOP detect.py.
-echo No need to click start_detection.bat or stop_detection.bat.
+echo Keep this window open on the on-site PC.
+echo detect.py starts ONLY when Open Surveillance is open,
+echo and stops when that page is closed.
 echo.
 cd /d "%~dp0"
 set "PATH=%~dp0;%PATH%"

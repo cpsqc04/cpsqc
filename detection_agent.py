@@ -336,13 +336,13 @@ def main() -> int:
         or "2"
     )
     poll_seconds = max(1.5, poll_seconds)
-    # Stop shortly after the viewer leaves (heartbeat max age on server is ~90s).
+    # Stop almost immediately once Open Surveillance clears the viewer flag.
     stop_grace_seconds = float(
         file_env.get("CCTV_AGENT_STOP_GRACE_SECONDS")
         or os.environ.get("CCTV_AGENT_STOP_GRACE_SECONDS")
-        or "20"
+        or "8"
     )
-    stop_grace_seconds = max(5.0, stop_grace_seconds)
+    stop_grace_seconds = max(3.0, stop_grace_seconds)
 
     if not api_key or not status_url:
         log(
@@ -351,14 +351,19 @@ def main() -> int:
         )
         return 1
 
-    log("Detection agent started (auto start/stop — no manual bat files needed).")
+    log("Detection agent started.")
     log(f"  viewer: {status_url}")
     log(f"  scan:   {scan_url}")
     log(f"  poll:   every {poll_seconds:.0f}s | stop grace: {stop_grace_seconds:.0f}s")
-    log("Leave this window open. Open Surveillance will start/stop detection by itself.")
+    log("detect.py starts ONLY while Open Surveillance is open; otherwise it stays stopped.")
+
+    # Never leave a leftover always-on detect.py running when the agent boots.
+    if read_detect_pid() is not None:
+        stop_detect("agent startup — waiting for Open Surveillance")
 
     idle_since: Optional[float] = None
     last_should_run: Optional[bool] = None
+    api_fail_streak = 0
 
     while True:
         if scan_url:
@@ -368,13 +373,24 @@ def main() -> int:
                 log(f"Scan job handler error: {exc}")
 
         status = api_request(status_url, api_key, method="GET", timeout=8)
-        should_run = bool(status and (status.get("should_run") or status.get("viewer_active")))
+        if not status or not status.get("success"):
+            api_fail_streak += 1
+            # Fail closed: never start without a confirmed Open Surveillance heartbeat.
+            # If we already lost contact, stop after a few failed polls.
+            if api_fail_streak >= 3 and read_detect_pid() is not None:
+                stop_detect("viewer status unreachable — stopping detection")
+            time.sleep(poll_seconds)
+            continue
+
+        api_fail_streak = 0
+        # Require an explicit true flag from the website (Open Surveillance open).
+        should_run = bool(status.get("should_run") is True or status.get("viewer_active") is True)
 
         if last_should_run is None or should_run != last_should_run:
             if should_run:
-                log("Viewer active — detection should run")
+                log("Open Surveillance is open — starting detection")
             else:
-                log("Viewer idle — detection will stop after grace period")
+                log("Open Surveillance is closed — detection stays/stops off")
             last_should_run = should_run
 
         if should_run:
@@ -382,15 +398,14 @@ def main() -> int:
             if read_detect_pid() is None:
                 start_detect()
         else:
+            # Stop promptly when the page is not open (no always-on mode).
             if idle_since is None:
                 idle_since = time.time()
-            elif time.time() - idle_since >= stop_grace_seconds:
-                if read_detect_pid() is not None:
-                    stop_detect("Open Surveillance closed / heartbeat expired")
-                idle_since = time.time()  # avoid spam; re-check next cycles
+            if read_detect_pid() is not None and (time.time() - idle_since) >= stop_grace_seconds:
+                stop_detect("Open Surveillance is not open")
+                idle_since = time.time()
 
         time.sleep(poll_seconds)
-
 
 if __name__ == "__main__":
     try:

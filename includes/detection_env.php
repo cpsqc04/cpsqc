@@ -106,7 +106,8 @@ function getDetectionViewerStatus(float $maxAgeSeconds = 90.0): array
 
     $updatedAt = isset($data['updated_at']) ? (float) $data['updated_at'] : 0.0;
     $age = $updatedAt > 0 ? max(0.0, microtime(true) - $updatedAt) : null;
-    $flag = array_key_exists('viewer_active', $data) ? (bool) $data['viewer_active'] : true;
+    // Only treat as active when Open Surveillance explicitly set viewer_active=true.
+    $flag = array_key_exists('viewer_active', $data) ? (bool) $data['viewer_active'] : false;
     $active = $flag && $age !== null && $age <= $maxAgeSeconds;
 
     return [

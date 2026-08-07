@@ -41,9 +41,9 @@ if ($providedKey === '' || !hash_equals($expectedKey, $providedKey)) {
     exit;
 }
 
-$maxAge = (float) ($_ENV['CCTV_VIEWER_ACTIVE_SECONDS'] ?? getenv('CCTV_VIEWER_ACTIVE_SECONDS') ?: 90);
-if ($maxAge < 30) {
-    $maxAge = 30;
+$maxAge = (float) ($_ENV['CCTV_VIEWER_ACTIVE_SECONDS'] ?? getenv('CCTV_VIEWER_ACTIVE_SECONDS') ?: 45);
+if ($maxAge < 20) {
+    $maxAge = 20;
 }
 
 $status = getDetectionViewerStatus($maxAge);
