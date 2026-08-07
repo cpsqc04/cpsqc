@@ -379,6 +379,9 @@ $cctvNavActive = 'camera-management';
                             <button type="button" class="btn-primary" onclick="openCameraModal()"><i class="fas fa-plus"></i> Add Camera</button>
                         </div>
                     </div>
+                    <p style="margin:0 0 1rem;color:var(--text-secondary);font-size:0.9rem;">
+                        Edit camera IP, credentials, and stream here. Changes save to <strong>cameras.json</strong> on the server right away; the on-site PC syncs them automatically (do not edit the JSON file by hand).
+                    </p>
                     <div class="scan-panel" id="scanPanel">
                         <p class="scan-status" id="scanStatus">Ready to scan.</p>
                         <div class="scan-list" id="scanList"></div>
@@ -711,12 +714,12 @@ $cctvNavActive = 'camera-management';
         }
 
         function editCamera(id) {
-            const camera = cameras.find(function(item) { return item.id === id; });
+            const camera = cameras.find(function(item) { return String(item.id) === String(id); });
             if (camera) openCameraModal(camera);
         }
 
         function deleteCamera(id) {
-            const camera = cameras.find(function(item) { return item.id === id; });
+            const camera = cameras.find(function(item) { return String(item.id) === String(id); });
             if (!camera) return;
             deleteTargetId = id;
             document.getElementById('deleteCameraLabel').textContent = camera.cameraId + ' — ' + camera.name;
@@ -731,7 +734,11 @@ $cctvNavActive = 'camera-management';
         async function confirmDeleteCamera() {
             if (!deleteTargetId) return;
             try {
-                const res = await fetch('api/cameras.php?id=' + encodeURIComponent(deleteTargetId), { method: 'DELETE' });
+                const res = await fetch('api/cameras.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'delete', id: String(deleteTargetId) })
+                });
                 const result = await res.json();
                 if (!result.success) throw new Error(result.error || 'Delete failed');
                 closeDeleteModal();
@@ -745,6 +752,7 @@ $cctvNavActive = 'camera-management';
             event.preventDefault();
             const id = document.getElementById('cameraDbId').value;
             const payload = {
+                action: id ? 'update' : 'create',
                 name: document.getElementById('cameraName').value.trim(),
                 location: document.getElementById('cameraLocation').value.trim(),
                 ipAddress: document.getElementById('cameraIp').value.trim(),
@@ -755,6 +763,7 @@ $cctvNavActive = 'camera-management';
                 status: document.getElementById('cameraStatus').value,
                 description: document.getElementById('cameraDescription').value.trim()
             };
+            if (id) payload.id = String(id);
             if (!payload.name || !payload.location || !payload.ipAddress || !payload.username) {
                 alert('Please fill in all required fields.');
                 return;
@@ -765,15 +774,15 @@ $cctvNavActive = 'camera-management';
             }
             try {
                 const res = await fetch('api/cameras.php', {
-                    method: id ? 'PUT' : 'POST',
+                    method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(id ? Object.assign({ id: id }, payload) : payload)
+                    body: JSON.stringify(payload)
                 });
                 const result = await res.json();
                 if (!result.success) throw new Error(result.error || 'Save failed');
                 closeCameraModal();
-                loadCameras();
-                alert('Camera saved. Detection will reconnect automatically within a few seconds (on-site PC). On Hostinger, update the on-site PC if the IP changed.');
+                await loadCameras();
+                alert(result.message || 'Camera saved to cameras.json. On-site detection will use the new IP within a few seconds.');
             } catch (e) {
                 alert(e.message || 'Failed to save camera.');
             }

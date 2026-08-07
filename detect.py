@@ -129,7 +129,7 @@ CCTV_UPLOAD_MAX_WIDTH = 1600     # Near-HD for Open Surveillance
 _last_cctv_upload_at = 0.0
 _last_cameras_sync_at = 0.0
 _last_detections_upload_at = 0.0
-CAMERAS_SYNC_INTERVAL = 15
+CAMERAS_SYNC_INTERVAL = 3  # Pull Camera Management edits from Hostinger quickly
 DETECTIONS_UPLOAD_INTERVAL = 1.5  # don't POST detections JSON on every frame
 DETECTIONS_FILE = "detections.json"
 FRAME_FILE = "current_frame.jpg"  # Frame saved for web display
@@ -469,12 +469,24 @@ def sync_cameras_json_from_server(force=False):
         cameras = payload.get("cameras") if isinstance(payload, dict) else None
         if not isinstance(cameras, list):
             return False
-        Path(CAMERAS_FILE).write_text(
-            json.dumps(cameras, indent=4, ensure_ascii=False) + "\n",
-            encoding="utf-8",
-        )
+
+        new_text = json.dumps(cameras, indent=4, ensure_ascii=False) + "\n"
+        old_text = ""
+        cameras_path = Path(CAMERAS_FILE)
+        if cameras_path.is_file():
+            try:
+                old_text = cameras_path.read_text(encoding="utf-8")
+            except OSError:
+                old_text = ""
+
+        if new_text == old_text:
+            return False
+
+        cameras_path.write_text(new_text, encoding="utf-8")
+        print("✓ cameras.json synced from Camera Management (website).")
         return True
-    except Exception:
+    except Exception as exc:
+        print(f"⚠ cameras.json sync failed: {exc}")
         return False
 
 
@@ -505,8 +517,16 @@ def reload_camera_source_if_changed():
         return False
     if fp == CAMERAS_CONFIG_FINGERPRINT:
         return False
+    old = CAMERAS_CONFIG_FINGERPRINT
     CAMERAS_CONFIG_FINGERPRINT = fp
     configure_camera_source()
+    try:
+        print(
+            f"↻ Camera settings updated via Camera Management: "
+            f"{old[1] if old else '?'}:{old[2] if old else '?'} → {fp[1]}:{fp[2]} ({fp[5]})"
+        )
+    except Exception:
+        pass
     return True
 
 
