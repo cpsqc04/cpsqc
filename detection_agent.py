@@ -733,6 +733,60 @@ def request_encoding_poll_async(encoding_url: str, api_key: str, min_interval: f
     threading.Thread(target=_worker, name="encoding-probe", daemon=True).start()
 
 
+_go2rtc_lock = threading.Lock()
+_last_go2rtc_ensure_at = 0.0
+
+
+def ensure_go2rtc_alive(force: bool = False) -> None:
+    """Keep go2rtc running for near-Reolink-app live latency."""
+    global _last_go2rtc_ensure_at
+    now = time.time()
+    if not force and now - _last_go2rtc_ensure_at < 15.0:
+        return
+    if not _go2rtc_lock.acquire(blocking=False):
+        return
+    try:
+        _last_go2rtc_ensure_at = now
+        from go2rtc_manager import ensure_go2rtc
+
+        status = ensure_go2rtc(force_config_refresh=force)
+        if status.get("running"):
+            log_rate_limited(
+                "go2rtc-ok",
+                f"go2rtc live view ready → {status.get('player_url')}",
+                120.0,
+            )
+        else:
+            log_rate_limited(
+                "go2rtc-fail",
+                f"go2rtc not ready: {status.get('error') or 'unknown'}",
+                60.0,
+            )
+    except Exception as exc:  # noqa: BLE001
+        log_rate_limited("go2rtc-exc", f"go2rtc ensure error: {exc}", 60.0)
+    finally:
+        _go2rtc_lock.release()
+
+
+def publish_webrtc_status(webrtc_status_url: str, api_key: str) -> None:
+    if not webrtc_status_url or not api_key:
+        return
+    try:
+        from go2rtc_manager import write_status, go2rtc_is_running
+
+        payload = write_status(running=go2rtc_is_running())
+        api_request(
+            webrtc_status_url + "?role=agent",
+            api_key,
+            method="POST",
+            payload=payload,
+            timeout=6.0,
+            quiet=True,
+        )
+    except Exception as exc:  # noqa: BLE001
+        log_rate_limited("webrtc-pub", f"WebRTC status publish failed: {exc}", 60.0)
+
+
 def main() -> int:
     file_env = load_env(ROOT / ".env")
     for key, value in file_env.items():
@@ -756,6 +810,11 @@ def main() -> int:
         or os.environ.get("CCTV_ENCODING_SYNC_URL", "")
         or derive_api_url(frame_url, "cctv_encoding_sync.php")
     ).strip()
+    webrtc_url = (
+        file_env.get("CCTV_WEBRTC_STATUS_URL", "")
+        or os.environ.get("CCTV_WEBRTC_STATUS_URL", "")
+        or derive_api_url(frame_url, "cctv_webrtc_status.php")
+    ).strip()
     poll_seconds = float(
         file_env.get("CCTV_AGENT_POLL_SECONDS")
         or os.environ.get("CCTV_AGENT_POLL_SECONDS")
@@ -770,17 +829,28 @@ def main() -> int:
     log("Detection agent started (always-on monitoring).")
     log(f"  scan:   {scan_url or '(none)'}")
     log(f"  encode: {encoding_url or '(none)'}")
+    log(f"  webrtc: {webrtc_url or '(local go2rtc only)'}")
     log(f"  poll:   every {poll_seconds:.0f}s")
     log("detect.py stays running continuously — Open Surveillance is view-only.")
+    log("go2rtc provides low-latency live view (near Reolink app delay).")
+
+    ensure_go2rtc_alive(force=True)
+    publish_webrtc_status(webrtc_url, api_key)
 
     if not detection_is_running():
         start_detect()
 
+    last_webrtc_publish = 0.0
     while True:
         if scan_url:
             request_scan_poll_async(scan_url, api_key, min_interval=15.0)
         if encoding_url:
             request_encoding_poll_async(encoding_url, api_key, min_interval=8.0)
+
+        ensure_go2rtc_alive(force=False)
+        if webrtc_url and (time.time() - last_webrtc_publish) >= 20.0:
+            publish_webrtc_status(webrtc_url, api_key)
+            last_webrtc_publish = time.time()
 
         if not detection_is_running():
             log("detect.py not running — restarting for continuous monitoring")

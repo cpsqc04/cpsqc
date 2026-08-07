@@ -46,6 +46,11 @@ camera_encoding_job.json
 camera_encoding.json
 camera_scan_result_tmp.json
 camera_config_revision.json
+webrtc_status.json
+go2rtc.yaml
+go2rtc.pid
+go2rtc.log
+tools/go2rtc/
 
 # ML model weights (large; download separately)
 *.pt

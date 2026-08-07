@@ -5,7 +5,8 @@ echo ========================================
 echo.
 echo Starting HIDDEN in the background (no Terminal window).
 echo Keeps detect.py running continuously for 24/7 monitoring.
-echo Logs: detection_agent.log
+echo Also starts go2rtc for low-latency WebRTC live view.
+echo Logs: detection_agent.log / go2rtc.log
 echo.
 cd /d "%~dp0"
 set "PATH=%~dp0;%PATH%"
