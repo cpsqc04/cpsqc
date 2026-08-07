@@ -258,7 +258,7 @@ def get_rtsp_bases(rtsp_url):
 def build_rtsp_url(ip, port, username, password, stream_type):
     """Build a valid RTSP URL with URL-encoded credentials."""
     port = str(port or "554").strip() or "554"
-    suffix = "Preview_01_main" if stream_type == "main" else "Preview_01_sub"
+    suffix = "h264Preview_01_main" if stream_type == "main" else "h264Preview_01_sub"
     if username:
         user = quote(str(username).strip(), safe="")
         pwd = quote(str(password).strip(), safe="") if password else ""

@@ -173,6 +173,27 @@ $cctvNavActive = 'camera-management';
         .scan-item strong { color: var(--text-color); font-size: 1rem; }
         .btn-use-ip { background: var(--primary-color); color: #fff; border: none; padding: 0.45rem 0.85rem; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 0.85rem; }
         .btn-use-ip:hover { background: #4ca8a6; }
+        .toast-popup {
+            position: fixed;
+            top: 1.25rem;
+            right: 1.25rem;
+            z-index: 4000;
+            background: #059669;
+            color: #fff;
+            padding: 0.85rem 1.15rem;
+            border-radius: 10px;
+            font-weight: 600;
+            font-size: 0.95rem;
+            box-shadow: 0 10px 30px rgba(5, 150, 105, 0.35);
+            opacity: 0;
+            transform: translateY(-8px);
+            pointer-events: none;
+            transition: opacity 0.2s ease, transform 0.2s ease;
+        }
+        .toast-popup.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
         .confidence-pill { display: inline-block; font-size: 0.75rem; font-weight: 600; padding: 0.15rem 0.5rem; border-radius: 999px; margin-left: 0.35rem; }
         .confidence-high { background: #d1fae5; color: #065f46; }
         .confidence-medium { background: #fef3c7; color: #92400e; }
@@ -490,6 +511,8 @@ $cctvNavActive = 'camera-management';
         </div>
     </div>
 
+    <div id="toastPopup" class="toast-popup" role="status" aria-live="polite">Camera updated</div>
+
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             const sidebar = document.getElementById('sidebar');
@@ -507,6 +530,18 @@ $cctvNavActive = 'camera-management';
         let deleteTargetId = null;
         let scanPollTimer = null;
         let lastScanCameras = [];
+        let toastTimer = null;
+
+        function showToast(message) {
+            const el = document.getElementById('toastPopup');
+            if (!el) return;
+            el.textContent = message || 'Camera updated';
+            el.classList.add('show');
+            if (toastTimer) clearTimeout(toastTimer);
+            toastTimer = setTimeout(function() {
+                el.classList.remove('show');
+            }, 2200);
+        }
 
         function statusClass(status) {
             return String(status || 'offline').toLowerCase();
@@ -782,7 +817,7 @@ $cctvNavActive = 'camera-management';
                 if (!result.success) throw new Error(result.error || 'Save failed');
                 closeCameraModal();
                 await loadCameras();
-                alert(result.message || 'Camera saved to cameras.json. On-site detection will use the new IP within a few seconds.');
+                showToast(id ? 'Camera updated' : 'Camera added');
             } catch (e) {
                 alert(e.message || 'Failed to save camera.');
             }

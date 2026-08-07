@@ -78,7 +78,8 @@ function camerasSave(string $camerasFile, array $cameras): bool
 
 function buildRtspUrl(string $ip, string $port, string $username, string $password, string $streamType): string
 {
-    $streamPath = $streamType === 'main' ? 'Preview_01_main' : 'Preview_01_sub';
+    // Reolink-compatible main/sub paths (detect.py also tries Preview_01_* fallbacks).
+    $streamPath = $streamType === 'main' ? 'h264Preview_01_main' : 'h264Preview_01_sub';
     return 'rtsp://' . rawurlencode($username) . ':' . rawurlencode($password) . '@' . $ip . ':' . $port . '/' . $streamPath;
 }
 

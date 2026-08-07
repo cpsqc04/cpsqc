@@ -8,7 +8,7 @@ header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 require_once __DIR__ . '/live_frame_helpers.php';
 require_once __DIR__ . '/../includes/detection_env.php';
 
-$maxAgeSeconds = 8;
+$maxAgeSeconds = 4;
 $frameFile = newestLiveFramePath();
 
 if ($frameFile === null) {

@@ -649,20 +649,31 @@ ensureLocalDetectionStarted();
             if (state === false) mode = 'offline';
 
             const isLive = mode === 'live';
-            const showingFeed = feed.classList.contains('active') || isLive;
+            const isConnecting = mode === 'connecting';
+            const showingFeed = feed.classList.contains('active');
 
             badge.classList.toggle('active', isLive);
-            badge.innerHTML = '<span class="dot"></span> ' + (isLive ? 'Live' : (mode === 'connecting' ? 'Connecting' : 'Offline'));
-            if (isLive) {
-                feed.classList.add('active');
+            badge.innerHTML = '<span class="dot"></span> ' + (isLive ? 'Live' : (isConnecting ? 'Connecting' : 'Offline'));
+
+            if (isLive || (isConnecting && showingFeed)) {
                 placeholder.classList.add('hidden');
-            } else if (showingFeed) {
-                placeholder.classList.add('hidden');
-            } else {
+            } else if (!showingFeed) {
                 placeholder.classList.remove('hidden');
             }
-            if (datetimeOverlay) datetimeOverlay.classList.toggle('visible', showingFeed || isLive);
-            if (cameraOverlay) cameraOverlay.classList.toggle('visible', showingFeed || isLive);
+
+            if (datetimeOverlay) datetimeOverlay.classList.toggle('visible', isLive || showingFeed);
+            if (cameraOverlay) cameraOverlay.classList.toggle('visible', isLive || showingFeed);
+        }
+
+        function formatFrameTimestamp(iso) {
+            if (!iso) return '—';
+            const dt = new Date(iso);
+            if (Number.isNaN(dt.getTime())) return '—';
+            const pad = (n) => String(n).padStart(2, '0');
+            const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+            return pad(dt.getMonth() + 1) + '/' + pad(dt.getDate()) + '/' + dt.getFullYear() +
+                '  ' + pad(dt.getHours()) + ':' + pad(dt.getMinutes()) + ':' + pad(dt.getSeconds()) +
+                '  ' + days[dt.getDay()];
         }
 
         async function loadFeedCameraName() {
@@ -685,6 +696,7 @@ ensureLocalDetectionStarted();
 
         function startCameraFeed() {
             const feed = document.getElementById('cameraFeed');
+            const feedDateTime = document.getElementById('feedDateTime');
             let hasShownFrame = false;
             let lastFrameUpdatedAt = '';
             let frameLoading = false;
@@ -696,7 +708,7 @@ ensureLocalDetectionStarted();
                 pollTimer = setTimeout(pollCameraFrame, delayMs);
             };
 
-            const showFrame = (updatedAt) => {
+            const showFrame = (updatedAt, isLive) => {
                 frameLoading = true;
                 feed.onload = function() {
                     frameLoading = false;
@@ -705,52 +717,70 @@ ensureLocalDetectionStarted();
                     hasShownFrame = true;
                     feed.classList.add('active');
                     document.getElementById('cameraPlaceholder').classList.add('hidden');
-                    setCameraUiState('live');
-                    schedulePoll(250);
+                    if (feedDateTime) feedDateTime.textContent = formatFrameTimestamp(updatedAt);
+                    setCameraUiState(isLive ? 'live' : 'connecting');
+                    schedulePoll(isLive ? 250 : 500);
                 };
                 feed.onerror = function() {
                     frameLoading = false;
                     feedErrors += 1;
                     schedulePoll(400);
                 };
-                feed.src = 'api/current_frame.php?t=' + Date.now();
+                // Cache-bust with frame mtime so the browser never reuses a stale image.
+                feed.src = 'api/current_frame.php?t=' + encodeURIComponent(updatedAt || Date.now()) + '&r=' + Date.now();
             };
 
             const pollCameraFrame = async () => {
                 try {
                     const res = await fetch('api/camera_status.php?t=' + Date.now(), { cache: 'no-store' });
                     const status = await res.json();
-                    const warmUp = (Date.now() - startedAt) < 45000;
+                    const warmUp = (Date.now() - startedAt) < 60000;
+                    const age = typeof status.age_seconds === 'number' ? status.age_seconds : null;
 
-                    // Fresh live frame
-                    if (status.available || status.has_frame) {
-                        if (frameLoading || status.updated_at === lastFrameUpdatedAt) {
-                            if (status.available && hasShownFrame) {
-                                setCameraUiState('live');
-                            }
-                            schedulePoll(status.available ? 250 : 400);
+                    // Only treat as Live when the frame is fresh from the on-site camera.
+                    if (status.available) {
+                        if (frameLoading) {
+                            schedulePoll(200);
                             return;
                         }
-                        showFrame(status.updated_at);
+                        if (status.updated_at === lastFrameUpdatedAt) {
+                            setCameraUiState('live');
+                            if (feedDateTime) feedDateTime.textContent = formatFrameTimestamp(status.updated_at);
+                            schedulePoll(250);
+                            return;
+                        }
+                        showFrame(status.updated_at, true);
                         return;
                     }
 
-                    if (!hasShownFrame) {
-                        setCameraUiState('connecting');
+                    // Brief warm-up: may show a recent frame as Connecting, never as Live.
+                    if (status.has_frame && age !== null && age < 20 && warmUp) {
+                        if (!frameLoading && status.updated_at !== lastFrameUpdatedAt) {
+                            showFrame(status.updated_at, false);
+                            return;
+                        }
+                        setCameraUiState(hasShownFrame ? 'connecting' : 'connecting');
+                        schedulePoll(400);
+                        return;
                     }
-                    schedulePoll(warmUp ? 500 : 1500);
-                } catch (e) {
+
+                    if (!status.has_frame || age === null || age > 20) {
+                        feed.classList.remove('active');
+                        hasShownFrame = false;
+                        lastFrameUpdatedAt = '';
+                        setCameraUiState(warmUp ? 'connecting' : 'offline');
+                        schedulePoll(warmUp ? 500 : 1200);
+                        return;
+                    }
+
+                    setCameraUiState('connecting');
                     schedulePoll(800);
+                } catch (e) {
+                    schedulePoll(1000);
                 }
             };
 
-            // Try to show any existing frame immediately
-            feed.src = 'api/current_frame.php?t=' + Date.now();
-            feed.onload = function() {
-                hasShownFrame = true;
-                feed.classList.add('active');
-                setCameraUiState('connecting');
-            };
+            setCameraUiState('connecting');
             schedulePoll(0);
         }
 
@@ -966,16 +996,7 @@ ensureLocalDetectionStarted();
             const timeEl = document.getElementById('currentTime');
             if (dateEl) dateEl.textContent = dateStr;
             if (timeEl) timeEl.textContent = timeStr;
-
-            const feedDateTime = document.getElementById('feedDateTime');
-            if (feedDateTime) {
-                const pad = (n) => String(n).padStart(2, '0');
-                const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-                feedDateTime.textContent =
-                    pad(now.getMonth() + 1) + '/' + pad(now.getDate()) + '/' + now.getFullYear() +
-                    '  ' + pad(now.getHours()) + ':' + pad(now.getMinutes()) + ':' + pad(now.getSeconds()) +
-                    '  ' + days[now.getDay()];
-            }
+            // Feed overlay timestamp is driven by the actual frame updated_at (see startCameraFeed).
         }
     </script>
     <?php require __DIR__ . '/includes/admin_notifications_script.php'; ?>
