@@ -178,6 +178,14 @@ ensureLocalDetectionStarted();
         .feed-overlay { position: absolute; z-index: 3; pointer-events: none; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.9), 0 0 8px rgba(0,0,0,0.7); font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; opacity: 0; transition: opacity 0.2s ease; }
         .feed-overlay.visible { opacity: 1; }
         .feed-overlay-camera { bottom: 0.85rem; right: 0.85rem; font-size: clamp(0.95rem, 1.8vw, 1.25rem); font-weight: 700; background: rgba(0,0,0,0.5); padding: 0.4rem 0.85rem; border-radius: 8px; max-width: min(70%, 420px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .detection-overlay {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 4;
+        }
         .video-placeholder { display: flex; flex-direction: column; align-items: center; justify-content: center; color: rgba(255,255,255,0.75); text-align: center; padding: 2rem; position: absolute; inset: 0; z-index: 2; }
         .video-placeholder.hidden { display: none; }
         .video-placeholder i { font-size: 3rem; margin-bottom: 0.75rem; opacity: 0.8; }
@@ -540,6 +548,7 @@ ensureLocalDetectionStarted();
                                 <iframe id="webrtcFeed" class="webrtc-frame" title="Low-latency live camera" allow="autoplay; fullscreen" referrerpolicy="no-referrer"></iframe>
                                 <img id="cameraFeed" class="camera-feed" alt="Live surveillance feed with YOLO detection">
                                 <div class="feed-overlay feed-overlay-camera" id="feedCameraName">Location</div>
+                                <canvas id="detectionOverlay" class="detection-overlay" aria-hidden="true"></canvas>
                                 <div class="video-placeholder" id="cameraPlaceholder">
                                     <i class="fas fa-camera"></i>
                                     <p id="cameraPlaceholderText">Connecting to camera…</p>
@@ -575,7 +584,7 @@ ensureLocalDetectionStarted();
             setInterval(updateDateTime, 1000);
             loadFeedCameraName();
             setCameraUiState('connecting');
-            // Prefer low-latency WebRTC (go2rtc); never use JPEG relay for live view.
+            // Prefer low-latency WebRTC (go2rtc); JPEG relay is fallback only.
             startLiveView();
             ensureDetectionRunning();
             setInterval(pollDetections, 1000);
@@ -1182,6 +1191,103 @@ ensureLocalDetectionStarted();
             `;
         }
 
+        let lastOverlayDetections = [];
+        let lastOverlayFrameSize = { w: 0, h: 0 };
+
+        function clearDetectionOverlay() {
+            const canvas = document.getElementById('detectionOverlay');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) return;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            lastOverlayDetections = [];
+        }
+
+        function detectionOverlayColor(category) {
+            // User-facing boxes: green for phones/persons; keep accents for other classes.
+            const colors = {
+                person: '#22c55e',
+                phone: '#22c55e',
+                backpack: '#a855f7',
+                suitcase: '#f59e0b',
+                group: '#a855f7',
+                crowd: '#ec4899',
+                vehicle: '#f97316',
+                animal: '#eab308',
+                plant: '#10b981',
+                weapon: '#ef4444'
+            };
+            return colors[category] || '#22c55e';
+        }
+
+        function drawDetectionOverlay(detections, frameWidth, frameHeight) {
+            const canvas = document.getElementById('detectionOverlay');
+            const shell = document.getElementById('videoShell');
+            if (!canvas || !shell) return;
+
+            const cssW = shell.clientWidth || 0;
+            const cssH = shell.clientHeight || 0;
+            if (cssW < 2 || cssH < 2) return;
+
+            const dpr = window.devicePixelRatio || 1;
+            canvas.width = Math.round(cssW * dpr);
+            canvas.height = Math.round(cssH * dpr);
+            canvas.style.width = cssW + 'px';
+            canvas.style.height = cssH + 'px';
+
+            const ctx = canvas.getContext('2d');
+            if (!ctx) return;
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+            ctx.clearRect(0, 0, cssW, cssH);
+
+            const fw = Number(frameWidth) || 0;
+            const fh = Number(frameHeight) || 0;
+            lastOverlayDetections = Array.isArray(detections) ? detections : [];
+            lastOverlayFrameSize = { w: fw, h: fh };
+            if (!lastOverlayDetections.length || fw < 1 || fh < 1) {
+                return;
+            }
+
+            // object-fit: contain letterboxing inside the video shell
+            const scale = Math.min(cssW / fw, cssH / fh);
+            const drawW = fw * scale;
+            const drawH = fh * scale;
+            const offsetX = (cssW - drawW) / 2;
+            const offsetY = (cssH - drawH) / 2;
+
+            lastOverlayDetections.forEach(function(item) {
+                const bbox = item && item.bbox;
+                if (!bbox) return;
+                const x1 = offsetX + (Number(bbox.x1) || 0) * scale;
+                const y1 = offsetY + (Number(bbox.y1) || 0) * scale;
+                const x2 = offsetX + (Number(bbox.x2) || 0) * scale;
+                const y2 = offsetY + (Number(bbox.y2) || 0) * scale;
+                const w = Math.max(2, x2 - x1);
+                const h = Math.max(2, y2 - y1);
+                const color = detectionOverlayColor(item.category || item.class || 'object');
+                const label = categoryLabel(item.category || item.class || 'object');
+
+                ctx.strokeStyle = color;
+                ctx.lineWidth = 3;
+                ctx.strokeRect(x1, y1, w, h);
+
+                ctx.font = '600 13px Segoe UI, Tahoma, sans-serif';
+                const text = label + (item.confidence ? (' ' + Math.round((item.confidence || 0) * 100) + '%') : '');
+                const tw = ctx.measureText(text).width;
+                const ty = Math.max(16, y1 - 6);
+                ctx.fillStyle = color;
+                ctx.fillRect(x1, ty - 14, tw + 10, 18);
+                ctx.fillStyle = '#052e16';
+                ctx.fillText(text, x1 + 5, ty);
+            });
+        }
+
+        window.addEventListener('resize', function() {
+            if (lastOverlayDetections.length) {
+                drawDetectionOverlay(lastOverlayDetections, lastOverlayFrameSize.w, lastOverlayFrameSize.h);
+            }
+        });
+
         async function pollDetections() {
             try {
                 if (!activeCamera || liveTransport === 'none') {
@@ -1192,6 +1298,7 @@ ensureLocalDetectionStarted();
                         banner.textContent = '';
                         banner.classList.remove('show');
                     }
+                    clearDetectionOverlay();
                     return;
                 }
                 const res = await fetch('api/get_detections.php?t=' + Date.now());
@@ -1206,8 +1313,11 @@ ensureLocalDetectionStarted();
                         banner.textContent = '';
                         banner.classList.remove('show');
                     }
+                    clearDetectionOverlay();
                     return;
                 }
+
+                drawDetectionOverlay(detections, data.frame_width, data.frame_height);
 
                 const suspicious = detections.filter(function(item) { return item.suspicious; });
                 if (banner) {

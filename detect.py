@@ -193,9 +193,10 @@ IDLE_AUTO_STOP_ENABLED = (
 )
 CONFIDENCE_THRESHOLD = 0.35
 PLANT_CONFIDENCE_THRESHOLD = 0.20  # Potted plants are often lower-confidence in YOLO
-PHONE_CONFIDENCE_THRESHOLD = 0.25  # Phones are small / often partially occluded
+PHONE_CONFIDENCE_THRESHOLD = 0.18  # Phones are small / often partially occluded / held close-up
 PHONE_YOLO_SCAN_CONF = 0.05  # Low conf for dedicated phone scan passes
 PHONE_CONTOUR_CONFIDENCE = 0.42  # Estimated confidence for shape-based phone hits
+PHONE_CLOSEUP_CONFIDENCE = 0.55  # Phone held very close to the lens (fills most of the frame)
 PHONE_SCAN_IMGSZ = 1280
 ENABLE_PHONE_SECONDARY_SCAN = True
 PHONE_MODEL_CANDIDATES = ('phone_yolov8.pt', 'yolov8s.pt', 'yolov8m.pt', 'yolov8n.pt')
@@ -1236,7 +1237,8 @@ def scan_contour_phones_in_crop(frame, offset_x, offset_y, crop):
     best = None
     best_score = 0.0
     min_area = max(250, int(ch * cw * 0.004))
-    max_area = int(ch * cw * 0.35)
+    # Allow large phone bodies / close-ups (previously capped at 35% and missed lens-filling phones).
+    max_area = int(ch * cw * 0.92)
 
     for contour in contours:
         area = cv2.contourArea(contour)
@@ -1325,6 +1327,78 @@ def dedupe_phone_hits(phone_hits, min_iou=0.25):
         kept_boxes.append(bbox)
     return kept
 
+def scan_closeup_phone_frame(frame):
+    """
+    Detect a cellphone held close to the camera (often fills most of the view).
+    COCO 'cell phone' usually fails on extreme close-ups / screen-facing shots.
+    """
+    hits = []
+    if frame is None or getattr(frame, 'size', 0) == 0:
+        return hits
+
+    h, w = frame.shape[:2]
+    if h < 80 or w < 80:
+        return hits
+
+    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    blur = cv2.GaussianBlur(gray, (5, 5), 0)
+    edges = cv2.Canny(blur, 35, 120)
+    edge_density = float(np.count_nonzero(edges)) / float(max(1, h * w))
+    std_dev = float(np.std(gray))
+
+    # Digital screens / phone UI have visible structure; reject near-blank frames.
+    if edge_density < 0.012 or std_dev < 10:
+        return hits
+
+    # Prefer a centered large rectangle (phone body / screen).
+    margin_x = int(w * 0.04)
+    margin_y = int(h * 0.04)
+    x1, y1 = margin_x, margin_y
+    x2, y2 = w - margin_x, h - margin_y
+
+    # Refine with largest rectangular contour if available.
+    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (5, 5))
+    closed = cv2.morphologyEx(edges, cv2.MORPH_CLOSE, kernel, iterations=2)
+    contours, _ = cv2.findContours(closed, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    frame_area = float(h * w)
+    best = None
+    best_area = 0.0
+    for contour in contours:
+        area = float(cv2.contourArea(contour))
+        if area < frame_area * 0.12 or area > frame_area * 0.98:
+            continue
+        rx, ry, rw, rh = cv2.boundingRect(contour)
+        if rw < w * 0.25 or rh < h * 0.25:
+            continue
+        aspect = max(rw, rh) / float(max(1, min(rw, rh)))
+        if aspect > 3.2:
+            continue
+        if area > best_area:
+            best_area = area
+            best = (rx, ry, rx + rw, ry + rh)
+
+    if best is not None:
+        x1, y1, x2, y2 = best
+
+    # Require the candidate to occupy a meaningful share of the frame (close-up).
+    box_area = float(max(1, (x2 - x1) * (y2 - y1)))
+    if box_area / frame_area < 0.18:
+        return hits
+
+    hits.append({
+        'bbox': {
+            'x1': int(x1),
+            'y1': int(y1),
+            'x2': int(x2),
+            'y2': int(y2),
+        },
+        'confidence': PHONE_CLOSEUP_CONFIDENCE,
+        'class_name': 'cell phone',
+        'source': 'closeup_phone_scan',
+    })
+    return hits
+
+
 def enhance_phone_detections(frame, model, detections):
     """Run extra phone passes because COCO phone class is often missed on CCTV footage."""
     if not ENABLE_PHONE_SECONDARY_SCAN or not USE_ULTRALYTICS:
@@ -1362,10 +1436,11 @@ def enhance_phone_detections(frame, model, detections):
             )
             if contour_hits:
                 phone_hits.append(contour_hits[0])
-    else:
-        phone_hits.extend(
-            scan_yolo_phones_in_crop(frame, scan_model, 0, 0, frame)
-        )
+
+    # Always also scan the full frame (hand-held / close-to-lens phones are often missed
+    # when we only search around person boxes).
+    phone_hits.extend(scan_yolo_phones_in_crop(frame, scan_model, 0, 0, frame))
+    phone_hits.extend(scan_contour_phones_in_crop(frame, 0, 0, frame))
 
     for hit in dedupe_phone_hits(phone_hits):
         if hit['confidence'] < PHONE_CONFIDENCE_THRESHOLD:
@@ -1378,6 +1453,18 @@ def enhance_phone_detections(frame, model, detections):
             hit.get('class_name', 'cell phone'),
             hit.get('source', 'scan'),
         )
+
+    # Extreme close-ups (phone filling the lens) are frequently missed by COCO/YOLO.
+    if not any(d.get('category') == 'phone' for d in detections):
+        for hit in scan_closeup_phone_frame(frame):
+            append_phone_detection(
+                detections,
+                frame,
+                hit['bbox'],
+                hit['confidence'],
+                hit.get('class_name', 'cell phone'),
+                hit.get('source', 'closeup_phone_scan'),
+            )
 
     return detections
 
@@ -2804,7 +2891,7 @@ def get_color_for_category(category):
         "vehicle": (255, 165, 0),   # Orange
         "animal": (0, 255, 255),    # Yellow
         "plant": (72, 187, 120),    # Light green
-        "phone": (59, 130, 246),    # Blue
+        "phone": (0, 255, 0),       # Green (same as classic detection boxes)
         "backpack": (168, 85, 247), # Purple
         "suitcase": (245, 158, 11), # Amber
         "group": (168, 85, 247),    # Purple
@@ -2861,12 +2948,20 @@ def attach_detection_thumbnails(detections):
     return detections
 
 
-def save_detections(detections):
+def save_detections(detections, frame_size=None):
     """Save detections to JSON file atomically with better Windows file lock handling"""
     temp_file = DETECTIONS_FILE + ".tmp"
     
     try:
         attach_detection_thumbnails(detections)
+        frame_width = None
+        frame_height = None
+        if frame_size and len(frame_size) >= 2:
+            frame_width = int(frame_size[0])
+            frame_height = int(frame_size[1])
+        elif FRAME_WIDTH and FRAME_HEIGHT:
+            frame_width = int(FRAME_WIDTH)
+            frame_height = int(FRAME_HEIGHT)
         detection_data = {
             "timestamp": datetime.now().isoformat(),
             "detections": detections,
@@ -2876,7 +2971,10 @@ def save_detections(detections):
             "crowd_count": sum(1 for d in detections if d.get('category') == 'crowd'),
             "backpack_count": sum(1 for d in detections if d.get('category') == 'backpack'),
             "suitcase_count": sum(1 for d in detections if d.get('category') == 'suitcase'),
+            "phone_count": sum(1 for d in detections if d.get('category') == 'phone'),
             "suspicious_count": sum(1 for d in detections if d.get('suspicious')),
+            "frame_width": frame_width,
+            "frame_height": frame_height,
             "status": "active"
         }
         
@@ -4378,7 +4476,7 @@ def main():
                         # Always refresh detections.json so the UI stays in sync
                         if current_time - last_detection_save >= 0.5:
                             try:
-                                save_detections(detections)
+                                save_detections(detections, frame_size=(frame.shape[1], frame.shape[0]))
                                 if detections:
                                     cleanup_old_object_images()
                                     print(f"[{datetime.now().strftime('%H:%M:%S')}] ✓ Detected {len(detections)} object(s)")
