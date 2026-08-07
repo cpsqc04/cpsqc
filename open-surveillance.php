@@ -160,22 +160,6 @@ ensureLocalDetectionStarted();
         .live-mode-chip { display: inline-flex; align-items: center; gap: 0.35rem; margin-left: 0.5rem; padding: 0.2rem 0.55rem; border-radius: 999px; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.02em; background: rgba(15, 23, 42, 0.08); color: var(--text-secondary); }
         .live-mode-chip.webrtc { background: rgba(76, 138, 137, 0.15); color: #0f766e; }
         .live-mode-chip.jpeg { background: rgba(245, 158, 11, 0.15); color: #b45309; }
-        .realtime-gate {
-            display: none; position: absolute; inset: 0; z-index: 4;
-            background: rgba(15, 23, 42, 0.88); color: #fff;
-            flex-direction: column; align-items: center; justify-content: center;
-            text-align: center; padding: 1.5rem; gap: 0.85rem;
-        }
-        .realtime-gate.show { display: flex; }
-        .realtime-gate h3 { margin: 0; font-size: 1.15rem; }
-        .realtime-gate p { margin: 0; max-width: 28rem; color: rgba(255,255,255,0.82); line-height: 1.45; font-size: 0.92rem; }
-        .realtime-gate .btn-realtime {
-            display: inline-flex; align-items: center; gap: 0.5rem;
-            background: #0f766e; color: #fff; border: none; border-radius: 8px;
-            padding: 0.7rem 1.1rem; font-weight: 700; cursor: pointer; font-size: 0.95rem;
-            text-decoration: none;
-        }
-        .realtime-gate .btn-realtime:hover { background: #0d9488; }
         .video-shell:fullscreen,
         .video-shell:-webkit-full-screen { border-radius: 0; border: none; aspect-ratio: auto; max-height: none; min-height: 100vh; width: 100vw; height: 100vh; background: #000; }
         .video-shell:fullscreen .camera-feed,
@@ -534,13 +518,6 @@ ensureLocalDetectionStarted();
                                 </button>
                                 <iframe id="webrtcFeed" class="webrtc-frame" title="Low-latency live camera" allow="autoplay; fullscreen" referrerpolicy="no-referrer"></iframe>
                                 <img id="cameraFeed" class="camera-feed" alt="Live surveillance feed with YOLO detection">
-                                <div class="realtime-gate" id="realtimeGate">
-                                    <h3><i class="fas fa-bolt"></i> Real-time camera view</h3>
-                                    <p>To match the Reolink app delay, open the direct live player (same LAN as the camera). The JPEG preview below has higher delay.</p>
-                                    <a class="btn-realtime" id="realtimeOpenBtn" href="#" target="_blank" rel="noopener">
-                                        <i class="fas fa-external-link-alt"></i> Open real-time live view
-                                    </a>
-                                </div>
                                 <div class="feed-overlay feed-overlay-camera" id="feedCameraName">Surveillance</div>
                                 <div class="video-placeholder" id="cameraPlaceholder">
                                     <i class="fas fa-camera"></i>
@@ -737,8 +714,6 @@ ensureLocalDetectionStarted();
         async function tryStartWebRtcFeed() {
             const webrtc = document.getElementById('webrtcFeed');
             const jpeg = document.getElementById('cameraFeed');
-            const gate = document.getElementById('realtimeGate');
-            const openBtn = document.getElementById('realtimeOpenBtn');
             if (!webrtc) return false;
             try {
                 const res = await fetch('api/cctv_webrtc_status.php?t=' + Date.now(), {
@@ -747,48 +722,36 @@ ensureLocalDetectionStarted();
                 });
                 const data = await res.json();
                 if (!data || !data.success || !data.running) {
-                    if (gate) gate.classList.remove('show');
                     return false;
                 }
 
                 const pageHttps = window.location.protocol === 'https:';
                 const hostLocal = /^(localhost|127\.0\.0\.1)$/i.test(window.location.hostname);
                 let candidates = [];
+                if (data.tunnel_url) {
+                    candidates.push(String(data.tunnel_url).replace(/\/$/, '') + '/stream.html?src=' + encodeURIComponent(data.stream || 'alertara_live') + '&mode=mse,webrtc');
+                }
                 if (Array.isArray(data.player_urls)) candidates = candidates.concat(data.player_urls);
-                if (data.localhost_player_url) candidates.unshift(data.localhost_player_url);
-                if (data.lan_player_url) candidates.push(data.lan_player_url);
                 if (data.player_url) candidates.push(data.player_url);
-                // Prefer localhost when browsing XAMPP on this PC.
                 if (hostLocal && data.localhost_player_url) {
-                    candidates = [data.localhost_player_url].concat(candidates);
+                    candidates.unshift(data.localhost_player_url);
                 }
                 candidates = candidates.filter(Boolean).filter(function(url, idx, arr) {
                     return arr.indexOf(url) === idx;
                 });
 
-                const embeddable = candidates.filter(function(url) {
+                // Prefer HTTPS embeds on HTTPS pages (Cloudflare tunnel); localhost on local XAMPP.
+                let embeddable = candidates.filter(function(url) {
                     if (pageHttps && String(url).indexOf('http://') === 0) return false;
                     return true;
                 });
-
-                const bestExternal = candidates.find(function(url) {
-                    return String(url).indexOf('http://') === 0 || String(url).indexOf('https://') === 0;
-                }) || data.lan_player_url || data.player_url || '';
-
-                if (openBtn && bestExternal) {
-                    openBtn.href = bestExternal;
+                if (!embeddable.length && !pageHttps) {
+                    embeddable = candidates;
                 }
-
                 if (!embeddable.length) {
-                    // HTTPS Hostinger cannot embed HTTP go2rtc — offer one-click real-time window.
-                    if (gate && bestExternal) {
-                        gate.classList.add('show');
-                        setLiveModeChip('jpeg');
-                    }
                     return false;
                 }
 
-                if (gate) gate.classList.remove('show');
                 liveTransport = 'webrtc';
                 setLiveModeChip('webrtc');
                 if (jpeg) {
@@ -818,9 +781,17 @@ ensureLocalDetectionStarted();
                             setLiveModeChip('connecting');
                             setCameraUiState('connecting');
                             startCameraFeed();
+                            return;
+                        }
+                        // Hot-swap to HTTPS tunnel URL when agent publishes it.
+                        if (pageHttps && st.tunnel_url) {
+                            const next = String(st.tunnel_url).replace(/\/$/, '') + '/stream.html?src=' + encodeURIComponent(st.stream || 'alertara_live') + '&mode=mse,webrtc';
+                            if (webrtc.src.indexOf(st.tunnel_url) === -1) {
+                                webrtc.src = next;
+                            }
                         }
                     } catch (e) { /* keep current */ }
-                }, 20000);
+                }, 12000);
                 return true;
             } catch (e) {
                 console.warn('WebRTC status check failed', e);

@@ -50,7 +50,10 @@ webrtc_status.json
 go2rtc.yaml
 go2rtc.pid
 go2rtc.log
+webrtc_tunnel_url.txt
+cloudflared.pid
 tools/go2rtc/
+tools/cloudflared/
 
 # ML model weights (large; download separately)
 *.pt

@@ -21,12 +21,19 @@ from urllib.request import urlretrieve
 
 ROOT = Path(__file__).resolve().parent
 TOOLS_DIR = ROOT / "tools" / "go2rtc"
+CLOUDFLARED_DIR = ROOT / "tools" / "cloudflared"
 CONFIG_PATH = ROOT / "go2rtc.yaml"
 STATUS_PATH = ROOT / "webrtc_status.json"
+TUNNEL_URL_PATH = ROOT / "webrtc_tunnel_url.txt"
 PID_PATH = ROOT / "go2rtc.pid"
+TUNNEL_PID_PATH = ROOT / "cloudflared.pid"
 LOG_PATH = ROOT / "go2rtc.log"
 STREAM_NAME = "alertara_live"
 GO2RTC_WIN64_URL = "https://github.com/AlexxIT/go2rtc/releases/latest/download/go2rtc_win64.zip"
+CLOUDFLARED_WIN64_URL = (
+    "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-amd64.exe"
+)
+TUNNEL_URL_RE = __import__("re").compile(r"https://[a-z0-9-]+\.trycloudflare\.com", __import__("re").I)
 
 
 def log(msg: str) -> None:
@@ -399,26 +406,223 @@ def public_base_url() -> str:
     ).strip().rstrip("/")
     if configured:
         return configured
+    tunnel = read_tunnel_url()
+    if tunnel:
+        return tunnel
     return f"http://{local_lan_ip()}:1984"
 
 
+def cloudflared_binary() -> Path:
+    if os.name == "nt":
+        return CLOUDFLARED_DIR / "cloudflared.exe"
+    return CLOUDFLARED_DIR / "cloudflared"
+
+
+def ensure_cloudflared_binary() -> Optional[Path]:
+    binary = cloudflared_binary()
+    if binary.is_file():
+        return binary
+    CLOUDFLARED_DIR.mkdir(parents=True, exist_ok=True)
+    try:
+        log("Downloading cloudflared (HTTPS tunnel for in-page live view)…")
+        urlretrieve(CLOUDFLARED_WIN64_URL if os.name == "nt" else CLOUDFLARED_WIN64_URL, binary)
+        if os.name != "nt":
+            try:
+                os.chmod(binary, 0o755)
+            except OSError:
+                pass
+        if binary.is_file():
+            log(f"cloudflared ready: {binary}")
+            return binary
+    except Exception as exc:  # noqa: BLE001
+        log(f"Failed to download cloudflared: {exc}")
+    return None if not binary.is_file() else binary
+
+
+def read_tunnel_url() -> str:
+    try:
+        url = TUNNEL_URL_PATH.read_text(encoding="utf-8").strip()
+        if url.startswith("https://"):
+            return url.rstrip("/")
+    except OSError:
+        pass
+    return ""
+
+
+def write_tunnel_url(url: str) -> None:
+    try:
+        TUNNEL_URL_PATH.write_text((url or "").strip() + "\n", encoding="utf-8")
+    except OSError:
+        pass
+
+
+def tunnel_enabled() -> bool:
+    file_env = load_env(ROOT / ".env")
+    # Default ON so Hostinger HTTPS can embed the live stream in-page.
+    flag = str(
+        file_env.get("CCTV_WEBRTC_TUNNEL", "")
+        or os.environ.get("CCTV_WEBRTC_TUNNEL", "")
+        or "true"
+    ).strip().lower()
+    return flag not in {"0", "false", "no", "off"}
+
+
+def stop_cloudflared(reason: str = "stop") -> None:
+    pid = None
+    try:
+        pid = int(TUNNEL_PID_PATH.read_text(encoding="utf-8").strip() or "0")
+    except (OSError, ValueError):
+        pid = None
+    log(f"Stopping cloudflared ({reason})…")
+    hide = windows_hide_kwargs()
+    try:
+        if os.name == "nt":
+            if pid:
+                subprocess.run(
+                    ["taskkill", "/F", "/PID", str(pid), "/T"],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    check=False,
+                    **hide,
+                )
+            subprocess.run(
+                [
+                    "powershell",
+                    "-NoProfile",
+                    "-WindowStyle",
+                    "Hidden",
+                    "-Command",
+                    "Get-CimInstance Win32_Process | "
+                    "Where-Object { $_.Name -match 'cloudflared' } | "
+                    "ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }",
+                ],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                check=False,
+                **hide,
+            )
+        elif pid:
+            try:
+                os.kill(pid, 15)
+            except OSError:
+                pass
+    except OSError:
+        pass
+    try:
+        if TUNNEL_PID_PATH.exists():
+            TUNNEL_PID_PATH.unlink()
+    except OSError:
+        pass
+
+
+def ensure_https_tunnel() -> str:
+    """
+    Start Cloudflare quick tunnel → https://*.trycloudflare.com → local go2rtc :1984
+    so Hostinger HTTPS pages can iframe the live stream (no mixed-content block).
+    """
+    file_env = load_env(ROOT / ".env")
+    configured = (
+        file_env.get("CCTV_WEBRTC_PUBLIC_URL", "")
+        or os.environ.get("CCTV_WEBRTC_PUBLIC_URL", "")
+        or ""
+    ).strip().rstrip("/")
+    if configured.startswith("https://"):
+        write_tunnel_url(configured)
+        return configured
+    if not tunnel_enabled():
+        return read_tunnel_url()
+
+    existing = read_tunnel_url()
+    tunnel_pid = None
+    if TUNNEL_PID_PATH.is_file():
+        try:
+            tunnel_pid = int(TUNNEL_PID_PATH.read_text(encoding="utf-8").strip() or "0")
+        except ValueError:
+            tunnel_pid = None
+    if existing and pid_alive(tunnel_pid):
+        return existing
+
+    binary = ensure_cloudflared_binary()
+    if not binary:
+        return existing
+
+    stop_cloudflared("refresh")
+    time.sleep(0.4)
+    log("Starting Cloudflare HTTPS tunnel for in-page live embed…")
+    try:
+        with LOG_PATH.open("a", encoding="utf-8") as log_fh:
+            proc = subprocess.Popen(
+                [
+                    str(binary),
+                    "tunnel",
+                    "--no-autoupdate",
+                    "--url",
+                    "http://127.0.0.1:1984",
+                ],
+                cwd=str(ROOT),
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                stdin=subprocess.DEVNULL,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                **windows_hide_kwargs(),
+            )
+        TUNNEL_PID_PATH.write_text(str(proc.pid), encoding="utf-8")
+    except OSError as exc:
+        log(f"Failed to start cloudflared: {exc}")
+        return existing
+
+    url = ""
+    deadline = time.time() + 45.0
+    buf = ""
+    while time.time() < deadline and proc.poll() is None:
+        try:
+            line = proc.stdout.readline() if proc.stdout else ""
+        except Exception:
+            line = ""
+        if line:
+            buf += line
+            try:
+                with LOG_PATH.open("a", encoding="utf-8") as log_fh:
+                    log_fh.write(line)
+            except OSError:
+                pass
+            match = TUNNEL_URL_RE.search(buf)
+            if match:
+                url = match.group(0).rstrip("/")
+                break
+        else:
+            time.sleep(0.2)
+
+    if url:
+        write_tunnel_url(url)
+        log(f"HTTPS tunnel ready -> {url}")
+        return url
+
+    log("cloudflared started but tunnel URL not detected yet")
+    return existing
+
+
 def player_url_for(base: str, stream: str = STREAM_NAME) -> str:
-    # MSE first: plays H.265 main with copy (WebRTC often cannot). No HLS (adds delay).
+    # MSE over HTTPS tunnel embeds cleanly in Hostinger; WebRTC as secondary.
     return f"{base.rstrip('/')}/stream.html?src={stream}&mode=mse,webrtc"
 
 
 def write_status(running: bool, error: str = "", meta: Optional[dict] = None) -> dict:
     meta = meta or {}
     lan_ip = str(meta.get("lan_ip") or local_lan_ip())
+    tunnel = read_tunnel_url()
     public = public_base_url()
     local_base = "http://127.0.0.1:1984"
     lan_base = f"http://{lan_ip}:1984"
     bases = []
-    for candidate in (public, local_base, lan_base):
+    # Prefer HTTPS first so Open Surveillance (Hostinger) can embed in-page.
+    for candidate in (tunnel, public, local_base, lan_base):
         if candidate and candidate not in bases:
             bases.append(candidate)
 
-    primary = public if public else lan_base
+    primary = bases[0] if bases else lan_base
     payload = {
         "success": True,
         "enabled": True,
@@ -430,6 +634,7 @@ def write_status(running: bool, error: str = "", meta: Optional[dict] = None) ->
         "player_urls": [player_url_for(b) for b in bases],
         "localhost_player_url": player_url_for(local_base),
         "lan_player_url": player_url_for(lan_base),
+        "tunnel_url": tunnel,
         "webrtc_url": f"{primary}/api/webrtc?src={STREAM_NAME}",
         "ws_url": f"{primary.replace('https://', 'wss://').replace('http://', 'ws://')}/api/ws?src={STREAM_NAME}",
         "listen": meta.get("listen") or ":1984",
@@ -454,6 +659,9 @@ def ensure_go2rtc(force_config_refresh: bool = False) -> dict:
     new_cfg = CONFIG_PATH.read_text(encoding="utf-8") if CONFIG_PATH.is_file() else ""
     changed = prev_cfg != new_cfg
     ok = start_go2rtc(force_restart=force_config_refresh or changed)
+    if ok:
+        ensure_https_tunnel()
+        meta["lan_ip"] = meta.get("lan_ip") or local_lan_ip()
     return write_status(running=ok and go2rtc_is_running(), error="" if ok else "not running", meta=meta)
 
 
@@ -464,11 +672,13 @@ if __name__ == "__main__":
     parser.add_argument("action", choices=["start", "stop", "restart", "status", "ensure"])
     args = parser.parse_args()
     if args.action == "stop":
+        stop_cloudflared("cli")
         stop_go2rtc("cli")
         print(json.dumps(write_status(running=False, error="stopped"), indent=2))
     elif args.action == "status":
         print(json.dumps(write_status(running=go2rtc_is_running()), indent=2))
     elif args.action == "restart":
+        stop_cloudflared("restart")
         stop_go2rtc("restart")
         time.sleep(0.5)
         print(json.dumps(ensure_go2rtc(force_config_refresh=True), indent=2))

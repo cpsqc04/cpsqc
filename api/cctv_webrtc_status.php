@@ -82,6 +82,12 @@ function webrtcBuildResponse(array $stored): array
             }
         }
     }
+    if (!empty($stored['tunnel_url'])) {
+        $tunnel = rtrim((string) $stored['tunnel_url'], '/');
+        if ($tunnel !== '' && !in_array($tunnel, $bases, true)) {
+            array_unshift($bases, $tunnel);
+        }
+    }
     if (isLocalDetectionEnabled()) {
         foreach (['http://127.0.0.1:1984'] as $local) {
             if (!in_array($local, $bases, true)) {
@@ -89,6 +95,13 @@ function webrtcBuildResponse(array $stored): array
             }
         }
     }
+
+    // Prefer HTTPS (tunnel) first for Hostinger in-page embed.
+    usort($bases, static function ($a, $b) {
+        $ah = (strpos($a, 'https://') === 0) ? 0 : 1;
+        $bh = (strpos($b, 'https://') === 0) ? 0 : 1;
+        return $ah <=> $bh;
+    });
 
     $primary = $bases[0] ?? '';
     $enabled = $primary !== '';
@@ -108,6 +121,7 @@ function webrtcBuildResponse(array $stored): array
         'player_urls' => $playerUrls,
         'localhost_player_url' => $mkPlayer('http://127.0.0.1:1984'),
         'lan_player_url' => (string) ($stored['lan_player_url'] ?? ''),
+        'tunnel_url' => (string) ($stored['tunnel_url'] ?? ''),
         'webrtc_url' => $primary !== '' ? ($primary . '/api/webrtc?src=' . rawurlencode($stream)) : '',
         'camera_name' => $stored['camera_name'] ?? null,
         'camera_id' => $stored['camera_id'] ?? null,
@@ -144,6 +158,7 @@ if ($role === 'agent' || ($method === 'POST' && isset($_SERVER['HTTP_X_CCTV_UPLO
         'webrtc_url' => (string) ($input['webrtc_url'] ?? ''),
         'camera_name' => $input['camera_name'] ?? null,
         'camera_id' => $input['camera_id'] ?? null,
+        'tunnel_url' => rtrim((string) ($input['tunnel_url'] ?? ''), '/'),
         'error' => (string) ($input['error'] ?? ''),
         'updated_at' => date('c'),
         'updated_ts' => microtime(true),
