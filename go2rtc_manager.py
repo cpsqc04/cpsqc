@@ -166,7 +166,7 @@ def pick_camera(cameras: list) -> Optional[dict]:
 
 
 def camera_rtsp_urls(camera: dict) -> Tuple[str, str]:
-    """Return (main_url, sub_url) for live WebRTC (prefer Clear/main like Reolink)."""
+    """Return (main_url, sub_url) for live WebRTC/MSE."""
     ip = str(camera.get("ipAddress") or "").strip()
     port = str(camera.get("port") or "554").strip() or "554"
     user = str(camera.get("username") or "admin").strip() or "admin"
@@ -199,13 +199,26 @@ def write_go2rtc_config(cameras: Optional[list] = None) -> Dict[str, Any]:
         or os.environ.get("CCTV_WEBRTC_TRANSCODE", "")
         or "false"
     ).strip().lower() in {"1", "true", "yes", "on"}
+    # Prefer Fluent/sub for Hostinger+tunnel (H.264, low bitrate). Main/4K/HEVC often
+    # works on LAN but stalls forever through Cloudflare quick tunnels.
+    prefer_main = str(
+        file_env.get("CCTV_WEBRTC_PREFER_MAIN", "")
+        or os.environ.get("CCTV_WEBRTC_PREFER_MAIN", "")
+        or "false"
+    ).strip().lower() in {"1", "true", "yes", "on"}
 
     sources: List[str] = []
-    # Zero-copy first (same path Reolink uses). ffmpeg re-encode of 4K HEVC adds multi-second delay.
-    if main_url:
-        sources.append(main_url)
-    if sub_url:
-        sources.append(sub_url)
+    # Zero-copy RTSP (no default ffmpeg) for low delay.
+    if prefer_main:
+        if main_url:
+            sources.append(main_url)
+        if sub_url:
+            sources.append(sub_url)
+    else:
+        if sub_url:
+            sources.append(sub_url)
+        if main_url:
+            sources.append(main_url)
     if transcode and main_url:
         # Optional last resort only — not used for "match Reolink delay".
         sources.append(f"ffmpeg:{main_url}#video=h264#hardware")
@@ -439,6 +452,22 @@ def ensure_cloudflared_binary() -> Optional[Path]:
     return None if not binary.is_file() else binary
 
 
+def tunnel_url_healthy(url: str, timeout: float = 5.0) -> bool:
+    """Return True if the Cloudflare/public go2rtc base answers HTTP."""
+    base = (url or "").strip().rstrip("/")
+    if not base.startswith("https://"):
+        return False
+    try:
+        import urllib.request
+
+        req = urllib.request.Request(base + "/api", method="GET")
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            code = int(getattr(resp, "status", 0) or 0)
+            return 200 <= code < 500
+    except Exception:
+        return False
+
+
 def read_tunnel_url() -> str:
     try:
         url = TUNNEL_URL_PATH.read_text(encoding="utf-8").strip()
@@ -539,15 +568,24 @@ def ensure_https_tunnel() -> str:
             tunnel_pid = int(TUNNEL_PID_PATH.read_text(encoding="utf-8").strip() or "0")
         except ValueError:
             tunnel_pid = None
-    if existing and pid_alive(tunnel_pid):
+    if existing and pid_alive(tunnel_pid) and tunnel_url_healthy(existing):
         return existing
+    if existing and pid_alive(tunnel_pid) and not tunnel_url_healthy(existing):
+        log(f"HTTPS tunnel unresponsive ({existing}) — restarting cloudflared…")
+    elif existing and not pid_alive(tunnel_pid):
+        log("cloudflared not running — starting a fresh HTTPS tunnel…")
 
     binary = ensure_cloudflared_binary()
     if not binary:
-        return existing
+        return existing if tunnel_url_healthy(existing) else ""
 
     stop_cloudflared("refresh")
     time.sleep(0.4)
+    try:
+        if TUNNEL_URL_PATH.is_file():
+            TUNNEL_URL_PATH.unlink()
+    except OSError:
+        pass
     log("Starting Cloudflare HTTPS tunnel for in-page live embed…")
     try:
         with LOG_PATH.open("a", encoding="utf-8") as log_fh:
@@ -597,11 +635,16 @@ def ensure_https_tunnel() -> str:
 
     if url:
         write_tunnel_url(url)
-        log(f"HTTPS tunnel ready -> {url}")
+        # Give Cloudflare a moment before first health probe / publish.
+        time.sleep(1.2)
+        if tunnel_url_healthy(url, timeout=6.0):
+            log(f"HTTPS tunnel ready -> {url}")
+            return url
+        log(f"HTTPS tunnel URL obtained but not answering yet -> {url}")
         return url
 
     log("cloudflared started but tunnel URL not detected yet")
-    return existing
+    return existing if (existing and tunnel_url_healthy(existing)) else ""
 
 
 def player_url_for(base: str, stream: str = STREAM_NAME) -> str:

@@ -167,7 +167,7 @@ ensureLocalDetectionStarted();
         .fullscreen-btn { pointer-events: auto; }
         .live-mode-chip { display: inline-flex; align-items: center; gap: 0.35rem; margin-left: 0.5rem; padding: 0.2rem 0.55rem; border-radius: 999px; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.02em; background: rgba(15, 23, 42, 0.08); color: var(--text-secondary); }
         .live-mode-chip.webrtc { background: rgba(76, 138, 137, 0.15); color: #0f766e; }
-        .live-mode-chip.jpeg { display: none; } /* JPEG relay disabled for live view */
+        .live-mode-chip.jpeg { background: rgba(234, 179, 8, 0.18); color: #854d0e; }
         .video-shell:fullscreen,
         .video-shell:-webkit-full-screen { border-radius: 0; border: none; aspect-ratio: auto; max-height: none; min-height: 100vh; width: 100vw; height: 100vh; background: #000; }
         .video-shell:fullscreen .camera-feed,
@@ -701,8 +701,12 @@ ensureLocalDetectionStarted();
         }
 
         let feedErrors = 0;
-        let liveTransport = 'connecting'; // webrtc | none | connecting
+        let liveTransport = 'connecting'; // webrtc | jpeg | none | connecting
         let activeCamera = null;
+        let liveEmbedBases = [];
+        let liveEmbedBaseIndex = 0;
+        let liveEmbedWatchTimer = null;
+        let jpegFeedTimer = null;
         window.__detectionThumbFallback = function(img) {
             if (!img || !img.parentNode) return;
             const ph = document.createElement('div');
@@ -720,6 +724,10 @@ ensureLocalDetectionStarted();
                 chip.textContent = 'WebRTC · low latency';
                 chip.classList.add('webrtc');
                 chip.title = 'Direct camera stream via go2rtc (near Reolink app delay)';
+            } else if (mode === 'jpeg') {
+                chip.textContent = 'JPEG relay';
+                chip.classList.add('jpeg');
+                chip.title = 'Showing uploaded frames while low-latency stream reconnects';
             } else if (mode === 'missing') {
                 chip.textContent = 'No camera';
                 chip.title = '';
@@ -786,6 +794,14 @@ ensureLocalDetectionStarted();
         }
 
         function stopLiveFeeds() {
+            if (liveEmbedWatchTimer) {
+                clearTimeout(liveEmbedWatchTimer);
+                liveEmbedWatchTimer = null;
+            }
+            if (jpegFeedTimer) {
+                clearInterval(jpegFeedTimer);
+                jpegFeedTimer = null;
+            }
             const webrtc = document.getElementById('webrtcFeed');
             const jpeg = document.getElementById('cameraFeed');
             if (webrtc) {
@@ -797,6 +813,101 @@ ensureLocalDetectionStarted();
                 jpeg.removeAttribute('src');
             }
         }
+
+        function startJpegRelayFeed() {
+            const webrtc = document.getElementById('webrtcFeed');
+            const jpeg = document.getElementById('cameraFeed');
+            if (!jpeg) return false;
+            if (webrtc) {
+                webrtc.classList.remove('active');
+                webrtc.removeAttribute('src');
+            }
+            if (jpegFeedTimer) {
+                clearInterval(jpegFeedTimer);
+                jpegFeedTimer = null;
+            }
+            liveTransport = 'jpeg';
+            setLiveModeChip('jpeg');
+            const refresh = () => {
+                jpeg.src = 'api/current_frame.php?t=' + Date.now();
+            };
+            jpeg.onload = function() {
+                jpeg.classList.add('active');
+                document.getElementById('cameraPlaceholder').classList.add('hidden');
+                setCameraUiState('live');
+                applyLocationOverlay(activeCamera);
+                feedErrors = 0;
+            };
+            jpeg.onerror = function() {
+                feedErrors += 1;
+                if (feedErrors >= 8) {
+                    setCameraUiState('offline');
+                }
+            };
+            refresh();
+            jpegFeedTimer = setInterval(refresh, 350);
+            return true;
+        }
+
+        function applyLiveEmbedBase(baseUrl, streamName) {
+            const webrtc = document.getElementById('webrtcFeed');
+            const jpeg = document.getElementById('cameraFeed');
+            if (!webrtc || !baseUrl) return false;
+            if (jpegFeedTimer) {
+                clearInterval(jpegFeedTimer);
+                jpegFeedTimer = null;
+            }
+            if (jpeg) {
+                jpeg.classList.remove('active');
+                jpeg.removeAttribute('src');
+            }
+            const embedUrl = buildCleanEmbedUrl(baseUrl, streamName);
+            liveTransport = 'webrtc';
+            setLiveModeChip('webrtc');
+            webrtc.src = embedUrl;
+            webrtc.classList.add('active');
+            document.getElementById('cameraPlaceholder').classList.add('hidden');
+            setCameraUiState('connecting');
+            applyLocationOverlay(activeCamera);
+
+            if (liveEmbedWatchTimer) clearTimeout(liveEmbedWatchTimer);
+            liveEmbedWatchTimer = setTimeout(function() {
+                if (liveTransport !== 'webrtc') return;
+                // No playing ack yet — try next HTTPS/LAN base, then JPEG relay.
+                liveEmbedBaseIndex += 1;
+                if (liveEmbedBaseIndex < liveEmbedBases.length) {
+                    applyLiveEmbedBase(liveEmbedBases[liveEmbedBaseIndex], streamName);
+                    return;
+                }
+                startJpegRelayFeed();
+            }, 12000);
+            return true;
+        }
+
+        window.addEventListener('message', function(ev) {
+            const data = ev && ev.data;
+            if (!data || data.source !== 'alertara-live-embed') return;
+            if (data.state === 'playing') {
+                if (liveEmbedWatchTimer) {
+                    clearTimeout(liveEmbedWatchTimer);
+                    liveEmbedWatchTimer = null;
+                }
+                liveTransport = 'webrtc';
+                setLiveModeChip('webrtc');
+                setCameraUiState('live');
+                applyLocationOverlay(activeCamera);
+            } else if (data.state === 'error' && liveTransport === 'webrtc') {
+                liveEmbedBaseIndex += 1;
+                const streamName = (document.getElementById('webrtcFeed') && liveEmbedBases.length)
+                    ? 'alertara_live'
+                    : 'alertara_live';
+                if (liveEmbedBaseIndex < liveEmbedBases.length) {
+                    applyLiveEmbedBase(liveEmbedBases[liveEmbedBaseIndex], streamName);
+                } else {
+                    startJpegRelayFeed();
+                }
+            }
+        });
 
         async function fetchActiveCamera() {
             try {
@@ -836,7 +947,6 @@ ensureLocalDetectionStarted();
 
         async function tryStartWebRtcFeed() {
             const webrtc = document.getElementById('webrtcFeed');
-            const jpeg = document.getElementById('cameraFeed');
             if (!webrtc) return false;
             try {
                 const res = await fetch('api/cctv_webrtc_status.php?t=' + Date.now(), {
@@ -851,12 +961,13 @@ ensureLocalDetectionStarted();
                 const pageHttps = window.location.protocol === 'https:';
                 const hostLocal = /^(localhost|127\.0\.0\.1)$/i.test(window.location.hostname);
                 let bases = [];
+                if (hostLocal) bases.push('http://127.0.0.1:1984');
                 if (data.tunnel_url) bases.push(String(data.tunnel_url).replace(/\/$/, ''));
                 if (Array.isArray(data.base_urls)) {
                     data.base_urls.forEach(function(b) { bases.push(String(b).replace(/\/$/, '')); });
                 }
                 if (data.base_url) bases.push(String(data.base_url).replace(/\/$/, ''));
-                if (hostLocal) bases.unshift('http://127.0.0.1:1984');
+                if (hostLocal) bases.push('http://127.0.0.1:1984');
                 bases = bases.filter(Boolean).filter(function(url, idx, arr) {
                     return arr.indexOf(url) === idx;
                 });
@@ -872,20 +983,9 @@ ensureLocalDetectionStarted();
                     return false;
                 }
 
-                const streamName = data.stream || 'alertara_live';
-                const embedUrl = buildCleanEmbedUrl(embeddableBases[0], streamName);
-                liveTransport = 'webrtc';
-                setLiveModeChip('webrtc');
-                if (jpeg) {
-                    jpeg.classList.remove('active');
-                    jpeg.removeAttribute('src');
-                }
-                webrtc.src = embedUrl;
-                webrtc.classList.add('active');
-                document.getElementById('cameraPlaceholder').classList.add('hidden');
-                setCameraUiState('live');
-                applyLocationOverlay(activeCamera);
-                return true;
+                liveEmbedBases = embeddableBases;
+                liveEmbedBaseIndex = 0;
+                return applyLiveEmbedBase(liveEmbedBases[0], data.stream || 'alertara_live');
             } catch (e) {
                 console.warn('WebRTC status check failed', e);
                 return false;
@@ -905,7 +1005,10 @@ ensureLocalDetectionStarted();
             applyLocationOverlay(activeCamera);
             const ok = await tryStartWebRtcFeed();
             if (!ok) {
-                // WebRTC only — do not fall back to JPEG relay.
+                // Low-latency path unavailable — still show uploaded frames.
+                if (startJpegRelayFeed()) {
+                    return;
+                }
                 liveTransport = 'connecting';
                 stopLiveFeeds();
                 setCameraUiState('connecting');
@@ -923,9 +1026,8 @@ ensureLocalDetectionStarted();
             }
         }
 
-        // JPEG relay disabled — kept as no-op so older callers don't break.
         function startCameraFeed() {
-            return;
+            startJpegRelayFeed();
         }
 
         // Re-check camera list + promote/repair WebRTC periodically.

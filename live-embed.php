@@ -40,6 +40,7 @@ $wsUrl = $wsBase . '/api/ws?src=' . rawurlencode($stream);
             height: 100%;
             background: #000;
             overflow: hidden;
+            font-family: Segoe UI, Tahoma, sans-serif;
         }
         video-stream, video {
             width: 100% !important;
@@ -48,19 +49,57 @@ $wsUrl = $wsBase . '/api/ws?src=' . rawurlencode($stream);
             object-fit: contain;
             background: #000;
         }
-        /* Kill native media chrome if any browser injects it */
         video::-webkit-media-controls { display: none !important; }
         video::-webkit-media-controls-enclosure { display: none !important; }
+        #status {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: rgba(255,255,255,0.85);
+            font-size: 0.95rem;
+            pointer-events: none;
+            z-index: 2;
+        }
+        #status.hidden { display: none; }
     </style>
     <script type="module" src="https://cdn.jsdelivr.net/gh/AlexxIT/go2rtc@v1.9.4/www/video-stream.js"></script>
 </head>
 <body>
+<div id="status">Connecting to camera…</div>
 <script type="module">
+    const statusEl = document.getElementById('status');
+    const notify = (state, detail) => {
+        try {
+            parent.postMessage({
+                source: 'alertara-live-embed',
+                state: state,
+                detail: detail || '',
+                base: <?php echo json_encode($base, JSON_UNESCAPED_SLASHES); ?>,
+            }, '*');
+        } catch (e) { /* ignore */ }
+    };
+
     const vs = document.createElement('video-stream');
     vs.background = true;
+    // MSE first — more reliable through Cloudflare tunnels than WebRTC.
     vs.mode = 'mse,webrtc';
     vs.src = <?php echo json_encode($wsUrl, JSON_UNESCAPED_SLASHES); ?>;
     document.body.appendChild(vs);
+    notify('connecting');
+
+    let playing = false;
+    const markPlaying = () => {
+        if (playing) return;
+        const video = vs.querySelector('video') || vs.video;
+        if (!video) return;
+        if (video.readyState >= 2 && video.videoWidth > 0) {
+            playing = true;
+            if (statusEl) statusEl.classList.add('hidden');
+            notify('playing');
+        }
+    };
 
     const lockChrome = () => {
         const video = vs.querySelector('video') || vs.video;
@@ -73,9 +112,19 @@ $wsUrl = $wsBase . '/api/ws?src=' . rawurlencode($stream);
         video.muted = true;
         video.autoplay = true;
         try { video.play().catch(() => {}); } catch (e) {}
+        video.addEventListener('playing', markPlaying);
+        video.addEventListener('loadeddata', markPlaying);
+        markPlaying();
     };
     lockChrome();
     setInterval(lockChrome, 500);
+
+    setTimeout(() => {
+        if (!playing) {
+            if (statusEl) statusEl.textContent = 'Stream timeout';
+            notify('error', 'timeout');
+        }
+    }, 12000);
 </script>
 </body>
 </html>
