@@ -798,7 +798,7 @@ $cctvNavActive = 'camera-management';
                                 localStorage.setItem('cameraConfigUpdated', String(Date.now()));
                                 window.dispatchEvent(new Event('camera-config-updated'));
                             } catch (e) { /* ignore */ }
-                        } else if (tries > 40) {
+                        } else if (tries > 60) {
                             clearInterval(encodingPollTimer);
                             encodingPollTimer = null;
                             if (btn) btn.disabled = false;

@@ -595,6 +595,7 @@ def process_encoding_job(encoding_url: str, api_key: str) -> None:
     ip = str(camera.get("ipAddress") or "").strip()
     user = str(camera.get("username") or "").strip()
     password = password_from_camera(camera)
+    port = str(camera.get("port") or "554").strip() or "554"
     if not password:
         api_request(
             encoding_url + "?role=agent",
@@ -611,8 +612,8 @@ def process_encoding_job(encoding_url: str, api_key: str) -> None:
         )
         return
 
-    log(f"Probing Reolink encoding at {ip} (user={user})…")
-    result = probe_reolink_encoding(ip, user, password, timeout=8.0)
+    log(f"Probing Reolink encoding at {ip}:{port} (user={user})…")
+    result = probe_reolink_encoding(ip, user, password, timeout=10.0, rtsp_port=port)
     payload = {
         "action": "complete",
         "role": "agent",

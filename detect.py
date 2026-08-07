@@ -362,7 +362,8 @@ def probe_and_sync_reolink_encoding(camera_row, force=False):
         username,
         password,
         force_main=CCTV_USE_MAIN_STREAM,
-        timeout=5.0,
+        timeout=8.0,
+        rtsp_port=str((camera_row or {}).get("port") or "554"),
     )
     _last_encoding_probe_at = now
     try:
