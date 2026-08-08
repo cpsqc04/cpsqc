@@ -7,7 +7,7 @@
  *   {
  *     "source_tip_id": "TIP-2026-002",
  *     "tip_id": "TIP-2026-002",
- *     "backup_status": "Dispatched",
+ *     "backup_status": "Dispatched",   // Requested | Dispatched | Completed
  *     "status": "Dispatched",
  *     "notes": "Unit 12 en route",
  *     "emergency_response_reference_id": "COORD-2026-A1B2C3"
@@ -75,12 +75,12 @@ if ($sourceTipId === '' || $statusRaw === '') {
 }
 
 $normalized = normalizeTipBackupStatus($statusRaw, true);
-if (!in_array($normalized, ['Requested', 'Dispatched', 'Completed', 'Declined'], true)) {
+if (!in_array($normalized, ['Requested', 'Dispatched', 'Completed'], true)) {
     http_response_code(400);
     echo json_encode([
         'success' => false,
-        'message' => 'Invalid backup_status. Use Requested, Dispatched, Completed, or Declined.',
-        'accepted' => ['Requested', 'Dispatched', 'Completed', 'Declined'],
+        'message' => 'Invalid backup_status. Use Requested, Dispatched, or Completed.',
+        'accepted' => ['Requested', 'Dispatched', 'Completed'],
     ]);
     exit;
 }

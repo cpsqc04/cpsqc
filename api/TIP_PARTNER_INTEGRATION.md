@@ -172,7 +172,7 @@ Partners should callback when assistance progresses (**Inter-Agency Status** in 
 - `Content-Type: application/json`
 - `X-API-Key: {EMERGENCY_RESPONSE_API_KEY}` or `Authorization: Bearer {EMERGENCY_RESPONSE_API_KEY}`
 
-**Accepted `backup_status` values:** `Requested`, `Dispatched`, `Completed`, `Declined`  
+**Accepted `backup_status` values:** `Requested`, `Dispatched`, `Completed`  
 (Aliases like `On Scene` / `En Route` map to `Dispatched`.)
 
 ```json

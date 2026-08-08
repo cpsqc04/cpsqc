@@ -168,7 +168,7 @@ function tipsSelectColumns(string $prefix = ''): string
 
 function tipBackupStatusOptions(): array
 {
-    return ['Not Requested', 'Requested', 'Dispatched', 'Completed', 'Declined'];
+    return ['Not Requested', 'Requested', 'Dispatched', 'Completed'];
 }
 
 /**
@@ -192,11 +192,6 @@ function normalizeTipBackupStatus(?string $status, $backupRequestedAt = null): s
         'completed' => 'Completed',
         'resolved' => 'Completed',
         'closed' => 'Completed',
-        'declined' => 'Declined',
-        'rejected' => 'Declined',
-        'cancelled' => 'Declined',
-        'canceled' => 'Declined',
-        'denied' => 'Declined',
     ];
     $key = strtolower($value);
     if (isset($map[$key])) {

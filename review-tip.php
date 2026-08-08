@@ -1096,8 +1096,8 @@ require_once __DIR__ . '/db.php';
                 <p><strong>Timestamp:</strong> ${escapeHtml(timestamp)}</p>
                 <p><strong>Location:</strong> ${escapeHtml(tip.location || '')}</p>
                 <p><strong>Assigned To:</strong> ${escapeHtml(tip.assigned_to || 'Not assigned')}</p>
-                <p><strong>Outcome:</strong> ${escapeHtml(displayTipOutcome(tip))} <span style="color:var(--text-secondary);font-size:0.85rem;">(from assigned patrol report)</span></p>
-                <p><strong>Inter-Agency Status:</strong> ${backupStatusBadgeHtml(tip)}${tip.backup_status_notes ? `<br><span style="color:var(--text-secondary);font-size:0.85rem;">${escapeHtml(tip.backup_status_notes)}</span>` : ''}</p>
+                <p><strong>Outcome:</strong> ${escapeHtml(displayTipOutcome(tip))}</p>
+                <p><strong>Inter-Agency Status:</strong> ${backupStatusBadgeHtml(tip)}</p>
                 <p><strong>Tip Description:</strong><br>${escapeHtml(tip.description || '')}</p>
                 ${reportHtml}
                 ${photoHtml}
@@ -1166,8 +1166,7 @@ require_once __DIR__ . '/db.php';
                 const ref = tip.emergency_response_reference_id
                     ? ' · Ref: ' + tip.emergency_response_reference_id
                     : '';
-                const notes = tip.backup_status_notes ? ' · ' + tip.backup_status_notes : '';
-                document.getElementById('manageBackupMeta').textContent = (updated + ref + notes).trim() || 'Awaiting Inter-Agency status updates.';
+                document.getElementById('manageBackupMeta').textContent = (updated + ref).trim() || 'Awaiting Inter-Agency status updates.';
             } else {
                 backupPanel.style.display = 'none';
             }

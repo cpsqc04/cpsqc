@@ -3021,11 +3021,8 @@ $personnelCode = htmlspecialchars(getBpsoPersonnelCode());
                 photoHtml = '<div class="complaint-detail"><strong>Photo:</strong> No photo attached</div>';
             }
             const backupStatus = displayTipBackupStatus(tip);
-            const backupNotes = tip.backup_status_notes
-                ? `<br><span style="color:var(--text-secondary);font-size:0.85rem;">${escapeHtml(tip.backup_status_notes)}</span>`
-                : '';
             const backupBlock = backupStatus !== 'Not Requested'
-                ? `<div class="complaint-detail"><strong>Inter-Agency status:</strong> ${tipBackupBadgeHtml(tip)}${backupNotes}<br><span style="color:var(--text-secondary);font-size:0.85rem;">Updated by Inter-Agency — you still submit the tip outcome below.</span></div>`
+                ? `<div class="complaint-detail"><strong>Inter-Agency status:</strong> ${tipBackupBadgeHtml(tip)}</div>`
                 : '';
             document.getElementById('tipDetailContent').innerHTML = `
                 <div class="complaint-detail"><strong>Tip ID:</strong> ${escapeHtml(tip.tip_id)}</div>

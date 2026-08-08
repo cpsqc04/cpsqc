@@ -449,7 +449,7 @@ function getIntegrationCatalog(): array
                         'groups' => ['emergency-response'],
                         'env_key' => 'EMERGENCY_RESPONSE_API_KEY',
                         'description' => 'Inter-Agency / Emergency Response callbacks for assistance progress (UI: Inter-Agency Status). Separate from tanod tip Outcome.',
-                        'accepted_statuses' => ['Requested', 'Dispatched', 'Completed', 'Declined'],
+                        'accepted_statuses' => ['Requested', 'Dispatched', 'Completed'],
                         'sample_request' => [
                             'source_tip_id' => 'TIP-2026-002',
                             'backup_status' => 'Dispatched',
