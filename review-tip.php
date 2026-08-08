@@ -712,8 +712,6 @@ require_once __DIR__ . '/db.php';
             </div>
             <div class="manage-backup-panel" id="manageBackupPanel" style="display:none;">
                 <p><strong>Inter-Agency status:</strong> <span id="manageBackupBadge"></span></p>
-                <p class="manage-backup-hint" id="manageBackupMeta"></p>
-                <p class="manage-backup-hint">Updated by Inter-Agency (Requested → Dispatched → Completed). Tip Outcome stays with the assigned tanod report.</p>
             </div>
             <div class="form-actions">
                 <button type="button" class="btn-cancel" onclick="closeManageTipModal()">Close</button>
@@ -1160,13 +1158,6 @@ require_once __DIR__ . '/db.php';
             if (tip.backup_requested_at || backupStatus !== 'Not Requested') {
                 backupPanel.style.display = 'block';
                 document.getElementById('manageBackupBadge').innerHTML = backupStatusBadgeHtml(tip);
-                const updated = tip.backup_status_updated_at
-                    ? 'Updated ' + formatTipTimestamp(tip.backup_status_updated_at)
-                    : (tip.backup_requested_at ? 'Requested ' + formatTipTimestamp(tip.backup_requested_at) : '');
-                const ref = tip.emergency_response_reference_id
-                    ? ' · Ref: ' + tip.emergency_response_reference_id
-                    : '';
-                document.getElementById('manageBackupMeta').textContent = (updated + ref).trim() || 'Awaiting Inter-Agency status updates.';
             } else {
                 backupPanel.style.display = 'none';
             }
