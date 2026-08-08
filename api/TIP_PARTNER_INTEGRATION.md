@@ -192,9 +192,8 @@ Partners should callback when backup progresses. **Tip Outcome** (tanod report) 
 |----------|--------|------|
 | `/api/send_to_incident_reporting.php` | POST | `{ "id": 1 }` or `{ "tip_id": "TIP-2026-002" }` |
 | `/api/send_to_emergency_response.php` | POST | `{ "id": 1, "police_backup_reason": "..." }` |
-| `/api/tips.php` | POST | `{ "action": "update_backup_status", "id": 1, "backup_status": "Dispatched" }` |
 
-Requires admin session. Returns reference IDs and updates the `tips` table.
+Requires admin session. Returns reference IDs and updates the `tips` table. Police backup progress (`Dispatched` / `Completed`) is updated only via the inbound partner callback above.
 
 ---
 

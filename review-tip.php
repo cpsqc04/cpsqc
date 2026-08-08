@@ -406,19 +406,8 @@ require_once __DIR__ . '/db.php';
             background: #f9fafb;
         }
         .manage-backup-panel p { margin: 0 0 0.5rem; line-height: 1.45; }
+        .manage-backup-panel p:last-child { margin-bottom: 0; }
         .manage-backup-hint { font-size: 0.85rem; color: var(--text-secondary); }
-        .manage-backup-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.75rem; }
-        .manage-backup-actions button {
-            border: 1px solid #d1d5db;
-            background: #fff;
-            color: #1f2937;
-            border-radius: 6px;
-            padding: 0.4rem 0.7rem;
-            font-size: 0.82rem;
-            cursor: pointer;
-        }
-        .manage-backup-actions button:hover:not(:disabled) { background: #f3f4f6; }
-        .manage-backup-actions button:disabled { opacity: 0.45; cursor: not-allowed; }
         .action-buttons { display: flex; gap: 0.5rem; }
         .btn-view, .btn-manage {
             padding: 0.5rem 1rem;
@@ -724,12 +713,7 @@ require_once __DIR__ . '/db.php';
             <div class="manage-backup-panel" id="manageBackupPanel" style="display:none;">
                 <p><strong>Police backup:</strong> <span id="manageBackupBadge"></span></p>
                 <p class="manage-backup-hint" id="manageBackupMeta"></p>
-                <p class="manage-backup-hint">Inter-Agency owns this status (Dispatched / Completed). Tip Outcome stays with the assigned tanod report. Use the buttons below to simulate partner updates for demo.</p>
-                <div class="manage-backup-actions">
-                    <button type="button" id="simBackupDispatched" onclick="setTipBackupStatus('Dispatched')">Mark Dispatched</button>
-                    <button type="button" id="simBackupCompleted" onclick="setTipBackupStatus('Completed')">Mark Completed</button>
-                    <button type="button" id="simBackupDeclined" onclick="setTipBackupStatus('Declined')">Mark Declined</button>
-                </div>
+                <p class="manage-backup-hint">Updated by Inter-Agency (Requested → Dispatched → Completed). Tip Outcome stays with the assigned tanod report.</p>
             </div>
             <div class="form-actions">
                 <button type="button" class="btn-cancel" onclick="closeManageTipModal()">Close</button>
@@ -1183,52 +1167,12 @@ require_once __DIR__ . '/db.php';
                     ? ' · Ref: ' + tip.emergency_response_reference_id
                     : '';
                 const notes = tip.backup_status_notes ? ' · ' + tip.backup_status_notes : '';
-                document.getElementById('manageBackupMeta').textContent = (updated + ref + notes).trim() || 'Awaiting Inter-Agency updates.';
-                document.getElementById('simBackupDispatched').disabled = backupStatus === 'Dispatched' || backupStatus === 'Completed';
-                document.getElementById('simBackupCompleted').disabled = backupStatus === 'Completed';
-                document.getElementById('simBackupDeclined').disabled = backupStatus === 'Completed' || backupStatus === 'Declined';
+                document.getElementById('manageBackupMeta').textContent = (updated + ref + notes).trim() || 'Awaiting Inter-Agency status updates.';
             } else {
                 backupPanel.style.display = 'none';
             }
 
             document.getElementById('manageTipModal').style.display = 'block';
-        }
-
-        async function setTipBackupStatus(status) {
-            if (!currentTipId) return;
-            const tip = tipData[currentTipId];
-            if (!tip) return;
-            if (!confirm(`Set police backup status for ${tip.tip_id} to "${status}"?`)) return;
-
-            try {
-                const response = await fetch('api/tips.php', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        action: 'update_backup_status',
-                        id: tip.id,
-                        backup_status: status,
-                        notes: 'Manual / demo update from Review Tip'
-                    })
-                });
-                const result = await response.json();
-                if (!result.success) {
-                    alert(result.message || 'Failed to update backup status.');
-                    return;
-                }
-                tip.backup_status = result.data?.backup_status || status;
-                tip.backup_status_updated_at = result.data?.backup_status_updated_at || new Date().toISOString();
-                tip.backup_status_notes = result.data?.backup_status_notes || tip.backup_status_notes;
-                const row = document.querySelector(`tr[data-tip-id="${tip.id}"]`);
-                if (row) {
-                    row.remove();
-                    addTipTableRow(tip.id);
-                }
-                openManageTipModal(tip.id);
-            } catch (e) {
-                console.error(e);
-                alert('Failed to update police backup status.');
-            }
         }
 
         function closeManageTipModal() {
