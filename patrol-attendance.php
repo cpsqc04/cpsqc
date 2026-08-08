@@ -3005,7 +3005,25 @@ $personnelCode = htmlspecialchars(getBpsoPersonnelCode());
             }
         }
 
-        function openTipModal(id) {
+        async function ensureBpsoTipPhoto(id) {
+            const tip = tipData[id];
+            if (!tip) return null;
+            if (tip.photo_data) return tip.photo_data;
+            const hasPhoto = tip.has_photo === true || tip.has_photo === 1 || tip.has_photo === '1';
+            if (!hasPhoto) return null;
+            try {
+                const res = await fetch('api/bpso_tips.php?id=' + encodeURIComponent(id));
+                const result = await res.json();
+                if (result.success && result.data) {
+                    tip.photo_data = result.data.photo_data || '';
+                    tip.has_photo = !!tip.photo_data;
+                    return tip.photo_data || null;
+                }
+            } catch (e) { /* ignore */ }
+            return null;
+        }
+
+        async function openTipModal(id) {
             const tip = tipData[id];
             if (!tip) return;
             document.getElementById('resolutionTipId').value = id;
@@ -3014,6 +3032,10 @@ $personnelCode = htmlspecialchars(getBpsoPersonnelCode());
             const finalOutcomes = ['Investigation Successful', 'Arrest Made', 'Unfounded / No Action'];
             const currentOutcome = finalOutcomes.includes(tip.outcome) ? tip.outcome : '';
             outcomeSelect.value = currentOutcome;
+            document.getElementById('tipResolutionModal').classList.add('active');
+            document.getElementById('tipDetailContent').innerHTML = '<div class="complaint-detail">Loading tip details…</div>';
+            await ensureBpsoTipPhoto(id);
+
             let photoHtml = '';
             if (tip.photo_data) {
                 photoHtml = `<div class="complaint-detail"><strong>Photo:</strong><br><img src="${tip.photo_data}" alt="Tip photo" class="incident-photo" onclick="AlertaraPhotoLightbox.open(this.src, 'Tip photo')" title="Click to view full size"></div>`;
@@ -3036,7 +3058,6 @@ $personnelCode = htmlspecialchars(getBpsoPersonnelCode());
             document.getElementById('tipResolutionReport').readOnly = isResolved;
             outcomeSelect.disabled = isResolved;
             document.getElementById('resolveTipBtn').style.display = isResolved ? 'none' : '';
-            document.getElementById('tipResolutionModal').classList.add('active');
         }
 
         function closeTipModal() {

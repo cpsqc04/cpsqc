@@ -30,17 +30,47 @@ if ($action !== 'create' && (!isset($_SESSION['admin_logged_in']) || $_SESSION['
 
 if ($method === 'GET') {
     try {
-        $cols = tipsSelectColumns();
-        $stmt = $pdo->query("SELECT {$cols} FROM tips ORDER BY id DESC");
-        $tips = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        foreach ($tips as &$tip) {
-            $tip['status'] = normalizeTipStatus($tip['status'] ?? 'New');
-            $tip['backup_status'] = normalizeTipBackupStatus(
-                $tip['backup_status'] ?? null,
-                $tip['backup_requested_at'] ?? null
-            );
+        $id = (int) ($_GET['id'] ?? 0);
+        $idsParam = trim((string) ($_GET['ids'] ?? ''));
+        $includePhoto = isset($_GET['include_photo'])
+            && in_array(strtolower((string) $_GET['include_photo']), ['1', 'true', 'yes'], true);
+
+        // Single tip (includes photo) — used for View / Manage / lazy thumbnail.
+        if ($id > 0) {
+            $tip = fetchTipById($pdo, $id, true);
+            if (!$tip) {
+                http_response_code(404);
+                echo json_encode(['success' => false, 'message' => 'Tip not found.']);
+                exit;
+            }
+            echo json_encode([
+                'success' => true,
+                'data' => normalizeTipListRow($tip),
+            ]);
+            exit;
         }
-        unset($tip);
+
+        // Explicit multi-id fetch with photos (export).
+        if ($idsParam !== '') {
+            $ids = array_values(array_unique(array_filter(array_map('intval', explode(',', $idsParam)))));
+            if (!$ids) {
+                echo json_encode(['success' => true, 'data' => []]);
+                exit;
+            }
+            $placeholders = implode(',', array_fill(0, count($ids), '?'));
+            $orderField = implode(',', $ids); // ints only
+            $cols = tipsSelectColumns('', true);
+            $stmt = $pdo->prepare("SELECT {$cols} FROM tips WHERE id IN ({$placeholders}) ORDER BY FIELD(id, {$orderField})");
+            $stmt->execute($ids);
+            $tips = array_map('normalizeTipListRow', $stmt->fetchAll(PDO::FETCH_ASSOC));
+            echo json_encode(['success' => true, 'data' => $tips]);
+            exit;
+        }
+
+        // Default list: no photo payloads (has_photo flag only) for fast page load.
+        $cols = tipsSelectColumns('', $includePhoto);
+        $stmt = $pdo->query("SELECT {$cols} FROM tips ORDER BY id DESC");
+        $tips = array_map('normalizeTipListRow', $stmt->fetchAll(PDO::FETCH_ASSOC));
 
         echo json_encode([
             'success' => true,

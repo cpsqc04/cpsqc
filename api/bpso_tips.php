@@ -29,16 +29,30 @@ $action = $input['action'] ?? '';
 
 if ($method === 'GET') {
     try {
-        $cols = tipsSelectColumns();
+        $id = (int) ($_GET['id'] ?? 0);
+
+        // Single assigned tip with photo (modal / resolve).
+        if ($id > 0) {
+            $tip = fetchTipById($pdo, $id, true);
+            if (!$tip || (int) ($tip['assigned_patrol_id'] ?? 0) !== (int) $patrolId) {
+                http_response_code(404);
+                echo json_encode(['success' => false, 'message' => 'Tip not found.']);
+                exit;
+            }
+            $tip = normalizeTipListRow($tip);
+            $tip['status'] = normalizeTipStatus($tip['status'] ?? 'Assigned');
+            echo json_encode(['success' => true, 'data' => $tip]);
+            exit;
+        }
+
+        // List without photo payloads for faster portal load.
+        $cols = tipsSelectColumns('', false);
         $stmt = $pdo->prepare("SELECT {$cols} FROM tips WHERE assigned_patrol_id = :patrol_id ORDER BY FIELD(status, 'Assigned', 'New', 'Resolved'), assigned_at DESC, id DESC");
         $stmt->execute([':patrol_id' => $patrolId]);
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
         foreach ($rows as &$row) {
+            $row = normalizeTipListRow($row);
             $row['status'] = normalizeTipStatus($row['status'] ?? 'Assigned');
-            $row['backup_status'] = normalizeTipBackupStatus(
-                $row['backup_status'] ?? null,
-                $row['backup_requested_at'] ?? null
-            );
         }
         unset($row);
         echo json_encode(['success' => true, 'data' => $rows]);

@@ -135,16 +135,23 @@ function ensureTipsTable(PDO $pdo): void
     }
 }
 
-function tipsSelectColumns(string $prefix = ''): string
+/**
+ * Tip SELECT columns. Omit full photo_data for list endpoints (use has_photo instead).
+ */
+function tipsSelectColumns(string $prefix = '', bool $includePhoto = true): string
 {
     $p = $prefix !== '' ? $prefix . '.' : '';
+    $photoCol = $includePhoto
+        ? "{$p}photo_data"
+        : "(CASE WHEN {$p}photo_data IS NOT NULL AND TRIM({$p}photo_data) <> '' THEN 1 ELSE 0 END) AS has_photo";
+
     return implode(', ', [
         "{$p}id",
         "{$p}tip_id",
         "{$p}location",
         "{$p}description",
         "{$p}contact_number",
-        "{$p}photo_data",
+        $photoCol,
         "{$p}status",
         "{$p}outcome",
         "{$p}assigned_to",
@@ -164,6 +171,15 @@ function tipsSelectColumns(string $prefix = ''): string
         "{$p}submitted_at",
         "{$p}created_at",
     ]);
+}
+
+function tipHasPhotoFlag(array $tip): bool
+{
+    if (array_key_exists('has_photo', $tip)) {
+        return !empty($tip['has_photo']);
+    }
+    $photo = trim((string) ($tip['photo_data'] ?? ''));
+    return $photo !== '';
 }
 
 function tipBackupStatusOptions(): array
@@ -349,11 +365,29 @@ function tipOutcomeOptions(): array
     ];
 }
 
-function fetchTipById(PDO $pdo, int $id): ?array
+function fetchTipById(PDO $pdo, int $id, bool $includePhoto = true): ?array
 {
-    $cols = tipsSelectColumns();
+    $cols = tipsSelectColumns('', $includePhoto);
     $stmt = $pdo->prepare("SELECT {$cols} FROM tips WHERE id = :id LIMIT 1");
     $stmt->execute([':id' => $id]);
     $row = $stmt->fetch(PDO::FETCH_ASSOC);
-    return $row ?: null;
+    if (!$row) {
+        return null;
+    }
+    $row['has_photo'] = tipHasPhotoFlag($row);
+    return $row;
+}
+
+function normalizeTipListRow(array $tip): array
+{
+    $tip['status'] = normalizeTipStatus($tip['status'] ?? 'New');
+    $tip['backup_status'] = normalizeTipBackupStatus(
+        $tip['backup_status'] ?? null,
+        $tip['backup_requested_at'] ?? null
+    );
+    $tip['has_photo'] = tipHasPhotoFlag($tip);
+    if (!array_key_exists('photo_data', $tip)) {
+        $tip['photo_data'] = null;
+    }
+    return $tip;
 }

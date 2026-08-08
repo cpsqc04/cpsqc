@@ -900,10 +900,66 @@ require_once __DIR__ . '/db.php';
             return Array.from(document.querySelectorAll('#tipsTableBody .tip-select:checked'))
                 .map(cb => cb.value);
         }
-        // Tip data storage (loaded from database)
+        // Tip data storage (loaded from database; photos loaded on demand)
         let tipData = {};
+        const tipPhotoPromises = {};
+
+        function tipHasPhoto(tip) {
+            if (!tip) return false;
+            if (tip.photo_data) return true;
+            return !!(tip.has_photo === true || tip.has_photo === 1 || tip.has_photo === '1');
+        }
+
+        async function ensureTipPhoto(id) {
+            const tip = tipData[id];
+            if (!tip) return null;
+            if (tip.photo_data) return tip.photo_data;
+            if (!tipHasPhoto(tip)) return null;
+            if (tipPhotoPromises[id]) return tipPhotoPromises[id];
+
+            tipPhotoPromises[id] = fetch('api/tips.php?id=' + encodeURIComponent(id))
+                .then(res => res.json())
+                .then(result => {
+                    if (result.success && result.data) {
+                        tip.photo_data = result.data.photo_data || '';
+                        tip.has_photo = !!(tip.photo_data);
+                        return tip.photo_data || null;
+                    }
+                    return null;
+                })
+                .catch(() => null)
+                .finally(() => { delete tipPhotoPromises[id]; });
+
+            return tipPhotoPromises[id];
+        }
+
+        async function lazyLoadTipThumbnails() {
+            const ids = Object.keys(tipData).filter(id => tipHasPhoto(tipData[id]) && !tipData[id].photo_data);
+            const concurrency = 3;
+            for (let i = 0; i < ids.length; i += concurrency) {
+                const batch = ids.slice(i, i + concurrency);
+                await Promise.all(batch.map(async (id) => {
+                    const photo = await ensureTipPhoto(id);
+                    if (!photo) return;
+                    const thumb = document.getElementById('tip-thumbnail-' + id);
+                    if (thumb && thumb.tagName === 'IMG') {
+                        thumb.src = photo;
+                    } else if (thumb) {
+                        const img = document.createElement('img');
+                        img.id = 'tip-thumbnail-' + id;
+                        img.src = photo;
+                        img.alt = 'Tip Photo';
+                        img.className = 'tip-photo-thumbnail';
+                        img.addEventListener('click', function() {
+                            viewPhotoFull(photo);
+                        });
+                        thumb.replaceWith(img);
+                    }
+                }));
+            }
+        }
         
-        // Load tips from database
+        // Load tips from database (list excludes photo payloads for speed)
         async function loadTips() {
             try {
                 const response = await fetch('api/tips.php');
@@ -933,6 +989,8 @@ require_once __DIR__ . '/db.php';
                 } else {
                     updateExportTipsButtonState();
                 }
+                // Fill thumbnails in the background after the table is visible.
+                lazyLoadTipThumbnails();
             } catch (e) {
                 console.error('Error loading tips:', e);
             }
@@ -1032,6 +1090,9 @@ require_once __DIR__ . '/db.php';
             if (tip.photo_data) {
                 const thumbnailId = 'tip-thumbnail-' + id;
                 photoCell = `<img id="${thumbnailId}" src="${tip.photo_data}" alt="Tip Photo" class="tip-photo-thumbnail">`;
+            } else if (tipHasPhoto(tip)) {
+                const thumbnailId = 'tip-thumbnail-' + id;
+                photoCell = `<div id="${thumbnailId}" class="tip-photo-placeholder">Loading…</div>`;
             }
 
             row.innerHTML = `
@@ -1069,7 +1130,7 @@ require_once __DIR__ . '/db.php';
 
         let currentTipId = null;
 
-        function viewTip(id) {
+        async function viewTip(id) {
             const tip = tipData[id];
             if (!tip) {
                 alert('Tip not found');
@@ -1077,12 +1138,18 @@ require_once __DIR__ . '/db.php';
             }
 
             currentTipId = id;
+            document.getElementById('viewTipModal').style.display = 'block';
+            document.getElementById('viewTipContent').innerHTML = '<p>Loading tip details…</p>';
+            await ensureTipPhoto(id);
+
             const timestamp = formatTipTimestamp(tip.submitted_at);
 
             let photoHtml = '';
             if (tip.photo_data) {
                 const photoId = 'tip-photo-' + id;
                 photoHtml = `<p><strong>Photo:</strong></p><img id="${photoId}" src="${tip.photo_data}" alt="Tip Photo" class="tip-photo-full" style="cursor: pointer;">`;
+            } else if (tipHasPhoto(tip)) {
+                photoHtml = '<p><strong>Photo:</strong> Unable to load photo.</p>';
             }
 
             const reportHtml = tip.resolution_report
@@ -1112,8 +1179,6 @@ require_once __DIR__ . '/db.php';
                     }
                 }, 100);
             }
-
-            document.getElementById('viewTipModal').style.display = 'block';
         }
 
         function closeViewTipModal() {
@@ -1321,7 +1386,7 @@ require_once __DIR__ . '/db.php';
             }
         }
 
-        function openAgencyTipModal(id) {
+        async function openAgencyTipModal(id) {
             const tip = tipData[id];
             if (!tip) return;
             if (tip.backup_requested_at) {
@@ -1330,8 +1395,12 @@ require_once __DIR__ . '/db.php';
             }
             currentTipId = id;
             document.getElementById('agencyBackupReason').value = tip.police_backup_reason || tip.description || '';
+            document.getElementById('agencyTipModal').style.display = 'block';
             const photoWrap = document.getElementById('agencyTipPhotoPreview');
             const photoImg = document.getElementById('agencyTipPhotoImg');
+            photoImg.removeAttribute('src');
+            photoWrap.style.display = tipHasPhoto(tip) ? 'block' : 'none';
+            await ensureTipPhoto(id);
             if (tip.photo_data) {
                 photoImg.src = tip.photo_data;
                 photoWrap.style.display = 'block';
@@ -1339,7 +1408,6 @@ require_once __DIR__ . '/db.php';
                 photoImg.removeAttribute('src');
                 photoWrap.style.display = 'none';
             }
-            document.getElementById('agencyTipModal').style.display = 'block';
         }
 
         function closeAgencyTipModal() {
@@ -1426,7 +1494,20 @@ require_once __DIR__ . '/db.php';
                 return;
             }
             try {
-                await exportTipsToWord(tips.map(tipToExportPayload));
+                // Load photos only for selected tips (keeps list API light).
+                const idList = tips.map(t => t.id).join(',');
+                const photoRes = await fetch('api/tips.php?ids=' + encodeURIComponent(idList));
+                const photoResult = await photoRes.json();
+                if (photoResult.success && Array.isArray(photoResult.data)) {
+                    photoResult.data.forEach(full => {
+                        if (tipData[full.id]) {
+                            tipData[full.id].photo_data = full.photo_data || '';
+                            tipData[full.id].has_photo = !!full.photo_data;
+                        }
+                    });
+                }
+                const exportTips = tips.map(t => tipData[t.id]).filter(Boolean);
+                await exportTipsToWord(exportTips.map(tipToExportPayload));
                 exitTipExportSelectMode();
             } catch (e) {
                 console.error(e);
