@@ -164,7 +164,7 @@ Production partner URL typically: `anonymous_tip.php` (`EMERGENCY_RESPONSE_API_U
 
 ### Inbound backup status (Partner → AlertaraQC)
 
-Partners should callback when backup progresses. **Tip Outcome** (tanod report) stays separate from this status.
+Partners should callback when assistance progresses (**Inter-Agency Status** in AlertaraQC UI). **Tip Outcome** (tanod report) stays separate from this status.
 
 **Endpoint:** `POST /api/tip_backup_status_receive.php`
 
@@ -193,7 +193,7 @@ Partners should callback when backup progresses. **Tip Outcome** (tanod report) 
 | `/api/send_to_incident_reporting.php` | POST | `{ "id": 1 }` or `{ "tip_id": "TIP-2026-002" }` |
 | `/api/send_to_emergency_response.php` | POST | `{ "id": 1, "police_backup_reason": "..." }` |
 
-Requires admin session. Returns reference IDs and updates the `tips` table. Police backup progress (`Dispatched` / `Completed`) is updated only via the inbound partner callback above.
+Requires admin session. Returns reference IDs and updates the `tips` table. Inter-Agency status progress (`Dispatched` / `Completed`) is updated only via the inbound partner callback above.
 
 ---
 

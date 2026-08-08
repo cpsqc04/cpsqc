@@ -232,15 +232,15 @@ function updateTipBackupStatus(
     if ($normalized === 'Not Requested' && empty($tip['backup_requested_at'])) {
         // Allow explicit Not Requested only when never requested.
     } elseif ($normalized === 'Not Requested' && !empty($tip['backup_requested_at'])) {
-        return ['success' => false, 'message' => 'Cannot reset backup status to Not Requested after a request was sent.'];
+        return ['success' => false, 'message' => 'Cannot reset Inter-Agency status to Not Requested after a request was sent.'];
     }
 
     if (!in_array($normalized, tipBackupStatusOptions(), true)) {
-        return ['success' => false, 'message' => 'Invalid backup status.'];
+        return ['success' => false, 'message' => 'Invalid Inter-Agency status.'];
     }
 
     if ($normalized !== 'Not Requested' && empty($tip['backup_requested_at'])) {
-        return ['success' => false, 'message' => 'Police backup has not been requested for this tip yet.'];
+        return ['success' => false, 'message' => 'Inter-Agency assistance has not been requested for this tip yet.'];
     }
 
     $previous = normalizeTipBackupStatus($tip['backup_status'] ?? null, $tip['backup_requested_at'] ?? null);
@@ -280,7 +280,7 @@ function updateTipBackupStatus(
 
     return [
         'success' => true,
-        'message' => 'Police backup status updated to ' . $normalized . '.',
+        'message' => 'Inter-Agency status updated to ' . $normalized . '.',
         'data' => [
             'id' => $tipId,
             'tip_id' => $updated['tip_id'] ?? null,
@@ -303,8 +303,8 @@ function notifyTipBackupStatusChange(PDO $pdo, array $tip, string $status): void
 
     $tipLabel = (string) ($tip['tip_id'] ?? ('#' . ($tip['id'] ?? '')));
     $status = normalizeTipBackupStatus($status, $tip['backup_requested_at'] ?? null);
-    $title = 'Police Backup: ' . $status;
-    $message = 'Tip #' . $tipLabel . ' police backup is now ' . $status . '.';
+    $title = 'Inter-Agency Status: ' . $status;
+    $message = 'Tip #' . $tipLabel . ' Inter-Agency status is now ' . $status . '.';
     $linkSuffix = 'backup:' . strtolower(str_replace(' ', '-', $status)) . ':' . ($tip['id'] ?? 0);
 
     $patrolId = (int) ($tip['assigned_patrol_id'] ?? 0);

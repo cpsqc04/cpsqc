@@ -25,7 +25,7 @@ function buildEmergencyResponseBackupPayload(array $tip, string $backupReason = 
         $reason = trim($tip['description'] ?? '');
     }
     if ($reason === '') {
-        $reason = 'Police backup requested from BPSO admin review of community tip.';
+        $reason = 'Inter-Agency assistance requested from BPSO admin review of community tip.';
     }
 
     $description = trim($tip['description'] ?? '');
@@ -246,7 +246,7 @@ function parseEmergencyResponseResult(array $transport, string $tipId): array
 
     return [
         'success' => true,
-        'message' => trim((string) ($decoded['message'] ?? 'Tip sent to Emergency Response for police backup.')),
+        'message' => trim((string) ($decoded['message'] ?? 'Tip sent to Inter-Agency for assistance.')),
         'emergency_response_reference_id' => $referenceId,
         'http_code' => $httpCode,
         'retryable_without_photo' => false,
@@ -256,7 +256,7 @@ function parseEmergencyResponseResult(array $transport, string $tipId): array
 function forwardTipToEmergencyResponse(array $tip, string $backupReason = ''): array
 {
     if (!function_exists('curl_init')) {
-        return ['success' => false, 'message' => 'cURL extension is required to request police backup.'];
+        return ['success' => false, 'message' => 'cURL extension is required to request Inter-Agency assistance.'];
     }
 
     $config = getEmergencyResponseApiConfig();
@@ -304,7 +304,7 @@ function forwardTipToEmergencyResponse(array $tip, string $backupReason = ''): a
         $parsed = parseEmergencyResponseResult($transport, $tipId);
         if (!empty($parsed['success'])) {
             if ($index > 0) {
-                $parsed['message'] = trim(($parsed['message'] ?? 'Police backup requested.') . ' (Sent without tip photo after partner API error.)');
+                $parsed['message'] = trim(($parsed['message'] ?? 'Sent to Inter-Agency.') . ' (Sent without tip photo after partner API error.)');
             }
             return $parsed;
         }
@@ -312,7 +312,7 @@ function forwardTipToEmergencyResponse(array $tip, string $backupReason = ''): a
         $lastFailure = $parsed;
     }
 
-    return $lastFailure ?: ['success' => false, 'message' => 'Failed to request police backup.'];
+    return $lastFailure ?: ['success' => false, 'message' => 'Failed to request Inter-Agency assistance.'];
 }
 
 /** @deprecated Use getEmergencyResponseApiConfig() */

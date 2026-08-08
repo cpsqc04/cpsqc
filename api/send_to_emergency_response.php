@@ -58,7 +58,7 @@ try {
         http_response_code(409);
         echo json_encode([
             'success' => false,
-            'message' => 'Police backup was already requested for this tip.',
+            'message' => 'Inter-Agency assistance was already requested for this tip.',
             'data' => [
                 'backup_requested_at' => $tip['backup_requested_at'],
                 'emergency_response_reference_id' => $tip['emergency_response_reference_id'],
@@ -72,7 +72,7 @@ try {
         http_response_code(502);
         echo json_encode([
             'success' => false,
-            'message' => $result['message'] ?? 'Failed to request police backup.',
+            'message' => $result['message'] ?? 'Failed to request Inter-Agency assistance.',
         ]);
         exit;
     }
@@ -114,6 +114,6 @@ try {
     http_response_code(500);
     echo json_encode([
         'success' => false,
-        'message' => 'Unable to request police backup: ' . $e->getMessage(),
+        'message' => 'Unable to request Inter-Agency assistance: ' . $e->getMessage(),
     ]);
 }

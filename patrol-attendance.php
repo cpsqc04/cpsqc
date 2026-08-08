@@ -958,7 +958,7 @@ $personnelCode = htmlspecialchars(getBpsoPersonnelCode());
                                     <th>Tip ID</th>
                                     <th>Location</th>
                                     <th>Outcome</th>
-                                    <th>Police Backup</th>
+                                    <th>Inter-Agency Status</th>
                                     <th>Status</th>
                                     <th>Actions</th>
                                 </tr>
@@ -1082,7 +1082,7 @@ $personnelCode = htmlspecialchars(getBpsoPersonnelCode());
                         <option value="Arrest Made">Arrest Made</option>
                         <option value="Unfounded / No Action">Unfounded / No Action</option>
                     </select>
-                    <p class="field-hint">Final outcome is set by your report. Police backup status (Requested / Dispatched / Completed) comes from Inter-Agency and is separate.</p>
+                    <p class="field-hint">Final outcome is set by your report. Inter-Agency status (Requested / Dispatched / Completed) is separate and updated by the partner.</p>
                 </div>
                 <div style="display:flex;gap:0.75rem;flex-wrap:wrap;justify-content:flex-end;">
                     <button type="submit" id="resolveTipBtn" class="btn-submit">Mark as Resolved</button>
@@ -3025,7 +3025,7 @@ $personnelCode = htmlspecialchars(getBpsoPersonnelCode());
                 ? `<br><span style="color:var(--text-secondary);font-size:0.85rem;">${escapeHtml(tip.backup_status_notes)}</span>`
                 : '';
             const backupBlock = backupStatus !== 'Not Requested'
-                ? `<div class="complaint-detail"><strong>Police backup:</strong> ${tipBackupBadgeHtml(tip)}${backupNotes}<br><span style="color:var(--text-secondary);font-size:0.85rem;">Inter-Agency status — you still submit the tip outcome below.</span></div>`
+                ? `<div class="complaint-detail"><strong>Inter-Agency status:</strong> ${tipBackupBadgeHtml(tip)}${backupNotes}<br><span style="color:var(--text-secondary);font-size:0.85rem;">Updated by Inter-Agency — you still submit the tip outcome below.</span></div>`
                 : '';
             document.getElementById('tipDetailContent').innerHTML = `
                 <div class="complaint-detail"><strong>Tip ID:</strong> ${escapeHtml(tip.tip_id)}</div>

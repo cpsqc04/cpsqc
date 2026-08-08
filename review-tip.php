@@ -663,7 +663,7 @@ require_once __DIR__ . '/db.php';
                                 <th>Tip Description</th>
                                 <th>Assigned To</th>
                                 <th title="Set by the assigned BPSO patrol in their tip report">Outcome</th>
-                                <th title="Updated by Inter-Agency / Emergency Response">Police Backup</th>
+                                <th title="Updated by Inter-Agency / Emergency Response">Inter-Agency Status</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
@@ -711,7 +711,7 @@ require_once __DIR__ . '/db.php';
                 </button>
             </div>
             <div class="manage-backup-panel" id="manageBackupPanel" style="display:none;">
-                <p><strong>Police backup:</strong> <span id="manageBackupBadge"></span></p>
+                <p><strong>Inter-Agency status:</strong> <span id="manageBackupBadge"></span></p>
                 <p class="manage-backup-hint" id="manageBackupMeta"></p>
                 <p class="manage-backup-hint">Updated by Inter-Agency (Requested → Dispatched → Completed). Tip Outcome stays with the assigned tanod report.</p>
             </div>
@@ -745,21 +745,21 @@ require_once __DIR__ . '/db.php';
         </div>
     </div>
 
-    <!-- Inter-Agency / Police Backup Modal -->
+    <!-- Inter-Agency Status Modal -->
     <div id="agencyTipModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
                 <h2>Send to Inter-Agency</h2>
                 <span class="close" onclick="closeAgencyTipModal()">&times;</span>
             </div>
-            <p style="margin:0 0 1rem 0;color:var(--text-secondary);line-height:1.5;">Request police backup assistance. BPSO remains responsible for the final tip report. Tip photo evidence is included when available.</p>
+            <p style="margin:0 0 1rem 0;color:var(--text-secondary);line-height:1.5;">Request Inter-Agency assistance. BPSO remains responsible for the final tip report. Tip photo evidence is included when available.</p>
             <div id="agencyTipPhotoPreview" class="form-group" style="display:none;">
                 <label>Tip photo (included with request)</label>
                 <img id="agencyTipPhotoImg" src="" alt="Tip photo" class="tip-photo-full" style="max-height:220px;margin-top:0.35rem;">
             </div>
             <div class="form-group">
-                <label for="agencyBackupReason">Reason for police backup</label>
-                <textarea id="agencyBackupReason" placeholder="Describe why police assistance is needed..."></textarea>
+                <label for="agencyBackupReason">Reason for Inter-Agency request</label>
+                <textarea id="agencyBackupReason" placeholder="Describe why Inter-Agency assistance is needed..."></textarea>
             </div>
             <div class="form-actions">
                 <button type="button" class="btn-cancel" onclick="closeAgencyTipModal()">Cancel</button>
@@ -1097,7 +1097,7 @@ require_once __DIR__ . '/db.php';
                 <p><strong>Location:</strong> ${escapeHtml(tip.location || '')}</p>
                 <p><strong>Assigned To:</strong> ${escapeHtml(tip.assigned_to || 'Not assigned')}</p>
                 <p><strong>Outcome:</strong> ${escapeHtml(displayTipOutcome(tip))} <span style="color:var(--text-secondary);font-size:0.85rem;">(from assigned patrol report)</span></p>
-                <p><strong>Police Backup:</strong> ${backupStatusBadgeHtml(tip)}${tip.backup_status_notes ? `<br><span style="color:var(--text-secondary);font-size:0.85rem;">${escapeHtml(tip.backup_status_notes)}</span>` : ''}</p>
+                <p><strong>Inter-Agency Status:</strong> ${backupStatusBadgeHtml(tip)}${tip.backup_status_notes ? `<br><span style="color:var(--text-secondary);font-size:0.85rem;">${escapeHtml(tip.backup_status_notes)}</span>` : ''}</p>
                 <p><strong>Tip Description:</strong><br>${escapeHtml(tip.description || '')}</p>
                 ${reportHtml}
                 ${photoHtml}
@@ -1147,7 +1147,7 @@ require_once __DIR__ . '/db.php';
 
             agencyBtn.disabled = !!tip.backup_requested_at;
             agencyBtn.innerHTML = tip.backup_requested_at
-                ? '<i class="fas fa-check"></i> Police backup already requested'
+                ? '<i class="fas fa-check"></i> Already sent to Inter-Agency'
                 : '<i class="fas fa-shield-alt"></i> Send to Inter-Agency';
 
             assignBtn.disabled = tip.status === 'Resolved';
@@ -1335,7 +1335,7 @@ require_once __DIR__ . '/db.php';
             const tip = tipData[id];
             if (!tip) return;
             if (tip.backup_requested_at) {
-                alert('Police backup was already requested for this tip.');
+                alert('Inter-Agency assistance was already requested for this tip.');
                 return;
             }
             currentTipId = id;
@@ -1377,7 +1377,7 @@ require_once __DIR__ . '/db.php';
                 });
                 const result = await response.json();
                 if (!result.success) {
-                    alert(result.message || 'Failed to request police backup.');
+                    alert(result.message || 'Failed to request Inter-Agency assistance.');
                     return;
                 }
                 tip.backup_requested_at = result.data?.backup_requested_at || new Date().toISOString();
@@ -1390,7 +1390,7 @@ require_once __DIR__ . '/db.php';
                     row.remove();
                     addTipTableRow(tip.id);
                 }
-                alert(result.message || 'Police backup requested. Inter-Agency will update Dispatched/Completed. Tanod still submits the tip outcome.');
+                alert(result.message || 'Sent to Inter-Agency. They will update status to Dispatched/Completed. Tanod still submits the tip outcome.');
                 closeAgencyTipModal();
             } catch (e) {
                 console.error(e);
@@ -1406,7 +1406,7 @@ require_once __DIR__ . '/db.php';
                 description: tip.description || '',
                 assignedTo: tip.assigned_to || 'Not assigned',
                 outcome: displayTipOutcome(tip),
-                policeBackup: displayTipBackupStatus(tip),
+                interAgencyStatus: displayTipBackupStatus(tip),
                 resolutionReport: tip.resolution_report || ''
             };
         }
