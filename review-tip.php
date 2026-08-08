@@ -1388,6 +1388,14 @@ require_once __DIR__ . '/db.php';
             }
         }
 
+        function tipPhotoForExport(photoData) {
+            const raw = String(photoData || '').trim();
+            if (!raw) return '';
+            if (raw.indexOf('data:image/') === 0) return raw;
+            // Older tips may store bare base64.
+            return 'data:image/jpeg;base64,' + raw.replace(/\s+/g, '');
+        }
+
         function tipToExportPayload(tip) {
             return {
                 tipId: tip.tip_id || '',
@@ -1397,7 +1405,8 @@ require_once __DIR__ . '/db.php';
                 assignedTo: tip.assigned_to || 'Not assigned',
                 outcome: displayTipOutcome(tip),
                 interAgencyStatus: displayTipBackupStatus(tip),
-                resolutionReport: tip.resolution_report || ''
+                resolutionReport: tip.resolution_report || '',
+                photoData: tipPhotoForExport(tip.photo_data)
             };
         }
 
@@ -1433,13 +1442,7 @@ require_once __DIR__ . '/db.php';
             if (!Array.isArray(tips) || !tips.length) return;
 
             const sections = tips.map(function(tip) {
-                const blocks = [
-                    { label: 'Tip Description', value: tip.description || '' }
-                ];
-                if (tip.resolutionReport) {
-                    blocks.push({ label: 'BPSO Report', value: tip.resolutionReport });
-                }
-                return {
+                const section = {
                     fields: [
                         { label: 'Tip ID', value: tip.tipId || '' },
                         { label: 'Timestamp', value: tip.timestamp || '' },
@@ -1447,8 +1450,19 @@ require_once __DIR__ . '/db.php';
                         { label: 'Assigned To', value: tip.assignedTo || 'Not assigned' },
                         { label: 'Outcome', value: tip.outcome || 'No Outcome Yet' }
                     ],
-                    blocks: blocks
+                    blocks: [
+                        { label: 'Tip Description', value: tip.description || '' }
+                    ],
+                    images: [
+                        { label: 'Tip Photo', src: tip.photoData || '' }
+                    ]
                 };
+                if (tip.resolutionReport) {
+                    section.blocksAfterImages = [
+                        { label: 'BPSO Report', value: tip.resolutionReport }
+                    ];
+                }
+                return section;
             });
 
             const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');

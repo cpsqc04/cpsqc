@@ -235,6 +235,11 @@
         if (section._imageXml) {
             xml += section._imageXml;
         }
+        if (section.blocksAfterImages && section.blocksAfterImages.length) {
+            section.blocksAfterImages.forEach(function (b) {
+                xml += blockXml(b.label, b.value);
+            });
+        }
         return { xml: xml };
     }
 
