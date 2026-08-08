@@ -84,11 +84,13 @@ try {
         $reasonToStore = trim($tip['description'] ?? '');
     }
 
-    $update = $pdo->prepare('UPDATE tips SET backup_requested_at = :backup_requested_at, emergency_response_reference_id = :reference_id, police_backup_reason = :reason WHERE id = :id');
+    $update = $pdo->prepare('UPDATE tips SET backup_requested_at = :backup_requested_at, emergency_response_reference_id = :reference_id, police_backup_reason = :reason, backup_status = :backup_status, backup_status_updated_at = :backup_status_updated_at WHERE id = :id');
     $update->execute([
         ':backup_requested_at' => $timestamp,
         ':reference_id' => $referenceId !== '' ? $referenceId : null,
         ':reason' => $reasonToStore !== '' ? $reasonToStore : null,
+        ':backup_status' => 'Requested',
+        ':backup_status_updated_at' => $timestamp,
         ':id' => $id,
     ]);
 
@@ -99,6 +101,8 @@ try {
             'id' => $id,
             'tip_id' => $tip['tip_id'],
             'backup_requested_at' => $timestamp,
+            'backup_status' => 'Requested',
+            'backup_status_updated_at' => $timestamp,
             'emergency_response_reference_id' => $referenceId,
             'police_backup_reason' => $reasonToStore,
         ],

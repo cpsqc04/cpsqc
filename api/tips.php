@@ -35,6 +35,10 @@ if ($method === 'GET') {
         $tips = $stmt->fetchAll(PDO::FETCH_ASSOC);
         foreach ($tips as &$tip) {
             $tip['status'] = normalizeTipStatus($tip['status'] ?? 'New');
+            $tip['backup_status'] = normalizeTipBackupStatus(
+                $tip['backup_status'] ?? null,
+                $tip['backup_requested_at'] ?? null
+            );
         }
         unset($tip);
 
@@ -215,6 +219,53 @@ if ($method === 'POST') {
         } catch (PDOException $e) {
             http_response_code(500);
             echo json_encode(['success' => false, 'message' => 'Failed to assign tip: ' . $e->getMessage()]);
+        }
+        exit;
+    }
+
+    if ($action === 'update_backup_status') {
+        $id = (int) ($input['id'] ?? 0);
+        $status = trim((string) ($input['backup_status'] ?? $input['status'] ?? ''));
+        $notes = trim((string) ($input['notes'] ?? $input['backup_status_notes'] ?? ''));
+
+        if ($id <= 0 || $status === '') {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'message' => 'Tip id and backup_status are required.']);
+            exit;
+        }
+
+        try {
+            $result = updateTipBackupStatus(
+                $pdo,
+                $id,
+                $status,
+                $notes !== '' ? $notes : null
+            );
+            if (!$result['success']) {
+                http_response_code(400);
+                echo json_encode($result);
+                exit;
+            }
+
+            $tip = $result['data']['tip'] ?? [];
+            if (($result['data']['previous_status'] ?? '') !== ($result['data']['backup_status'] ?? '')) {
+                notifyTipBackupStatusChange($pdo, $tip, (string) ($result['data']['backup_status'] ?? $status));
+            }
+
+            echo json_encode([
+                'success' => true,
+                'message' => $result['message'],
+                'data' => [
+                    'id' => $id,
+                    'tip_id' => $result['data']['tip_id'] ?? null,
+                    'backup_status' => $result['data']['backup_status'] ?? null,
+                    'backup_status_updated_at' => $result['data']['backup_status_updated_at'] ?? null,
+                    'backup_status_notes' => $result['data']['backup_status_notes'] ?? null,
+                ],
+            ]);
+        } catch (PDOException $e) {
+            http_response_code(500);
+            echo json_encode(['success' => false, 'message' => 'Failed to update backup status: ' . $e->getMessage()]);
         }
         exit;
     }

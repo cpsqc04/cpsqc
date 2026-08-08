@@ -372,6 +372,12 @@ $personnelCode = htmlspecialchars(getBpsoPersonnelCode());
         .status-pending { background: #fef3c7; color: #b45309; }
         .status-processing { background: #dbeafe; color: #1d4ed8; }
         .status-resolved { background: #d1fae5; color: #047857; }
+        .backup-badge { padding: 0.25rem 0.75rem; border-radius: 12px; font-size: 0.82rem; font-weight: 500; display: inline-block; }
+        .backup-none { background: #f3f4f6; color: #4b5563; }
+        .backup-requested { background: #fef3c7; color: #92400e; }
+        .backup-dispatched { background: #dbeafe; color: #1e40af; }
+        .backup-completed { background: #d1fae5; color: #065f46; }
+        .backup-declined { background: #fee2e2; color: #991b1b; }
         .btn-view { padding: 0.5rem 1rem; background: var(--primary-color); color: #fff; border: none; border-radius: 6px; font-size: 0.85rem; cursor: pointer; }
         .btn-view:hover { background: #4ca8a6; }
         .btn-edit { padding: 0.5rem 1rem; background: var(--primary-color); color: #fff; border: none; border-radius: 6px; font-size: 0.85rem; cursor: pointer; margin-left: 0.35rem; }
@@ -952,12 +958,13 @@ $personnelCode = htmlspecialchars(getBpsoPersonnelCode());
                                     <th>Tip ID</th>
                                     <th>Location</th>
                                     <th>Outcome</th>
+                                    <th>Police Backup</th>
                                     <th>Status</th>
                                     <th>Actions</th>
                                 </tr>
                             </thead>
                             <tbody id="tipsTableBody">
-                                <tr><td colspan="5" class="empty-state">Loading tips...</td></tr>
+                                <tr><td colspan="6" class="empty-state">Loading tips...</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -1075,7 +1082,7 @@ $personnelCode = htmlspecialchars(getBpsoPersonnelCode());
                         <option value="Arrest Made">Arrest Made</option>
                         <option value="Unfounded / No Action">Unfounded / No Action</option>
                     </select>
-                    <p class="field-hint">Final outcome is set by your report. Police backup (if requested) is assistance only.</p>
+                    <p class="field-hint">Final outcome is set by your report. Police backup status (Requested / Dispatched / Completed) comes from Inter-Agency and is separate.</p>
                 </div>
                 <div style="display:flex;gap:0.75rem;flex-wrap:wrap;justify-content:flex-end;">
                     <button type="submit" id="resolveTipBtn" class="btn-submit">Mark as Resolved</button>
@@ -2915,6 +2922,28 @@ $personnelCode = htmlspecialchars(getBpsoPersonnelCode());
             return 'status-pending';
         }
 
+        function displayTipBackupStatus(tip) {
+            if (!tip) return 'Not Requested';
+            const raw = (tip.backup_status || '').trim();
+            if (raw) return raw;
+            return tip.backup_requested_at ? 'Requested' : 'Not Requested';
+        }
+
+        function tipBackupBadgeClass(status) {
+            switch (status) {
+                case 'Requested': return 'backup-requested';
+                case 'Dispatched': return 'backup-dispatched';
+                case 'Completed': return 'backup-completed';
+                case 'Declined': return 'backup-declined';
+                default: return 'backup-none';
+            }
+        }
+
+        function tipBackupBadgeHtml(tip) {
+            const status = displayTipBackupStatus(tip);
+            return `<span class="backup-badge ${tipBackupBadgeClass(status)}">${escapeHtml(status)}</span>`;
+        }
+
         function setTipFilter(filter, button) {
             tipFilter = filter;
             document.querySelectorAll('#panel-tips .filter-tab').forEach(tab => tab.classList.remove('active'));
@@ -2930,7 +2959,7 @@ $personnelCode = htmlspecialchars(getBpsoPersonnelCode());
             if (tipFilter === 'resolved') rows = rows.filter(r => r.status === 'Resolved');
 
             if (!rows.length) {
-                tbody.innerHTML = '<tr><td colspan="5" class="empty-state"><i class="fas fa-inbox"></i>No tips in this filter.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="6" class="empty-state"><i class="fas fa-inbox"></i>No tips in this filter.</td></tr>';
                 return;
             }
 
@@ -2941,6 +2970,7 @@ $personnelCode = htmlspecialchars(getBpsoPersonnelCode());
                     <td>${escapeHtml(row.tip_id)}</td>
                     <td>${escapeHtml(row.location)}</td>
                     <td>${escapeHtml(row.outcome || 'No Outcome Yet')}</td>
+                    <td>${tipBackupBadgeHtml(row)}</td>
                     <td><span class="status-badge ${tipStatusClass(row.status)}">${escapeHtml(row.status)}</span></td>
                     <td>${canResolve
                         ? `<button type="button" class="btn-view" onclick="openTipModal(${row.id})">Report / Resolve</button>`
@@ -2955,21 +2985,21 @@ $personnelCode = htmlspecialchars(getBpsoPersonnelCode());
                 const res = await fetch('api/bpso_tips.php');
                 const result = await res.json();
                 if (!result.success) {
-                    tbody.innerHTML = '<tr><td colspan="5" class="empty-state">Failed to load tips.</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="6" class="empty-state">Failed to load tips.</td></tr>';
                     portalTips = [];
                     updateNavBadges();
                     return;
                 }
                 portalTips = result.data || [];
                 if (!portalTips.length) {
-                    tbody.innerHTML = '<tr><td colspan="5" class="empty-state"><i class="fas fa-inbox"></i>No tips assigned to you yet.</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="6" class="empty-state"><i class="fas fa-inbox"></i>No tips assigned to you yet.</td></tr>';
                     updateNavBadges();
                     return;
                 }
                 renderTipsTable();
                 updateNavBadges();
             } catch (e) {
-                tbody.innerHTML = '<tr><td colspan="5" class="empty-state">Error loading tips.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="6" class="empty-state">Error loading tips.</td></tr>';
                 portalTips = [];
                 updateNavBadges();
             }
@@ -2990,13 +3020,20 @@ $personnelCode = htmlspecialchars(getBpsoPersonnelCode());
             } else {
                 photoHtml = '<div class="complaint-detail"><strong>Photo:</strong> No photo attached</div>';
             }
+            const backupStatus = displayTipBackupStatus(tip);
+            const backupNotes = tip.backup_status_notes
+                ? `<br><span style="color:var(--text-secondary);font-size:0.85rem;">${escapeHtml(tip.backup_status_notes)}</span>`
+                : '';
+            const backupBlock = backupStatus !== 'Not Requested'
+                ? `<div class="complaint-detail"><strong>Police backup:</strong> ${tipBackupBadgeHtml(tip)}${backupNotes}<br><span style="color:var(--text-secondary);font-size:0.85rem;">Inter-Agency status — you still submit the tip outcome below.</span></div>`
+                : '';
             document.getElementById('tipDetailContent').innerHTML = `
                 <div class="complaint-detail"><strong>Tip ID:</strong> ${escapeHtml(tip.tip_id)}</div>
                 <div class="complaint-detail"><strong>Location:</strong> ${escapeHtml(tip.location)}</div>
                 <div class="complaint-detail"><strong>Description:</strong><br>${escapeHtml(tip.description)}</div>
                 ${photoHtml}
                 <div class="complaint-detail"><strong>Status:</strong> <span class="status-badge ${tipStatusClass(tip.status)}">${escapeHtml(tip.status)}</span></div>
-                ${tip.backup_requested_at ? '<div class="complaint-detail"><strong>Police backup:</strong> Requested (assistance only — you still submit the final report)</div>' : ''}
+                ${backupBlock}
             `;
             const isResolved = tip.status === 'Resolved';
             document.getElementById('tipResolutionReport').readOnly = isResolved;

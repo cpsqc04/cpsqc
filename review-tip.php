@@ -392,6 +392,33 @@ require_once __DIR__ . '/db.php';
         .outcome-success { background: #d1fae5; color: #065f46; }
         .outcome-arrest { background: #fee2e2; color: #991b1b; }
         .outcome-unfounded { background: #ede9fe; color: #5b21b6; }
+        .backup-badge { padding: 0.25rem 0.75rem; border-radius: 12px; font-size: 0.82rem; font-weight: 500; display: inline-block; }
+        .backup-none { background: #f3f4f6; color: #4b5563; }
+        .backup-requested { background: #fef3c7; color: #92400e; }
+        .backup-dispatched { background: #dbeafe; color: #1e40af; }
+        .backup-completed { background: #d1fae5; color: #065f46; }
+        .backup-declined { background: #fee2e2; color: #991b1b; }
+        .manage-backup-panel {
+            margin-top: 1rem;
+            padding: 0.9rem 1rem;
+            border: 1px solid var(--border-color, #e5e7eb);
+            border-radius: 8px;
+            background: #f9fafb;
+        }
+        .manage-backup-panel p { margin: 0 0 0.5rem; line-height: 1.45; }
+        .manage-backup-hint { font-size: 0.85rem; color: var(--text-secondary); }
+        .manage-backup-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.75rem; }
+        .manage-backup-actions button {
+            border: 1px solid #d1d5db;
+            background: #fff;
+            color: #1f2937;
+            border-radius: 6px;
+            padding: 0.4rem 0.7rem;
+            font-size: 0.82rem;
+            cursor: pointer;
+        }
+        .manage-backup-actions button:hover:not(:disabled) { background: #f3f4f6; }
+        .manage-backup-actions button:disabled { opacity: 0.45; cursor: not-allowed; }
         .action-buttons { display: flex; gap: 0.5rem; }
         .btn-view, .btn-manage {
             padding: 0.5rem 1rem;
@@ -647,6 +674,7 @@ require_once __DIR__ . '/db.php';
                                 <th>Tip Description</th>
                                 <th>Assigned To</th>
                                 <th title="Set by the assigned BPSO patrol in their tip report">Outcome</th>
+                                <th title="Updated by Inter-Agency / Emergency Response">Police Backup</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
@@ -692,6 +720,16 @@ require_once __DIR__ . '/db.php';
                 <button type="button" class="manage-btn-agency" id="manageAgencyBtn" onclick="manageSendAgency()">
                     <i class="fas fa-shield-alt"></i> Send to Inter-Agency
                 </button>
+            </div>
+            <div class="manage-backup-panel" id="manageBackupPanel" style="display:none;">
+                <p><strong>Police backup:</strong> <span id="manageBackupBadge"></span></p>
+                <p class="manage-backup-hint" id="manageBackupMeta"></p>
+                <p class="manage-backup-hint">Inter-Agency owns this status (Dispatched / Completed). Tip Outcome stays with the assigned tanod report. Use the buttons below to simulate partner updates for demo.</p>
+                <div class="manage-backup-actions">
+                    <button type="button" id="simBackupDispatched" onclick="setTipBackupStatus('Dispatched')">Mark Dispatched</button>
+                    <button type="button" id="simBackupCompleted" onclick="setTipBackupStatus('Completed')">Mark Completed</button>
+                    <button type="button" id="simBackupDeclined" onclick="setTipBackupStatus('Declined')">Mark Declined</button>
+                </div>
             </div>
             <div class="form-actions">
                 <button type="button" class="btn-cancel" onclick="closeManageTipModal()">Close</button>
@@ -953,6 +991,13 @@ require_once __DIR__ . '/db.php';
             return tip.outcome || 'No Outcome Yet';
         }
 
+        function displayTipBackupStatus(tip) {
+            if (!tip) return 'Not Requested';
+            const raw = (tip.backup_status || '').trim();
+            if (raw) return raw;
+            return tip.backup_requested_at ? 'Requested' : 'Not Requested';
+        }
+
         function getOutcomeBadgeClass(outcome) {
             switch (outcome) {
                 case 'Under Investigation':
@@ -966,6 +1011,26 @@ require_once __DIR__ . '/db.php';
                 default:
                     return 'outcome-none';
             }
+        }
+
+        function getBackupBadgeClass(status) {
+            switch (status) {
+                case 'Requested':
+                    return 'backup-requested';
+                case 'Dispatched':
+                    return 'backup-dispatched';
+                case 'Completed':
+                    return 'backup-completed';
+                case 'Declined':
+                    return 'backup-declined';
+                default:
+                    return 'backup-none';
+            }
+        }
+
+        function backupStatusBadgeHtml(tip) {
+            const status = displayTipBackupStatus(tip);
+            return `<span class="backup-badge ${getBackupBadgeClass(status)}">${escapeHtml(status)}</span>`;
         }
 
         function addTipTableRow(id) {
@@ -996,6 +1061,7 @@ require_once __DIR__ . '/db.php';
                 <td>${escapeHtml(tip.description || '')}</td>
                 <td>${escapeHtml(assignedTo)}</td>
                 <td><span class="outcome-badge ${outcomeClass}">${escapeHtml(outcomeText)}</span></td>
+                <td>${backupStatusBadgeHtml(tip)}</td>
                 <td>
                     <div class="action-buttons">
                         <button type="button" class="btn-view" onclick="viewTip('${id}')">View</button>
@@ -1047,6 +1113,7 @@ require_once __DIR__ . '/db.php';
                 <p><strong>Location:</strong> ${escapeHtml(tip.location || '')}</p>
                 <p><strong>Assigned To:</strong> ${escapeHtml(tip.assigned_to || 'Not assigned')}</p>
                 <p><strong>Outcome:</strong> ${escapeHtml(displayTipOutcome(tip))} <span style="color:var(--text-secondary);font-size:0.85rem;">(from assigned patrol report)</span></p>
+                <p><strong>Police Backup:</strong> ${backupStatusBadgeHtml(tip)}${tip.backup_status_notes ? `<br><span style="color:var(--text-secondary);font-size:0.85rem;">${escapeHtml(tip.backup_status_notes)}</span>` : ''}</p>
                 <p><strong>Tip Description:</strong><br>${escapeHtml(tip.description || '')}</p>
                 ${reportHtml}
                 ${photoHtml}
@@ -1104,7 +1171,64 @@ require_once __DIR__ . '/db.php';
                 ? '<i class="fas fa-ban"></i> Tip already resolved'
                 : '<i class="fas fa-user-check"></i> Assign Patrol';
 
+            const backupPanel = document.getElementById('manageBackupPanel');
+            const backupStatus = displayTipBackupStatus(tip);
+            if (tip.backup_requested_at || backupStatus !== 'Not Requested') {
+                backupPanel.style.display = 'block';
+                document.getElementById('manageBackupBadge').innerHTML = backupStatusBadgeHtml(tip);
+                const updated = tip.backup_status_updated_at
+                    ? 'Updated ' + formatTipTimestamp(tip.backup_status_updated_at)
+                    : (tip.backup_requested_at ? 'Requested ' + formatTipTimestamp(tip.backup_requested_at) : '');
+                const ref = tip.emergency_response_reference_id
+                    ? ' · Ref: ' + tip.emergency_response_reference_id
+                    : '';
+                const notes = tip.backup_status_notes ? ' · ' + tip.backup_status_notes : '';
+                document.getElementById('manageBackupMeta').textContent = (updated + ref + notes).trim() || 'Awaiting Inter-Agency updates.';
+                document.getElementById('simBackupDispatched').disabled = backupStatus === 'Dispatched' || backupStatus === 'Completed';
+                document.getElementById('simBackupCompleted').disabled = backupStatus === 'Completed';
+                document.getElementById('simBackupDeclined').disabled = backupStatus === 'Completed' || backupStatus === 'Declined';
+            } else {
+                backupPanel.style.display = 'none';
+            }
+
             document.getElementById('manageTipModal').style.display = 'block';
+        }
+
+        async function setTipBackupStatus(status) {
+            if (!currentTipId) return;
+            const tip = tipData[currentTipId];
+            if (!tip) return;
+            if (!confirm(`Set police backup status for ${tip.tip_id} to "${status}"?`)) return;
+
+            try {
+                const response = await fetch('api/tips.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        action: 'update_backup_status',
+                        id: tip.id,
+                        backup_status: status,
+                        notes: 'Manual / demo update from Review Tip'
+                    })
+                });
+                const result = await response.json();
+                if (!result.success) {
+                    alert(result.message || 'Failed to update backup status.');
+                    return;
+                }
+                tip.backup_status = result.data?.backup_status || status;
+                tip.backup_status_updated_at = result.data?.backup_status_updated_at || new Date().toISOString();
+                tip.backup_status_notes = result.data?.backup_status_notes || tip.backup_status_notes;
+                const row = document.querySelector(`tr[data-tip-id="${tip.id}"]`);
+                if (row) {
+                    row.remove();
+                    addTipTableRow(tip.id);
+                }
+                openManageTipModal(tip.id);
+            } catch (e) {
+                console.error(e);
+                alert('Failed to update police backup status.');
+            }
         }
 
         function closeManageTipModal() {
@@ -1313,9 +1437,16 @@ require_once __DIR__ . '/db.php';
                     return;
                 }
                 tip.backup_requested_at = result.data?.backup_requested_at || new Date().toISOString();
+                tip.backup_status = result.data?.backup_status || 'Requested';
+                tip.backup_status_updated_at = result.data?.backup_status_updated_at || tip.backup_requested_at;
                 tip.police_backup_reason = reason;
                 tip.emergency_response_reference_id = result.data?.emergency_response_reference_id || tip.emergency_response_reference_id;
-                alert(result.message || 'Police backup requested. BPSO must still submit the final tip report.');
+                const row = document.querySelector(`tr[data-tip-id="${tip.id}"]`);
+                if (row) {
+                    row.remove();
+                    addTipTableRow(tip.id);
+                }
+                alert(result.message || 'Police backup requested. Inter-Agency will update Dispatched/Completed. Tanod still submits the tip outcome.');
                 closeAgencyTipModal();
             } catch (e) {
                 console.error(e);
@@ -1331,6 +1462,7 @@ require_once __DIR__ . '/db.php';
                 description: tip.description || '',
                 assignedTo: tip.assigned_to || 'Not assigned',
                 outcome: displayTipOutcome(tip),
+                policeBackup: displayTipBackupStatus(tip),
                 resolutionReport: tip.resolution_report || ''
             };
         }

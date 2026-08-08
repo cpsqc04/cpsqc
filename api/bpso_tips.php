@@ -35,6 +35,10 @@ if ($method === 'GET') {
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
         foreach ($rows as &$row) {
             $row['status'] = normalizeTipStatus($row['status'] ?? 'Assigned');
+            $row['backup_status'] = normalizeTipBackupStatus(
+                $row['backup_status'] ?? null,
+                $row['backup_requested_at'] ?? null
+            );
         }
         unset($row);
         echo json_encode(['success' => true, 'data' => $rows]);

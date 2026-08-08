@@ -162,6 +162,28 @@ Production partner URL typically: `anonymous_tip.php` (`EMERGENCY_RESPONSE_API_U
 }
 ```
 
+### Inbound backup status (Partner → AlertaraQC)
+
+Partners should callback when backup progresses. **Tip Outcome** (tanod report) stays separate from this status.
+
+**Endpoint:** `POST /api/tip_backup_status_receive.php`
+
+**Headers:**
+- `Content-Type: application/json`
+- `X-API-Key: {EMERGENCY_RESPONSE_API_KEY}` or `Authorization: Bearer {EMERGENCY_RESPONSE_API_KEY}`
+
+**Accepted `backup_status` values:** `Requested`, `Dispatched`, `Completed`, `Declined`  
+(Aliases like `On Scene` / `En Route` map to `Dispatched`.)
+
+```json
+{
+  "source_tip_id": "TIP-2026-002",
+  "backup_status": "Dispatched",
+  "notes": "Unit 12 en route",
+  "emergency_response_reference_id": "COORD-2026-A1B2C3"
+}
+```
+
 ---
 
 ## AlertaraQC admin endpoints (internal)
@@ -170,6 +192,7 @@ Production partner URL typically: `anonymous_tip.php` (`EMERGENCY_RESPONSE_API_U
 |----------|--------|------|
 | `/api/send_to_incident_reporting.php` | POST | `{ "id": 1 }` or `{ "tip_id": "TIP-2026-002" }` |
 | `/api/send_to_emergency_response.php` | POST | `{ "id": 1, "police_backup_reason": "..." }` |
+| `/api/tips.php` | POST | `{ "action": "update_backup_status", "id": 1, "backup_status": "Dispatched" }` |
 
 Requires admin session. Returns reference IDs and updates the `tips` table.
 
