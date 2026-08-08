@@ -4,45 +4,73 @@
  * Normalize / compress tip photos for partner outbound payloads.
  */
 
-function prepareTipOutboundPhoto(?string $photoData, int $maxChars = 4_500_000): array
+function prepareTipOutboundPhoto(?string $photoData, int $maxChars = 900_000): array
 {
     $raw = trim((string) $photoData);
     if ($raw === '') {
         return [
             'has_photo' => false,
             'photo_data' => '',
+            'photo_base64' => '',
+            'mime' => '',
         ];
     }
 
     $dataUrl = $raw;
     if (!str_starts_with($raw, 'data:')) {
         // Bare base64 from older clients — assume JPEG.
-        $dataUrl = 'data:image/jpeg;base64,' . $raw;
+        $dataUrl = 'data:image/jpeg;base64,' . preg_replace('/\s+/', '', $raw);
     }
 
-    if (strlen($dataUrl) <= $maxChars) {
+    // Always try to compress sizable images — partner hosts often 500 on multi‑MB JSON.
+    if (strlen($dataUrl) > 180_000 || !str_contains(strtolower($dataUrl), 'image/jpeg')) {
+        $compressed = tipOutboundCompressPhotoDataUrl($dataUrl, 1024, 72);
+        if ($compressed !== '') {
+            $dataUrl = $compressed;
+        }
+    }
+
+    if (strlen($dataUrl) > $maxChars) {
+        $compressed = tipOutboundCompressPhotoDataUrl($dataUrl, 800, 62);
+        if ($compressed !== '' && strlen($compressed) < strlen($dataUrl)) {
+            $dataUrl = $compressed;
+        }
+    }
+
+    if (strlen($dataUrl) > $maxChars) {
+        $compressed = tipOutboundCompressPhotoDataUrl($dataUrl, 640, 55);
+        if ($compressed !== '' && strlen($compressed) <= $maxChars) {
+            $dataUrl = $compressed;
+        }
+    }
+
+    // If still too large for shared-host JSON posts, drop the photo rather than crash partners.
+    if (strlen($dataUrl) > $maxChars) {
         return [
-            'has_photo' => true,
-            'photo_data' => $dataUrl,
+            'has_photo' => false,
+            'photo_data' => '',
+            'photo_base64' => '',
+            'mime' => '',
+            'omitted' => true,
         ];
     }
 
-    $compressed = tipOutboundCompressPhotoDataUrl($dataUrl);
-    if ($compressed !== '' && (strlen($compressed) <= $maxChars || strlen($compressed) < strlen($dataUrl))) {
-        return [
-            'has_photo' => true,
-            'photo_data' => $compressed,
-        ];
+    $base64 = '';
+    $mime = 'image/jpeg';
+    if (preg_match('#^data:(image/[^;]+);base64,(.+)$#is', $dataUrl, $matches)) {
+        $mime = strtolower(trim($matches[1]));
+        $base64 = preg_replace('/\s+/', '', $matches[2]);
     }
 
-    // Still include original rather than silently dropping evidence.
     return [
-        'has_photo' => true,
+        'has_photo' => $base64 !== '',
         'photo_data' => $dataUrl,
+        'photo_base64' => $base64,
+        'mime' => $mime,
     ];
 }
 
-function tipOutboundCompressPhotoDataUrl(string $dataUrl): string
+function tipOutboundCompressPhotoDataUrl(string $dataUrl, int $maxWidth = 1280, int $quality = 78): string
 {
     if (!function_exists('imagecreatefromstring')) {
         return '';
@@ -64,7 +92,7 @@ function tipOutboundCompressPhotoDataUrl(string $dataUrl): string
 
     $width = imagesx($image);
     $height = imagesy($image);
-    $maxWidth = 1280;
+    $maxWidth = max(320, $maxWidth);
 
     if ($width > $maxWidth) {
         $newHeight = (int) max(1, round($height * ($maxWidth / $width)));
@@ -77,7 +105,7 @@ function tipOutboundCompressPhotoDataUrl(string $dataUrl): string
     }
 
     ob_start();
-    imagejpeg($image, null, 78);
+    imagejpeg($image, null, max(40, min(90, $quality)));
     imagedestroy($image);
     $jpeg = (string) ob_get_clean();
     if ($jpeg === '') {
