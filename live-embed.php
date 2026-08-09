@@ -46,7 +46,8 @@ $wsUrl = $wsBase . '/api/ws?src=' . rawurlencode($stream);
             width: 100% !important;
             height: 100% !important;
             display: block;
-            object-fit: contain;
+            object-fit: cover;
+            object-position: center;
             background: #000;
         }
         video::-webkit-media-controls { display: none !important; }
@@ -111,6 +112,11 @@ $wsUrl = $wsBase . '/api/ws?src=' . rawurlencode($stream);
         video.setAttribute('playsinline', '');
         video.muted = true;
         video.autoplay = true;
+        // Fill the Open Surveillance frame (no pillarbox / letterbox bars).
+        video.style.width = '100%';
+        video.style.height = '100%';
+        video.style.objectFit = 'cover';
+        video.style.objectPosition = 'center';
         try { video.play().catch(() => {}); } catch (e) {}
         video.addEventListener('playing', markPlaying);
         video.addEventListener('loadeddata', markPlaying);

@@ -151,7 +151,7 @@ ensureLocalDetectionStarted();
         .live-badge.active .dot { animation: pulse 1.2s infinite; }
         @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
         .video-shell { background: #0f172a; border-radius: 12px; overflow: hidden; border: 1px solid var(--border-color); width: 100%; aspect-ratio: 16 / 9; max-height: 75vh; display: flex; align-items: center; justify-content: center; position: relative; }
-        .video-shell .camera-feed { width: 100%; height: 100%; display: none; background: #000; object-fit: contain; object-position: center; image-rendering: auto; }
+        .video-shell .camera-feed { width: 100%; height: 100%; display: none; background: #000; object-fit: cover; object-position: center; image-rendering: auto; }
         .video-shell .camera-feed.active { display: block; }
         .video-shell .webrtc-frame {
             width: 100%;
@@ -171,7 +171,7 @@ ensureLocalDetectionStarted();
         .video-shell:fullscreen,
         .video-shell:-webkit-full-screen { border-radius: 0; border: none; aspect-ratio: auto; max-height: none; min-height: 100vh; width: 100vw; height: 100vh; background: #000; }
         .video-shell:fullscreen .camera-feed,
-        .video-shell:-webkit-full-screen .camera-feed { width: 100%; height: 100%; object-fit: contain; }
+        .video-shell:-webkit-full-screen .camera-feed { width: 100%; height: 100%; object-fit: cover; }
         .fullscreen-btn { position: absolute; top: 0.75rem; right: 0.75rem; z-index: 5; width: 40px; height: 40px; border: none; border-radius: 8px; background: rgba(15, 23, 42, 0.72); color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 1rem; transition: background 0.2s ease, transform 0.2s ease; }
         .fullscreen-btn:hover { background: rgba(76, 138, 137, 0.9); transform: scale(1.05); }
         .fullscreen-btn:focus-visible { outline: 2px solid #4c8a89; outline-offset: 2px; }
