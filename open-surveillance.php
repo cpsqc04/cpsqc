@@ -177,6 +177,21 @@ ensureLocalDetectionStarted();
         .fullscreen-btn:focus-visible { outline: 2px solid #4c8a89; outline-offset: 2px; }
         .feed-overlay { position: absolute; z-index: 3; pointer-events: none; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.9), 0 0 8px rgba(0,0,0,0.7); font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; opacity: 0; transition: opacity 0.2s ease; }
         .feed-overlay.visible { opacity: 1; }
+        .feed-overlay-datetime {
+            top: 0.75rem;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: clamp(0.85rem, 1.6vw, 1.1rem);
+            font-weight: 700;
+            letter-spacing: 0.02em;
+            background: rgba(0,0,0,0.5);
+            padding: 0.35rem 0.85rem;
+            border-radius: 8px;
+            white-space: nowrap;
+            max-width: calc(100% - 6rem);
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
         .feed-overlay-camera { bottom: 0.85rem; right: 0.85rem; font-size: clamp(0.95rem, 1.8vw, 1.25rem); font-weight: 700; background: rgba(0,0,0,0.5); padding: 0.4rem 0.85rem; border-radius: 8px; max-width: min(70%, 420px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .detection-overlay {
             position: absolute;
@@ -547,6 +562,7 @@ ensureLocalDetectionStarted();
                                 </button>
                                 <iframe id="webrtcFeed" class="webrtc-frame" title="Low-latency live camera" allow="autoplay; fullscreen" referrerpolicy="no-referrer"></iframe>
                                 <img id="cameraFeed" class="camera-feed" alt="Live surveillance feed with YOLO detection">
+                                <div class="feed-overlay feed-overlay-datetime" id="feedDateTime" aria-live="polite">—</div>
                                 <div class="feed-overlay feed-overlay-camera" id="feedCameraName">Location</div>
                                 <canvas id="detectionOverlay" class="detection-overlay" aria-hidden="true"></canvas>
                                 <div class="video-placeholder" id="cameraPlaceholder">
@@ -754,6 +770,7 @@ ensureLocalDetectionStarted();
             const feed = document.getElementById('cameraFeed');
             const webrtc = document.getElementById('webrtcFeed');
             const cameraOverlay = document.getElementById('feedCameraName');
+            const dateTimeOverlay = document.getElementById('feedDateTime');
 
             let mode = state;
             if (state === true) mode = 'live';
@@ -785,6 +802,7 @@ ensureLocalDetectionStarted();
                     cameraOverlay.textContent = 'Camera not found';
                     cameraOverlay.classList.add('visible');
                 }
+                if (dateTimeOverlay) dateTimeOverlay.classList.remove('visible');
                 setLiveModeChip('missing');
                 return;
             }
@@ -799,7 +817,9 @@ ensureLocalDetectionStarted();
                 placeholder.classList.remove('hidden');
             }
 
-            if (cameraOverlay) cameraOverlay.classList.toggle('visible', isLive || showingFeed || isMissing);
+            const showOverlays = isLive || showingFeed || isMissing;
+            if (cameraOverlay) cameraOverlay.classList.toggle('visible', showOverlays);
+            if (dateTimeOverlay) dateTimeOverlay.classList.toggle('visible', isLive || showingFeed);
         }
 
         function stopLiveFeeds() {
@@ -1378,6 +1398,21 @@ ensureLocalDetectionStarted();
             if (!isActive) { module.classList.add('active'); }
         }
 
+        function formatFeedDateTime(now) {
+            const pad = (n) => String(n).padStart(2, '0');
+            const month = pad(now.getMonth() + 1);
+            const day = pad(now.getDate());
+            const year = now.getFullYear();
+            let hour = now.getHours();
+            const ampm = hour >= 12 ? 'pm' : 'am';
+            hour = hour % 12;
+            if (hour === 0) hour = 12;
+            const minute = pad(now.getMinutes());
+            const second = pad(now.getSeconds());
+            const weekday = now.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase();
+            return month + '/' + day + '/' + year + ' ' + pad(hour) + ':' + minute + ':' + second + ' ' + ampm + ' ' + weekday;
+        }
+
         function updateDateTime() {
             const now = new Date();
             const dateStr = now.toLocaleDateString('en-US', {
@@ -1396,6 +1431,8 @@ ensureLocalDetectionStarted();
             const timeEl = document.getElementById('currentTime');
             if (dateEl) dateEl.textContent = dateStr;
             if (timeEl) timeEl.textContent = timeStr;
+            const feedDateTime = document.getElementById('feedDateTime');
+            if (feedDateTime) feedDateTime.textContent = formatFeedDateTime(now);
         }
     </script>
     <?php require __DIR__ . '/includes/admin_notifications_script.php'; ?>
