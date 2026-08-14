@@ -856,7 +856,7 @@ $autoOpenSetPassword = !empty($showSetPasswordModal);
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>AlerTara QC — Community Policing &amp; Surveillance</title>
+    <title>AlerTara QC — Community Policing &amp; Monitoring</title>
     <link rel="icon" type="image/x-icon" href="images/favicon.ico">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
@@ -1780,7 +1780,7 @@ $autoOpenSetPassword = !empty($showSetPasswordModal);
     <header class="site-nav" id="siteNav">
         <a href="#top" class="nav-brand">
             <img src="images/logo.svg" alt="AlerTara QC">
-            <span class="nav-brand-title">Community Policing and Surveillance</span>
+            <span class="nav-brand-title">Community Policing and Monitoring</span>
         </a>
         <button class="nav-toggle" id="navToggle" aria-label="Menu"><i class="fas fa-bars"></i></button>
         <ul class="nav-links" id="navLinks">
@@ -1806,8 +1806,8 @@ $autoOpenSetPassword = !empty($showSetPasswordModal);
                     <img src="images/tara.png" alt="">
                     <span class="ler">ler</span><span class="rest">Tara QC</span>
                 </div>
-                <h1>Community Policing and Surveillance</h1>
-                <p class="lead">24/7 community policing and surveillance that connects responders across Barangay San Agustin, Novaliches, Quezon City in real time.</p>
+                <h1>Community Policing and Monitoring</h1>
+                <p class="lead">24/7 community policing and monitoring that connects responders across Barangay San Agustin, Novaliches, Quezon City in real time.</p>
                 <div class="hero-ctas">
                     <button type="button" class="btn" onclick="openLoginModal()">Login</button>
                     <a class="btn btn-ghost" href="#about">Learn more</a>
@@ -1822,7 +1822,7 @@ $autoOpenSetPassword = !empty($showSetPasswordModal);
             <div class="section-inner">
                 <p class="section-label reveal">About</p>
                 <h2 class="reveal reveal-delay-1">A unified platform for community safety</h2>
-                <p class="sub reveal reveal-delay-2">AlerTara QC brings surveillance intelligence and community policing into one coordinated system for Barangay San Agustin, Novaliches, Quezon City.</p>
+                <p class="sub reveal reveal-delay-2">AlerTara QC brings monitoring intelligence and community policing into one coordinated system for Barangay San Agustin, Novaliches, Quezon City.</p>
                 <p class="about-copy reveal reveal-delay-3">
                     Built for administrators, barangay peacekeeping officers, and neighborhood watch partners in Barangay San Agustin,
                     AlerTara QC streamlines alerts, incident awareness, and coordinated response—
@@ -1842,7 +1842,7 @@ $autoOpenSetPassword = !empty($showSetPasswordModal);
                         <h3>BPSO Administrator</h3>
                         <p>Barangay peace and security administrators who manage response coordination and community safety operations in Barangay San Agustin.</p>
                         <ul class="role-list">
-                            <li>Oversee community policing and surveillance</li>
+                            <li>Oversee community policing and monitoring</li>
                             <li>Review patrol and incident reports</li>
                             <li>Coordinate public-safety response</li>
                         </ul>
@@ -1888,7 +1888,7 @@ $autoOpenSetPassword = !empty($showSetPasswordModal);
         <section class="section importance-section" id="importance">
             <div class="section-inner">
                 <p class="section-label reveal">Why it matters</p>
-                <h2 class="reveal reveal-delay-1">Community policing &amp; surveillance</h2>
+                <h2 class="reveal reveal-delay-1">Community policing &amp; monitoring</h2>
                 <p class="sub reveal reveal-delay-2">Technology only works when people and process stay connected. Here’s why this platform matters for Barangay San Agustin.</p>
                 <ol class="importance-list">
                     <li class="reveal">
@@ -1923,7 +1923,7 @@ $autoOpenSetPassword = !empty($showSetPasswordModal);
                 <div class="mvv-block reveal" id="vision">
                     <p class="section-label">Vision</p>
                     <h3>Our Vision</h3>
-                    <p>To become a model barangay for community policing and surveillance in Novaliches, Quezon City—leveraging technology to create a safer, more resilient Barangay San Agustin through proactive and coordinated public safety initiatives.</p>
+                    <p>To become a model barangay for community policing and monitoring in Novaliches, Quezon City—leveraging technology to create a safer, more resilient Barangay San Agustin through proactive and coordinated public safety initiatives.</p>
                 </div>
                 <div class="mvv-block reveal" id="values">
                     <p class="section-label">Values</p>
@@ -1951,7 +1951,7 @@ $autoOpenSetPassword = !empty($showSetPasswordModal);
                         <p>Use Forgot Password on the login modal. We’ll send a short-lived OTP to your registered email so you can reset securely.</p>
                     </details>
                     <details class="faq reveal">
-                        <summary>Is community surveillance used responsibly?</summary>
+                        <summary>Is community monitoring used responsibly?</summary>
                         <p>Yes. The platform supports lawful public-safety operations for Barangay San Agustin with accountability measures for authorized barangay partners.</p>
                     </details>
                 </div>
@@ -1992,7 +1992,7 @@ $autoOpenSetPassword = !empty($showSetPasswordModal);
                 <button type="button" onclick="openLegalModal('cookies')">Cookie Policy</button>
                 <a href="#contact">Contact</a>
             </div>
-            <p class="footer-copy">&copy; <?php echo date('Y'); ?> AlerTara QC — Community Policing and Surveillance for Barangay San Agustin, Novaliches, Quezon City. All rights reserved.</p>
+            <p class="footer-copy">&copy; <?php echo date('Y'); ?> AlerTara QC — Community Policing and Monitoring for Barangay San Agustin, Novaliches, Quezon City. All rights reserved.</p>
         </div>
     </footer>
 
@@ -2196,7 +2196,7 @@ $autoOpenSetPassword = !empty($showSetPasswordModal);
             terms: {
                 title: 'Terms of Service',
                 html: `
-                    <p>By accessing AlerTara QC, you agree to use the platform only for lawful community policing and surveillance operations in Barangay San Agustin, Novaliches, Quezon City.</p>
+                    <p>By accessing AlerTara QC, you agree to use the platform only for lawful community policing and monitoring operations in Barangay San Agustin, Novaliches, Quezon City.</p>
                     <h3>Acceptable use</h3>
                     <p>Users must protect credentials, follow role permissions, and avoid unauthorized disclosure of sensitive information.</p>
                     <h3>Accounts</h3>

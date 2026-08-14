@@ -561,7 +561,7 @@ ensureLocalDetectionStarted();
                                     <i class="fas fa-expand"></i>
                                 </button>
                                 <iframe id="webrtcFeed" class="webrtc-frame" title="Low-latency live camera" allow="autoplay; fullscreen" referrerpolicy="no-referrer"></iframe>
-                                <img id="cameraFeed" class="camera-feed" alt="Live surveillance feed with YOLO detection">
+                                <img id="cameraFeed" class="camera-feed" alt="Live monitoring feed with YOLO detection">
                                 <div class="feed-overlay feed-overlay-datetime" id="feedDateTime" aria-live="polite">—</div>
                                 <div class="feed-overlay feed-overlay-camera" id="feedCameraName">Location</div>
                                 <canvas id="detectionOverlay" class="detection-overlay" aria-hidden="true"></canvas>

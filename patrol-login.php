@@ -271,7 +271,7 @@ $autoOpenSetPassword = !empty($showSetPasswordModal);
     <header class="site-nav" id="siteNav">
         <a href="login.php" class="nav-brand">
             <img src="images/logo.svg" alt="AlerTara QC">
-            <span class="nav-brand-title">Community Policing and Surveillance</span>
+            <span class="nav-brand-title">Community Policing and Monitoring</span>
         </a>
         <button class="nav-toggle" id="navToggle" aria-label="Menu"><i class="fas fa-bars"></i></button>
         <ul class="nav-links" id="navLinks">
@@ -346,7 +346,7 @@ $autoOpenSetPassword = !empty($showSetPasswordModal);
                 <div class="mvv-block reveal" id="vision">
                     <p class="section-label">Vision</p>
                     <h3>Our Vision</h3>
-                    <p>To become a model barangay for community policing and surveillance in Novaliches, Quezon City—leveraging technology to create a safer, more resilient Barangay San Agustin through proactive and coordinated public safety initiatives.</p>
+                    <p>To become a model barangay for community policing and monitoring in Novaliches, Quezon City—leveraging technology to create a safer, more resilient Barangay San Agustin through proactive and coordinated public safety initiatives.</p>
                 </div>
                 <div class="mvv-block reveal" id="values">
                     <p class="section-label">Values</p>

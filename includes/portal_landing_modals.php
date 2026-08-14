@@ -103,7 +103,7 @@ $autoOpenLogin = !empty($autoOpenLogin);
             terms: {
                 title: 'Terms of Service',
                 html: `
-                    <p>By accessing AlerTara QC, you agree to use the platform only for lawful community policing and surveillance operations in Barangay San Agustin, Novaliches, Quezon City.</p>
+                    <p>By accessing AlerTara QC, you agree to use the platform only for lawful community policing and monitoring operations in Barangay San Agustin, Novaliches, Quezon City.</p>
                     <h3>Acceptable use</h3>
                     <p>Users must protect credentials, follow role permissions, and avoid unauthorized disclosure of sensitive information.</p>
                     <h3>Accounts</h3>
