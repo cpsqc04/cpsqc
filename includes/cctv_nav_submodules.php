@@ -1,13 +1,13 @@
 <?php
 /**
- * Shared CCTV Surveillance sidebar links.
+ * Shared CCTV Monitoring System sidebar links.
  * Set $cctvNavActive to: open-surveillance | playback | camera-management | cctv-request
  */
 $cctvNavActive = $cctvNavActive ?? '';
 ?>
-<a href="open-surveillance.php" class="nav-submodule<?php echo $cctvNavActive === 'open-surveillance' ? ' active' : ''; ?>" data-tooltip="Open Surveillance">
+<a href="open-surveillance.php" class="nav-submodule<?php echo $cctvNavActive === 'open-surveillance' ? ' active' : ''; ?>" data-tooltip="Live Monitoring">
     <span class="nav-submodule-icon"><i class="fas fa-tv"></i></span>
-    <span class="nav-submodule-text">Open Surveillance</span>
+    <span class="nav-submodule-text">Live Monitoring</span>
 </a>
 <a href="playback.php" class="nav-submodule<?php echo $cctvNavActive === 'playback' ? ' active' : ''; ?>" data-tooltip="Playback">
     <span class="nav-submodule-icon"><i class="fas fa-play-circle"></i></span>

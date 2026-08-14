@@ -22,7 +22,7 @@ ensureLocalDetectionStarted();
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>Open Surveillance - Alertara</title>
+    <title>Live Monitoring - Alertara</title>
     <link rel="icon" type="image/x-icon" href="images/favicon.ico">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="css/theme.css">
@@ -431,9 +431,9 @@ ensureLocalDetectionStarted();
                 </div>
             </div>
             <div class="nav-module active">
-                <div class="nav-module-header" onclick="toggleModule(this)" data-tooltip="CCTV Surveillance System Management">
+                <div class="nav-module-header" onclick="toggleModule(this)" data-tooltip="CCTV Monitoring System">
                     <span class="nav-module-icon"><i class="fas fa-video"></i></span>
-                    <span class="nav-module-header-text">CCTV Surveillance System Management</span>
+                    <span class="nav-module-header-text">CCTV Monitoring System</span>
                     <span class="arrow">▶</span>
                 </div>
                 <div class="nav-submodules">
@@ -513,7 +513,7 @@ ensureLocalDetectionStarted();
                 <button class="content-burger-btn" onclick="toggleSidebar()" aria-label="Toggle sidebar">
                     <span></span>
                 </button>
-                <h1 class="page-title">Open Surveillance</h1>
+                <h1 class="page-title">Live Monitoring</h1>
             </div>
             <div class="user-info">
                 <div class="datetime-display">
@@ -546,7 +546,7 @@ ensureLocalDetectionStarted();
                 <div class="section-block surveillance-panel">
                     <div class="surveillance-meta">
                         <div>
-                            <h2 class="section-title" style="margin-bottom:0.35rem;"><i class="fas fa-video"></i> Open Surveillance</h2>
+                            <h2 class="section-title" style="margin-bottom:0.35rem;"><i class="fas fa-video"></i> Live Monitoring</h2>
                         </div>
                         <div style="display:flex;align-items:center;gap:0.35rem;flex-wrap:wrap;">
                             <span class="live-badge" id="liveBadge"><span class="dot"></span> Connecting</span>

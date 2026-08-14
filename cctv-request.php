@@ -440,9 +440,9 @@ $cctvNavActive = 'cctv-request';
                 </div>
             </div>
             <div class="nav-module active">
-                <div class="nav-module-header" onclick="toggleModule(this)" data-tooltip="CCTV Surveillance System Management">
+                <div class="nav-module-header" onclick="toggleModule(this)" data-tooltip="CCTV Monitoring System">
                     <span class="nav-module-icon"><i class="fas fa-video"></i></span>
-                    <span class="nav-module-header-text">CCTV Surveillance System Management</span>
+                    <span class="nav-module-header-text">CCTV Monitoring System</span>
                     <span class="arrow">▶</span>
                 </div>
                 <div class="nav-submodules">
