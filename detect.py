@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 """
 YOLO Object Detection Script for RTSP Camera Stream
-Detects: person, group/crowd, vehicle, animal, plant, phone, backpack, suitcase (and weapon when model supports it)
+Detects: person, group/crowd, vehicle (+plate OCR), animal, plant, phone, backpack/suitcase (suspicious after ~1 min)
 Stable, offline-capable, with auto-reconnection
 """
 
 import cv2
 import json
+import re
 import time
 import os
 import base64
@@ -105,15 +106,23 @@ except ImportError:
         print("Or install yolov5: pip install yolov5")
         exit(1)
 
-# Try to import deepface for face analysis (gender, expression, etc.) - OPTIONAL
-# Note: DeepFace requires TensorFlow which may have dependency conflicts
-# The system works fine without it using heuristic-based detection
+# Facial attribute models removed — person UI keeps shirt/clothes color only.
+DEEPFACE_AVAILABLE = False
+
+# Optional OCR engines for license plates (install one if plate reading is needed).
+EASYOCR_AVAILABLE = False
+PYTESSERACT_AVAILABLE = False
+_easyocr_reader = None
 try:
-    from deepface import DeepFace
-    DEEPFACE_AVAILABLE = True
+    import easyocr  # type: ignore
+    EASYOCR_AVAILABLE = True
 except ImportError:
-    DEEPFACE_AVAILABLE = False
-    # Silent - heuristic methods will be used instead
+    pass
+try:
+    import pytesseract  # type: ignore
+    PYTESSERACT_AVAILABLE = True
+except ImportError:
+    pass
 
 # Configuration
 # Main stream for 4K quality: H.264, 3840x2160 (4K UHD)
@@ -165,6 +174,9 @@ FRAME_FILE_ALT = "current_frame_alt.jpg"  # Alternate file to avoid locks
 FRAME_FILE_TEMP = "current_frame_temp.jpg"  # Temporary file for atomic writes
 DETECTED_OBJECTS_DIR = "detected_objects"  # Directory for cropped detected object images
 LOCK_FILE = "detect.lock"  # Lock file to prevent multiple instances
+_bag_presence_tracks = []  # sustained backpack/suitcase tracks across frames
+_plate_read_cache = []  # recent vehicle plate OCR results
+_bag_track_seq = 0
 RECORDINGS_DIR = "recordings"  # Directory for recorded video files
 RECORDINGS_UPLOAD_MARKER_SUFFIX = ".uploaded"  # Sidecar marker after Hostinger sync
 # Display/recording target — use native camera resolution up to this cap (never upscale).
@@ -214,6 +226,16 @@ BAG_YOLO_SCAN_CONF = 0.12  # Low conf for dedicated bag scan passes
 ENABLE_BAG_SECONDARY_SCAN = True
 BAG_COCO_CLASS_IDS = [24, 26, 28]  # backpack, handbag, suitcase
 SUSPICIOUS_CATEGORIES = frozenset({'crowd', 'group', 'backpack', 'suitcase'})
+# Backpack/suitcase: only flag suspicious after sustained presence (~1 minute).
+BAG_SUSPICIOUS_DURATION_SECONDS = 60
+BAG_TRACK_MATCH_IOU = 0.30
+BAG_TRACK_GAP_SECONDS = 10  # brief misses keep the same track
+BAG_STATIONARY_MOVE_RATIO = 0.45  # center drift vs bag size before resetting track
+# License plate OCR (optional engines; OpenCV candidate finder always runs).
+ENABLE_LICENSE_PLATE_OCR = True
+PLATE_OCR_MIN_VEHICLE_AREA = 80 * 80
+PLATE_CACHE_MATCH_IOU = 0.45
+PLATE_CACHE_TTL_SECONDS = 12
 MAX_PERSON_DETECTIONS = 25  # Keep enough people for crowd counting
 MAX_OTHER_DETECTIONS = 15
 MAX_RECONNECT_ATTEMPTS = 10
@@ -1875,16 +1897,8 @@ def detect_face_in_bbox(frame, bbox):
     except:
         return None
 
-def analyze_person_attributes(frame, person_bbox, face_bbox=None):
-    """Analyze person attributes: gender, expression, accessories, clothes color"""
-    attributes = {
-        "gender": "Unknown",
-        "expression": "calm",
-        "accessories": [],
-        "clothes_color": "Unknown",
-        "facial_hair": "None",
-    }
-    
+def estimate_clothes_color(frame, person_bbox):
+    """Estimate upper-body clothing color only (no facial attributes)."""
     try:
         x1, y1, x2, y2 = int(person_bbox['x1']), int(person_bbox['y1']), int(person_bbox['x2']), int(person_bbox['y2'])
         height, width = frame.shape[:2]
@@ -1892,545 +1906,70 @@ def analyze_person_attributes(frame, person_bbox, face_bbox=None):
         y1 = max(0, min(y1, height - 1))
         x2 = max(x1 + 1, min(x2, width))
         y2 = max(y1 + 1, min(y2, height))
-        
-        person_crop = frame[y1:y2, x1:x2]
-        person_height = y2 - y1
-        person_width = x2 - x1
-        
-        # Use DeepFace for gender and expression if available (optional)
-        if DEEPFACE_AVAILABLE and face_bbox:
-            try:
-                fx1, fy1, fx2, fy2 = face_bbox
-                face_crop = frame[fy1:fy2, fx1:fx2]
-                if face_crop.size > 0 and face_crop.shape[0] > 30 and face_crop.shape[1] > 30:
-                    # Analyze with DeepFace (may be slow, so we catch exceptions)
-                    with suppress_stderr():
-                        analysis = DeepFace.analyze(face_crop, 
-                                                   actions=['gender', 'emotion'], 
-                                                   enforce_detection=False,
-                                                   silent=True)
-                    if isinstance(analysis, list):
-                        analysis = analysis[0]
-                    
-                    # Extract gender
-                    if 'gender' in analysis:
-                        gender_data = analysis['gender']
-                        attributes["gender"] = max(gender_data.items(), key=lambda x: x[1])[0]
-                    
-                    # Extract expression (map emotion to expression)
-                    if 'emotion' in analysis:
-                        emotion_data = analysis['emotion']
-                        # Map emotions to requested expressions
-                        emotion_mapping = {
-                            'happy': 'happy',
-                            'sad': 'sad',
-                            'angry': 'angry',
-                            'fear': 'anxious',
-                            'surprise': 'anxious',
-                            'neutral': 'calm',
-                            'disgust': 'angry'
-                        }
-                        dominant_emotion = max(emotion_data.items(), key=lambda x: x[1])[0]
-                        attributes["expression"] = emotion_mapping.get(dominant_emotion, 'calm')
-            except:
-                pass  # Fallback to heuristic methods
-        
-        # Enhanced heuristic-based gender detection (works without DeepFace)
-        if face_bbox and (not DEEPFACE_AVAILABLE or attributes["gender"] == "Unknown"):
-            try:
-                fx1, fy1, fx2, fy2 = face_bbox
-                face_crop = frame[fy1:fy2, fx1:fx2]
-                if face_crop.size > 0 and face_crop.shape[0] > 30 and face_crop.shape[1] > 30:
-                    face_height = fy2 - fy1
-                    face_width = fx2 - fx1
-                    
-                    # Gender detection using multiple facial features
-                    gray_face = cv2.cvtColor(face_crop, cv2.COLOR_BGR2GRAY)
-                    
-                    # Feature 1: Face width-to-height ratio
-                    face_ratio = face_width / face_height if face_height > 0 else 1.0
-                    
-                    # Feature 2: Jawline analysis (lower face region)
-                    lower_face_y_start = int(face_height * 0.5)
-                    lower_face = face_crop[lower_face_y_start:, :]
-                    lower_variance = 0
-                    if lower_face.size > 0:
-                        lower_gray = cv2.cvtColor(lower_face, cv2.COLOR_BGR2GRAY)
-                        lower_variance = np.var(lower_gray)
-                    
-                    # Feature 3: Cheekbone analysis (middle face region)
-                    cheek_region_y1 = int(face_height * 0.3)
-                    cheek_region_y2 = int(face_height * 0.6)
-                    cheek_region = face_crop[cheek_region_y1:cheek_region_y2, :]
-                    cheek_width = 0
-                    if cheek_region.size > 0:
-                        cheek_gray = cv2.cvtColor(cheek_region, cv2.COLOR_BGR2GRAY)
-                        # Detect cheek width (brightness pattern)
-                        cheek_edges = cv2.Canny(cheek_gray, 50, 150)
-                        cheek_width = np.sum(cheek_edges > 0)
-                    
-                    # Feature 4: Forehead analysis (upper face region)
-                    forehead_region = face_crop[:int(face_height * 0.4), :]
-                    forehead_smoothness = 0
-                    if forehead_region.size > 0:
-                        forehead_gray = cv2.cvtColor(forehead_region, cv2.COLOR_BGR2GRAY)
-                        # Females typically have smoother foreheads
-                        forehead_smoothness = 1.0 / (np.var(forehead_gray) + 1)
-                    
-                    # Feature 5: Overall face structure (square vs oval)
-                    face_aspect = face_width / face_height
-                    
-                    # Feature 6: Hair length analysis (important for gender detection)
-                    # Check region above face for hair length
-                    hair_length_score = 0  # 0-4 score: higher = longer hair = more likely female
-                    px1, py1, px2, py2 = int(person_bbox['x1']), int(person_bbox['y1']), int(person_bbox['x2']), int(person_bbox['y2'])
-                    
-                    # Analyze hair region: above face, extending to sides
-                    height, width = frame.shape[:2]
-                    hair_region_y1 = max(0, fy1 - int(face_height * 0.5))
-                    hair_region_y2 = fy1
-                    hair_region_x1 = max(0, fx1 - int(face_width * 0.3))
-                    hair_region_x2 = min(width, fx2 + int(face_width * 0.3))
-                    hair_region = frame[hair_region_y1:hair_region_y2, hair_region_x1:hair_region_x2]
-                    
-                    if hair_region.size > 0 and hair_region.shape[0] > 10:
-                        hair_gray = cv2.cvtColor(hair_region, cv2.COLOR_BGR2GRAY)
-                        
-                        # Analyze hair characteristics
-                        # Long hair typically extends more vertically and has more texture
-                        # Short hair is more uniform and compact
-                        
-                        # 1. Vertical extent: long hair extends further down
-                        hair_vertical_ratio = (fy1 - hair_region_y1) / face_height if face_height > 0 else 0
-                        
-                        # 2. Texture analysis: long hair has more variation (edges)
-                        hair_edges = cv2.Canny(hair_gray, 30, 100)
-                        hair_texture_density = np.sum(hair_edges > 0) / (hair_region.shape[0] * hair_region.shape[1])
-                        
-                        # 3. Brightness variation: long hair often has more highlights/shadows
-                        hair_brightness_std = np.std(hair_gray)
-                        
-                        # 4. Check for hair extending beyond face width (longer hair flows more)
-                        hair_width_ratio = (hair_region_x2 - hair_region_x1) / face_width if face_width > 0 else 1.0
-                        
-                        # Scoring for hair length (higher = longer = more likely female)
-                        if hair_vertical_ratio > 0.4:  # Hair extends well above face
-                            hair_length_score += 1
-                        if hair_texture_density > 0.12:  # High texture (longer hair has more detail)
-                            hair_length_score += 1
-                        if hair_brightness_std > 25:  # High variation (highlights/shadows)
-                            hair_length_score += 1
-                        if hair_width_ratio > 1.4:  # Hair extends beyond face width
-                            hair_length_score += 1
-                    
-                    # Scoring system for gender detection (including hair length)
-                    male_score = 0
-                    female_score = 0
-                    
-                    # Male indicators
-                    if face_ratio > 0.78:  # Wider face
-                        male_score += 2
-                    elif face_ratio < 0.72:  # Narrower face
-                        female_score += 2
-                    
-                    if lower_variance > 500:  # Defined jawline
-                        male_score += 2
-                    elif lower_variance < 300:  # Softer jawline
-                        female_score += 1
-                    
-                    if face_aspect > 0.85:  # Square face shape
-                        male_score += 1
-                    elif face_aspect < 0.75:  # Oval face shape
-                        female_score += 1
-                    
-                    if cheek_width < face_width * 0.3:  # Narrower cheekbones
-                        female_score += 1
-                    
-                    if forehead_smoothness > 0.01:  # Smoother forehead
-                        female_score += 1
-                    
-                    # Hair length indicators (important for gender detection)
-                    if hair_length_score <= 1:  # Short hair (typical male)
-                        male_score += 2
-                    elif hair_length_score >= 3:  # Long hair (typical female)
-                        female_score += 2
-                    
-                    # Determine gender based on scores
-                    if male_score > female_score and male_score >= 2:
-                        attributes["gender"] = "Male"
-                    elif female_score > male_score and female_score >= 2:
-                        attributes["gender"] = "Female"
-                    else:
-                        # If scores are close, use hair length as strong tiebreaker
-                        if hair_length_score <= 1:
-                            attributes["gender"] = "Male"
-                        elif hair_length_score >= 3:
-                            attributes["gender"] = "Female"
-                        # Otherwise use face ratio as final tiebreaker
-                        elif face_ratio > 0.75:
-                            attributes["gender"] = "Male"
-                        elif face_ratio < 0.70:
-                            attributes["gender"] = "Female"
-                        else:
-                            attributes["gender"] = "Unknown"
-                    
-                    # Expression detection using facial features (heuristic)
-                    # Analyze mouth region for expression
-                    mouth_region = face_crop[int(face_height * 0.6):int(face_height * 0.85), 
-                                            int(face_width * 0.2):int(face_width * 0.8)]
-                    if mouth_region.size > 0:
-                        mouth_gray = cv2.cvtColor(mouth_region, cv2.COLOR_BGR2GRAY)
-                        
-                        # Detect mouth corners (for smile detection)
-                        edges = cv2.Canny(mouth_gray, 30, 100)
-                        edge_points = np.where(edges > 0)
-                        
-                        if len(edge_points[0]) > 0:
-                            # Check if mouth corners curve upward (happy) or downward (sad)
-                            mouth_center_y = mouth_region.shape[0] // 2
-                            upper_edges = np.sum(edge_points[0] < mouth_center_y)
-                            lower_edges = np.sum(edge_points[0] > mouth_center_y)
-                            
-                            if upper_edges > lower_edges * 1.5:
-                                attributes["expression"] = "happy"
-                            elif lower_edges > upper_edges * 1.5:
-                                attributes["expression"] = "sad"
-                            else:
-                                # Check eyebrow region for angry/anxious
-                                eyebrow_region = face_crop[int(face_height * 0.15):int(face_height * 0.4), :]
-                                if eyebrow_region.size > 0:
-                                    eyebrow_gray = cv2.cvtColor(eyebrow_region, cv2.COLOR_BGR2GRAY)
-                                    eyebrow_edges = cv2.Canny(eyebrow_gray, 40, 120)
-                                    eyebrow_density = np.sum(eyebrow_edges > 0) / (eyebrow_region.shape[0] * eyebrow_region.shape[1])
-                                    
-                                    if eyebrow_density > 0.2:
-                                        attributes["expression"] = "angry"
-                                    else:
-                                        attributes["expression"] = "calm"
-                                else:
-                                    attributes["expression"] = "calm"
-                        else:
-                            attributes["expression"] = "calm"
-            except:
-                pass  # Keep default values
-        
-        # Improved accessories detection (more accurate)
-        if face_bbox:
-            fx1, fy1, fx2, fy2 = face_bbox
-            face_crop = frame[fy1:fy2, fx1:fx2]
-            if face_crop.size > 0 and face_crop.shape[0] > 30 and face_crop.shape[1] > 30:
-                face_height = fy2 - fy1
-                face_width = fx2 - fx1
-                
-                # Improved mask detection (lower face region - mouth/nose area)
-                lower_face_y1 = int(face_height * 0.55)
-                lower_face = face_crop[lower_face_y1:, :]
-                if lower_face.size > 0 and lower_face.shape[0] > 10:
-                    lower_face_gray = cv2.cvtColor(lower_face, cv2.COLOR_BGR2GRAY)
-                    avg_brightness = np.mean(lower_face_gray)
-                    brightness_std = np.std(lower_face_gray)
-                    
-                    # Stricter mask detection: dark area with low variance (uniform dark color)
-                    # Mask should cover center region (nose/mouth) uniformly
-                    if avg_brightness < 65 and brightness_std < 20:  # Stricter thresholds
-                        # Additional check: mask covers nose/mouth region uniformly
-                        center_region = lower_face[:, int(lower_face.shape[1] * 0.25):int(lower_face.shape[1] * 0.75)]
-                        if center_region.size > 0:
-                            center_gray = cv2.cvtColor(center_region, cv2.COLOR_BGR2GRAY)
-                            center_brightness = np.mean(center_gray)
-                            center_std = np.std(center_gray)
-                            # Mask should be uniformly dark in center region
-                            if center_brightness < 55 and center_std < 18:
-                                # Verify it's not just shadow (mask should cover most of lower face)
-                                coverage_ratio = np.sum(center_gray < 70) / center_gray.size
-                                if coverage_ratio > 0.6:  # At least 60% of center region is dark (mask coverage)
-                                    attributes["accessories"].append("mask")
-                
-                # Stricter glasses detection (eye region - upper 60% of face)
-                upper_face_y2 = int(face_height * 0.65)
-                upper_face = face_crop[:upper_face_y2, :]
-                if upper_face.size > 0 and upper_face.shape[0] > 15:
-                    gray = cv2.cvtColor(upper_face, cv2.COLOR_BGR2GRAY)
-                    
-                    # Look for rectangular/oval shapes typical of glasses frames
-                    edges = cv2.Canny(gray, 50, 150)
-                    
-                    # Check eye region specifically (middle horizontal band where glasses sit)
-                    eye_region_y1 = int(upper_face.shape[0] * 0.35)
-                    eye_region_y2 = int(upper_face.shape[0] * 0.65)
-                    eye_region = edges[eye_region_y1:eye_region_y2, :]
-                    eye_edge_density = np.sum(eye_region > 0) / (eye_region.shape[0] * eye_region.shape[1])
-                    
-                    # Stricter glasses detection: Must have high edge density AND frame-like patterns
-                    # Glasses typically create two oval/rectangular regions (lenses)
-                    if eye_edge_density > 0.18:  # Higher threshold to reduce false positives
-                        # Check for frame patterns (horizontal lines at top/bottom of eye region)
-                        eye_region_gray = gray[eye_region_y1:eye_region_y2, :]
-                        avg_brightness = np.mean(eye_region_gray)
-                        
-                        # Look for distinct frame edges (strong horizontal lines)
-                        horizontal_lines = cv2.HoughLinesP(edges[eye_region_y1:eye_region_y2, :], 1, np.pi/180, 
-                                                          threshold=int(eye_region.shape[1] * 0.3), 
-                                                          minLineLength=int(eye_region.shape[1] * 0.4), 
-                                                          maxLineGap=5)
-                        
-                        # Glasses should have frame structure (horizontal lines for top/bottom of frames)
-                        has_frame_structure = horizontal_lines is not None and len(horizontal_lines) >= 2
-                        
-                        # Additional check: brightness contrast (glasses often have darker frames)
-                        brightness_std = np.std(eye_region_gray)
-                        
-                        if has_frame_structure or (eye_edge_density > 0.25 and brightness_std > 15):
-                            # Dark area = sunglasses, lighter with strong edges = eyeglasses
-                            if avg_brightness < 70 and brightness_std < 20:  # Dark and uniform = sunglasses
-                                attributes["accessories"].append("sunglasses")
-                            elif eye_edge_density > 0.22 and brightness_std > 20:  # Strong edges with contrast = eyeglasses
-                                attributes["accessories"].append("eyeglasses")
-        
-        # Stricter hat/cap detection (top of head region, more accurate)
-        if face_bbox:
-            fx1, fy1, fx2, fy2 = face_bbox
-            # Check region above detected face for hat/cap (wider region for better detection)
-            face_height = fy2 - fy1
-            head_region_y1 = max(0, fy1 - int(face_height * 0.4))
-            head_region_y2 = fy1
-            head_region_width = fx2 - fx1
-            head_region_x1 = max(0, fx1 - int(head_region_width * 0.2))
-            head_region_x2 = min(width, fx2 + int(head_region_width * 0.2))
-            head_region = frame[head_region_y1:head_region_y2, head_region_x1:head_region_x2]
-        else:
-            head_region_y1 = max(0, y1 - int(person_height * 0.2))
-            head_region_y2 = min(height, y1 + int(person_height * 0.25))
-            head_region = frame[head_region_y1:head_region_y2, x1:x2]
-        
-        if head_region.size > 0 and head_region.shape[0] > 8:
-            head_gray = cv2.cvtColor(head_region, cv2.COLOR_BGR2GRAY)
-            avg_brightness = np.mean(head_gray)
-            
-            # Hat/cap typically creates strong horizontal edge (brim) and covers top of head
-            edges = cv2.Canny(head_gray, 40, 120)
-            
-            # Check for horizontal brim line (strong horizontal edge in middle-bottom of region)
-            brim_region_y1 = int(head_region.shape[0] * 0.5)
-            brim_region_y2 = int(head_region.shape[0] * 0.9)
-            brim_region = edges[brim_region_y1:brim_region_y2, :]
-            horizontal_edges = np.sum(brim_region > 0)
-            
-            # Stricter hat detection: Must have strong horizontal edge (brim) AND darker area
-            # Also check for hat shape (circular/rectangular contour covering significant area)
-            contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-            has_hat_shape = False
-            if len(contours) > 0:
-                largest_contour = max(contours, key=cv2.contourArea)
-                contour_area = cv2.contourArea(largest_contour)
-                # Hat should cover at least 20% of head region
-                if contour_area > head_region.size * 0.2:
-                    # Check if contour is roughly horizontal/rectangular (hat brim)
-                    x, y, w, h = cv2.boundingRect(largest_contour)
-                    aspect_ratio = w / h if h > 0 else 0
-                    if aspect_ratio > 1.5:  # Horizontal/rectangular shape (brim)
-                        has_hat_shape = True
-            
-            # Hat detection: strong horizontal brim edge + darker area + hat-like shape
-            brim_density = horizontal_edges / (brim_region.shape[0] * brim_region.shape[1]) if brim_region.size > 0 else 0
-            
-            if brim_density > 0.15 and avg_brightness < 130 and has_hat_shape:
-                attributes["accessories"].append("hat")
-        
-        # Detect clothes - improved accuracy by excluding background (focus on center of person)
-        # Shrink bounding box to exclude edges where background might leak in
-        person_width = x2 - x1
-        person_height = y2 - y1
-        
-        # Use only center 70% width and height to avoid background contamination
-        shrink_factor_x = 0.15  # Exclude 15% from each side (30% total)
-        shrink_factor_y = 0.10  # Exclude 10% from top/bottom
-        center_x1 = x1 + int(person_width * shrink_factor_x)
-        center_x2 = x2 - int(person_width * shrink_factor_x)
-        center_y1 = y1 + int(person_height * shrink_factor_y)
-        center_y2 = y2 - int(person_height * shrink_factor_y)
-        
-        # Ensure valid coordinates
-        center_x1 = max(x1, center_x1)
-        center_x2 = min(x2, center_x2)
-        center_y1 = max(y1, center_y1)
-        center_y2 = min(y2, center_y2)
-        
-        # Check upper body (chest/shoulder area, excluding face) - USE CENTER REGION ONLY
-        upper_body_y1 = center_y1 + int((center_y2 - center_y1) * 0.15)  # Start below face region
-        upper_body_y2 = center_y1 + int((center_y2 - center_y1) * 0.50)  # Mid-torso
-        upper_body_region = frame[upper_body_y1:upper_body_y2, center_x1:center_x2]
-        
-        # Check lower body (waist down) - USE CENTER REGION ONLY
-        lower_body_y1 = center_y1 + int((center_y2 - center_y1) * 0.50)
-        lower_body_y2 = center_y2
-        lower_body_region = frame[lower_body_y1:lower_body_y2, center_x1:center_x2]
-        
-        has_upper_clothes = False
-        has_lower_clothes = False
-        clothes_color = "Unknown"
-        
-        # Improved skin tone detection range (HSV) - more accurate
-        # Skin tones: Hue 0-30 or 160-180, Saturation 25-255, Value 40-255
-        def is_skin_pixel(h, s, v):
-            """Check if pixel is skin-colored (excluding background colors)"""
-            if v < 40 or v > 250:  # Too dark or too bright (exclude pure white)
-                return False
-            if s < 25:  # Too desaturated (gray/white/black - likely not skin or clothes)
-                return False
-            if (h < 30) or (h > 160):  # Red/orange/yellow range (skin tones)
-                return True
-            return False
-        
-        def is_likely_clothes_color(h, s, v, region_hsv):
-            """Check if color is likely from clothes, not background
-            Clothes colors are typically more saturated and have distinct hues"""
-            # Exclude very dark (shadows) and very bright (overexposed)
-            if v < 50 or v > 240:
-                return False
-            # Exclude very low saturation (grays, whites, blacks)
-            if s < 30:
-                return False
-            # Exclude skin tones (already filtered but double-check)
-            if (h < 30) or (h > 160):
-                if 50 < v < 200:  # Valid skin tone range
-                    return False
-            return True
-        
-        # Check upper body for clothes (not skin-colored, excluding background)
-        if upper_body_region.size > 0 and upper_body_region.shape[0] > 10 and upper_body_region.shape[1] > 10:
-            hsv_upper = cv2.cvtColor(upper_body_region, cv2.COLOR_BGR2HSV)
-            pixels_upper = hsv_upper.reshape(-1, 3)
-            
-            # Count non-skin pixels that are likely clothes (not background)
-            non_skin_clothes_count = 0
-            likely_clothes_pixels = []
-            
-            for pixel in pixels_upper:
-                h, s, v = pixel[0], pixel[1], pixel[2]
-                if not is_skin_pixel(h, s, v) and is_likely_clothes_color(h, s, v, hsv_upper):
-                    non_skin_clothes_count += 1
-                    likely_clothes_pixels.append(pixel)
-            
-            non_skin_ratio = non_skin_clothes_count / len(pixels_upper) if len(pixels_upper) > 0 else 0
-            
-            # Much higher threshold: at least 45% non-skin pixels that look like clothes (very strict to avoid background)
-            if non_skin_ratio > 0.45:
-                has_upper_clothes = True
-                
-                # Get dominant color from likely clothes pixels only
-                if len(likely_clothes_pixels) > 150:  # Need sufficient pixels for accurate color detection
-                    clothes_array = np.array(likely_clothes_pixels)
-                    
-                    # Use median for more robust color detection (less affected by outliers/background)
-                    median_hue = np.median(clothes_array[:, 0])
-                    median_sat = np.median(clothes_array[:, 1])
-                    
-                    # Additional validation: ensure sufficient saturation for color to be meaningful
-                    if median_sat > 40:  # Must have decent saturation to be a valid color
-                        # Improved color mapping
-                        if median_hue < 5 or median_hue > 175:
-                            clothes_color = "Red"
-                        elif 5 <= median_hue < 20:
-                            clothes_color = "Orange"
-                        elif 20 <= median_hue < 30:
-                            clothes_color = "Yellow"
-                        elif 30 <= median_hue < 70:
-                            clothes_color = "Green"
-                        elif 70 <= median_hue < 95:
-                            clothes_color = "Cyan"
-                        elif 95 <= median_hue < 120:
-                            clothes_color = "Blue"
-                        elif 120 <= median_hue < 145:
-                            clothes_color = "Purple"
-                        elif 145 <= median_hue < 175:
-                            clothes_color = "Pink"
-                        else:
-                            clothes_color = "Unknown"
-                    else:
-                        # Low saturation = grayish, not a clear color
-                        clothes_color = "Unknown"
-                else:
-                    # Not enough clothes pixels detected
-                    clothes_color = "Unknown"
-        
-        # Check lower body for clothes (using same background-exclusion logic)
-        if lower_body_region.size > 0 and lower_body_region.shape[0] > 10:
-            hsv_lower = cv2.cvtColor(lower_body_region, cv2.COLOR_BGR2HSV)
-            pixels_lower = hsv_lower.reshape(-1, 3)
-            
-            # Count non-skin pixels that are likely clothes (not background)
-            non_skin_clothes_count_lower = 0
-            likely_clothes_pixels_lower = []
-            
-            for pixel in pixels_lower:
-                h, s, v = pixel[0], pixel[1], pixel[2]
-                if not is_skin_pixel(h, s, v) and is_likely_clothes_color(h, s, v, hsv_lower):
-                    non_skin_clothes_count_lower += 1
-                    likely_clothes_pixels_lower.append(pixel)
-            
-            non_skin_ratio_lower = non_skin_clothes_count_lower / len(pixels_lower) if len(pixels_lower) > 0 else 0
-            
-            if non_skin_ratio_lower > 0.50:  # At least 50% non-skin pixels that look like clothes (very strict)
-                has_lower_clothes = True
-                # Update color if upper body didn't have clothes
-                if not has_upper_clothes and clothes_color == "Unknown":
-                    if len(likely_clothes_pixels_lower) > 150:
-                        clothes_array_lower = np.array(likely_clothes_pixels_lower)
-                        median_hue_lower = np.median(clothes_array_lower[:, 0])
-                        median_sat_lower = np.median(clothes_array_lower[:, 1])
-                        
-                        # Ensure sufficient saturation
-                        if median_sat_lower > 40:
-                            # Same color mapping as above
-                            if median_hue_lower < 5 or median_hue_lower > 175:
-                                clothes_color = "Red"
-                            elif 5 <= median_hue_lower < 20:
-                                clothes_color = "Orange"
-                            elif 20 <= median_hue_lower < 30:
-                                clothes_color = "Yellow"
-                            elif 30 <= median_hue_lower < 70:
-                                clothes_color = "Green"
-                            elif 70 <= median_hue_lower < 95:
-                                clothes_color = "Cyan"
-                            elif 95 <= median_hue_lower < 120:
-                                clothes_color = "Blue"
-                            elif 120 <= median_hue_lower < 145:
-                                clothes_color = "Purple"
-                            elif 145 <= median_hue_lower < 175:
-                                clothes_color = "Pink"
-        
-        # Determine clothes description with improved logic
-        if not has_upper_clothes and not has_lower_clothes:
-            attributes["clothes_color"] = "none"  # No clothes at all
-        elif not has_upper_clothes:
-            attributes["clothes_color"] = "topless"  # No top clothes
-        elif clothes_color != "Unknown":
-            attributes["clothes_color"] = clothes_color
-        else:
-            attributes["clothes_color"] = "Unknown"
-        
-        # Format accessories - must be "None" string if empty
-        if not attributes["accessories"]:
-            attributes["accessories"] = "None"  # Explicitly set to "None" string when no accessories
-        else:
-            attributes["accessories"] = ", ".join(attributes["accessories"]).lower()
 
-        # Facial hair heuristic from lower face region
-        if face_bbox:
-            fx1, fy1, fx2, fy2 = face_bbox
-            fh = max(1, fy2 - fy1)
-            beard_y1 = fy1 + int(fh * 0.55)
-            beard_region = frame[beard_y1:fy2, fx1:fx2]
-            if beard_region.size > 0:
-                gray_beard = cv2.cvtColor(beard_region, cv2.COLOR_BGR2GRAY)
-                dark_ratio = float(np.mean(gray_beard < 75))
-                if dark_ratio > 0.35:
-                    attributes["facial_hair"] = "Beard"
-    except:
-        pass
-    
-    return attributes
+        person_h = max(1, y2 - y1)
+        person_w = max(1, x2 - x1)
+        # Center torso band (avoid head/background edges).
+        cx1 = x1 + int(person_w * 0.2)
+        cx2 = x2 - int(person_w * 0.2)
+        cy1 = y1 + int(person_h * 0.22)
+        cy2 = y1 + int(person_h * 0.55)
+        if cx2 <= cx1 + 4 or cy2 <= cy1 + 4:
+            return 'Unknown'
+
+        region = frame[cy1:cy2, cx1:cx2]
+        if region.size == 0:
+            return 'Unknown'
+
+        hsv = cv2.cvtColor(region, cv2.COLOR_BGR2HSV)
+        pixels = hsv.reshape(-1, 3)
+        if len(pixels) < 80:
+            return 'Unknown'
+
+        clothes = []
+        for h, s, v in pixels:
+            if v < 50 or v > 240 or s < 30:
+                continue
+            # Skip common skin-tone hues.
+            if (h < 30 or h > 160) and 50 < v < 200 and s < 120:
+                continue
+            clothes.append((int(h), int(s), int(v)))
+
+        if len(clothes) < max(40, int(len(pixels) * 0.2)):
+            return 'Unknown'
+
+        arr = np.array(clothes)
+        median_hue = float(np.median(arr[:, 0]))
+        median_sat = float(np.median(arr[:, 1]))
+        if median_sat <= 40:
+            return 'Unknown'
+        if median_hue < 5 or median_hue > 175:
+            return 'Red'
+        if 5 <= median_hue < 20:
+            return 'Orange'
+        if 20 <= median_hue < 30:
+            return 'Yellow'
+        if 30 <= median_hue < 70:
+            return 'Green'
+        if 70 <= median_hue < 95:
+            return 'Cyan'
+        if 95 <= median_hue < 120:
+            return 'Blue'
+        if 120 <= median_hue < 145:
+            return 'Purple'
+        if 145 <= median_hue < 175:
+            return 'Pink'
+        return 'Unknown'
+    except Exception:
+        return 'Unknown'
+
+
+def analyze_person_attributes(frame, person_bbox, face_bbox=None):
+    """Person attributes for UI: shirt/clothes color only."""
+    return {
+        'clothes_color': estimate_clothes_color(frame, person_bbox),
+    }
+
 
 def phone_near_person(phone_bbox, person_bbox):
     cx, cy = bbox_center(phone_bbox)
@@ -2441,8 +1980,80 @@ def phone_near_person(phone_bbox, person_bbox):
 def object_near_person(object_bbox, person_bbox):
     return phone_near_person(object_bbox, person_bbox)
 
+def _bbox_center_xy(bbox):
+    return (
+        (float(bbox['x1']) + float(bbox['x2'])) * 0.5,
+        (float(bbox['y1']) + float(bbox['y2'])) * 0.5,
+    )
+
+
+def _bag_track_is_stationary(prev_bbox, curr_bbox):
+    """Require roughly the same place so walking bags don't auto-flag."""
+    if not prev_bbox or not curr_bbox:
+        return False
+    px, py = _bbox_center_xy(prev_bbox)
+    cx, cy = _bbox_center_xy(curr_bbox)
+    bw = max(1.0, float(curr_bbox['x2'] - curr_bbox['x1']))
+    bh = max(1.0, float(curr_bbox['y2'] - curr_bbox['y1']))
+    max_move = BAG_STATIONARY_MOVE_RATIO * max(bw, bh)
+    return abs(cx - px) <= max_move and abs(cy - py) <= max_move
+
+
+def update_bag_presence_tracks(detections, now=None):
+    """Track backpack/suitcase presence over time; return map track_id -> duration."""
+    global _bag_presence_tracks, _bag_track_seq
+    now = float(now if now is not None else time.time())
+    bags = [d for d in detections if d.get('category') in ('backpack', 'suitcase') and d.get('bbox')]
+    matched_track_ids = set()
+
+    for det in bags:
+        bbox = det['bbox']
+        category = det.get('category') or 'backpack'
+        best = None
+        best_iou = 0.0
+        for track in _bag_presence_tracks:
+            if track['category'] != category:
+                continue
+            if (now - track['last_seen']) > BAG_TRACK_GAP_SECONDS:
+                continue
+            iou = bbox_iou(bbox, track['bbox'])
+            if iou > best_iou:
+                best_iou = iou
+                best = track
+
+        if best is not None and best_iou >= BAG_TRACK_MATCH_IOU and _bag_track_is_stationary(best['bbox'], bbox):
+            best['bbox'] = dict(bbox)
+            best['last_seen'] = now
+            best['hits'] = int(best.get('hits', 1)) + 1
+            matched_track_ids.add(best['id'])
+            det['bag_track_id'] = best['id']
+            det['bag_duration_seconds'] = max(0.0, now - best['first_seen'])
+        else:
+            _bag_track_seq += 1
+            track = {
+                'id': _bag_track_seq,
+                'category': category,
+                'bbox': dict(bbox),
+                'first_seen': now,
+                'last_seen': now,
+                'hits': 1,
+            }
+            _bag_presence_tracks.append(track)
+            matched_track_ids.add(track['id'])
+            det['bag_track_id'] = track['id']
+            det['bag_duration_seconds'] = 0.0
+
+    # Drop stale tracks
+    _bag_presence_tracks = [
+        t for t in _bag_presence_tracks
+        if (now - t['last_seen']) <= BAG_TRACK_GAP_SECONDS * 3
+    ]
+    return detections
+
+
 def mark_suspicious_detections(detections):
-    """Flag crowds, groups, and luggage for suspicious-activity monitoring."""
+    """Flag crowds/groups immediately; bags only after ~1 minute stationary presence."""
+    detections = update_bag_presence_tracks(detections)
     persons = [d for d in detections if d.get('category') == 'person' and d.get('bbox')]
 
     for det in detections:
@@ -2455,57 +2066,216 @@ def mark_suspicious_detections(detections):
             count = det.get('people_count') or det.get('group_size') or 0
             det['suspicious'] = True
             det['suspicious_reason'] = f'Group of {count} people — monitor for suspicious activity'
-        elif category == 'backpack':
+        elif category in ('backpack', 'suitcase'):
             bag_bbox = det.get('bbox')
             near_person = any(object_near_person(bag_bbox, p['bbox']) for p in persons) if bag_bbox else False
-            det['suspicious'] = True
-            det['suspicious_reason'] = (
-                'Backpack on/near person — monitor for suspicious activity'
-                if near_person else
-                'Unattended backpack — possible suspicious activity'
-            )
-        elif category == 'suitcase':
-            bag_bbox = det.get('bbox')
-            near_person = any(object_near_person(bag_bbox, p['bbox']) for p in persons) if bag_bbox else False
-            det['suspicious'] = True
-            det['suspicious_reason'] = (
-                'Suitcase on/near person — monitor for suspicious activity'
-                if near_person else
-                'Unattended suitcase/luggage — possible suspicious activity'
-            )
+            duration = float(det.get('bag_duration_seconds') or 0.0)
+            det['bag_duration_seconds'] = round(duration, 1)
+            label = 'Backpack' if category == 'backpack' else 'Suitcase'
+            if duration >= BAG_SUSPICIOUS_DURATION_SECONDS:
+                det['suspicious'] = True
+                place = 'on/near person' if near_person else 'unattended/stationary'
+                det['suspicious_reason'] = (
+                    f'{label} {place} for ~{int(duration)}s (≥{BAG_SUSPICIOUS_DURATION_SECONDS}s) — '
+                    'flagged as suspicious'
+                )
+                det['activity'] = 'Suspicious'
+            else:
+                det['suspicious'] = False
+                det.pop('suspicious_reason', None)
+                remaining = max(0, int(BAG_SUSPICIOUS_DURATION_SECONDS - duration))
+                det['activity'] = 'Monitoring'
+                det['monitor_note'] = (
+                    f'{label} tracked {int(duration)}s — suspicious after {BAG_SUSPICIOUS_DURATION_SECONDS}s'
+                    f' (~{remaining}s left)'
+                )
         else:
             det['suspicious'] = False
             det.pop('suspicious_reason', None)
 
     return detections
 
+
+def _normalize_plate_text(text):
+    if not text:
+        return ''
+    cleaned = re.sub(r'[^A-Z0-9]', '', str(text).upper())
+    # Typical PH private plate length ~6-7; allow 5-8 for OCR noise.
+    if len(cleaned) < 5 or len(cleaned) > 8:
+        return ''
+    if not re.search(r'[A-Z]', cleaned) or not re.search(r'[0-9]', cleaned):
+        return ''
+    return cleaned
+
+
+def _get_easyocr_reader():
+    global _easyocr_reader
+    if not EASYOCR_AVAILABLE:
+        return None
+    if _easyocr_reader is None:
+        try:
+            import easyocr  # type: ignore
+            _easyocr_reader = easyocr.Reader(['en'], gpu=False, verbose=False)
+        except Exception:
+            return None
+    return _easyocr_reader
+
+
+def _ocr_plate_image(plate_bgr):
+    """Run optional OCR on a candidate plate crop."""
+    if plate_bgr is None or plate_bgr.size == 0:
+        return ''
+    h, w = plate_bgr.shape[:2]
+    if h < 12 or w < 30:
+        return ''
+    scale = max(2.0, 160.0 / float(h))
+    up = cv2.resize(plate_bgr, (int(w * scale), int(h * scale)), interpolation=cv2.INTER_CUBIC)
+    gray = cv2.cvtColor(up, cv2.COLOR_BGR2GRAY)
+    gray = cv2.bilateralFilter(gray, 7, 50, 50)
+    _, bw = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+
+    candidates = []
+    reader = _get_easyocr_reader()
+    if reader is not None:
+        try:
+            for item in reader.readtext(up):
+                raw = item[1] if len(item) > 1 else ''
+                norm = _normalize_plate_text(raw)
+                if norm:
+                    candidates.append(norm)
+        except Exception:
+            pass
+
+    if PYTESSERACT_AVAILABLE and not candidates:
+        try:
+            import pytesseract  # type: ignore
+            cfg = '--psm 7 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
+            for img in (gray, bw):
+                raw = pytesseract.image_to_string(img, config=cfg)
+                norm = _normalize_plate_text(raw)
+                if norm:
+                    candidates.append(norm)
+        except Exception:
+            pass
+
+    if not candidates:
+        return ''
+    # Prefer the most common normalized reading.
+    return max(set(candidates), key=candidates.count)
+
+
+def find_license_plate_candidates(vehicle_bgr):
+    """Find plate-like rectangles in the lower portion of a vehicle crop."""
+    if vehicle_bgr is None or vehicle_bgr.size == 0:
+        return []
+    h, w = vehicle_bgr.shape[:2]
+    if h < 40 or w < 60:
+        return []
+
+    y0 = int(h * 0.45)
+    roi = vehicle_bgr[y0:h, :]
+    if roi.size == 0:
+        return []
+
+    gray = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
+    gray = cv2.bilateralFilter(gray, 9, 75, 75)
+    edges = cv2.Canny(gray, 60, 160)
+    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (5, 3))
+    edges = cv2.morphologyEx(edges, cv2.MORPH_CLOSE, kernel, iterations=2)
+
+    contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    candidates = []
+    roi_h, roi_w = roi.shape[:2]
+    for cnt in contours:
+        x, y, bw, bh = cv2.boundingRect(cnt)
+        if bw < 40 or bh < 12:
+            continue
+        aspect = bw / float(bh)
+        area = bw * bh
+        if aspect < 2.0 or aspect > 6.5:
+            continue
+        if area < 900 or area > (roi_w * roi_h * 0.45):
+            continue
+        # Prefer mid-lower center plates.
+        cx = x + bw * 0.5
+        score = area * (1.0 - abs(cx - roi_w * 0.5) / max(1.0, roi_w * 0.5))
+        pad = 2
+        x1 = max(0, x - pad)
+        y1 = max(0, y - pad)
+        x2 = min(roi_w, x + bw + pad)
+        y2 = min(roi_h, y + bh + pad)
+        crop = roi[y1:y2, x1:x2]
+        candidates.append((score, crop, (x1, y0 + y1, x2, y0 + y2)))
+
+    candidates.sort(key=lambda t: t[0], reverse=True)
+    return candidates[:4]
+
+
+def read_license_plate(frame, vehicle_bbox):
+    """Detect + OCR a license plate from a vehicle bbox. Returns text or empty."""
+    global _plate_read_cache
+    if not ENABLE_LICENSE_PLATE_OCR or not vehicle_bbox:
+        return ''
+
+    now = time.time()
+    # Reuse recent OCR for the same vehicle location.
+    best_cache = None
+    best_iou = 0.0
+    for item in _plate_read_cache:
+        if (now - item['ts']) > PLATE_CACHE_TTL_SECONDS:
+            continue
+        iou = bbox_iou(vehicle_bbox, item['bbox'])
+        if iou > best_iou:
+            best_iou = iou
+            best_cache = item
+    if best_cache is not None and best_iou >= PLATE_CACHE_MATCH_IOU:
+        return best_cache.get('plate') or ''
+
+    height, width = frame.shape[:2]
+    bbox = clamp_bbox(vehicle_bbox, width, height)
+    x1, y1, x2, y2 = bbox['x1'], bbox['y1'], bbox['x2'], bbox['y2']
+    if (x2 - x1) * (y2 - y1) < PLATE_OCR_MIN_VEHICLE_AREA:
+        return ''
+
+    crop = frame[y1:y2, x1:x2]
+    plate_text = ''
+    for _score, plate_img, _rel in find_license_plate_candidates(crop):
+        plate_text = _ocr_plate_image(plate_img)
+        if plate_text:
+            break
+
+    # Fallback: OCR lower band directly when no contour candidate worked.
+    if not plate_text and (EASYOCR_AVAILABLE or PYTESSERACT_AVAILABLE):
+        h = crop.shape[0]
+        band = crop[int(h * 0.55):h, :]
+        plate_text = _ocr_plate_image(band)
+
+    _plate_read_cache.append({
+        'bbox': dict(bbox),
+        'plate': plate_text,
+        'ts': now,
+    })
+    _plate_read_cache = [p for p in _plate_read_cache if (now - p['ts']) <= PLATE_CACHE_TTL_SECONDS * 2][-30:]
+    return plate_text
+
+
 def enrich_detections_for_display(detections):
-    """Normalize person fields for the Detected Objects card UI."""
+    """Normalize fields for the Detected Objects card UI."""
     phones = [d for d in detections if d.get('category') == 'phone' and d.get('bbox')]
     bags = [d for d in detections if d.get('category') in ('backpack', 'suitcase') and d.get('bbox')]
 
     for det in detections:
         category = det.get('category')
         if category == 'person':
-            acc = str(det.get('accessories', 'None') or 'None').lower()
-            det['mask'] = 'Yes' if 'mask' in acc else 'No'
-            det['earrings'] = 'Yes' if 'earring' in acc else 'No'
-            det['facial_hair'] = det.get('facial_hair') or 'None'
-
-            gender = det.get('gender', 'Unknown')
-            if gender == 'Male':
-                det['gender'] = 'Man'
-            elif gender == 'Female':
-                det['gender'] = 'Woman'
-
-            expr = str(det.get('expression', 'calm') or 'calm')
-            det['expression'] = expr.capitalize()
-
             clothes = str(det.get('clothes_color', 'Unknown') or 'Unknown')
             if clothes.lower() in ('none', 'unknown'):
                 det['clothes_color'] = clothes.capitalize() if clothes.lower() == 'none' else 'Unknown'
             else:
                 det['clothes_color'] = clothes.capitalize()
+
+            # Drop legacy facial fields if present from older agent builds.
+            for key in ('gender', 'expression', 'mask', 'earrings', 'facial_hair', 'accessories', 'age'):
+                det.pop(key, None)
 
             items = []
             weapon = det.get('weapon')
@@ -2524,6 +2294,12 @@ def enrich_detections_for_display(detections):
             det['items_detected'] = ', '.join(dict.fromkeys(items)) if items else 'None'
             continue
 
+        if category == 'vehicle':
+            plate = str(det.get('license_plate') or det.get('plate_number') or '').strip()
+            det['license_plate'] = plate or 'Unreadable'
+            det['items_detected'] = det.get('class') or 'vehicle'
+            continue
+
         if category in ('group', 'crowd'):
             count = det.get('people_count') or det.get('group_size') or 0
             det['items_detected'] = f'{count} people'
@@ -2535,11 +2311,14 @@ def enrich_detections_for_display(detections):
             det['items_detected'] = det.get('class') or category
             if det.get('suspicious_reason'):
                 det['activity'] = 'Suspicious'
+            elif not det.get('activity'):
+                det['activity'] = 'Monitoring'
             continue
 
         det['items_detected'] = det.get('class') or category or 'None'
 
     return detections
+
 
 def save_detected_object_image(frame, bbox, detection_id, category="person", face_bbox=None):
     """Crop and save detected object image - for persons, extract FACE ONLY (no body parts)"""
@@ -2723,13 +2502,16 @@ def process_detections(results, frame):
                         # Generate unique ID for this detection
                         detection_id = detection_id_counter + len(detections)
                         
-                        # For persons, detect face and analyze attributes
+                        # Persons: shirt color only. Vehicles: license plate OCR.
                         face_bbox = None
                         attributes = {}
                         if category == "person":
                             face_bbox = detect_face_in_bbox(frame, bbox)
-                            if face_bbox:
-                                attributes = analyze_person_attributes(frame, bbox, face_bbox)
+                            attributes = analyze_person_attributes(frame, bbox, face_bbox)
+                        elif category == "vehicle":
+                            plate = read_license_plate(frame, bbox)
+                            if plate:
+                                attributes['license_plate'] = plate
                         
                         # Check if person has weapon nearby - if yes, include weapon in detection
                         weapon_detected = None
@@ -2777,8 +2559,8 @@ def process_detections(results, frame):
                             "timestamp": datetime.now().isoformat()
                         }
                         
-                        # Add person attributes if available
-                        if category == "person" and attributes:
+                        # Add person / vehicle attributes if available
+                        if category in ("person", "vehicle") and attributes:
                             detection.update(attributes)
                         
                         # Add weapon info if person has weapon
@@ -2823,13 +2605,16 @@ def process_detections(results, frame):
                     # Generate unique ID for this detection
                     detection_id = detection_id_counter + len(detections)
                     
-                    # For persons, detect face and analyze attributes
+                    # Persons: shirt color only. Vehicles: license plate OCR.
                     face_bbox = None
                     attributes = {}
                     if category == "person":
                         face_bbox = detect_face_in_bbox(frame, bbox)
-                        if face_bbox:
-                            attributes = analyze_person_attributes(frame, bbox, face_bbox)
+                        attributes = analyze_person_attributes(frame, bbox, face_bbox)
+                    elif category == "vehicle":
+                        plate = read_license_plate(frame, bbox)
+                        if plate:
+                            attributes['license_plate'] = plate
                     
                     # Extract and save object image (face only for persons)
                     image_path = save_detected_object_image(frame, bbox, detection_id, category, face_bbox)
@@ -2844,8 +2629,8 @@ def process_detections(results, frame):
                         "timestamp": datetime.now().isoformat()
                     }
                     
-                    # Add person attributes if available
-                    if category == "person" and attributes:
+                    # Add person / vehicle attributes if available
+                    if category in ("person", "vehicle") and attributes:
                         detection.update(attributes)
                     
                     detections.append(detection)
@@ -2990,6 +2775,12 @@ def draw_detections_on_frame(frame, detections):
         if category in ("group", "crowd"):
             people_count = detection.get('people_count', detection.get('group_size', 0))
             label = f"{category}: {people_count} people"
+        elif category == "vehicle":
+            plate = str(detection.get('license_plate') or '').strip()
+            if plate and plate.lower() != 'unreadable':
+                label = f"vehicle: {plate} {conf:.2f}"
+            else:
+                label = f"{category}: {class_name} {conf:.2f}"
         elif detection.get('suspicious'):
             label = f"! {category}: {class_name} {conf:.2f}"
         else:

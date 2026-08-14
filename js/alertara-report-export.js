@@ -1,6 +1,6 @@
 /**
  * Shared Alertara QC branded DOCX export.
- * Layout: centered brand/address header, title, fields, watermark, Generated on.
+ * Layout: centered brand/address header, title, fields, repeating page watermark, Generated on.
  * Requires JSZip (global).
  */
 (function (global) {
@@ -83,9 +83,9 @@
         );
     }
 
-    function pictureDrawing(rId, name, cx, cy, docPrId, behindDoc) {
-        var wrap = behindDoc
-            ? (
+    function pictureDrawingXml(rId, name, cx, cy, docPrId, behindDoc) {
+        if (behindDoc) {
+            return (
                 '                    <wp:anchor distT="0" distB="0" distL="0" distR="0" simplePos="0" relativeHeight="0" behindDoc="1" locked="0" layoutInCell="1" allowOverlap="1">' + NL +
                 '                        <wp:simplePos x="0" y="0"/>' + NL +
                 '                        <wp:positionH relativeFrom="page"><wp:align>center</wp:align></wp:positionH>' + NL +
@@ -104,32 +104,56 @@
                 '                            </a:graphicData>' + NL +
                 '                        </a:graphic>' + NL +
                 '                    </wp:anchor>'
-            )
-            : (
-                '                    <wp:inline distT="0" distB="0" distL="0" distR="0">' + NL +
-                '                        <wp:extent cx="' + cx + '" cy="' + cy + '"/>' + NL +
-                '                        <wp:docPr id="' + docPrId + '" name="' + escapeXml(name) + '"/>' + NL +
-                '                        <a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">' + NL +
-                '                            <a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">' + NL +
-                '                                <pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture">' + NL +
-                '                                    <pic:nvPicPr><pic:cNvPr id="0" name="' + escapeXml(name) + '"/><pic:cNvPicPr/></pic:nvPicPr>' + NL +
-                '                                    <pic:blipFill><a:blip r:embed="' + rId + '"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill>' + NL +
-                '                                    <pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="' + cx + '" cy="' + cy + '"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr>' + NL +
-                '                                </pic:pic>' + NL +
-                '                            </a:graphicData>' + NL +
-                '                        </a:graphic>' + NL +
-                '                    </wp:inline>'
             );
+        }
+        return (
+            '                    <wp:inline distT="0" distB="0" distL="0" distR="0">' + NL +
+            '                        <wp:extent cx="' + cx + '" cy="' + cy + '"/>' + NL +
+            '                        <wp:docPr id="' + docPrId + '" name="' + escapeXml(name) + '"/>' + NL +
+            '                        <a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">' + NL +
+            '                            <a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">' + NL +
+            '                                <pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture">' + NL +
+            '                                    <pic:nvPicPr><pic:cNvPr id="0" name="' + escapeXml(name) + '"/><pic:cNvPicPr/></pic:nvPicPr>' + NL +
+            '                                    <pic:blipFill><a:blip r:embed="' + rId + '"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill>' + NL +
+            '                                    <pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="' + cx + '" cy="' + cy + '"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr>' + NL +
+            '                                </pic:pic>' + NL +
+            '                            </a:graphicData>' + NL +
+            '                        </a:graphic>' + NL +
+            '                    </wp:inline>'
+        );
+    }
 
+    function pictureDrawing(rId, name, cx, cy, docPrId, behindDoc) {
         return (
             '        <w:p>' + NL +
             '            <w:pPr><w:spacing w:before="0" w:after="0"/></w:pPr>' + NL +
             '            <w:r>' + NL +
             '                <w:drawing>' + NL +
-            wrap + NL +
+            pictureDrawingXml(rId, name, cx, cy, docPrId, behindDoc) + NL +
             '                </w:drawing>' + NL +
             '            </w:r>' + NL +
             '        </w:p>' + NL
+        );
+    }
+
+    function buildWatermarkHeaderXml(rId, cx, cy) {
+        // Header-anchored floating image repeats on every page (unlike body-only anchors).
+        return (
+            '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' + NL +
+            '<w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"' + NL +
+            '       xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"' + NL +
+            '       xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"' + NL +
+            '       xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"' + NL +
+            '       xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture">' + NL +
+            '    <w:p>' + NL +
+            '        <w:pPr><w:spacing w:before="0" w:after="0"/></w:pPr>' + NL +
+            '        <w:r>' + NL +
+            '            <w:drawing>' + NL +
+            pictureDrawingXml(rId, 'Alertara Watermark', cx, cy, 1, true) + NL +
+            '            </w:drawing>' + NL +
+            '        </w:r>' + NL +
+            '    </w:p>' + NL +
+            '</w:hdr>'
         );
     }
 
@@ -307,13 +331,17 @@
         var watermark = await loadWatermarkPart();
         var mediaFiles = [];
         var imageRels = [];
+        var headerImageRels = [];
         var contentTypeDefaults = {};
         var relNum = 20;
+        var hasHeaderWatermark = false;
 
         if (watermark) {
             mediaFiles.push({ path: 'word/media/watermark.png', bytes: watermark.bytes, ext: 'png', mime: 'image/png' });
-            imageRels.push({ id: 'rIdWatermark', target: 'media/watermark.png' });
+            // Image is referenced from header1.xml, not document.xml
+            headerImageRels.push({ id: 'rIdWatermark', target: 'media/watermark.png' });
             contentTypeDefaults.png = 'image/png';
+            hasHeaderWatermark = true;
         }
 
         for (var s = 0; s < sections.length; s++) {
@@ -329,9 +357,6 @@
         }
 
         var body = '';
-        if (watermark) {
-            body += pictureDrawing('rIdWatermark', 'Watermark', watermark.cx, watermark.cy, 99, true);
-        }
         body += buildHeaderXml();
         body += centeredPara(title, { bold: true, size: 36, after: 80, before: 80, color: '000000' });
         body += centeredPara(subtitle, { size: 20, after: 360, color: '333333' });
@@ -368,8 +393,23 @@
         });
         contentTypes +=
             '    <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>' + NL +
-            '    <Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>' + NL +
-            '</Types>';
+            '    <Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>' + NL;
+        if (hasHeaderWatermark) {
+            contentTypes +=
+                '    <Override PartName="/word/header1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml"/>' + NL;
+        }
+        contentTypes += '</Types>';
+
+        var sectPr =
+            '        <w:sectPr>' + NL;
+        if (hasHeaderWatermark) {
+            sectPr +=
+                '            <w:headerReference w:type="default" r:id="rIdHeader"/>' + NL;
+        }
+        sectPr +=
+            '            <w:pgSz w:w="12240" w:h="15840"/>' + NL +
+            '            <w:pgMar w:top="720" w:right="864" w:bottom="720" w:left="864" w:header="36" w:footer="36"/>' + NL +
+            '        </w:sectPr>' + NL;
 
         var documentXml =
             xmlDecl +
@@ -378,10 +418,7 @@
             '            xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing">' + NL +
             '    <w:body>' + NL +
             body +
-            '        <w:sectPr>' + NL +
-            '            <w:pgSz w:w="12240" w:h="15840"/>' + NL +
-            '            <w:pgMar w:top="720" w:right="864" w:bottom="720" w:left="864"/>' + NL +
-            '        </w:sectPr>' + NL +
+            sectPr +
             '    </w:body>' + NL +
             '</w:document>';
 
@@ -406,6 +443,10 @@
             xmlDecl +
             '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' + NL +
             '    <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>' + NL;
+        if (hasHeaderWatermark) {
+            wordRels +=
+                '    <Relationship Id="rIdHeader" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/header" Target="header1.xml"/>' + NL;
+        }
         imageRels.forEach(function (r) {
             wordRels +=
                 '    <Relationship Id="' + r.id + '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="' + r.target + '"/>' + NL;
@@ -417,6 +458,18 @@
         zip.file('word/styles.xml', stylesXml);
         zip.file('_rels/.rels', rels);
         zip.file('word/_rels/document.xml.rels', wordRels);
+        if (hasHeaderWatermark) {
+            zip.file('word/header1.xml', buildWatermarkHeaderXml('rIdWatermark', watermark.cx, watermark.cy));
+            var headerRels =
+                xmlDecl +
+                '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' + NL;
+            headerImageRels.forEach(function (r) {
+                headerRels +=
+                    '    <Relationship Id="' + r.id + '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="' + r.target + '"/>' + NL;
+            });
+            headerRels += '</Relationships>';
+            zip.file('word/_rels/header1.xml.rels', headerRels);
+        }
         mediaFiles.forEach(function (mf) {
             zip.file(mf.path, mf.bytes);
         });

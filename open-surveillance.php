@@ -1116,18 +1116,21 @@ ensureLocalDetectionStarted();
             const cat = item.category || 'object';
             const confidence = ((item.confidence || 0) * 100).toFixed(1) + '%';
             const detectedAt = formatDetectedTime(item.timestamp);
-            const wideLabels = { Reason: true };
+            const wideLabels = { Reason: true, Note: true };
+            const rawLabels = { 'License Plate': true, Reason: true, Note: true };
 
             let rows;
             if (cat === 'person') {
                 rows = [
-                    ['Gender', item.gender || 'Unknown'],
-                    ['Expression', item.expression || 'Calm'],
-                    ['Mask', item.mask || 'No'],
-                    ['Facial Hair', item.facial_hair || 'None'],
-                    ['Earrings', item.earrings || 'No'],
-                    ['Items Detected', item.items_detected || 'None'],
                     ['Clothes Color', item.clothes_color || 'Unknown'],
+                    ['Items Detected', item.items_detected || 'None'],
+                    ['Confidence', confidence],
+                    ['Detected', detectedAt]
+                ];
+            } else if (cat === 'vehicle') {
+                rows = [
+                    ['Type', item.class || categoryLabel(cat)],
+                    ['License Plate', item.license_plate || 'Unreadable'],
                     ['Confidence', confidence],
                     ['Detected', detectedAt]
                 ];
@@ -1142,8 +1145,12 @@ ensureLocalDetectionStarted();
                     rows.splice(1, 0, ['Reason', item.suspicious_reason]);
                 }
             } else if (cat === 'backpack' || cat === 'suitcase') {
+                const duration = (typeof item.bag_duration_seconds === 'number')
+                    ? Math.round(item.bag_duration_seconds) + 's'
+                    : '—';
                 rows = [
                     ['Type', item.class || categoryLabel(cat)],
+                    ['Tracked For', duration],
                     ['Items Detected', item.items_detected || item.class || 'None'],
                     ['Confidence', confidence],
                     ['Detected', detectedAt]
@@ -1151,6 +1158,10 @@ ensureLocalDetectionStarted();
                 if (item.suspicious_reason) {
                     rows.unshift(['Activity', item.activity || 'Suspicious']);
                     rows.splice(1, 0, ['Reason', item.suspicious_reason]);
+                } else if (item.monitor_note) {
+                    rows.unshift(['Activity', item.activity || 'Monitoring']);
+                    rows.splice(1, 0, ['Note', item.monitor_note]);
+                    wideLabels.Note = true;
                 }
             } else {
                 rows = [
@@ -1165,7 +1176,8 @@ ensureLocalDetectionStarted();
                 return {
                     label: pair[0],
                     value: pair[1],
-                    wide: !!wideLabels[pair[0]]
+                    wide: !!wideLabels[pair[0]],
+                    raw: !!rawLabels[pair[0]]
                 };
             });
         }
@@ -1189,7 +1201,7 @@ ensureLocalDetectionStarted();
             const thumb = detectionThumbHtml(item, cat);
 
             const attrHtml = attrs.map(function(row) {
-                const valueClass = row.wide ? 'value' : 'value capitalize';
+                const valueClass = (row.wide || row.raw) ? 'value' : 'value capitalize';
                 return `
                 <div class="detection-attr${row.wide ? ' wide' : ''}">
                     <span class="label">${escapeHtml(row.label)}:</span>
@@ -1342,7 +1354,7 @@ ensureLocalDetectionStarted();
                 const suspicious = detections.filter(function(item) { return item.suspicious; });
                 if (banner) {
                     if (suspicious.length) {
-                        banner.textContent = 'Suspicious activity: ' + suspicious.length + ' alert(s) — crowds, groups, backpacks, or suitcases detected.';
+                        banner.textContent = 'Suspicious activity: ' + suspicious.length + ' alert(s) — crowds, groups, or bags tracked ~1 minute+.';
                         banner.classList.add('show');
                     } else {
                         banner.textContent = '';

@@ -1952,7 +1952,7 @@ $autoOpenSetPassword = !empty($showSetPasswordModal);
                     </details>
                     <details class="faq reveal">
                         <summary>Is community monitoring used responsibly?</summary>
-                        <p>Yes. The platform supports lawful public-safety operations for Barangay San Agustin with accountability measures for authorized barangay partners.</p>
+                        <p>Yes. The platform supports responsible community monitoring for public safety in Barangay San Agustin, with access limited to authorized personnel and accountability measures in place.</p>
                     </details>
                 </div>
             </div>
