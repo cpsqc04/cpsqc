@@ -8,7 +8,7 @@ Always-on monitoring:
 
 Configure in .env (same as detect.py):
   CCTV_FRAME_UPLOAD_KEY=...
-  CCTV_FRAME_UPLOAD_URL=https://surveillance.alertaraqc.com/api/cctv_frame_upload.php
+  CCTV_FRAME_UPLOAD_URL=https://policy.alertaraqc.com/api/cctv_frame_upload.php
 """
 
 from __future__ import annotations

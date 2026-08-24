@@ -5,7 +5,7 @@ Community Policing and Safety Quality Control system for **Barangay San Agustin,
 AlertaraQC supports BPSO patrol scheduling and monitoring, neighborhood watch coordination, CCTV surveillance, community complaints, anonymous tips, awareness events, and partner-group API integrations.
 
 **Repository:** [cpsqc04/cpsqc](https://github.com/cpsqc04/cpsqc)  
-**Production:** [surveillance.alertaraqc.com](https://surveillance.alertaraqc.com)
+**Production:** [policy.alertaraqc.com](https://policy.alertaraqc.com)
 
 ---
 
@@ -116,8 +116,8 @@ Required fields: `rule_name`, `location` (or `area_name`), `severity` (`CRITICAL
    ```
 3. Keep a separate production `.env` on the server (never overwrite it with local secrets).
 4. Verify:
-   - Site: `https://surveillance.alertaraqc.com`
-   - Partner API: `https://surveillance.alertaraqc.com/api/partner-api.php`
+   - Site: `https://policy.alertaraqc.com`
+   - Partner API: `https://policy.alertaraqc.com/api/partner-api.php`
 
 ---
 

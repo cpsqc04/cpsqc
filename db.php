@@ -48,7 +48,12 @@ function isProduction() {
     
     // Auto-detect based on HTTP_HOST
     $host = $_SERVER['HTTP_HOST'] ?? '';
-    $productionDomains = ['surveillance.alertaraqc.com', 'www.surveillance.alertaraqc.com'];
+    $productionDomains = [
+        'policy.alertaraqc.com',
+        'www.policy.alertaraqc.com',
+        'surveillance.alertaraqc.com',
+        'www.surveillance.alertaraqc.com',
+    ];
     
     foreach ($productionDomains as $domain) {
         if (strpos($host, $domain) !== false) {
