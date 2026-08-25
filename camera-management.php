@@ -166,13 +166,16 @@ $cctvNavActive = 'camera-management';
         .toolbar-actions { display: flex; gap: 0.75rem; flex-wrap: wrap; align-items: center; }
         .scan-panel { margin-top: 1rem; padding: 1rem; border: 1px solid var(--border-color); border-radius: 10px; background: #f8fafc; display: none; }
         .scan-panel.show { display: block; }
+        .scan-panel-title { margin: 0 0 0.35rem; font-size: 1rem; font-weight: 700; color: var(--text-color); }
         .scan-status { color: var(--text-secondary); font-size: 0.9rem; margin: 0 0 0.75rem; }
         .scan-list { display: flex; flex-direction: column; gap: 0.5rem; }
         .scan-item { display: flex; justify-content: space-between; align-items: center; gap: 0.75rem; padding: 0.75rem 0.9rem; background: #fff; border: 1px solid var(--border-color); border-radius: 8px; flex-wrap: wrap; }
         .scan-item-meta { font-size: 0.85rem; color: var(--text-secondary); }
         .scan-item strong { color: var(--text-color); font-size: 1rem; }
+        .scan-item-tag { display: inline-block; font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.02em; padding: 0.12rem 0.45rem; border-radius: 999px; margin-right: 0.35rem; background: #e0f2fe; color: #075985; }
         .btn-use-ip { background: var(--primary-color); color: #fff; border: none; padding: 0.45rem 0.85rem; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 0.85rem; }
         .btn-use-ip:hover { background: #4ca8a6; }
+        .btn-use-ip:disabled { opacity: 0.65; cursor: default; background: #94a3b8; }
         .toast-popup {
             position: fixed;
             top: 1.25rem;
@@ -400,7 +403,8 @@ $cctvNavActive = 'camera-management';
                         </div>
                     </div>
                     <div class="scan-panel" id="scanPanel">
-                        <p class="scan-status" id="scanStatus">Ready to scan.</p>
+                        <h3 class="scan-panel-title"><i class="fas fa-lightbulb"></i> Suggested cameras (LAN)</h3>
+                        <p class="scan-status" id="scanStatus">Looking for cameras on the LAN…</p>
                         <div class="scan-list" id="scanList"></div>
                     </div>
                     <div class="table-container">
@@ -516,7 +520,7 @@ $cctvNavActive = 'camera-management';
     <div id="toastPopup" class="toast-popup" role="status" aria-live="polite">Camera updated</div>
 
     <script>
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', async function() {
             const sidebar = document.getElementById('sidebar');
             const savedState = localStorage.getItem('sidebarCollapsed');
             if (savedState === 'true') {
@@ -525,7 +529,8 @@ $cctvNavActive = 'camera-management';
             }
             updateDateTime();
             setInterval(updateDateTime, 1000);
-            loadCameras();
+            await loadCameras();
+            await restoreOrStartLanScan();
         });
 
         let cameras = [];
@@ -544,6 +549,15 @@ $cctvNavActive = 'camera-management';
             toastTimer = setTimeout(function() {
                 el.classList.remove('show');
             }, 2200);
+        }
+
+        function registeredIpSet() {
+            const set = {};
+            (cameras || []).forEach(function(cam) {
+                const ip = String(cam.ipAddress || '').trim();
+                if (ip) set[ip] = true;
+            });
+            return set;
         }
 
         function buildRtspUrl(ip, port, username, password, streamType) {
@@ -613,21 +627,28 @@ $cctvNavActive = 'camera-management';
             const wrap = document.getElementById('scanList');
             lastScanCameras = Array.isArray(list) ? list : [];
             if (!lastScanCameras.length) {
-                wrap.innerHTML = '<div class="scan-item-meta">No camera candidates found on the scanned subnet(s).</div>';
+                wrap.innerHTML = '<div class="scan-item-meta">No suggested cameras found on the LAN yet. Make sure the camera and on-site PC share the same router, then click Scan LAN again.</div>';
                 return;
             }
+            const registered = registeredIpSet();
             wrap.innerHTML = lastScanCameras.map(function(cam, index) {
                 const conf = String(cam.confidence || 'low').toLowerCase();
                 const ports = (cam.open_ports || []).join(', ');
                 const hint = cam.hint ? (' · ' + cam.hint) : '';
+                const ip = String(cam.ip || '').trim();
+                const already = !!registered[ip];
+                const actionBtn = already
+                    ? '<button type="button" class="btn-use-ip" disabled>Already added</button>'
+                    : '<button type="button" class="btn-use-ip" onclick="useDiscoveredCamera(' + index + ')"><i class="fas fa-plus"></i> Add Camera</button>';
                 return `
                     <div class="scan-item">
                         <div>
-                            <strong>${escapeHtml(cam.ip)}</strong>
+                            <span class="scan-item-tag">Suggested</span>
+                            <strong>${escapeHtml(ip)}</strong>
                             <span class="confidence-pill confidence-${escapeHtml(conf)}">${escapeHtml(conf)}</span>
                             <div class="scan-item-meta">ports ${escapeHtml(ports)}${escapeHtml(hint)}</div>
                         </div>
-                        <button type="button" class="btn-use-ip" onclick="useDiscoveredCamera(${index})">Use IP</button>
+                        ${actionBtn}
                     </div>
                 `;
             }).join('');
@@ -639,6 +660,7 @@ $cctvNavActive = 'camera-management';
             openCameraModal();
             document.getElementById('cameraIp').value = cam.ip || '';
             document.getElementById('cameraPort').value = String(cam.rtsp_port || 554);
+            document.getElementById('cameraStreamType').value = cam.suggested_stream_type || 'sub';
             if (!document.getElementById('cameraUsername').value) {
                 document.getElementById('cameraUsername').value = 'admin';
             }
@@ -649,6 +671,32 @@ $cctvNavActive = 'camera-management';
                 document.getElementById('cameraName').value = document.getElementById('cameraLocation').value;
             }
             document.getElementById('cameraStatus').value = 'Online';
+            refreshRtspPreview();
+            showToast('Suggested camera loaded — enter password and save.');
+        }
+
+        async function restoreOrStartLanScan() {
+            showScanPanel();
+            setScanStatus('Looking for cameras on the LAN…');
+            try {
+                const res = await fetch('api/cctv_camera_scan.php', { cache: 'no-store' });
+                const result = await res.json();
+                const job = result.job;
+                if (job && (job.status === 'pending' || job.status === 'running')) {
+                    applyScanJob(job);
+                    if (!scanPollTimer) {
+                        scanPollTimer = setInterval(pollCameraScan, 2500);
+                    }
+                    return;
+                }
+                if (job && job.status === 'done' && Array.isArray(job.cameras) && job.cameras.length) {
+                    setScanStatus('Suggested cameras from last scan. Refreshing LAN…');
+                    renderScanResults(job.cameras);
+                }
+            } catch (e) {
+                /* start a fresh scan below */
+            }
+            startCameraScan(false);
         }
 
         function stopScanPolling() {
@@ -668,7 +716,12 @@ $cctvNavActive = 'camera-management';
                 return false;
             }
             if (status === 'done') {
-                setScanStatus(job.message || ('Found ' + (job.count || 0) + ' camera(s).'));
+                const count = job.count != null ? job.count : ((job.cameras || []).length);
+                setScanStatus(
+                    count > 0
+                        ? ('Found ' + count + ' suggested camera(s) on the LAN.')
+                        : (job.message || 'No suggested cameras found on the LAN.')
+                );
                 renderScanResults(job.cameras || []);
                 stopScanPolling();
                 return true;
@@ -810,6 +863,9 @@ $cctvNavActive = 'camera-management';
                 if (!result.success) throw new Error(result.error || 'Failed to load cameras');
                 cameras = result.cameras || [];
                 renderCameras();
+                if (lastScanCameras.length) {
+                    renderScanResults(lastScanCameras);
+                }
             } catch (e) {
                 tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#b91c1c;">Failed to load cameras.</td></tr>';
             }
