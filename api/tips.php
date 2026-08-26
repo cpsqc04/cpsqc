@@ -106,10 +106,22 @@ if ($method === 'POST') {
             exit;
         }
 
-        $incident = normalizeTipIncidentAt(is_string($incidentRaw) || is_numeric($incidentRaw) ? (string) $incidentRaw : null);
-        if (!$incident['ok']) {
+        $incidentAtValue = null;
+        $incidentRawStr = is_string($incidentRaw) || is_numeric($incidentRaw) ? trim((string) $incidentRaw) : '';
+        if ($incidentRawStr !== '') {
+            $incident = normalizeTipIncidentAt($incidentRawStr);
+            if (!$incident['ok']) {
+                http_response_code(400);
+                echo json_encode(['success' => false, 'message' => $incident['message'] ?? 'Invalid incident date/time.']);
+                exit;
+            }
+            $incidentAtValue = $incident['value'];
+        } elseif (
+            (isset($input['date']) && trim((string) $input['date']) !== '')
+            xor (isset($input['time']) && trim((string) $input['time']) !== '')
+        ) {
             http_response_code(400);
-            echo json_encode(['success' => false, 'message' => $incident['message'] ?? 'Invalid incident date/time.']);
+            echo json_encode(['success' => false, 'message' => 'Provide both date and time of the incident, or leave both blank.']);
             exit;
         }
 
@@ -126,7 +138,7 @@ if ($method === 'POST') {
                 ':location' => $location,
                 ':description' => $description,
                 ':photo_data' => $photoData,
-                ':incident_at' => $incident['value'],
+                ':incident_at' => $incidentAtValue,
                 ':status' => 'New',
                 ':outcome' => 'No Outcome Yet',
             ]);
@@ -149,7 +161,7 @@ if ($method === 'POST') {
                     'tip_id' => $tipId,
                     'location' => $location,
                     'description' => $description,
-                    'incident_at' => $incident['value'],
+                    'incident_at' => $incidentAtValue,
                     'status' => 'New',
                     'outcome' => 'No Outcome Yet',
                 ],
