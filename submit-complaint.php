@@ -1429,15 +1429,7 @@ require_once __DIR__ . '/db.php';
             }
         }
         
-        // Generate unique complaint ID
-        function generateComplaintId() {
-            const year = new Date().getFullYear();
-            const timestamp = Date.now();
-            const random = Math.floor(Math.random() * 1000);
-            return `COMP-${year}-${String(random).padStart(3, '0')}`;
-        }
-        
-        
+        // Submit complaint (ID assigned by server)
         function toggleComplaintTypeOtherField() {
             const type = document.getElementById('complaintType').value;
             const group = document.getElementById('complaintTypeOtherGroup');
@@ -1486,10 +1478,8 @@ require_once __DIR__ . '/db.php';
             }
             
             // Get form values
-            const complaintId = generateComplaintId();
             const formData = {
                 action: 'create',
-                complaint_id: complaintId,
                 complainant_name: document.getElementById('complainantName').value.trim(),
                 contact_number: document.getElementById('complainantContact').value.trim(),
                 address: document.getElementById('complainantAddress').value.trim(),
@@ -1524,7 +1514,7 @@ require_once __DIR__ . '/db.php';
                 }
                 
                 // Show success modal
-                document.getElementById('complaintIdDisplay').textContent = complaintId;
+                document.getElementById('complaintIdDisplay').textContent = (result.data && result.data.complaint_id) ? result.data.complaint_id : '';
                 document.getElementById('successModal').classList.add('active');
                 
                 // Reset form

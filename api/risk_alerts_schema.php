@@ -189,19 +189,9 @@ function validateRiskAlertRequiredFields(array $data): ?string
 
 function generateRiskAlertId(PDO $pdo): string
 {
-    $year = date('Y');
-    $prefix = 'RISK-' . $year . '-';
+    require_once __DIR__ . '/../includes/public_id.php';
 
-    $stmt = $pdo->prepare('SELECT alert_id FROM risk_alerts WHERE alert_id LIKE :prefix ORDER BY id DESC LIMIT 1');
-    $stmt->execute([':prefix' => $prefix . '%']);
-    $last = $stmt->fetchColumn();
-
-    $next = 1;
-    if ($last && preg_match('/RISK-\d{4}-(\d+)$/', $last, $matches)) {
-        $next = (int) $matches[1] + 1;
-    }
-
-    return $prefix . str_pad((string) $next, 3, '0', STR_PAD_LEFT);
+    return generateYearlySequentialId($pdo, 'risk_alerts', 'alert_id', 'RISK-');
 }
 
 function riskAlertsSelectColumns(string $prefix = ''): string

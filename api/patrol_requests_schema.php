@@ -114,19 +114,9 @@ function patrolRequestsSelectColumns(string $prefix = ''): string
 
 function generatePatrolRequestId(PDO $pdo): string
 {
-    $year = date('Y');
-    $prefix = 'PT-REQ-' . $year . '-';
+    require_once __DIR__ . '/../includes/public_id.php';
 
-    $stmt = $pdo->prepare('SELECT request_id FROM patrol_requests WHERE request_id LIKE :prefix ORDER BY id DESC LIMIT 1');
-    $stmt->execute([':prefix' => $prefix . '%']);
-    $last = $stmt->fetchColumn();
-
-    $next = 1;
-    if ($last && preg_match('/PT-REQ-\d{4}-(\d+)$/', $last, $matches)) {
-        $next = (int) $matches[1] + 1;
-    }
-
-    return $prefix . str_pad((string) $next, 3, '0', STR_PAD_LEFT);
+    return generateYearlySequentialId($pdo, 'patrol_requests', 'request_id', 'PT-REQ-');
 }
 
 function patrolRequestAllowedSourceGroups(): array

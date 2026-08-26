@@ -75,11 +75,6 @@
         preview.style.display = 'block';
     }
 
-    function generateComplaintId() {
-        var year = new Date().getFullYear();
-        var random = Math.floor(Math.random() * 1000);
-        return 'COMP-' + year + '-' + String(random).padStart(3, '0');
-    }
 
     function toggleComplaintTypeOtherField() {
         var type = ($('complaintType') || {}).value;
@@ -165,13 +160,11 @@
             submitBtn.textContent = 'Submitting…';
         }
 
-        var complaintId = generateComplaintId();
         fetch('api/complaints.php', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 action: 'create',
-                complaint_id: complaintId,
                 complainant_name: $('complainantName').value.trim(),
                 contact_number: $('complainantContact').value.trim(),
                 address: $('complainantAddress').value.trim(),
@@ -195,9 +188,10 @@
                     return;
                 }
                 closeComplaintModal();
+                var assignedComplaintId = (result.data && result.data.complaint_id) ? result.data.complaint_id : '';
                 showSuccessModal(
                     'Complaint Submitted',
-                    'Your complaint ID is ' + complaintId + '. Please keep this ID for tracking and follow-up.',
+                    'Your complaint ID is ' + assignedComplaintId + '. Please keep this ID for tracking and follow-up.',
                     false
                 );
             })

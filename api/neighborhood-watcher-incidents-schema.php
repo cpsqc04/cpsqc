@@ -73,10 +73,7 @@ function nwIncidentSelectColumns(): string
 
 function generateNwIncidentReportId(PDO $pdo): string
 {
-    $year = date('Y');
-    $stmt = $pdo->query("SELECT MAX(CAST(SUBSTRING(report_id, LOCATE('-', report_id, 5) + 1) AS UNSIGNED)) AS max_num FROM nw_incident_reports WHERE report_id LIKE 'NWI-{$year}-%'");
-    $maxNum = $stmt->fetchColumn();
-    $nextNum = ($maxNum === false || $maxNum === null) ? 1 : ((int) $maxNum + 1);
+    require_once __DIR__ . '/../includes/public_id.php';
 
-    return 'NWI-' . $year . '-' . str_pad((string) $nextNum, 3, '0', STR_PAD_LEFT);
+    return generateYearlySequentialId($pdo, 'nw_incident_reports', 'report_id', 'NWI-');
 }

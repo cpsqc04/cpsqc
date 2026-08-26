@@ -9,6 +9,7 @@ require_once __DIR__ . '/bpso_attendance_schema.php';
 require_once __DIR__ . '/notifications_schema.php';
 require_once __DIR__ . '/../includes/blotter_forward.php';
 require_once __DIR__ . '/../includes/contact_validation.php';
+require_once __DIR__ . '/../includes/public_id.php';
 
 try {
     ensureComplaintsTable($pdo);
@@ -68,7 +69,11 @@ if ($method === 'POST') {
         $assignedTo = trim($input['assigned_to'] ?? 'Pending Assignment');
         $notes = trim($input['notes'] ?? 'Complaint submitted and awaiting review.');
 
-        if ($complaintId === '' || $complainantName === '' || $contactNumber === '' || $address === '' || $incidentDate === '' || $incidentTime === '' || $defendantName === '' || $defendantAddress === '' || $complaintType === '' || $description === '') {
+        if ($complaintId === '') {
+            $complaintId = generateYearlySequentialId($pdo, 'complaints', 'complaint_id', 'COMP-');
+        }
+
+        if ($complainantName === '' || $contactNumber === '' || $address === '' || $incidentDate === '' || $incidentTime === '' || $defendantName === '' || $defendantAddress === '' || $complaintType === '' || $description === '') {
             http_response_code(400);
             echo json_encode(['success' => false, 'message' => 'Missing required fields.']);
             exit;
@@ -126,7 +131,7 @@ if ($method === 'POST') {
                 'track-complaint.php?id=' . $complaintId
             );
 
-            echo json_encode(['success' => true, 'data' => ['id' => (int) $pdo->lastInsertId()]]);
+            echo json_encode(['success' => true, 'data' => ['id' => (int) $pdo->lastInsertId(), 'complaint_id' => $complaintId]]);
         } catch (PDOException $e) {
             http_response_code(500);
             echo json_encode(['success' => false, 'message' => 'Failed to save complaint: ' . $e->getMessage()]);

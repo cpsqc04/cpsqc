@@ -135,6 +135,9 @@ function ensureTipsTable(PDO $pdo): void
     } catch (PDOException $e) {
         // ignore
     }
+
+    require_once __DIR__ . '/../includes/public_id.php';
+    ensurePublicIdsRenumbered($pdo);
 }
 
 /**

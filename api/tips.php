@@ -5,6 +5,7 @@ header('Content-Type: application/json');
 
 require_once __DIR__ . '/../db.php';
 require_once __DIR__ . '/tips_schema.php';
+require_once __DIR__ . '/../includes/public_id.php';
 require_once __DIR__ . '/bpso_attendance_schema.php';
 require_once __DIR__ . '/notifications_schema.php';
 require_once __DIR__ . '/../includes/patrol_availability.php';
@@ -121,11 +122,7 @@ if ($method === 'POST') {
         }
         $incidentAtValue = $incident['value'];
 
-        $year = date('Y');
-        $stmt = $pdo->query("SELECT MAX(CAST(SUBSTRING(tip_id, LOCATE('-', tip_id, 5) + 1) AS UNSIGNED)) AS max_num FROM tips WHERE tip_id LIKE 'TIP-{$year}-%'");
-        $maxNum = $stmt->fetchColumn();
-        $nextNum = ($maxNum === false || $maxNum === null) ? 1 : $maxNum + 1;
-        $tipId = "TIP-{$year}-" . str_pad($nextNum, 3, '0', STR_PAD_LEFT);
+        $tipId = generateYearlySequentialId($pdo, 'tips', 'tip_id', 'TIP-');
 
         try {
             $stmt = $pdo->prepare('INSERT INTO tips (tip_id, location, description, photo_data, incident_at, status, outcome) VALUES (:tip_id, :location, :description, :photo_data, :incident_at, :status, :outcome)');

@@ -210,36 +210,16 @@ function requireConfiguredAwarenessEventApiKey(): bool
 
 function generateAwarenessEventId(PDO $pdo): string
 {
-    $year = date('Y');
-    $prefix = 'EVT-' . $year . '-';
+    require_once __DIR__ . '/../includes/public_id.php';
 
-    $stmt = $pdo->prepare('SELECT event_id FROM awareness_events WHERE event_id LIKE :prefix ORDER BY id DESC LIMIT 1');
-    $stmt->execute([':prefix' => $prefix . '%']);
-    $last = $stmt->fetchColumn();
-
-    $next = 1;
-    if ($last && preg_match('/EVT-\d{4}-(\d+)$/', $last, $matches)) {
-        $next = (int) $matches[1] + 1;
-    }
-
-    return $prefix . str_pad((string) $next, 3, '0', STR_PAD_LEFT);
+    return generateYearlySequentialId($pdo, 'awareness_events', 'event_id', 'EVT-');
 }
 
 function generateAwarenessEventReportId(PDO $pdo): string
 {
-    $year = date('Y');
-    $prefix = 'EVT-RPT-' . $year . '-';
+    require_once __DIR__ . '/../includes/public_id.php';
 
-    $stmt = $pdo->prepare('SELECT report_id FROM awareness_event_reports WHERE report_id LIKE :prefix ORDER BY id DESC LIMIT 1');
-    $stmt->execute([':prefix' => $prefix . '%']);
-    $last = $stmt->fetchColumn();
-
-    $next = 1;
-    if ($last && preg_match('/EVT-RPT-\d{4}-(\d+)$/', $last, $matches)) {
-        $next = (int) $matches[1] + 1;
-    }
-
-    return $prefix . str_pad((string) $next, 3, '0', STR_PAD_LEFT);
+    return generateYearlySequentialId($pdo, 'awareness_event_reports', 'report_id', 'EVT-RPT-');
 }
 
 function normalizeAwarenessEventInput(array $input): array
