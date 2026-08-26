@@ -175,6 +175,7 @@ define('NW_PAGE_MODE', 'incidents');
         }
     </style>
     <link rel="stylesheet" href="css/mobile-responsive.css">
+    <link rel="stylesheet" href="css/table-pagination.css">
 </head>
 <body>
     <aside class="sidebar" id="sidebar">
@@ -348,6 +349,13 @@ define('NW_PAGE_MODE', 'incidents');
                     <button type="button" class="btn-cancel-export export-select-only" onclick="exitNwExportSelectMode()">Cancel</button>
                 </div>
                 <div id="tableContainer"><div class="empty-state">Loading reports...</div></div>
+                <div class="table-pagination">
+                    <div class="page-info" id="nwIncidentsPageInfo">Page 1 of 1</div>
+                    <div class="page-buttons">
+                        <button type="button" id="nwIncidentsPrevBtn" onclick="changeNwIncidentsPage(-1)" disabled>Previous</button>
+                        <button type="button" id="nwIncidentsNextBtn" onclick="changeNwIncidentsPage(1)" disabled>Next</button>
+                    </div>
+                </div>
             </div>
         </main>
     </div>
@@ -387,9 +395,18 @@ define('NW_PAGE_MODE', 'incidents');
     </div>
 
     <script src="js/photo-lightbox.js"></script>
+    <script src="js/table-pagination.js"></script>
     <script>
         let reports = [];
         let selectedReport = null;
+        let filteredNwReports = [];
+        const nwIncidentsPager = AlertaraTablePager.create({
+            pageSize: 10,
+            pageInfoId: 'nwIncidentsPageInfo',
+            prevBtnId: 'nwIncidentsPrevBtn',
+            nextBtnId: 'nwIncidentsNextBtn',
+            itemLabel: 'reports'
+        });
 
         function escapeHtml(text) {
             const div = document.createElement('div');
@@ -440,10 +457,35 @@ define('NW_PAGE_MODE', 'incidents');
                 + photoHtml;
         }
 
+        function getFilteredNwReports() {
+            const input = document.getElementById('searchInput');
+            const query = (input && input.value ? input.value : '').trim().toLowerCase();
+            if (!query) return reports.slice();
+            return reports.filter(function(report) {
+                return [report.report_id, report.member_name, report.location, report.status, report.assigned_to]
+                    .join(' ').toLowerCase().includes(query);
+            });
+        }
+
+        function changeNwIncidentsPage(delta) {
+            nwIncidentsPager.change(delta, filteredNwReports.length);
+            renderTablePage();
+        }
+
         function renderTable(data) {
+            filteredNwReports = Array.isArray(data) ? data : [];
+            nwIncidentsPager.reset();
+            renderTablePage();
+        }
+
+        function renderTablePage() {
             const container = document.getElementById('tableContainer');
-            if (!data.length) {
-                container.innerHTML = '<div class="empty-state">No incident reports found.</div>';
+            const pageRows = nwIncidentsPager.slice(filteredNwReports);
+
+            if (!filteredNwReports.length) {
+                container.innerHTML = '<div class="empty-state">'
+                    + (reports.length === 0 ? 'No incident reports found.' : 'No reports match your search.')
+                    + '</div>';
                 updateNwExportButtonState();
                 return;
             }
@@ -453,7 +495,7 @@ define('NW_PAGE_MODE', 'incidents');
                 + '<th>Report ID</th><th>Member</th><th>Location</th><th>Assigned To</th><th>Status</th><th>Submitted</th><th>Actions</th>'
                 + '</tr></thead><tbody>';
 
-            data.forEach(function(report) {
+            pageRows.forEach(function(report) {
                 const date = report.created_at ? new Date(report.created_at).toLocaleString() : '-';
                 const isResolved = String(report.status || '').toLowerCase() === 'resolved';
                 html += '<tr data-report-id="' + Number(report.id) + '">'
@@ -707,17 +749,8 @@ define('NW_PAGE_MODE', 'incidents');
             }
         }
 
-        document.getElementById('searchInput').addEventListener('input', function(e) {
-            const query = e.target.value.trim().toLowerCase();
-            if (!query) {
-                renderTable(reports);
-                return;
-            }
-            const filtered = reports.filter(function(report) {
-                return [report.report_id, report.member_name, report.location, report.status, report.assigned_to]
-                    .join(' ').toLowerCase().includes(query);
-            });
-            renderTable(filtered);
+        document.getElementById('searchInput').addEventListener('input', function() {
+            renderTable(getFilteredNwReports());
         });
 
         function toggleSidebar() {

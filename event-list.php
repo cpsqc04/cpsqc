@@ -379,6 +379,7 @@ require_once __DIR__ . '/db.php';
         @media (max-width: 768px) { .sidebar { width: 320px; transform: translateX(-100%); transition: transform 0.3s ease; } .sidebar.mobile-open { transform: translateX(0); } .sidebar.collapsed { width: 80px; transform: translateX(0); } .main-wrapper { margin-left: 0; } body.sidebar-collapsed .main-wrapper { margin-left: 80px; } .modal-content { width: 95%; margin: 10% auto; padding: 1.5rem; } .search-container { flex-direction: column; } .btn-add { width: 100%; justify-content: center; } }
     </style>
     <link rel="stylesheet" href="css/mobile-responsive.css">
+    <link rel="stylesheet" href="css/table-pagination.css">
 </head>
 <body>
     <aside class="sidebar" id="sidebar">
@@ -562,6 +563,13 @@ require_once __DIR__ . '/db.php';
                         </tbody>
                     </table>
                 </div>
+                <div class="table-pagination">
+                    <div class="page-info" id="eventsPageInfo">Page 1 of 1</div>
+                    <div class="page-buttons">
+                        <button type="button" id="eventsPrevBtn" onclick="changeEventsPage(-1)" disabled>Previous</button>
+                        <button type="button" id="eventsNextBtn" onclick="changeEventsPage(1)" disabled>Next</button>
+                    </div>
+                </div>
             </div>
         </main>
     </div>
@@ -582,6 +590,7 @@ require_once __DIR__ . '/db.php';
         </div>
     </div>
 
+    <script src="js/table-pagination.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             const sidebar = document.getElementById('sidebar');
@@ -593,6 +602,21 @@ require_once __DIR__ . '/db.php';
             initializeEventData();
             loadEvents();
         });
+        
+        let allEvents = [];
+        let eventData = {};
+        const eventsPager = AlertaraTablePager.create({
+            pageSize: 10,
+            pageInfoId: 'eventsPageInfo',
+            prevBtnId: 'eventsPrevBtn',
+            nextBtnId: 'eventsNextBtn',
+            itemLabel: 'events'
+        });
+
+        function initializeEventData() {
+            eventData = {};
+            allEvents = [];
+        }
         function toggleSidebar() {
             const sidebar = document.getElementById('sidebar');
             const isCollapsed = sidebar.classList.contains('collapsed');
@@ -625,20 +649,33 @@ require_once __DIR__ . '/db.php';
             document.querySelectorAll('.nav-module').forEach(m => { m.classList.remove('active'); });
             if (!isActive) { module.classList.add('active'); }
         }
-        function filterEvents() {
+        function getFilteredEvents() {
             const input = document.getElementById('searchInput');
-            const filter = input.value.toLowerCase();
-            const table = document.getElementById('eventsTableBody');
-            const rows = table.getElementsByTagName('tr');
-            for (let i = 0; i < rows.length; i++) {
-                const row = rows[i];
-                const text = row.textContent || row.innerText;
-                if (text.toLowerCase().indexOf(filter) > -1) {
-                    row.style.display = '';
-                } else {
-                    row.style.display = 'none';
-                }
-            }
+            const filter = (input && input.value ? input.value : '').toLowerCase().trim();
+            if (!filter) return allEvents.slice();
+            return allEvents.filter(function(item) {
+                const haystack = [
+                    item.event_id,
+                    item.event_name,
+                    item.event_date,
+                    item.event_time_display || item.event_time,
+                    item.organizer,
+                    item.event_type,
+                    item.venue,
+                    item.description
+                ].join(' ').toLowerCase();
+                return haystack.indexOf(filter) > -1;
+            });
+        }
+
+        function filterEvents() {
+            eventsPager.reset();
+            renderEventsTable();
+        }
+
+        function changeEventsPage(delta) {
+            eventsPager.change(delta, getFilteredEvents().length);
+            renderEventsTable();
         }
 
         function formatDate(value) {
@@ -666,13 +703,9 @@ require_once __DIR__ . '/db.php';
         }
 
         function renderEvents(events) {
-            const tbody = document.getElementById('eventsTableBody');
+            allEvents = Array.isArray(events) ? events : [];
             eventData = {};
-            if (!events.length) {
-                tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--text-secondary);">No events found.</td></tr>';
-                return;
-            }
-            tbody.innerHTML = events.map(function(item) {
+            allEvents.forEach(function(item) {
                 eventData[item.event_id] = {
                     id: item.event_id,
                     eventId: item.event_id,
@@ -684,6 +717,24 @@ require_once __DIR__ . '/db.php';
                     venue: item.venue,
                     description: item.description || ''
                 };
+            });
+            eventsPager.reset();
+            renderEventsTable();
+        }
+
+        function renderEventsTable() {
+            const tbody = document.getElementById('eventsTableBody');
+            const filtered = getFilteredEvents();
+            const pageRows = eventsPager.slice(filtered);
+
+            if (filtered.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--text-secondary);">'
+                    + (allEvents.length === 0 ? 'No events found.' : 'No events match your search.')
+                    + '</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = pageRows.map(function(item) {
                 return `
                     <tr data-event-id="${item.event_id}">
                         <td>${item.event_id}</td>
@@ -701,12 +752,6 @@ require_once __DIR__ . '/db.php';
                     </tr>
                 `;
             }).join('');
-        }
-
-        let eventData = {};
-
-        function initializeEventData() {
-            eventData = {};
         }
 
         function openViewEventModal(id) {

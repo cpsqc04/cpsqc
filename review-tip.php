@@ -480,6 +480,7 @@ require_once __DIR__ . '/db.php';
         @media (max-width: 768px) { .sidebar { width: 320px; transform: translateX(-100%); transition: transform 0.3s ease; } .sidebar.mobile-open { transform: translateX(0); } .sidebar.collapsed { width: 80px; transform: translateX(0); } .main-wrapper { margin-left: 0; } body.sidebar-collapsed .main-wrapper { margin-left: 80px; } .modal-content { width: 95%; margin: 10% auto; padding: 1.5rem; } }
     </style>
     <link rel="stylesheet" href="css/mobile-responsive.css">
+    <link rel="stylesheet" href="css/table-pagination.css">
 </head>
 <body>
     <aside class="sidebar" id="sidebar">
@@ -672,6 +673,13 @@ require_once __DIR__ . '/db.php';
                         </tbody>
                     </table>
                 </div>
+                <div class="table-pagination">
+                    <div class="page-info" id="tipsPageInfo">Page 1 of 1</div>
+                    <div class="page-buttons">
+                        <button type="button" id="tipsPrevBtn" onclick="changeTipsPage(-1)" disabled>Previous</button>
+                        <button type="button" id="tipsNextBtn" onclick="changeTipsPage(1)" disabled>Next</button>
+                    </div>
+                </div>
             </div>
         </main>
     </div>
@@ -770,6 +778,7 @@ require_once __DIR__ . '/db.php';
 
 
     <script src="js/photo-lightbox.js"></script>
+    <script src="js/table-pagination.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             const sidebar = document.getElementById('sidebar');
@@ -813,25 +822,69 @@ require_once __DIR__ . '/db.php';
             if (!isActive) { module.classList.add('active'); }
         }
         let tipExportSelectMode = false;
+        let tipIdOrder = [];
+        const tipsPager = AlertaraTablePager.create({
+            pageSize: 10,
+            pageInfoId: 'tipsPageInfo',
+            prevBtnId: 'tipsPrevBtn',
+            nextBtnId: 'tipsNextBtn',
+            itemLabel: 'tips'
+        });
+
+        function tipSearchHaystack(tip) {
+            return [
+                tip.tip_id,
+                tipIncidentTimestamp(tip),
+                tip.location,
+                tip.description,
+                tip.assigned_to,
+                displayTipOutcome(tip),
+                displayTipBackupStatus(tip)
+            ].join(' ').toLowerCase();
+        }
+
+        function getFilteredTipIds() {
+            const input = document.getElementById('searchInput');
+            const filter = (input && input.value ? input.value : '').toLowerCase().trim();
+            if (!filter) return tipIdOrder.slice();
+            return tipIdOrder.filter(function(id) {
+                const tip = tipData[id];
+                return tip && tipSearchHaystack(tip).indexOf(filter) > -1;
+            });
+        }
 
         function filterTips() {
-            const input = document.getElementById('searchInput');
-            const filter = input.value.toLowerCase();
-            const table = document.getElementById('tipsTableBody');
-            const rows = table.getElementsByTagName('tr');
-            for (let i = 0; i < rows.length; i++) {
-                const row = rows[i];
-                const text = row.textContent || row.innerText;
-                if (text.toLowerCase().indexOf(filter) > -1) {
-                    row.style.display = '';
-                } else {
-                    row.style.display = 'none';
-                    const cb = row.querySelector('.tip-select');
-                    if (cb) cb.checked = false;
-                }
+            tipsPager.reset();
+            renderTipsTable();
+        }
+
+        function changeTipsPage(delta) {
+            tipsPager.change(delta, getFilteredTipIds().length);
+            renderTipsTable();
+        }
+
+        function renderTipsTable() {
+            const tbody = document.getElementById('tipsTableBody');
+            const filteredIds = getFilteredTipIds();
+            const pageIds = tipsPager.slice(filteredIds);
+            tbody.innerHTML = '';
+
+            if (filteredIds.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:2rem;color:#666;">'
+                    + (tipIdOrder.length === 0 ? 'No tips found.' : 'No tips match your search.')
+                    + '</td></tr>';
+            } else {
+                pageIds.forEach(function(id) { addTipTableRow(id); });
+            }
+
+            const master = document.getElementById('selectAllTips');
+            if (master) {
+                master.checked = false;
+                master.indeterminate = false;
             }
             syncSelectAllTipsState();
             updateExportTipsButtonState();
+            lazyLoadTipThumbnails();
         }
 
         function enterTipExportSelectMode() {
@@ -976,21 +1029,19 @@ require_once __DIR__ . '/db.php';
                 
                 // Store tips by id for easy lookup
                 tipData = {};
+                tipIdOrder = [];
                 tips.forEach(tip => {
                     tipData[tip.id] = tip;
+                    tipIdOrder.push(tip.id);
                 });
                 
-                // Populate table
-                tips.forEach(tip => {
-                    addTipTableRow(tip.id);
-                });
+                tipsPager.reset();
+                renderTipsTable();
                 if (tipExportSelectMode) {
                     exitTipExportSelectMode();
                 } else {
                     updateExportTipsButtonState();
                 }
-                // Fill thumbnails in the background after the table is visible.
-                lazyLoadTipThumbnails();
             } catch (e) {
                 console.error('Error loading tips:', e);
             }

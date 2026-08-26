@@ -1360,6 +1360,7 @@ require_once __DIR__ . '/db.php';
         }
     </style>
     <link rel="stylesheet" href="css/mobile-responsive.css">
+    <link rel="stylesheet" href="css/table-pagination.css">
 </head>
 <body>
     <!-- Sidebar Navigation -->
@@ -1564,6 +1565,13 @@ require_once __DIR__ . '/db.php';
                         </tbody>
                     </table>
                 </div>
+                <div class="table-pagination">
+                    <div class="page-info" id="complaintsPageInfo">Page 1 of 1</div>
+                    <div class="page-buttons">
+                        <button type="button" id="complaintsPrevBtn" onclick="changeComplaintsPage(-1)" disabled>Previous</button>
+                        <button type="button" id="complaintsNextBtn" onclick="changeComplaintsPage(1)" disabled>Next</button>
+                    </div>
+                </div>
             </div>
         </main>
     </div>
@@ -1610,6 +1618,7 @@ require_once __DIR__ . '/db.php';
 
     <div id="toastPopup" class="toast-popup" role="status" aria-live="polite"></div>
     
+    <script src="js/table-pagination.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             const sidebar = document.getElementById('sidebar');
@@ -1679,25 +1688,103 @@ require_once __DIR__ . '/db.php';
         }
         
         function filterComplaints() {
+            complaintsPager.reset();
+            renderComplaintsTable();
+        }
+
+        function changeComplaintsPage(delta) {
+            complaintsPager.change(delta, getFilteredComplaintIds().length);
+            renderComplaintsTable();
+        }
+
+        function getFilteredComplaintIds() {
             const input = document.getElementById('searchInput');
-            const filter = input.value.toLowerCase();
-            const table = document.getElementById('complaintsTableBody');
-            const rows = table.getElementsByTagName('tr');
-            
-            for (let i = 0; i < rows.length; i++) {
-                const row = rows[i];
-                const text = row.textContent || row.innerText;
-                if (text.toLowerCase().indexOf(filter) > -1) {
-                    row.style.display = '';
-                } else {
-                    row.style.display = 'none';
-                }
+            const filter = (input && input.value ? input.value : '').toLowerCase().trim();
+            if (!filter) return complaintIdOrder.slice();
+            return complaintIdOrder.filter(function(id) {
+                const c = complaintData[id];
+                if (!c) return false;
+                const date = new Date(c.incident_date);
+                const formattedDate = date.toLocaleDateString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit', timeZone: 'Asia/Manila' });
+                const haystack = [
+                    c.complaint_id,
+                    c.complainant_name,
+                    c.defendant_name,
+                    c.contact_number,
+                    formatComplaintTypeLabel(c),
+                    formattedDate,
+                    formatIncidentTime(c.incident_time),
+                    c.status
+                ].join(' ').toLowerCase();
+                return haystack.indexOf(filter) > -1;
+            });
+        }
+
+        function renderComplaintsTable() {
+            const tbody = document.getElementById('complaintsTableBody');
+            const filteredIds = getFilteredComplaintIds();
+            const pageIds = complaintsPager.slice(filteredIds);
+            tbody.innerHTML = '';
+
+            if (filteredIds.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:2rem;color:#666;">'
+                    + (complaintIdOrder.length === 0 ? 'No complaints found.' : 'No complaints match your search.')
+                    + '</td></tr>';
+                updateBlotterForwardButtonState();
+                updateComplaintExportButtonState();
+                return;
             }
+
+            pageIds.forEach(function(complaintId) {
+                const c = complaintData[complaintId];
+                if (!c) return;
+                const row = document.createElement('tr');
+                row.setAttribute('data-complaint-id', c.complaint_id);
+                const alreadyForwarded = isComplaintForwarded(c);
+                const disabledAttr = alreadyForwarded ? ' disabled' : '';
+                const date = new Date(c.incident_date);
+                const formattedDate = date.toLocaleDateString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit', timeZone: 'Asia/Manila' });
+                const formattedTime = formatIncidentTime(c.incident_time);
+
+                row.innerHTML = `
+                    <td class="col-select"><input type="checkbox" class="complaint-select" value="${Number(c.id)}" onchange="onComplaintSelectChange()"${disabledAttr}></td>
+                    <td>${c.complaint_id}</td>
+                    <td>${c.complainant_name}</td>
+                    <td>${c.defendant_name || '—'}</td>
+                    <td>${formatComplaintTypeLabel(c)}</td>
+                    <td>${formattedDate}</td>
+                    <td>${formattedTime}</td>
+                    <td><span class="status-badge status-${statusClass(c.status)}">${c.status}</span></td>
+                    <td>
+                        <div class="action-buttons">
+                            <button class="btn-view" onclick="viewComplaint('${c.complaint_id}')">View</button>
+                            ${String(c.status || '').toLowerCase() !== 'resolved'
+                                ? `<button class="btn-manage" onclick="manageComplaint('${c.complaint_id}')">Assign Patrol</button>`
+                                : ''}
+                        </div>
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+
+            const master = document.getElementById('selectAllComplaints');
+            if (master) master.checked = false;
+            updateBlotterForwardButtonState();
+            updateComplaintExportButtonState();
+            syncComplaintCheckboxAvailability();
         }
         
         // Complaint data storage (loaded from database)
         let complaintData = {};
+        let complaintIdOrder = [];
         let originalAssignedPatrolId = '';
+        const complaintsPager = AlertaraTablePager.create({
+            pageSize: 10,
+            pageInfoId: 'complaintsPageInfo',
+            prevBtnId: 'complaintsPrevBtn',
+            nextBtnId: 'complaintsNextBtn',
+            itemLabel: 'complaints'
+        });
 
         function statusClass(status) {
             const map = {
@@ -1909,45 +1996,14 @@ require_once __DIR__ . '/db.php';
                 
                 // Store complaints by complaint_id for easy lookup
                 complaintData = {};
+                complaintIdOrder = [];
                 complaints.forEach(c => {
                     complaintData[c.complaint_id] = c;
+                    complaintIdOrder.push(c.complaint_id);
                 });
                 
-                // Populate table
-                complaints.forEach(c => {
-                    const row = document.createElement('tr');
-                    row.setAttribute('data-complaint-id', c.complaint_id);
-                    const alreadyForwarded = isComplaintForwarded(c);
-                    const disabledAttr = alreadyForwarded ? ' disabled' : '';
-                    
-                    // Format date
-                    const date = new Date(c.incident_date);
-                    const formattedDate = date.toLocaleDateString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit', timeZone: 'Asia/Manila' });
-                    const formattedTime = formatIncidentTime(c.incident_time);
-                    
-                    row.innerHTML = `
-                        <td class="col-select"><input type="checkbox" class="complaint-select" value="${Number(c.id)}" onchange="onComplaintSelectChange()"${disabledAttr}></td>
-                        <td>${c.complaint_id}</td>
-                        <td>${c.complainant_name}</td>
-                        <td>${c.defendant_name || '—'}</td>
-                        <td>${formatComplaintTypeLabel(c)}</td>
-                        <td>${formattedDate}</td>
-                        <td>${formattedTime}</td>
-                        <td><span class="status-badge status-${statusClass(c.status)}">${c.status}</span></td>
-                        <td>
-                            <div class="action-buttons">
-                                <button class="btn-view" onclick="viewComplaint('${c.complaint_id}')">View</button>
-                                ${String(c.status || '').toLowerCase() !== 'resolved'
-                                    ? `<button class="btn-manage" onclick="manageComplaint('${c.complaint_id}')">Assign Patrol</button>`
-                                    : ''}
-                            </div>
-                        </td>
-                    `;
-                    tbody.appendChild(row);
-                });
-                updateBlotterForwardButtonState();
-                updateComplaintExportButtonState();
-                syncComplaintCheckboxAvailability();
+                complaintsPager.reset();
+                renderComplaintsTable();
             } catch (e) {
                 console.error('Error loading complaints:', e);
             }

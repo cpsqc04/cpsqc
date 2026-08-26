@@ -600,6 +600,7 @@ try {
         }
     </style>
     <link rel="stylesheet" href="css/mobile-responsive.css">
+    <link rel="stylesheet" href="css/table-pagination.css">
 </head>
 <body>
     <!-- Sidebar -->
@@ -786,12 +787,29 @@ try {
                         </tbody>
                     </table>
                 </div>
+                <div class="table-pagination">
+                    <div class="page-info" id="loginHistoryPageInfo">Page 1 of 1</div>
+                    <div class="page-buttons">
+                        <button type="button" id="loginHistoryPrevBtn" onclick="changeLoginHistoryPage(-1)" disabled>Previous</button>
+                        <button type="button" id="loginHistoryNextBtn" onclick="changeLoginHistoryPage(1)" disabled>Next</button>
+                    </div>
+                </div>
             </div>
         </main>
     </div>
     
+    <script src="js/table-pagination.js"></script>
     <script>
         // Load login history on page load
+        let allLoginHistory = [];
+        const loginHistoryPager = AlertaraTablePager.create({
+            pageSize: 10,
+            pageInfoId: 'loginHistoryPageInfo',
+            prevBtnId: 'loginHistoryPrevBtn',
+            nextBtnId: 'loginHistoryNextBtn',
+            itemLabel: 'entries'
+        });
+
         document.addEventListener('DOMContentLoaded', function() {
             loadLoginHistory();
             
@@ -873,16 +891,28 @@ try {
             }
         }
         
+        function changeLoginHistoryPage(delta) {
+            loginHistoryPager.change(delta, allLoginHistory.length);
+            renderLoginHistoryTable();
+        }
+
         function displayLoginHistory(history) {
+            allLoginHistory = Array.isArray(history) ? history : [];
+            loginHistoryPager.reset();
+            renderLoginHistoryTable();
+        }
+
+        function renderLoginHistoryTable() {
             const tbody = document.getElementById('loginHistoryTableBody');
             tbody.innerHTML = '';
+            const pageRows = loginHistoryPager.slice(allLoginHistory);
             
-            if (history.length === 0) {
+            if (allLoginHistory.length === 0) {
                 tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 2rem; color: var(--text-secondary);">No login history found</td></tr>';
                 return;
             }
             
-            history.forEach(entry => {
+            pageRows.forEach(entry => {
                 const tr = document.createElement('tr');
                 const statusClass = entry.status === 'Success' ? 'status-success' : 
                                    entry.status === 'Failed' ? 'status-failed' : 'status-locked';

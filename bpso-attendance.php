@@ -192,6 +192,7 @@ require_once __DIR__ . '/db.php';
         }
     </style>
     <link rel="stylesheet" href="css/mobile-responsive.css">
+    <link rel="stylesheet" href="css/table-pagination.css">
 </head>
 <body>
     <aside class="sidebar" id="sidebar">
@@ -353,7 +354,7 @@ require_once __DIR__ . '/db.php';
                     <div class="search-container">
                         <div class="search-box">
                             <i class="fas fa-search" aria-hidden="true"></i>
-                            <input type="text" id="logSearch" placeholder="Search by personnel ID or name..." onkeyup="filterTable('logTableBody', 'logSearch')">
+                            <input type="text" id="logSearch" placeholder="Search by personnel ID or name..." onkeyup="filterAttendanceLog()">
                         </div>
                         <div class="date-filter">
                             <label for="historyDate">Date:</label>
@@ -384,13 +385,28 @@ require_once __DIR__ . '/db.php';
                             </tbody>
                         </table>
                     </div>
+                    <div class="table-pagination">
+                        <div class="page-info" id="attendancePageInfo">Page 1 of 1</div>
+                        <div class="page-buttons">
+                            <button type="button" id="attendancePrevBtn" onclick="changeAttendancePage(-1)" disabled>Previous</button>
+                            <button type="button" id="attendanceNextBtn" onclick="changeAttendancePage(1)" disabled>Next</button>
+                        </div>
+                    </div>
                 </div>
             </div>
         </main>
     </div>
 
+    <script src="js/table-pagination.js"></script>
     <script>
         let logData = [];
+        const attendancePager = AlertaraTablePager.create({
+            pageSize: 10,
+            pageInfoId: 'attendancePageInfo',
+            prevBtnId: 'attendancePrevBtn',
+            nextBtnId: 'attendanceNextBtn',
+            itemLabel: 'records'
+        });
 
         document.addEventListener('DOMContentLoaded', function() {
             const sidebar = document.getElementById('sidebar');
@@ -547,16 +563,70 @@ require_once __DIR__ . '/db.php';
             return 'status-clocked-out';
         }
 
-        function filterTable(bodyId, inputId) {
-            const input = document.getElementById(inputId);
-            const filter = input.value.toLowerCase();
-            const table = document.getElementById(bodyId);
-            const rows = table.getElementsByTagName('tr');
-            for (let i = 0; i < rows.length; i++) {
-                const row = rows[i];
-                const text = row.textContent || row.innerText;
-                row.style.display = text.toLowerCase().indexOf(filter) > -1 ? '' : 'none';
+        function getFilteredAttendanceLog() {
+            const input = document.getElementById('logSearch');
+            const filter = (input && input.value ? input.value : '').toLowerCase().trim();
+            if (!filter) {
+                return logData.map(function(row, index) { return { row: row, index: index }; });
             }
+            return logData
+                .map(function(row, index) { return { row: row, index: index }; })
+                .filter(function(item) {
+                    const haystack = [
+                        item.row.bpso_personnel_id,
+                        item.row.personnel_name,
+                        item.row.duty,
+                        item.row.status_label
+                    ].join(' ').toLowerCase();
+                    return haystack.indexOf(filter) > -1;
+                });
+        }
+
+        function filterAttendanceLog() {
+            attendancePager.reset();
+            renderAttendanceLogTable();
+        }
+
+        function changeAttendancePage(delta) {
+            attendancePager.change(delta, getFilteredAttendanceLog().length);
+            renderAttendanceLogTable();
+        }
+
+        function renderAttendanceLogTable() {
+            const tableBody = document.getElementById('logTableBody');
+            const filtered = getFilteredAttendanceLog();
+            const pageRows = attendancePager.slice(filtered);
+
+            if (filtered.length === 0) {
+                const emptyMsg = logData.length === 0
+                    ? 'No attendance records for this date.'
+                    : 'No attendance records match your search.';
+                tableBody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:2rem;color:#666;">' + emptyMsg + '</td></tr>';
+                return;
+            }
+
+            tableBody.innerHTML = pageRows.map(function(item) {
+                const row = item.row;
+                const index = item.index;
+                return `
+                    <tr>
+                        <td>${escapeHtml(row.bpso_personnel_id || '-')}</td>
+                        <td>${escapeHtml(row.personnel_name)}</td>
+                        <td>${escapeHtml(row.duty || '-')}</td>
+                        <td>${formatDateOnly(row.time_in)}</td>
+                        <td>${formatTimeOnly(row.time_in)}</td>
+                        <td>${formatDateTime(row.time_out)}</td>
+                        <td>${escapeHtml(row.patrol_duration_label || '-')}</td>
+                        <td class="overtime-cell" data-index="${index}">${escapeHtml(computeLiveOvertimeLabel(row))}</td>
+                        <td><span class="status-badge ${statusClass(row.status_label)}">${escapeHtml(row.status_label)}</span></td>
+                        <td>
+                            <a class="btn-view-timesheet" href="patrol-timesheet.php?patrol_id=${Number(row.patrol_id) || 0}" style="text-decoration:none;display:inline-block;">
+                                View Timesheet
+                            </a>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
         }
 
         async function loadAttendanceLog() {
@@ -575,32 +645,8 @@ require_once __DIR__ . '/db.php';
                 }
 
                 logData = result.data || [];
-
-                if (logData.length === 0) {
-                    tableBody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:2rem;color:#666;">No attendance records for this date.</td></tr>';
-                    return;
-                }
-
-                tableBody.innerHTML = logData.map((row, index) => `
-                    <tr>
-                        <td>${escapeHtml(row.bpso_personnel_id || '-')}</td>
-                        <td>${escapeHtml(row.personnel_name)}</td>
-                        <td>${escapeHtml(row.duty || '-')}</td>
-                        <td>${formatDateOnly(row.time_in)}</td>
-                        <td>${formatTimeOnly(row.time_in)}</td>
-                        <td>${formatDateTime(row.time_out)}</td>
-                        <td>${escapeHtml(row.patrol_duration_label || '-')}</td>
-                        <td class="overtime-cell" data-index="${index}">${escapeHtml(computeLiveOvertimeLabel(row))}</td>
-                        <td><span class="status-badge ${statusClass(row.status_label)}">${escapeHtml(row.status_label)}</span></td>
-                        <td>
-                            <a class="btn-view-timesheet" href="patrol-timesheet.php?patrol_id=${Number(row.patrol_id) || 0}" style="text-decoration:none;display:inline-block;">
-                                View Timesheet
-                            </a>
-                        </td>
-                    </tr>
-                `).join('');
-
-                filterTable('logTableBody', 'logSearch');
+                attendancePager.reset();
+                renderAttendanceLogTable();
             } catch (e) {
                 console.error('Error loading attendance log:', e);
                 tableBody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:2rem;color:#666;">Error loading attendance log.</td></tr>';

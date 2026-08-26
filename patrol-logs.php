@@ -469,6 +469,7 @@ require_once __DIR__ . '/db.php';
         }
     </style>
     <link rel="stylesheet" href="css/mobile-responsive.css">
+    <link rel="stylesheet" href="css/table-pagination.css">
 </head>
 <body>
     <aside class="sidebar" id="sidebar">
@@ -660,6 +661,13 @@ require_once __DIR__ . '/db.php';
                         </tbody>
                     </table>
                 </div>
+                <div class="table-pagination">
+                    <div class="page-info" id="logsPageInfo">Page 1 of 1</div>
+                    <div class="page-buttons">
+                        <button type="button" id="logsPrevBtn" onclick="changeLogsPage(-1)" disabled>Previous</button>
+                        <button type="button" id="logsNextBtn" onclick="changeLogsPage(1)" disabled>Next</button>
+                    </div>
+                </div>
             </div>
         </main>
     </div>
@@ -724,6 +732,7 @@ require_once __DIR__ . '/db.php';
     </div>
 
     <script src="js/photo-lightbox.js"></script>
+    <script src="js/table-pagination.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             const sidebar = document.getElementById('sidebar');
@@ -766,25 +775,89 @@ require_once __DIR__ . '/db.php';
             document.querySelectorAll('.nav-module').forEach(m => { m.classList.remove('active'); });
             if (!isActive) { module.classList.add('active'); }
         }
-        function filterLogs() {
-            const input = document.getElementById('searchInput');
-            const filter = input.value.toLowerCase();
-            const table = document.getElementById('logsTableBody');
-            const rows = table.getElementsByTagName('tr');
-            for (let i = 0; i < rows.length; i++) {
-                const row = rows[i];
-                const text = row.textContent || row.innerText;
-                if (text.toLowerCase().indexOf(filter) > -1) {
-                    row.style.display = '';
-                } else {
-                    row.style.display = 'none';
-                }
-            }
-        }
         // Patrol log data loaded from database
         let patrolLogData = {};
+        let allPatrolLogs = [];
         let pendingCampaignIds = [];
         let campaignSelectMode = false;
+        const logsPager = AlertaraTablePager.create({
+            pageSize: 10,
+            pageInfoId: 'logsPageInfo',
+            prevBtnId: 'logsPrevBtn',
+            nextBtnId: 'logsNextBtn',
+            itemLabel: 'logs'
+        });
+
+        function getFilteredPatrolLogs() {
+            const input = document.getElementById('searchInput');
+            const filter = (input && input.value ? input.value : '').toLowerCase().trim();
+            if (!filter) return allPatrolLogs.slice();
+            return allPatrolLogs.filter(function(row) {
+                const haystack = [
+                    row.date,
+                    row.time,
+                    row.personnel_name,
+                    row.route,
+                    row.incidents,
+                    row.status,
+                    row.details,
+                    row.location
+                ].join(' ').toLowerCase();
+                return haystack.indexOf(filter) > -1;
+            });
+        }
+
+        function filterLogs() {
+            logsPager.reset();
+            renderPatrolLogsTable();
+        }
+
+        function changeLogsPage(delta) {
+            logsPager.change(delta, getFilteredPatrolLogs().length);
+            renderPatrolLogsTable();
+        }
+
+        function renderPatrolLogsTable() {
+            const tableBody = document.getElementById('logsTableBody');
+            const filtered = getFilteredPatrolLogs();
+            const pageRows = logsPager.slice(filtered);
+
+            if (filtered.length === 0) {
+                const emptyMsg = allPatrolLogs.length === 0
+                    ? 'No patrol logs yet.'
+                    : 'No patrol logs match your search.';
+                tableBody.innerHTML = '<tr class="empty-row"><td colspan="7" style="text-align:center;padding:2rem;color:#666;">' + emptyMsg + '</td></tr>';
+                updateCampaignButtonState();
+                updateLogExportButtonState();
+                return;
+            }
+
+            tableBody.innerHTML = pageRows.map(function(row) {
+                const dateTime = `${row.date}${row.time ? ' ' + row.time : ''}`;
+                const alreadySent = !!row.campaign_forwarded_at;
+                const badges = alreadySent ? '<span class="badge-sent">Sent to Campaign</span>' : '';
+                const disabledAttr = alreadySent ? ' disabled' : '';
+                return `<tr data-log-id="${row.id}">
+                    <td class="col-select"><input type="checkbox" class="log-select" value="${row.id}" onchange="onLogSelectChange()"${disabledAttr}></td>
+                    <td>${escapeHtml(dateTime)}${badges}</td>
+                    <td>${escapeHtml(row.personnel_name)}</td>
+                    <td>${escapeHtml(row.route)}</td>
+                    <td>${escapeHtml(row.incidents || 'None')}</td>
+                    <td><span class="status-badge ${statusClass(row.status)}">${escapeHtml(row.status)}</span></td>
+                    <td>
+                        <div class="action-buttons">
+                            <button class="btn-view" onclick="viewLog('${row.id}')">View</button>
+                        </div>
+                    </td>
+                </tr>`;
+            }).join('');
+
+            const master = document.getElementById('selectAllLogs');
+            if (master) master.checked = false;
+            updateCampaignButtonState();
+            updateLogExportButtonState();
+            syncLogCheckboxAvailability();
+        }
 
         function statusClass(status) {
             if (status === 'Completed') return 'status-completed';
@@ -897,15 +970,8 @@ require_once __DIR__ . '/db.php';
                 }
 
                 patrolLogData = {};
-                const rows = result.data || [];
-
-                if (rows.length === 0) {
-                    tableBody.innerHTML = '<tr class="empty-row"><td colspan="7" style="text-align:center;padding:2rem;color:#666;">No patrol logs yet.</td></tr>';
-                    updateCampaignButtonState();
-                    return;
-                }
-
-                tableBody.innerHTML = rows.map(row => {
+                allPatrolLogs = result.data || [];
+                allPatrolLogs.forEach(function(row) {
                     patrolLogData[row.id] = {
                         id: String(row.id),
                         date: row.date,
@@ -920,27 +986,9 @@ require_once __DIR__ . '/db.php';
                         campaign_forwarded_at: row.campaign_forwarded_at || null,
                         campaign_reference_id: row.campaign_reference_id || ''
                     };
-                    const dateTime = `${row.date}${row.time ? ' ' + row.time : ''}`;
-                    const alreadySent = !!row.campaign_forwarded_at;
-                    const badges = alreadySent ? '<span class="badge-sent">Sent to Campaign</span>' : '';
-                    const disabledAttr = alreadySent ? ' disabled' : '';
-                    return `<tr data-log-id="${row.id}">
-                        <td class="col-select"><input type="checkbox" class="log-select" value="${row.id}" onchange="onLogSelectChange()"${disabledAttr}></td>
-                        <td>${escapeHtml(dateTime)}${badges}</td>
-                        <td>${escapeHtml(row.personnel_name)}</td>
-                        <td>${escapeHtml(row.route)}</td>
-                        <td>${escapeHtml(row.incidents || 'None')}</td>
-                        <td><span class="status-badge ${statusClass(row.status)}">${escapeHtml(row.status)}</span></td>
-                        <td>
-                            <div class="action-buttons">
-                                <button class="btn-view" onclick="viewLog('${row.id}')">View</button>
-                            </div>
-                        </td>
-                    </tr>`;
-                }).join('');
-                updateCampaignButtonState();
-                updateLogExportButtonState();
-                syncLogCheckboxAvailability();
+                });
+                logsPager.reset();
+                renderPatrolLogsTable();
             } catch (e) {
                 console.error('Error loading patrol logs:', e);
                 tableBody.innerHTML = '<tr class="empty-row"><td colspan="7" style="text-align:center;padding:2rem;color:#666;">Error loading patrol logs.</td></tr>';

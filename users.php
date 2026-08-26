@@ -1010,6 +1010,7 @@ if (!isAdminUser()) {
         }
     </style>
     <link rel="stylesheet" href="css/mobile-responsive.css">
+    <link rel="stylesheet" href="css/table-pagination.css">
 </head>
 <body>
     <!-- Sidebar -->
@@ -1207,6 +1208,13 @@ if (!isAdminUser()) {
                         </tbody>
                     </table>
                 </div>
+                <div class="table-pagination">
+                    <div class="page-info" id="usersPageInfo">Page 1 of 1</div>
+                    <div class="page-buttons">
+                        <button type="button" id="usersPrevBtn" onclick="changeUsersPage(-1)" disabled>Previous</button>
+                        <button type="button" id="usersNextBtn" onclick="changeUsersPage(1)" disabled>Next</button>
+                    </div>
+                </div>
             </div>
         </main>
     </div>
@@ -1302,6 +1310,7 @@ if (!isAdminUser()) {
         </div>
     </div>
     
+    <script src="js/table-pagination.js"></script>
     <script>
         // Load users on page load
         document.addEventListener('DOMContentLoaded', function() {
@@ -1378,13 +1387,24 @@ if (!isAdminUser()) {
             }
         }
         
+        let allUsers = [];
+        const usersPager = AlertaraTablePager.create({
+            pageSize: 10,
+            pageInfoId: 'usersPageInfo',
+            prevBtnId: 'usersPrevBtn',
+            nextBtnId: 'usersNextBtn',
+            itemLabel: 'users'
+        });
+
         async function loadUsers() {
             try {
                 const response = await fetch('api/users.php');
                 const result = await response.json();
                 
                 if (result.success) {
-                    displayUsers(result.users);
+                    allUsers = result.users || [];
+                    usersPager.reset();
+                    renderUsersTable();
                 } else {
                     console.error('Failed to load users:', result.error);
                 }
@@ -1446,11 +1466,53 @@ if (!isAdminUser()) {
             return user.status === 'Active';
         }
 
+        function getFilteredUsers() {
+            const input = document.getElementById('searchInput');
+            const filter = (input && input.value ? input.value : '').toLowerCase().trim();
+            if (!filter) return allUsers.slice();
+            return allUsers.filter(function(user) {
+                const haystack = [
+                    user.id,
+                    user.full_name,
+                    user.username,
+                    user.email,
+                    formatRoleLabel(user.role),
+                    user.status
+                ].join(' ').toLowerCase();
+                return haystack.indexOf(filter) > -1;
+            });
+        }
+
+        function filterUsers() {
+            usersPager.reset();
+            renderUsersTable();
+        }
+
+        function changeUsersPage(delta) {
+            usersPager.change(delta, getFilteredUsers().length);
+            renderUsersTable();
+        }
+
         function displayUsers(users) {
+            allUsers = Array.isArray(users) ? users : [];
+            usersPager.reset();
+            renderUsersTable();
+        }
+
+        function renderUsersTable() {
             const tbody = document.getElementById('usersTableBody');
             tbody.innerHTML = '';
+            const filtered = getFilteredUsers();
+            const pageUsers = usersPager.slice(filtered);
 
-            users.forEach(user => {
+            if (filtered.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:2rem;color:var(--text-secondary);">'
+                    + (allUsers.length === 0 ? 'No users found.' : 'No users match your search.')
+                    + '</td></tr>';
+                return;
+            }
+
+            pageUsers.forEach(user => {
                 const tr = document.createElement('tr');
                 const isActive = isAccountActive(user);
                 const isBpso = isBpsoAccount(user);
@@ -1738,30 +1800,6 @@ if (!isAdminUser()) {
                 console.error('Error updating user:', error);
                 document.getElementById('editFormError').textContent = 'Network error. Please try again.';
                 document.getElementById('editFormError').style.display = 'block';
-            }
-        }
-        
-        function filterUsers() {
-            const input = document.getElementById('searchInput');
-            const filter = input.value.toLowerCase();
-            const table = document.getElementById('usersTable');
-            const tr = table.getElementsByTagName('tr');
-            
-            for (let i = 1; i < tr.length; i++) {
-                const td = tr[i].getElementsByTagName('td');
-                let found = false;
-                
-                for (let j = 0; j < td.length; j++) {
-                    if (td[j]) {
-                        const txtValue = td[j].textContent || td[j].innerText;
-                        if (txtValue.toLowerCase().indexOf(filter) > -1) {
-                            found = true;
-                            break;
-                        }
-                    }
-                }
-                
-                tr[i].style.display = found ? '' : 'none';
             }
         }
         
