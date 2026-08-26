@@ -536,14 +536,14 @@ require_once __DIR__ . '/db.php';
                             <textarea id="tipDetails" required style="width: 100%; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 8px; min-height: 150px;" placeholder="Provide detailed information about your tip..."></textarea>
                         </div>
                         <div style="margin-bottom: 1.5rem;">
-                            <label style="display: block; margin-bottom: 0.5rem; font-weight: 500;">Date of incident</label>
-                            <input type="date" id="tipIncidentDate" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 8px;">
-                            <p style="margin: 0.4rem 0 0; font-size: 0.85rem; color: var(--text-secondary);">When did this incident occur? (Optional)</p>
+                            <label style="display: block; margin-bottom: 0.5rem; font-weight: 500;">Date of incident *</label>
+                            <input type="date" id="tipIncidentDate" required style="width: 100%; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 8px;">
+                            <p style="margin: 0.4rem 0 0; font-size: 0.85rem; color: var(--text-secondary);">When did this incident occur?</p>
                         </div>
                         <div style="margin-bottom: 1.5rem;">
-                            <label style="display: block; margin-bottom: 0.5rem; font-weight: 500;">Time of incident</label>
-                            <input type="time" id="tipIncidentTime" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 8px;">
-                            <p style="margin: 0.4rem 0 0; font-size: 0.85rem; color: var(--text-secondary);">What time did it occur? (Optional)</p>
+                            <label style="display: block; margin-bottom: 0.5rem; font-weight: 500;">Time of incident *</label>
+                            <input type="time" id="tipIncidentTime" required style="width: 100%; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 8px;">
+                            <p style="margin: 0.4rem 0 0; font-size: 0.85rem; color: var(--text-secondary);">What time did it occur?</p>
                         </div>
                         <div style="margin-bottom: 1.5rem;">
                             <label style="display: block; margin-bottom: 0.5rem; font-weight: 500;">Location (Optional)</label>
@@ -609,29 +609,24 @@ require_once __DIR__ . '/db.php';
                 alert('Please provide tip details.');
                 return;
             }
-            const hasDate = !!String(incidentDate).trim();
-            const hasTime = !!String(incidentTime).trim();
-            if ((hasDate && !hasTime) || (!hasDate && hasTime)) {
-                alert('Please provide both the date and time of the incident, or leave both blank.');
+            if (!String(incidentDate).trim() || !String(incidentTime).trim()) {
+                alert('Please provide both the date and time of the incident.');
                 return;
             }
             
             // Submit to database
-            const payload = {
-                action: 'create',
-                location: location || 'Not specified',
-                description: description
-            };
-            if (hasDate && hasTime) {
-                payload.date = String(incidentDate).trim();
-                payload.time = String(incidentTime).trim();
-            }
             fetch('api/tips.php', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify(payload)
+                body: JSON.stringify({
+                    action: 'create',
+                    location: location || 'Not specified',
+                    description: description,
+                    date: String(incidentDate).trim(),
+                    time: String(incidentTime).trim()
+                })
             })
             .then(res => res.json())
             .then(result => {

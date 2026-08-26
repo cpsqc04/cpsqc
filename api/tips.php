@@ -108,22 +108,18 @@ if ($method === 'POST') {
 
         $incidentAtValue = null;
         $incidentRawStr = is_string($incidentRaw) || is_numeric($incidentRaw) ? trim((string) $incidentRaw) : '';
-        if ($incidentRawStr !== '') {
-            $incident = normalizeTipIncidentAt($incidentRawStr);
-            if (!$incident['ok']) {
-                http_response_code(400);
-                echo json_encode(['success' => false, 'message' => $incident['message'] ?? 'Invalid incident date/time.']);
-                exit;
-            }
-            $incidentAtValue = $incident['value'];
-        } elseif (
-            (isset($input['date']) && trim((string) $input['date']) !== '')
-            xor (isset($input['time']) && trim((string) $input['time']) !== '')
-        ) {
+        if ($incidentRawStr === '') {
             http_response_code(400);
-            echo json_encode(['success' => false, 'message' => 'Provide both date and time of the incident, or leave both blank.']);
+            echo json_encode(['success' => false, 'message' => 'Date and time of the incident are required.']);
             exit;
         }
+        $incident = normalizeTipIncidentAt($incidentRawStr);
+        if (!$incident['ok']) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'message' => $incident['message'] ?? 'Invalid incident date/time.']);
+            exit;
+        }
+        $incidentAtValue = $incident['value'];
 
         $year = date('Y');
         $stmt = $pdo->query("SELECT MAX(CAST(SUBSTRING(tip_id, LOCATE('-', tip_id, 5) + 1) AS UNSIGNED)) AS max_num FROM tips WHERE tip_id LIKE 'TIP-{$year}-%'");

@@ -223,13 +223,8 @@
         var photoFile = $('tipPhoto').files[0];
         var submitBtn = $('tipSubmitBtn');
 
-        if (!location || !description || !photoFile) {
-            showSuccessModal('Validation Error', 'Please fill in all required fields including the photo.', true);
-            return;
-        }
-
-        if ((incidentDate && !incidentTime) || (!incidentDate && incidentTime)) {
-            showSuccessModal('Validation Error', 'Please provide both date and time of the incident, or leave both blank.', true);
+        if (!location || !description || !incidentDate || !incidentTime || !photoFile) {
+            showSuccessModal('Validation Error', 'Please fill in all required fields including the date, time, and photo.', true);
             return;
         }
 
@@ -246,20 +241,17 @@
 
         var reader = new FileReader();
         reader.onload = function (e) {
-            var payload = {
-                action: 'create',
-                location: location,
-                description: description,
-                photo: e.target.result
-            };
-            if (incidentDate && incidentTime) {
-                payload.date = incidentDate;
-                payload.time = incidentTime;
-            }
             fetch('api/tips.php', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
+                body: JSON.stringify({
+                    action: 'create',
+                    location: location,
+                    description: description,
+                    date: incidentDate,
+                    time: incidentTime,
+                    photo: e.target.result
+                })
             })
                 .then(function (res) { return res.json(); })
                 .then(function (result) {
