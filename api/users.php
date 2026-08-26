@@ -228,8 +228,8 @@ function fetchAllManagedUsers(PDO $pdo): array
         foreach ($stmt->fetchAll() as $row) {
             $users[] = mapNwUser($row);
         }
-    } catch (PDOException $e) {
-        // NW table may not exist yet.
+    } catch (Throwable $e) {
+        // NW table may not exist yet, or schema prep failed — still return other users.
     }
 
     return $users;

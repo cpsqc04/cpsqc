@@ -1396,19 +1396,36 @@ if (!isAdminUser()) {
             itemLabel: 'users'
         });
 
+        function showUsersLoadError(message) {
+            const tbody = document.getElementById('usersTableBody');
+            tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:2rem;color:#b42318;">'
+                + message + '</td></tr>';
+            usersPager.reset();
+            usersPager.slice([]);
+        }
+
         async function loadUsers() {
             try {
                 const response = await fetch('api/users.php');
-                const result = await response.json();
-                
+                let result;
+                try {
+                    result = await response.json();
+                } catch (parseError) {
+                    showUsersLoadError('Could not load users. The server returned an invalid response — please refresh or contact support.');
+                    console.error('Error parsing users response:', parseError);
+                    return;
+                }
+
                 if (result.success) {
                     allUsers = result.users || [];
                     usersPager.reset();
                     renderUsersTable();
                 } else {
+                    showUsersLoadError(result.error || 'Failed to load users.');
                     console.error('Failed to load users:', result.error);
                 }
             } catch (error) {
+                showUsersLoadError('Could not load users. Please check your connection and try again.');
                 console.error('Error loading users:', error);
             }
         }

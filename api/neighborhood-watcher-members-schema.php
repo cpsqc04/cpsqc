@@ -197,7 +197,6 @@ function ensureNwMembersTable(PDO $pdo): void
         }
     }
 
-    syncNwMemberStructuredNamesFromFullName($pdo);
 }
 
 function syncNwMemberStructuredNamesFromFullName(PDO $pdo): void
@@ -226,7 +225,7 @@ function syncNwMemberStructuredNamesFromFullName(PDO $pdo): void
         }
 
         setAppMeta($pdo, 'nw_member_names_synced_v1', '1');
-    } catch (PDOException $e) {
+    } catch (Throwable $e) {
         // Best-effort sync only.
     }
 }

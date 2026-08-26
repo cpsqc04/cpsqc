@@ -93,6 +93,7 @@ try {
 
 try {
     ensureNwMembersTable($pdo);
+    syncNwMemberStructuredNamesFromFullName($pdo);
 } catch (PDOException $e) {
     http_response_code(500);
     echo json_encode(['success' => false, 'message' => 'Failed to prepare nw_members table: ' . $e->getMessage()]);
