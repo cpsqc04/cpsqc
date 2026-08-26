@@ -487,6 +487,7 @@ require_once __DIR__ . '/db.php';
         @media (max-width: 768px) { .sidebar { width: 320px; transform: translateX(-100%); transition: transform 0.3s ease; } .sidebar.mobile-open { transform: translateX(0); } .sidebar.collapsed { width: 80px; transform: translateX(0); } .main-wrapper { margin-left: 0; } body.sidebar-collapsed .main-wrapper { margin-left: 80px; } .modal-content { width: 95%; margin: 10% auto; padding: 1.5rem; } .schedule-toolbar { flex-direction: column; align-items: stretch; } .btn-add, .btn-high-risk { width: 100%; justify-content: center; } .risk-panel-actions { margin-left: 0; width: 100%; } }
     </style>
     <link rel="stylesheet" href="css/mobile-responsive.css">
+    <link rel="stylesheet" href="css/table-pagination.css">
 </head>
 <body>
     <aside class="sidebar" id="sidebar">
@@ -678,6 +679,13 @@ require_once __DIR__ . '/db.php';
                             </tbody>
                         </table>
                     </div>
+                    <div class="table-pagination">
+                        <div class="page-info" id="schedulesPageInfo">Page 1 of 1</div>
+                        <div class="page-buttons">
+                            <button type="button" id="schedulesPrevBtn" onclick="changeSchedulesPage(-1)" disabled>Previous</button>
+                            <button type="button" id="schedulesNextBtn" onclick="changeSchedulesPage(1)" disabled>Next</button>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- High-Risk Areas table view (My Schedule style) -->
@@ -717,6 +725,13 @@ require_once __DIR__ . '/db.php';
                                 <tr><td colspan="7" style="text-align:center;padding:2rem;color:#666;">Loading high-risk alerts...</td></tr>
                             </tbody>
                         </table>
+                    </div>
+                    <div class="table-pagination" id="riskAlertsPagination">
+                        <div class="page-info" id="riskAlertsPageInfo">Page 1 of 1</div>
+                        <div class="page-buttons">
+                            <button type="button" id="riskAlertsPrevBtn" onclick="changeRiskAlertsPage(-1)" disabled>Previous</button>
+                            <button type="button" id="riskAlertsNextBtn" onclick="changeRiskAlertsPage(1)" disabled>Next</button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -796,7 +811,7 @@ require_once __DIR__ . '/db.php';
 
 
     <script src="js/san-agustin-patrol-zones.js"></script>
-    <script src="js/san-agustin-patrol-zones.js"></script>
+    <script src="js/table-pagination.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             const sidebar = document.getElementById('sidebar');
@@ -951,15 +966,58 @@ require_once __DIR__ . '/db.php';
             if (!isActive) { module.classList.add('active'); }
         }
         function filterPatrols() {
+            schedulesPager.reset();
+            renderSchedulesTable();
+        }
+
+        function changeSchedulesPage(delta) {
+            schedulesPager.change(delta, getFilteredSchedules().length);
+            renderSchedulesTable();
+        }
+
+        function getFilteredSchedules() {
             const input = document.getElementById('searchInput');
-            const filter = input.value.toLowerCase();
-            const table = document.getElementById('patrolsTableBody');
-            const rows = table.getElementsByTagName('tr');
-            for (let i = 0; i < rows.length; i++) {
-                const row = rows[i];
-                const searchText = row.getAttribute('data-search') || row.textContent || row.innerText;
-                row.style.display = searchText.toLowerCase().indexOf(filter) > -1 ? '' : 'none';
+            const filter = (input && input.value ? input.value : '').toLowerCase().trim();
+            if (!filter) return allSchedules.slice();
+            return allSchedules.filter(function(row) {
+                const zone = row.patrol_zone || row.location || row.route || '';
+                const shiftLabel = formatShiftWithHours(row.shift);
+                const haystack = [row.personnel_name, shiftLabel, row.shift, zone, row.schedule_date, row.status]
+                    .join(' ').toLowerCase();
+                return haystack.indexOf(filter) > -1;
+            });
+        }
+
+        function renderSchedulesTable() {
+            const tableBody = document.getElementById('patrolsTableBody');
+            const filtered = getFilteredSchedules();
+            const pageRows = schedulesPager.slice(filtered);
+
+            if (filtered.length === 0) {
+                const emptyMsg = allSchedules.length === 0
+                    ? 'No patrol assignments yet. Click "Assign Patrol" to create one.'
+                    : 'No patrol schedules match your search.';
+                tableBody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:2rem;color:#666;">' + emptyMsg + '</td></tr>';
+                return;
             }
+
+            tableBody.innerHTML = pageRows.map(function(row) {
+                const zone = row.patrol_zone || row.location || row.route || '—';
+                const shiftLabel = formatShiftWithHours(row.shift);
+                const searchText = [row.personnel_name, shiftLabel, row.shift, zone, row.schedule_date, row.status].join(' ').toLowerCase();
+                return `<tr data-schedule-id="${row.id}" data-search="${escapeHtml(searchText)}">
+                    <td>${escapeHtml(row.personnel_name)}</td>
+                    <td>${escapeHtml(shiftLabel)}</td>
+                    <td>${escapeHtml(zone)}</td>
+                    <td>${escapeHtml(row.schedule_date)}</td>
+                    <td><span class="status-badge ${statusClass(row.status)}">${escapeHtml(row.status)}</span></td>
+                    <td>
+                        <div class="action-buttons">
+                            <button class="btn-view" onclick="viewPatrol('${row.id}')">View</button>
+                        </div>
+                    </td>
+                </tr>`;
+            }).join('');
         }
 
         function formatScheduleTime(value) {
@@ -971,9 +1029,24 @@ require_once __DIR__ . '/db.php';
         }
         // Patrol schedule data from database
         let patrolData = {};
+        let allSchedules = [];
         let riskAlertData = {};
         let riskAlertRows = [];
         let riskFilter = 'all';
+        const schedulesPager = AlertaraTablePager.create({
+            pageSize: 10,
+            pageInfoId: 'schedulesPageInfo',
+            prevBtnId: 'schedulesPrevBtn',
+            nextBtnId: 'schedulesNextBtn',
+            itemLabel: 'schedules'
+        });
+        const riskAlertsPager = AlertaraTablePager.create({
+            pageSize: 10,
+            pageInfoId: 'riskAlertsPageInfo',
+            prevBtnId: 'riskAlertsPrevBtn',
+            nextBtnId: 'riskAlertsNextBtn',
+            itemLabel: 'alerts'
+        });
 
         function showScheduleSection() {
             document.getElementById('scheduleSection').hidden = false;
@@ -991,6 +1064,7 @@ require_once __DIR__ . '/db.php';
             document.querySelectorAll('#riskFilterTabs .filter-tab').forEach(tab => {
                 tab.classList.toggle('active', tab === btn);
             });
+            riskAlertsPager.reset();
             renderRiskAlertsTable();
         }
 
@@ -1036,24 +1110,36 @@ require_once __DIR__ . '/db.php';
         function setRiskAlertsEmpty(message, showEmpty) {
             const emptyEl = document.getElementById('riskAlertsEmpty');
             const tableWrap = document.getElementById('riskAlertsTableWrap');
+            const pagination = document.getElementById('riskAlertsPagination');
             const tbody = document.getElementById('riskAlertsTableBody');
             if (showEmpty) {
                 emptyEl.textContent = message;
                 emptyEl.hidden = false;
                 tableWrap.hidden = true;
+                if (pagination) pagination.hidden = true;
                 tbody.innerHTML = '';
             } else {
                 emptyEl.hidden = true;
                 tableWrap.hidden = false;
+                if (pagination) pagination.hidden = false;
             }
+        }
+
+        function getFilteredRiskAlerts() {
+            return riskAlertRows.filter(row => {
+                if (riskFilter === 'all') return true;
+                return String(row.severity || '').toLowerCase() === riskFilter;
+            });
+        }
+
+        function changeRiskAlertsPage(delta) {
+            riskAlertsPager.change(delta, getFilteredRiskAlerts().length);
+            renderRiskAlertsTable();
         }
 
         function renderRiskAlertsTable() {
             const tbody = document.getElementById('riskAlertsTableBody');
-            const filtered = riskAlertRows.filter(row => {
-                if (riskFilter === 'all') return true;
-                return String(row.severity || '').toLowerCase() === riskFilter;
-            });
+            const filtered = getFilteredRiskAlerts();
 
             if (riskAlertRows.length === 0) {
                 return;
@@ -1065,7 +1151,8 @@ require_once __DIR__ . '/db.php';
             }
 
             setRiskAlertsEmpty('', false);
-            tbody.innerHTML = filtered.map(row => {
+            const pageRows = riskAlertsPager.slice(filtered);
+            tbody.innerHTML = pageRows.map(row => {
                 const severity = String(row.severity || 'MEDIUM').toUpperCase();
                 const area = row.area_name || row.location || '—';
                 const incidents = row.incident_count
@@ -1131,6 +1218,7 @@ require_once __DIR__ . '/db.php';
                     return;
                 }
 
+                riskAlertsPager.reset();
                 renderRiskAlertsTable();
             } catch (e) {
                 console.error('Error loading risk alerts:', e);
@@ -1172,31 +1260,12 @@ require_once __DIR__ . '/db.php';
                 }
 
                 patrolData = {};
-                const rows = result.data || [];
-
-                if (rows.length === 0) {
-                    tableBody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:2rem;color:#666;">No patrol assignments yet. Click "Assign Patrol" to create one.</td></tr>';
-                    return;
-                }
-
-                tableBody.innerHTML = rows.map(row => {
+                allSchedules = result.data || [];
+                allSchedules.forEach(function(row) {
                     patrolData[row.id] = row;
-                    const zone = row.patrol_zone || row.location || row.route || '—';
-                    const shiftLabel = formatShiftWithHours(row.shift);
-                    const searchText = [row.personnel_name, shiftLabel, row.shift, zone, row.schedule_date, row.status].join(' ').toLowerCase();
-                    return `<tr data-schedule-id="${row.id}" data-search="${escapeHtml(searchText)}">
-                        <td>${escapeHtml(row.personnel_name)}</td>
-                        <td>${escapeHtml(shiftLabel)}</td>
-                        <td>${escapeHtml(zone)}</td>
-                        <td>${escapeHtml(row.schedule_date)}</td>
-                        <td><span class="status-badge ${statusClass(row.status)}">${escapeHtml(row.status)}</span></td>
-                        <td>
-                            <div class="action-buttons">
-                                <button class="btn-view" onclick="viewPatrol('${row.id}')">View</button>
-                            </div>
-                        </td>
-                    </tr>`;
-                }).join('');
+                });
+                schedulesPager.reset();
+                renderSchedulesTable();
             } catch (e) {
                 console.error('Error loading patrol schedules:', e);
                 tableBody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:2rem;color:#666;">Error loading patrol schedules.</td></tr>';
