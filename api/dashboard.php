@@ -100,6 +100,34 @@ try {
         $stats['pendingTips'] = 0;
         $stats['newTipsThisWeek'] = 0;
     }
+
+    // Tip outcome analytics (for dashboard cards)
+    $tipOutcomeAnalytics = [
+        'totalTips' => 0,
+        'successfulInvestigations' => 0,
+        'arrests' => 0,
+        'effectivenessRate' => 0,
+    ];
+    if (tableExists($pdo, 'tips')) {
+        $stmt = $pdo->query('SELECT COUNT(*) as count FROM tips');
+        $totalTips = (int) $stmt->fetch()['count'];
+
+        $stmt = $pdo->query("SELECT COUNT(*) as count FROM tips WHERE outcome IN ('Investigation Successful', 'Arrest Made')");
+        $successfulInvestigations = (int) $stmt->fetch()['count'];
+
+        $stmt = $pdo->query("SELECT COUNT(*) as count FROM tips WHERE outcome = 'Arrest Made'");
+        $arrests = (int) $stmt->fetch()['count'];
+
+        $tipOutcomeAnalytics = [
+            'totalTips' => $totalTips,
+            'successfulInvestigations' => $successfulInvestigations,
+            'arrests' => $arrests,
+            'effectivenessRate' => $totalTips > 0
+                ? (int) round(($successfulInvestigations / $totalTips) * 100)
+                : 0,
+        ];
+    }
+    $response['tipOutcomeAnalytics'] = $tipOutcomeAnalytics;
     
     // Total Patrol Officers
     if (tableExists($pdo, 'patrols')) {

@@ -1602,7 +1602,6 @@ require_once __DIR__ . '/db.php';
             }
             
             loadDashboardData();
-            updateTipOutcomeAnalytics();
         });
         
         // Load dashboard statistics from API
@@ -1621,6 +1620,8 @@ require_once __DIR__ . '/db.php';
                     if (data.recentActivity && Array.isArray(data.recentActivity)) {
                         displayRecentActivity(data.recentActivity);
                     }
+
+                    updateTipOutcomeAnalytics(data.tipOutcomeAnalytics);
                 }
             } catch (error) {
                 console.error('Error loading dashboard data:', error);
@@ -1891,44 +1892,13 @@ require_once __DIR__ . '/db.php';
             }
         }
         
-        function getTipOutcomeAnalytics() {
-            let tips = [];
-            try {
-                const stored = localStorage.getItem('submittedTips');
-                tips = stored ? JSON.parse(stored) : [];
-            } catch (e) {
-                console.error('Failed to load submitted tips for analytics', e);
-                tips = [];
-            }
-            
-            const totalTips = tips.length;
-            let successfulInvestigations = 0;
-            let arrests = 0;
-            
-            tips.forEach(tip => {
-                const outcome = (tip.outcome || '').trim();
-                if (outcome === 'Investigation Successful' || outcome === 'Arrest Made') {
-                    successfulInvestigations++;
-                }
-                if (outcome === 'Arrest Made') {
-                    arrests++;
-                }
-            });
-            
-            const effectivenessRate = totalTips > 0
-                ? Math.round((successfulInvestigations / totalTips) * 100)
-                : 0;
-            
-            return {
-                totalTips,
-                successfulInvestigations,
-                arrests,
-                effectivenessRate
+        function updateTipOutcomeAnalytics(analytics) {
+            const stats = analytics || {
+                totalTips: 0,
+                successfulInvestigations: 0,
+                arrests: 0,
+                effectivenessRate: 0
             };
-        }
-        
-        function updateTipOutcomeAnalytics() {
-            const analytics = getTipOutcomeAnalytics();
             
             const totalEl = document.getElementById('tipAnalyticsTotal');
             const successEl = document.getElementById('tipAnalyticsSuccessful');
@@ -1939,10 +1909,10 @@ require_once __DIR__ . '/db.php';
                 return;
             }
             
-            totalEl.textContent = analytics.totalTips;
-            successEl.textContent = analytics.successfulInvestigations;
-            arrestsEl.textContent = analytics.arrests;
-            rateEl.textContent = analytics.effectivenessRate + '%';
+            totalEl.textContent = stats.totalTips;
+            successEl.textContent = stats.successfulInvestigations;
+            arrestsEl.textContent = stats.arrests;
+            rateEl.textContent = stats.effectivenessRate + '%';
         }
         // Date and Time Display
         function updateDateTime() {
