@@ -11,47 +11,6 @@ require_once __DIR__ . '/../includes/volunteer_notifications.php';
 require_once __DIR__ . '/../includes/neighborhood-watcher-member-credentials.php';
 require_once __DIR__ . '/../includes/app_url.php';
 
-function nwNormalizeNameParts(array $input): array
-{
-    $firstName = trim((string) ($input['first_name'] ?? ''));
-    $middleName = trim((string) ($input['middle_name'] ?? ''));
-    $lastName = trim((string) ($input['last_name'] ?? ''));
-    $legacyName = trim((string) ($input['name'] ?? ''));
-
-    if (($firstName === '' || $lastName === '') && $legacyName !== '') {
-        if (preg_match('/^([^,]+),\s*(.+)$/', $legacyName, $m)) {
-            $lastName = $lastName !== '' ? $lastName : trim($m[1]);
-            $rest = trim($m[2]);
-            if ($firstName === '') {
-                $parts = preg_split('/\s+/', $rest) ?: [];
-                $firstName = trim((string) ($parts[0] ?? ''));
-                if ($middleName === '' && count($parts) > 1) {
-                    $middleName = trim(implode(' ', array_slice($parts, 1)));
-                }
-            }
-        } else {
-            $parts = preg_split('/\s+/', $legacyName) ?: [];
-            if ($firstName === '' && !empty($parts)) {
-                $firstName = trim((string) $parts[0]);
-            }
-            if ($lastName === '' && count($parts) > 1) {
-                $lastName = trim((string) $parts[count($parts) - 1]);
-            }
-            if ($middleName === '' && count($parts) > 2) {
-                $middleName = trim(implode(' ', array_slice($parts, 1, -1)));
-            }
-        }
-    }
-
-    $fullName = buildNwMemberDisplayName($firstName, $middleName, $lastName, $legacyName);
-    return [
-        'first_name' => $firstName !== '' ? $firstName : null,
-        'middle_name' => $middleName !== '' ? $middleName : null,
-        'last_name' => $lastName !== '' ? $lastName : null,
-        'name' => $fullName,
-    ];
-}
-
 function nwNormalizeGender(?string $gender): ?string
 {
     $gender = trim((string) $gender);
@@ -162,7 +121,7 @@ if ($method === 'GET') {
         $nw_members = $stmt->fetchAll();
 
         foreach ($nw_members as &$member) {
-            if (empty($member['first_name']) && empty($member['last_name']) && !empty($member['name'])) {
+            if (!empty($member['name'])) {
                 $parts = nwNormalizeNameParts(['name' => $member['name']]);
                 $member['first_name'] = $parts['first_name'];
                 $member['middle_name'] = $parts['middle_name'];
@@ -176,6 +135,7 @@ if ($method === 'GET') {
                     $member['name'] ?? null
                 );
             }
+            unset($member['photo_data'], $member['photo_id_data'], $member['barangay_clearance_data']);
         }
         unset($member);
 

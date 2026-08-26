@@ -196,6 +196,39 @@ function ensureNwMembersTable(PDO $pdo): void
             // Column might already be nullable.
         }
     }
+
+    syncNwMemberStructuredNamesFromFullName($pdo);
+}
+
+function syncNwMemberStructuredNamesFromFullName(PDO $pdo): void
+{
+    require_once __DIR__ . '/../includes/public_id.php';
+    require_once __DIR__ . '/../includes/neighborhood-watcher-member-credentials.php';
+
+    if (getAppMeta($pdo, 'nw_member_names_synced_v1') === '1') {
+        return;
+    }
+
+    $table = nwMembersTableName();
+    try {
+        $stmt = $pdo->query("SELECT id, name FROM {$table} WHERE name IS NOT NULL AND TRIM(name) <> ''");
+        $update = $pdo->prepare("UPDATE {$table} SET first_name = :first_name, middle_name = :middle_name, last_name = :last_name, name = :name WHERE id = :id");
+
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $parts = nwNormalizeNameParts(['name' => (string) $row['name']]);
+            $update->execute([
+                ':first_name' => $parts['first_name'],
+                ':middle_name' => $parts['middle_name'],
+                ':last_name' => $parts['last_name'],
+                ':name' => $parts['name'],
+                ':id' => $row['id'],
+            ]);
+        }
+
+        setAppMeta($pdo, 'nw_member_names_synced_v1', '1');
+    } catch (PDOException $e) {
+        // Best-effort sync only.
+    }
 }
 
 /** @deprecated Use ensureNwMembersTable() */

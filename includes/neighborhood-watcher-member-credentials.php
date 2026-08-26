@@ -147,3 +147,45 @@ function buildNwMemberDisplayName(?string $firstName, ?string $middleName, ?stri
     }
     return $legacy;
 }
+
+function nwNormalizeNameParts(array $input): array
+{
+    $firstName = trim((string) ($input['first_name'] ?? ''));
+    $middleName = trim((string) ($input['middle_name'] ?? ''));
+    $lastName = trim((string) ($input['last_name'] ?? ''));
+    $legacyName = trim((string) ($input['name'] ?? ''));
+
+    if (($firstName === '' || $lastName === '') && $legacyName !== '') {
+        if (preg_match('/^([^,]+),\s*(.+)$/', $legacyName, $m)) {
+            $lastName = $lastName !== '' ? $lastName : trim($m[1]);
+            $rest = trim($m[2]);
+            if ($firstName === '') {
+                $parts = preg_split('/\s+/', $rest) ?: [];
+                $firstName = trim((string) ($parts[0] ?? ''));
+                if ($middleName === '' && count($parts) > 1) {
+                    $middleName = trim(implode(' ', array_slice($parts, 1)));
+                }
+            }
+        } else {
+            $parts = preg_split('/\s+/', $legacyName) ?: [];
+            if ($firstName === '' && !empty($parts)) {
+                $firstName = trim((string) $parts[0]);
+            }
+            if ($lastName === '' && count($parts) > 1) {
+                $lastName = trim((string) $parts[count($parts) - 1]);
+            }
+            if ($middleName === '' && count($parts) > 2) {
+                $middleName = trim(implode(' ', array_slice($parts, 1, -1)));
+            }
+        }
+    }
+
+    $fullName = buildNwMemberDisplayName($firstName, $middleName, $lastName, $legacyName);
+
+    return [
+        'first_name' => $firstName !== '' ? $firstName : null,
+        'middle_name' => $middleName !== '' ? $middleName : null,
+        'last_name' => $lastName !== '' ? $lastName : null,
+        'name' => $fullName,
+    ];
+}

@@ -99,9 +99,14 @@ if ($method === 'POST' && $action === 'update_profile') {
             exit;
         }
 
-        $stmt = $pdo->prepare('UPDATE nw_members SET name = :name, contact = :contact, email = :email, address = :address, emergency_contact_name = :emergency_name, emergency_contact_number = :emergency_contact WHERE id = :id AND status = :status');
+        $nameParts = nwNormalizeNameParts(['name' => $name]);
+
+        $stmt = $pdo->prepare('UPDATE nw_members SET name = :name, first_name = :first_name, middle_name = :middle_name, last_name = :last_name, contact = :contact, email = :email, address = :address, emergency_contact_name = :emergency_name, emergency_contact_number = :emergency_contact WHERE id = :id AND status = :status');
         $stmt->execute([
-            ':name' => $name,
+            ':name' => $nameParts['name'],
+            ':first_name' => $nameParts['first_name'],
+            ':middle_name' => $nameParts['middle_name'],
+            ':last_name' => $nameParts['last_name'],
             ':contact' => $contact,
             ':email' => $email,
             ':address' => $address,
@@ -111,13 +116,13 @@ if ($method === 'POST' && $action === 'update_profile') {
             ':status' => 'Active',
         ]);
 
-        $_SESSION['nw_member_name'] = $name;
+        $_SESSION['nw_member_name'] = $nameParts['name'];
         $_SESSION['nw_member_email'] = $email;
 
         notifyAdminActorActivity(
             $pdo,
             'watcher',
-            $name,
+            $nameParts['name'],
             'updated their personal information (registered email: ' . $email . ').',
             'neighborhood-watch-application.php?id=' . $memberId . '&activity=profile_' . time()
         );
