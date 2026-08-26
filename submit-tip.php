@@ -538,11 +538,12 @@ require_once __DIR__ . '/db.php';
                         <div style="margin-bottom: 1.5rem;">
                             <label style="display: block; margin-bottom: 0.5rem; font-weight: 500;">Date of incident</label>
                             <input type="date" id="tipIncidentDate" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 8px;">
+                            <p style="margin: 0.4rem 0 0; font-size: 0.85rem; color: var(--text-secondary);">When did this incident occur? (Optional)</p>
                         </div>
                         <div style="margin-bottom: 1.5rem;">
                             <label style="display: block; margin-bottom: 0.5rem; font-weight: 500;">Time of incident</label>
                             <input type="time" id="tipIncidentTime" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 8px;">
-                            <p style="margin: 0.4rem 0 0; font-size: 0.85rem; color: var(--text-secondary);">Optional. When did this happen? (Not when you are submitting.)</p>
+                            <p style="margin: 0.4rem 0 0; font-size: 0.85rem; color: var(--text-secondary);">What time did it occur? (Optional)</p>
                         </div>
                         <div style="margin-bottom: 1.5rem;">
                             <label style="display: block; margin-bottom: 0.5rem; font-weight: 500;">Location (Optional)</label>
