@@ -774,7 +774,7 @@ try {
                     <table id="loginHistoryTable">
                         <thead>
                             <tr>
-                                <th>ID</th>
+                                <th>#</th>
                                 <th>Username</th>
                                 <th>Login Date</th>
                                 <th>IP Address</th>
@@ -906,19 +906,20 @@ try {
             const tbody = document.getElementById('loginHistoryTableBody');
             tbody.innerHTML = '';
             const pageRows = loginHistoryPager.slice(allLoginHistory);
+            const start = (loginHistoryPager.page - 1) * loginHistoryPager.pageSize;
             
             if (allLoginHistory.length === 0) {
                 tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 2rem; color: var(--text-secondary);">No login history found</td></tr>';
                 return;
             }
             
-            pageRows.forEach(entry => {
+            pageRows.forEach((entry, index) => {
                 const tr = document.createElement('tr');
                 const statusClass = entry.status === 'Success' ? 'status-success' : 
                                    entry.status === 'Failed' ? 'status-failed' : 'status-locked';
                 
                 tr.innerHTML = `
-                    <td>${entry.id}</td>
+                    <td>${start + index + 1}</td>
                     <td>${entry.username}</td>
                     <td>${entry.login_datetime || '-'}</td>
                     <td>${entry.ip_address || '-'}</td>
