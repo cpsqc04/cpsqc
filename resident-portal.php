@@ -272,8 +272,12 @@ $autoOpenLogin = false;
                     <input id="tipLocation" name="location" type="text" required>
                 </div>
                 <div class="field">
-                    <label for="tipIncidentAt">Date &amp; time of incident *</label>
-                    <input id="tipIncidentAt" name="incident_at" type="datetime-local" required>
+                    <label for="tipIncidentDate">Date of incident *</label>
+                    <input id="tipIncidentDate" name="incident_date" type="date" required>
+                </div>
+                <div class="field">
+                    <label for="tipIncidentTime">Time of incident *</label>
+                    <input id="tipIncidentTime" name="incident_time" type="time" required>
                     <p class="field-hint">When did this happen? (Not when you are submitting the tip.)</p>
                 </div>
                 <div class="field">

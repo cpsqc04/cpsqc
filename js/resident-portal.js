@@ -218,12 +218,13 @@
 
         var location = $('tipLocation').value.trim();
         var description = $('tipDescription').value.trim();
-        var incidentAt = $('tipIncidentAt') ? $('tipIncidentAt').value.trim() : '';
+        var incidentDate = $('tipIncidentDate') ? $('tipIncidentDate').value.trim() : '';
+        var incidentTime = $('tipIncidentTime') ? $('tipIncidentTime').value.trim() : '';
         var photoFile = $('tipPhoto').files[0];
         var submitBtn = $('tipSubmitBtn');
 
-        if (!location || !description || !incidentAt || !photoFile) {
-            showSuccessModal('Validation Error', 'Please fill in all required fields including the date/time and photo.', true);
+        if (!location || !description || !incidentDate || !incidentTime || !photoFile) {
+            showSuccessModal('Validation Error', 'Please fill in all required fields including the date, time, and photo.', true);
             return;
         }
 
@@ -247,7 +248,8 @@
                     action: 'create',
                     location: location,
                     description: description,
-                    incident_at: incidentAt,
+                    date: incidentDate,
+                    time: incidentTime,
                     photo: e.target.result
                 })
             })
