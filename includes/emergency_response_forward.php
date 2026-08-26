@@ -14,6 +14,7 @@
 
 require_once __DIR__ . '/api_key_auth.php';
 require_once __DIR__ . '/tip_outbound_photo.php';
+require_once __DIR__ . '/../api/tips_schema.php';
 
 function buildEmergencyResponseBackupPayload(array $tip, string $backupReason = '', bool $includePhoto = true): array
 {
@@ -35,16 +36,31 @@ function buildEmergencyResponseBackupPayload(array $tip, string $backupReason = 
         $description = $description . "\n\n[Police backup] " . $reason;
     }
 
-    $submittedAt = $tip['submitted_at'] ?? null;
+    $eventAtRaw = tipPrimaryEventAt($tip) ?? ($tip['submitted_at'] ?? null);
+    $submittedAtRaw = $tip['submitted_at'] ?? null;
+    $submittedAt = $submittedAtRaw;
     $tipDatetime = '';
-    if ($submittedAt) {
+    if ($eventAtRaw) {
         try {
-            $dt = new DateTime($submittedAt);
-            $submittedAt = $dt->format('c');
+            $dt = new DateTime($eventAtRaw);
             $tipDatetime = $dt->format('Y-m-d H:i:s');
         } catch (Exception $e) {
+            $tipDatetime = (string) $eventAtRaw;
+        }
+    }
+    if ($submittedAt) {
+        try {
+            $submittedAt = (new DateTime($submittedAt))->format('c');
+        } catch (Exception $e) {
             $submittedAt = (string) $submittedAt;
-            $tipDatetime = $submittedAt;
+        }
+    }
+    $dateTimeIso = $submittedAt;
+    if ($eventAtRaw) {
+        try {
+            $dateTimeIso = (new DateTime($eventAtRaw))->format('c');
+        } catch (Exception $e) {
+            $dateTimeIso = (string) $eventAtRaw;
         }
     }
     if ($tipDatetime === '') {
@@ -52,6 +68,9 @@ function buildEmergencyResponseBackupPayload(array $tip, string $backupReason = 
     }
     if (!$submittedAt) {
         $submittedAt = date('c');
+    }
+    if (!$dateTimeIso) {
+        $dateTimeIso = $submittedAt;
     }
 
     $photoDataUrl = '';
@@ -108,10 +127,11 @@ function buildEmergencyResponseBackupPayload(array $tip, string $backupReason = 
         'request_type' => 'police_backup',
         'source_tip_id' => $tipId,
         'requesting_agency' => 'BPSO - Quezon City',
-        'date_time' => $submittedAt,
+        'date_time' => $dateTimeIso,
         'incident' => [
             'location' => $location,
             'description' => $description,
+            'incident_at' => $dateTimeIso,
             'submitted_at' => $submittedAt,
         ],
         'backup' => [

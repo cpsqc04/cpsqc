@@ -536,6 +536,11 @@ require_once __DIR__ . '/db.php';
                             <textarea id="tipDetails" required style="width: 100%; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 8px; min-height: 150px;" placeholder="Provide detailed information about your tip..."></textarea>
                         </div>
                         <div style="margin-bottom: 1.5rem;">
+                            <label style="display: block; margin-bottom: 0.5rem; font-weight: 500;">Date &amp; time of incident *</label>
+                            <input type="datetime-local" id="tipIncidentAt" required style="width: 100%; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 8px;">
+                            <p style="margin: 0.4rem 0 0; font-size: 0.85rem; color: var(--text-secondary);">When did this happen? (Not when you are submitting.)</p>
+                        </div>
+                        <div style="margin-bottom: 1.5rem;">
                             <label style="display: block; margin-bottom: 0.5rem; font-weight: 500;">Location (Optional)</label>
                             <input type="text" id="tipLocation" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 8px;" placeholder="Enter location if applicable">
                         </div>
@@ -592,9 +597,14 @@ require_once __DIR__ . '/db.php';
             
             const location = document.getElementById('tipLocation').value.trim();
             const description = document.getElementById('tipDetails').value.trim();
+            const incidentAt = (document.getElementById('tipIncidentAt') || {}).value || '';
             
             if (!description) {
                 alert('Please provide tip details.');
+                return;
+            }
+            if (!String(incidentAt).trim()) {
+                alert('Please provide the date and time of the incident.');
                 return;
             }
             
@@ -607,7 +617,8 @@ require_once __DIR__ . '/db.php';
                 body: JSON.stringify({
                     action: 'create',
                     location: location || 'Not specified',
-                    description: description
+                    description: description,
+                    incident_at: String(incidentAt).trim()
                 })
             })
             .then(res => res.json())

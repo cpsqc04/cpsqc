@@ -12,6 +12,7 @@
 
 require_once __DIR__ . '/api_key_auth.php';
 require_once __DIR__ . '/tip_outbound_photo.php';
+require_once __DIR__ . '/../api/tips_schema.php';
 
 function getTipBlotterApiConfig(): array
 {
@@ -26,12 +27,22 @@ function getTipBlotterApiConfig(): array
 
 function buildTipIncidentPayload(array $tip): array
 {
+    $eventAt = tipPrimaryEventAt($tip) ?? ($tip['submitted_at'] ?? null);
     $submittedAt = $tip['submitted_at'] ?? null;
+    $eventAtIso = $eventAt;
+    $submittedAtIso = $submittedAt;
+    if ($eventAt) {
+        try {
+            $eventAtIso = (new DateTime($eventAt))->format('c');
+        } catch (Exception $e) {
+            $eventAtIso = (string) $eventAt;
+        }
+    }
     if ($submittedAt) {
         try {
-            $submittedAt = (new DateTime($submittedAt))->format('c');
+            $submittedAtIso = (new DateTime($submittedAt))->format('c');
         } catch (Exception $e) {
-            $submittedAt = (string) $submittedAt;
+            $submittedAtIso = (string) $submittedAt;
         }
     }
 
@@ -56,7 +67,8 @@ function buildTipIncidentPayload(array $tip): array
         'incident' => [
             'location' => $location,
             'description' => $description,
-            'submitted_at' => $submittedAt,
+            'incident_at' => $eventAtIso,
+            'submitted_at' => $submittedAtIso,
             'classification' => 'community_tip',
         ],
         'reporter' => [
@@ -85,7 +97,9 @@ function buildTipIncidentPayload(array $tip): array
         'description' => $narrative,
         'narrative' => $narrative,
         'tip_id' => $tipId,
-        'date_time' => $submittedAt,
+        'date_time' => $eventAtIso,
+        'incident_at' => $eventAtIso,
+        'submitted_at' => $submittedAtIso,
         'tip_description' => $description,
         'status' => $tip['status'] ?? 'New',
         'outcome' => $tip['outcome'] ?? 'No Outcome Yet',

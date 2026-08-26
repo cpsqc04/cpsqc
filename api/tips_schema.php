@@ -28,6 +28,7 @@ function ensureTipsTable(PDO $pdo): void
             description TEXT NOT NULL,
             contact_number VARCHAR(50) DEFAULT NULL,
             photo_data LONGTEXT NULL,
+            incident_at DATETIME DEFAULT NULL,
             status VARCHAR(50) NOT NULL DEFAULT 'New',
             outcome VARCHAR(100) DEFAULT 'No Outcome Yet',
             assigned_to VARCHAR(255) DEFAULT NULL,
@@ -72,7 +73,8 @@ function ensureTipsTable(PDO $pdo): void
         'description' => 'ALTER TABLE tips ADD COLUMN description TEXT NOT NULL DEFAULT "" AFTER location',
         'contact_number' => 'ALTER TABLE tips ADD COLUMN contact_number VARCHAR(50) DEFAULT NULL AFTER description',
         'photo_data' => 'ALTER TABLE tips ADD COLUMN photo_data LONGTEXT NULL AFTER contact_number',
-        'status' => 'ALTER TABLE tips ADD COLUMN status VARCHAR(50) NOT NULL DEFAULT "New" AFTER photo_data',
+        'incident_at' => 'ALTER TABLE tips ADD COLUMN incident_at DATETIME DEFAULT NULL AFTER photo_data',
+        'status' => 'ALTER TABLE tips ADD COLUMN status VARCHAR(50) NOT NULL DEFAULT "New" AFTER incident_at',
         'outcome' => 'ALTER TABLE tips ADD COLUMN outcome VARCHAR(100) DEFAULT "No Outcome Yet" AFTER status',
         'assigned_to' => 'ALTER TABLE tips ADD COLUMN assigned_to VARCHAR(255) DEFAULT NULL AFTER outcome',
         'assigned_patrol_id' => 'ALTER TABLE tips ADD COLUMN assigned_patrol_id INT NULL AFTER assigned_to',
@@ -152,6 +154,7 @@ function tipsSelectColumns(string $prefix = '', bool $includePhoto = true): stri
         "{$p}description",
         "{$p}contact_number",
         $photoCol,
+        "{$p}incident_at",
         "{$p}status",
         "{$p}outcome",
         "{$p}assigned_to",
@@ -171,6 +174,53 @@ function tipsSelectColumns(string $prefix = '', bool $includePhoto = true): stri
         "{$p}submitted_at",
         "{$p}created_at",
     ]);
+}
+
+/**
+ * Normalize tip incident datetime from API/form input to MySQL DATETIME.
+ * Accepts: "YYYY-MM-DDTHH:MM", "YYYY-MM-DD HH:MM[:SS]", ISO-8601.
+ *
+ * @return array{ok:bool,value:?string,message?:string}
+ */
+function normalizeTipIncidentAt(?string $raw): array
+{
+    $value = trim((string) $raw);
+    if ($value === '') {
+        return ['ok' => false, 'value' => null, 'message' => 'Date and time of the incident are required.'];
+    }
+
+    $value = str_replace('T', ' ', $value);
+    if (preg_match('/^\d{4}-\d{2}-\d{2} \d{1,2}:\d{2}$/', $value)) {
+        $value .= ':00';
+    }
+
+    try {
+        $dt = new DateTime($value);
+    } catch (Exception $e) {
+        return ['ok' => false, 'value' => null, 'message' => 'Invalid incident date/time.'];
+    }
+
+    $now = new DateTime('now');
+    // Allow a small clock skew.
+    $maxFuture = (clone $now)->modify('+10 minutes');
+    if ($dt > $maxFuture) {
+        return ['ok' => false, 'value' => null, 'message' => 'Incident date/time cannot be in the future.'];
+    }
+
+    return ['ok' => true, 'value' => $dt->format('Y-m-d H:i:s')];
+}
+
+/**
+ * Prefer when the incident happened; fall back to when the tip was submitted.
+ */
+function tipPrimaryEventAt(array $tip): ?string
+{
+    $incident = trim((string) ($tip['incident_at'] ?? ''));
+    if ($incident !== '') {
+        return $incident;
+    }
+    $submitted = trim((string) ($tip['submitted_at'] ?? ''));
+    return $submitted !== '' ? $submitted : null;
 }
 
 function tipHasPhotoFlag(array $tip): bool

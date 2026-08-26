@@ -272,6 +272,11 @@ $autoOpenLogin = false;
                     <input id="tipLocation" name="location" type="text" required>
                 </div>
                 <div class="field">
+                    <label for="tipIncidentAt">Date &amp; time of incident *</label>
+                    <input id="tipIncidentAt" name="incident_at" type="datetime-local" required>
+                    <p class="field-hint">When did this happen? (Not when you are submitting the tip.)</p>
+                </div>
+                <div class="field">
                     <label for="tipPhoto">Photo *</label>
                     <input id="tipPhoto" name="photo" type="file" accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp" required onchange="previewResidentImage(this, 'tipPhotoPreview')">
                     <p class="field-hint">JPG or PNG, 10 MB or below.</p>

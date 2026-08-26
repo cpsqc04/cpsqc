@@ -641,7 +641,7 @@ require_once __DIR__ . '/db.php';
             <div class="page-content">
                 <div class="tips-toolbar">
                     <div class="search-box">
-                        <input type="text" id="searchInput" placeholder="Search tips by ID, timestamp, location, or description..." onkeyup="filterTips()">
+                        <input type="text" id="searchInput" placeholder="Search tips by ID, incident time, location, or description..." onkeyup="filterTips()">
                     </div>
                     <button type="button" class="btn-export-tips tip-export-enter-only" id="btnEnterTipExportSelect" onclick="enterTipExportSelectMode()">
                         <i class="fas fa-file-export"></i> Export
@@ -657,7 +657,7 @@ require_once __DIR__ . '/db.php';
                             <tr>
                                 <th class="col-select"><input type="checkbox" id="selectAllTips" title="Select all visible tips" onchange="toggleSelectAllTips(this)"></th>
                                 <th>Tip ID</th>
-                                <th>Timestamp</th>
+                                <th title="When the incident happened (from the tipster)">Incident Time</th>
                                 <th>Location</th>
                                 <th>Photo</th>
                                 <th>Tip Description</th>
@@ -1022,6 +1022,16 @@ require_once __DIR__ . '/db.php';
             }).replace(',', '');
         }
 
+        function tipIncidentTimestamp(tip) {
+            if (!tip) return '';
+            return formatTipTimestamp(tip.incident_at || tip.submitted_at || '');
+        }
+
+        function tipSubmittedTimestamp(tip) {
+            if (!tip) return '';
+            return formatTipTimestamp(tip.submitted_at || '');
+        }
+
         function displayTipOutcome(tip) {
             if (!tip) return 'No Outcome Yet';
             // Outcome is owned by the assigned patrol's report — not admin-editable.
@@ -1083,7 +1093,7 @@ require_once __DIR__ . '/db.php';
 
             const outcomeText = displayTipOutcome(tip);
             const outcomeClass = getOutcomeBadgeClass(outcomeText);
-            const timestamp = formatTipTimestamp(tip.submitted_at);
+            const timestamp = tipIncidentTimestamp(tip);
             const assignedTo = tip.assigned_to || '—';
 
             let photoCell = '<div class="tip-photo-placeholder">No Photo</div>';
@@ -1142,7 +1152,8 @@ require_once __DIR__ . '/db.php';
             document.getElementById('viewTipContent').innerHTML = '<p>Loading tip details…</p>';
             await ensureTipPhoto(id);
 
-            const timestamp = formatTipTimestamp(tip.submitted_at);
+            const incidentAt = tipIncidentTimestamp(tip);
+            const submittedAt = tipSubmittedTimestamp(tip);
 
             let photoHtml = '';
             if (tip.photo_data) {
@@ -1158,7 +1169,8 @@ require_once __DIR__ . '/db.php';
 
             document.getElementById('viewTipContent').innerHTML = `
                 <p><strong>Tip ID:</strong> ${escapeHtml(tip.tip_id || '')}</p>
-                <p><strong>Timestamp:</strong> ${escapeHtml(timestamp)}</p>
+                <p><strong>Incident date/time:</strong> ${escapeHtml(incidentAt || '—')}</p>
+                <p><strong>Submitted:</strong> ${escapeHtml(submittedAt || '—')}</p>
                 <p><strong>Location:</strong> ${escapeHtml(tip.location || '')}</p>
                 <p><strong>Assigned To:</strong> ${escapeHtml(tip.assigned_to || 'Not assigned')}</p>
                 <p><strong>Outcome:</strong> ${escapeHtml(displayTipOutcome(tip))}</p>
@@ -1467,7 +1479,8 @@ require_once __DIR__ . '/db.php';
         function tipToExportPayload(tip) {
             return {
                 tipId: tip.tip_id || '',
-                timestamp: formatTipTimestamp(tip.submitted_at),
+                incidentAt: tipIncidentTimestamp(tip),
+                timestamp: tipSubmittedTimestamp(tip),
                 location: tip.location || '',
                 description: tip.description || '',
                 assignedTo: tip.assigned_to || 'Not assigned',
@@ -1526,7 +1539,8 @@ require_once __DIR__ . '/db.php';
                 const section = {
                     fields: [
                         { label: 'Tip ID', value: tip.tipId || '' },
-                        { label: 'Timestamp', value: tip.timestamp || '' },
+                        { label: 'Incident Date/Time', value: tip.incidentAt || tip.timestamp || '' },
+                        { label: 'Submitted', value: tip.timestamp || '' },
                         { label: 'Location', value: tip.location || '' },
                         { label: 'Assigned To', value: tip.assignedTo || 'Not assigned' },
                         { label: 'Outcome', value: tip.outcome || 'No Outcome Yet' }

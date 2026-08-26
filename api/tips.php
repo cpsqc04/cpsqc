@@ -88,10 +88,28 @@ if ($method === 'POST') {
         $location = trim($input['location'] ?? '');
         $description = trim($input['description'] ?? '');
         $photoData = $input['photo'] ?? null;
+        $incidentRaw = $input['incident_at']
+            ?? $input['incident_datetime']
+            ?? $input['date_time']
+            ?? $input['incident_date']
+            ?? null;
+        // Mobile apps may send separate date + time.
+        if (($incidentRaw === null || trim((string) $incidentRaw) === '')
+            && !empty($input['date'])
+            && !empty($input['time'])) {
+            $incidentRaw = trim((string) $input['date']) . ' ' . trim((string) $input['time']);
+        }
 
         if ($location === '' || $description === '' || empty($photoData)) {
             http_response_code(400);
             echo json_encode(['success' => false, 'message' => 'Location, description, and photo are required.']);
+            exit;
+        }
+
+        $incident = normalizeTipIncidentAt(is_string($incidentRaw) || is_numeric($incidentRaw) ? (string) $incidentRaw : null);
+        if (!$incident['ok']) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'message' => $incident['message'] ?? 'Invalid incident date/time.']);
             exit;
         }
 
@@ -102,12 +120,13 @@ if ($method === 'POST') {
         $tipId = "TIP-{$year}-" . str_pad($nextNum, 3, '0', STR_PAD_LEFT);
 
         try {
-            $stmt = $pdo->prepare('INSERT INTO tips (tip_id, location, description, photo_data, status, outcome) VALUES (:tip_id, :location, :description, :photo_data, :status, :outcome)');
+            $stmt = $pdo->prepare('INSERT INTO tips (tip_id, location, description, photo_data, incident_at, status, outcome) VALUES (:tip_id, :location, :description, :photo_data, :incident_at, :status, :outcome)');
             $stmt->execute([
                 ':tip_id' => $tipId,
                 ':location' => $location,
                 ':description' => $description,
                 ':photo_data' => $photoData,
+                ':incident_at' => $incident['value'],
                 ':status' => 'New',
                 ':outcome' => 'No Outcome Yet',
             ]);
@@ -130,6 +149,7 @@ if ($method === 'POST') {
                     'tip_id' => $tipId,
                     'location' => $location,
                     'description' => $description,
+                    'incident_at' => $incident['value'],
                     'status' => 'New',
                     'outcome' => 'No Outcome Yet',
                 ],
