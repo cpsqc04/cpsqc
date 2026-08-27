@@ -650,7 +650,7 @@ $cctvNavActive = 'cctv-request';
             </div>
             <div id="selectFootagePanel" class="select-footage-panel">
                 <h3>Select Footage</h3>
-                <p class="panel-hint">Click a recording to attach it to this request. Then send it to Incident Reporting if needed.</p>
+                <p class="panel-hint">Click a recording to attach it to this request, then click Send.</p>
                 <div id="selectedFootageNote" class="selected-footage-note"></div>
                 <div class="footage-filters">
                     <div class="form-group">
@@ -669,7 +669,7 @@ $cctvNavActive = 'cctv-request';
                 </div>
                 <div class="form-actions">
                     <button type="button" class="btn-cancel" onclick="hideSelectFootagePanel()">Close</button>
-                    <button type="button" class="btn-incident-reporting" id="sendToIncidentReportingBtn" onclick="sendFootageToIncidentReporting()">Send to Incident Reporting</button>
+                    <button type="button" class="btn-incident-reporting" id="sendToIncidentReportingBtn" onclick="sendFootageToIncidentReporting()">Send</button>
                 </div>
                 <div id="incidentReportingEvidenceStatus" class="incident-reporting-status"></div>
             </div>
