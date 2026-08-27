@@ -76,7 +76,8 @@ Triggered in admin **Track Complaint → Forward**.
 | Local test receiver | `POST /api/blotter_receive.php` |
 
 Required by their `create_blotter` action: `complainant_name`, `incident_type`.  
-AlertaraQC also sends nested + flat complaint fields (location, description, defendant, contacts, source ids). Do not send `narrative` — IR's DB has no such column.
+AlertaraQC also sends nested + flat complaint fields (location, description, narrative, defendant, contacts, source ids).
+**Known IR bug (2026-08-27):** `create_blotter` hardcodes INSERT of column `narrative`. If their write table lacks that column, every create returns HTTP 500 `Unknown column 'narrative'`. IR must add the column (or fix the INSERT). AlertaraQC cannot work around this.
 
 Their success response uses `status: "success"` (and often `blotter_no`); AlertaraQC also accepts `success: true` / `blotter_reference_id`.
 

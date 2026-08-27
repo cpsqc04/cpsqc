@@ -89,7 +89,10 @@ function buildBlotterForwardPayload(array $complaint): array
         'incident_time' => $time,
         'date_time' => trim($date . ' ' . $time),
         'description' => $statusDescription,
-        // Do not send narrative — IR create_blotter inserts it and their DB has no narrative column (HTTP 500).
+        // IR blotter records use narrative as the primary text field (see action=all dump).
+        // create_blotter currently INSERTS narrative even when omitted — if IR's DB lacks the
+        // column, their API returns HTTP 500 until they add it or fix the INSERT.
+        'narrative' => $statusDescription,
         'defendant_name' => $complaint['defendant_name'] ?? '',
         'defendant_address' => $complaint['defendant_address'] ?? '',
         'defendant_contact_number' => $complaint['defendant_contact_number'] ?? '',
@@ -164,6 +167,9 @@ function forwardComplaintToBlotter(array $complaint): array
 
     if ($httpCode < 200 || $httpCode >= 300) {
         $message = trim($decoded['message'] ?? $decoded['error'] ?? 'Digital Blotter API request failed.');
+        if (stripos($message, 'narrative') !== false && stripos($message, 'Unknown column') !== false) {
+            $message = 'Incident Reporting Digital Blotter API is broken on their server (missing DB column `narrative` in create_blotter). AlertaraQC already omits that field — IR must add the column or stop inserting it.';
+        }
         return [
             'success' => false,
             'message' => $message . ' (HTTP ' . $httpCode . ')',
