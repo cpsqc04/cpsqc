@@ -64,6 +64,49 @@ function ensureNwIncidentReportsTable(PDO $pdo): void
     } catch (PDOException $e) {
         // Index may already exist under a different name.
     }
+
+    syncNwIncidentMemberNamesFromMembers($pdo);
+}
+
+/**
+ * Keep incident report member_name in sync with the current NW member profile.
+ */
+function syncNwIncidentMemberNamesFromMembers(PDO $pdo): void
+{
+    require_once __DIR__ . '/../includes/public_id.php';
+
+    try {
+        // Direct fix for the known stale surname display.
+        $pdo->exec("UPDATE nw_incident_reports
+            SET member_name = 'Maya Ligones'
+            WHERE member_name = 'Maya Ligones Marto'
+               OR member_name = 'Maya Marto'");
+
+        $pdo->exec("UPDATE nw_members
+            SET name = 'Maya Ligones',
+                first_name = 'Maya',
+                middle_name = NULL,
+                last_name = 'Ligones'
+            WHERE name = 'Maya Ligones Marto'
+               OR (first_name = 'Maya' AND last_name = 'Marto')
+               OR (first_name = 'Maya' AND middle_name = 'Ligones' AND last_name = 'Marto')");
+
+        if (getAppMeta($pdo, 'nw_incident_member_names_synced_v1') === '1') {
+            return;
+        }
+
+        // Prefer live profile name for all linked reports.
+        $pdo->exec("UPDATE nw_incident_reports r
+            INNER JOIN nw_members m ON m.id = r.volunteer_id
+            SET r.member_name = m.name
+            WHERE m.name IS NOT NULL
+              AND TRIM(m.name) <> ''
+              AND r.member_name <> m.name");
+
+        setAppMeta($pdo, 'nw_incident_member_names_synced_v1', '1');
+    } catch (Throwable $e) {
+        // Best-effort sync only.
+    }
 }
 
 function nwIncidentSelectColumns(): string

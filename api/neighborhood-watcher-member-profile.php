@@ -119,6 +119,17 @@ if ($method === 'POST' && $action === 'update_profile') {
         ]);
 
         $_SESSION['nw_member_name'] = $nameParts['name'];
+
+        // Keep older incident report snapshots aligned with the updated profile name.
+        try {
+            $sync = $pdo->prepare('UPDATE nw_incident_reports SET member_name = :name WHERE volunteer_id = :volunteer_id');
+            $sync->execute([
+                ':name' => $nameParts['name'],
+                ':volunteer_id' => $memberId,
+            ]);
+        } catch (PDOException $e) {
+            // Non-fatal: profile update already succeeded.
+        }
         $_SESSION['nw_member_email'] = $email;
 
         notifyAdminActorActivity(
