@@ -377,6 +377,41 @@ $nwSearchPlaceholder = $nwIsMemberList
         .modal { display: none; position: fixed; z-index: 2000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.5); backdrop-filter: blur(4px); }
         .modal.active { display: flex; align-items: center; justify-content: center; }
         .modal-content { background: var(--card-bg); border-radius: 12px; padding: 2rem; max-width: 600px; width: 90%; max-height: 90vh; overflow-y: auto; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2); }
+        #reviewMemberModal .modal-content { max-width: 960px; }
+        .review-application-layout {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+            gap: 1.5rem 2rem;
+            align-items: start;
+        }
+        .review-application-column {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            min-width: 0;
+        }
+        .review-application-full {
+            grid-column: 1 / -1;
+            display: flex;
+            flex-direction: column;
+            gap: 1.25rem;
+            padding-top: 0.25rem;
+            border-top: 1px solid var(--border-color);
+        }
+        .review-section-title {
+            margin: 0 0 0.25rem 0;
+            font-size: 0.78rem;
+            font-weight: 700;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            color: var(--tertiary-color);
+        }
+        .review-empty-note {
+            margin: 0;
+            color: var(--text-secondary);
+            font-style: italic;
+            font-size: 0.92rem;
+        }
         .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; padding-bottom: 1rem; border-bottom: 1px solid var(--border-color); }
         .modal-header h2 { margin: 0; color: var(--tertiary-color); font-size: 1.5rem; }
         .close-modal { background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--text-secondary); transition: color 0.2s ease; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; border-radius: 6px; }
@@ -477,7 +512,7 @@ $nwSearchPlaceholder = $nwIsMemberList
         .detail-value { color: var(--text-secondary); font-size: 0.95rem; line-height: 1.6; }
         .detail-row.inline { flex-direction: row; align-items: center; gap: 1rem; }
         .detail-row.inline .detail-label { min-width: 120px; }
-        @media (max-width: 768px) { .sidebar { width: 320px; transform: translateX(-100%); transition: transform 0.3s ease; } .sidebar.mobile-open { transform: translateX(0); } .sidebar.collapsed { width: 80px; transform: translateX(0); } .main-wrapper { margin-left: 0; } body.sidebar-collapsed .main-wrapper { margin-left: 80px; } .toolbar { flex-direction: column; } .search-box { width: 100%; } .form-row { grid-template-columns: 1fr; } }
+        @media (max-width: 768px) { .sidebar { width: 320px; transform: translateX(-100%); transition: transform 0.3s ease; } .sidebar.mobile-open { transform: translateX(0); } .sidebar.collapsed { width: 80px; transform: translateX(0); } .main-wrapper { margin-left: 0; } body.sidebar-collapsed .main-wrapper { margin-left: 80px; } .toolbar { flex-direction: column; } .search-box { width: 100%; } .form-row { grid-template-columns: 1fr; } .review-application-layout { grid-template-columns: 1fr; gap: 1.25rem; } #reviewMemberModal .modal-content { max-width: 95vw; padding: 1.25rem; } }
     </style>
     <link rel="stylesheet" href="css/mobile-responsive.css">
 </head>
@@ -1292,12 +1327,7 @@ $nwSearchPlaceholder = $nwIsMemberList
         function buildEligibilityReviewHtml(member) {
             const answers = parseEligibilityAnswers(member.eligibility_answers);
             if (!answers) {
-                return `
-                <div class="detail-row">
-                    <span class="detail-label">Eligibility Criteria:</span>
-                    <span class="detail-value" style="color: var(--text-secondary); font-style: italic;">No eligibility answers recorded</span>
-                </div>
-                `;
+                return '<p class="review-empty-note">No eligibility answers recorded</p>';
             }
 
             const items = Object.keys(ELIGIBILITY_CRITERIA_LABELS).map((key) => {
@@ -1312,14 +1342,7 @@ $nwSearchPlaceholder = $nwIsMemberList
                 `;
             }).join('');
 
-            return `
-                <div class="detail-row">
-                    <span class="detail-label">Eligibility Criteria Answers:</span>
-                    <div class="detail-value">
-                        <ul class="eligibility-review-list">${items}</ul>
-                    </div>
-                </div>
-            `;
+            return `<ul class="eligibility-review-list">${items}</ul>`;
         }
 
         function resetRejectForm() {
@@ -1373,141 +1396,151 @@ $nwSearchPlaceholder = $nwIsMemberList
             resetRejectForm();
 
             detailsContainer.innerHTML = `
-                <div class="detail-row inline">
-                    <span class="detail-label">First Name:</span>
-                    <span class="detail-value"><strong>${member.first_name || ''}</strong></span>
-                </div>
-                <div class="detail-row inline">
-                    <span class="detail-label">Last Name:</span>
-                    <span class="detail-value"><strong>${member.last_name || ''}</strong></span>
-                </div>
-                ${member.middle_name ? `
-                <div class="detail-row inline">
-                    <span class="detail-label">Middle Name:</span>
-                    <span class="detail-value">${member.middle_name}</span>
-                </div>
-                ` : ''}
-
-                <div class="detail-row inline">
-                    <span class="detail-label">Status:</span>
-                    <span class="status-badge ${statusClass}">${member.status || ''}</span>
-                </div>
-
-                ${member.gender ? `
-                <div class="detail-row">
-                    <span class="detail-label">Gender:</span>
-                    <span class="detail-value">${member.gender}</span>
-                </div>
-                ` : ''}
-
-                ${member.marital_status ? `
-                <div class="detail-row">
-                    <span class="detail-label">Marital Status:</span>
-                    <span class="detail-value">${member.marital_status}</span>
-                </div>
-                ` : ''}
-
-                ${birthdayDisplay ? `
-                <div class="detail-row">
-                    <span class="detail-label">Birthday:</span>
-                    <span class="detail-value">${birthdayDisplay}</span>
-                </div>
-                ` : ''}
-
-                ${member.id_number ? `
-                <div class="detail-row">
-                    <span class="detail-label">ID Number:</span>
-                    <span class="detail-value">${member.id_number}</span>
-                </div>
-                ` : ''}
-
-                ${member.contact ? `
-                <div class="detail-row">
-                    <span class="detail-label">Contact Number:</span>
-                    <span class="detail-value">${member.contact}</span>
-                </div>
-                ` : ''}
-
-                ${member.email ? `
-                <div class="detail-row">
-                    <span class="detail-label">Email Address:</span>
-                    <span class="detail-value">${member.email}</span>
-                </div>
-                ` : ''}
-
-                ${member.address || member.address_unit_street ? `
-                <div class="detail-row">
-                    <span class="detail-label">Home Address:</span>
-                    <span class="detail-value">
-                        ${member.address_unit_street || member.address_subdivision || member.address_barangay ? `
-                            ${member.address_unit_street ? `<div><strong>Unit/House & Street:</strong> ${member.address_unit_street}</div>` : ''}
-                            ${member.address_subdivision ? `<div><strong>Subdivision:</strong> ${member.address_subdivision}</div>` : ''}
-                            ${member.address_barangay ? `<div><strong>Barangay:</strong> ${member.address_barangay}</div>` : ''}
-                            ${member.address_city ? `<div><strong>City/Municipality:</strong> ${member.address_city}</div>` : ''}
-                            ${member.address_postal_code ? `<div><strong>Postal Code:</strong> ${member.address_postal_code}</div>` : ''}
-                            ${member.address_country ? `<div><strong>Country:</strong> ${member.address_country}</div>` : ''}
-                        ` : (member.address || '')}
-                    </span>
-                </div>
-                ` : ''}
-
-                ${member.emergency_contact_name || member.emergency_contact_number ? `
-                <div class="detail-row">
-                    <span class="detail-label">Emergency Contact:</span>
-                    <span class="detail-value">
-                        ${member.emergency_contact_name || ''}${member.emergency_contact_name && member.emergency_contact_number ? ' - ' : ''}${member.emergency_contact_number || ''}
-                    </span>
-                </div>
-                ` : ''}
-
-                ${buildEligibilityReviewHtml(member)}
-
-                ${member.status === 'Rejected' && (member.rejection_reason || member.notes) ? `
-                <div class="detail-row">
-                    <span class="detail-label">Rejection Details:</span>
-                    <span class="detail-value">
-                        ${member.rejection_reason ? `<div><strong>Reason:</strong> ${member.rejection_reason}</div>` : ''}
-                        ${member.notes ? `<div style="margin-top:0.35rem;"><strong>Notes:</strong> ${member.notes}</div>` : ''}
-                    </span>
-                </div>
-                ` : ''}
-
-                <div class="detail-row">
-                    <span class="detail-label">Uploaded Photos / Documents:</span>
-                    <div class="detail-value review-photo-grid">
-                        ${member.photo_data ? `
-                        <div class="review-photo-card">
-                            <span style="font-size: 0.85rem; color: var(--text-secondary);">Member Photo</span>
-                            <img src="${member.photo_data}" alt="Member Photo" onclick="viewPhoto(this.src)">
+                <div class="review-application-layout">
+                    <div class="review-application-column">
+                        <h3 class="review-section-title">Personal Information</h3>
+                        <div class="detail-row inline">
+                            <span class="detail-label">First Name:</span>
+                            <span class="detail-value"><strong>${member.first_name || ''}</strong></span>
+                        </div>
+                        <div class="detail-row inline">
+                            <span class="detail-label">Last Name:</span>
+                            <span class="detail-value"><strong>${member.last_name || ''}</strong></span>
+                        </div>
+                        ${member.middle_name ? `
+                        <div class="detail-row inline">
+                            <span class="detail-label">Middle Name:</span>
+                            <span class="detail-value">${member.middle_name}</span>
                         </div>
                         ` : ''}
-                        ${member.photo_id_data ? `
-                        <div class="review-photo-card">
-                            <span style="font-size: 0.85rem; color: var(--text-secondary);">Valid ID</span>
-                            <img src="${member.photo_id_data}" alt="Photo ID" onclick="viewPhoto(this.src)">
+
+                        <div class="detail-row inline">
+                            <span class="detail-label">Status:</span>
+                            <span class="status-badge ${statusClass}">${member.status || ''}</span>
                         </div>
-                        ` : `
-                        <span style="color: var(--text-secondary); font-style: italic;">No photo ID uploaded</span>
-                        `}
-                        ${member.barangay_clearance_data ? (
-                            /\.pdf($|\?)/i.test(String(member.barangay_clearance_data))
-                                ? `
-                        <div class="review-photo-card">
-                            <span style="font-size: 0.85rem; color: var(--text-secondary);">Barangay Clearance</span>
-                            <a href="${member.barangay_clearance_data}" target="_blank" rel="noopener noreferrer" style="display:inline-flex;align-items:center;gap:0.4rem;color:var(--primary-color);font-weight:600;">
-                                <i class="fas fa-file-pdf"></i> View PDF
-                            </a>
+
+                        ${member.gender ? `
+                        <div class="detail-row">
+                            <span class="detail-label">Gender:</span>
+                            <span class="detail-value">${member.gender}</span>
                         </div>
-                                `
-                                : `
-                        <div class="review-photo-card">
-                            <span style="font-size: 0.85rem; color: var(--text-secondary);">Barangay Clearance</span>
-                            <img src="${member.barangay_clearance_data}" alt="Barangay Clearance" onclick="viewPhoto(this.src)">
+                        ` : ''}
+
+                        ${member.marital_status ? `
+                        <div class="detail-row">
+                            <span class="detail-label">Marital Status:</span>
+                            <span class="detail-value">${member.marital_status}</span>
                         </div>
-                                `
-                        ) : `
-                        <span style="color: var(--text-secondary); font-style: italic;">No barangay clearance uploaded</span>
-                        `}
+                        ` : ''}
+
+                        ${birthdayDisplay ? `
+                        <div class="detail-row">
+                            <span class="detail-label">Birthday:</span>
+                            <span class="detail-value">${birthdayDisplay}</span>
+                        </div>
+                        ` : ''}
+
+                        ${member.id_number ? `
+                        <div class="detail-row">
+                            <span class="detail-label">ID Number:</span>
+                            <span class="detail-value">${member.id_number}</span>
+                        </div>
+                        ` : ''}
+
+                        ${member.contact ? `
+                        <div class="detail-row">
+                            <span class="detail-label">Contact Number:</span>
+                            <span class="detail-value">${member.contact}</span>
+                        </div>
+                        ` : ''}
+
+                        ${member.email ? `
+                        <div class="detail-row">
+                            <span class="detail-label">Email Address:</span>
+                            <span class="detail-value">${member.email}</span>
+                        </div>
+                        ` : ''}
+
+                        ${member.address || member.address_unit_street ? `
+                        <div class="detail-row">
+                            <span class="detail-label">Home Address:</span>
+                            <span class="detail-value">
+                                ${member.address_unit_street || member.address_subdivision || member.address_barangay ? `
+                                    ${member.address_unit_street ? `<div><strong>Unit/House & Street:</strong> ${member.address_unit_street}</div>` : ''}
+                                    ${member.address_subdivision ? `<div><strong>Subdivision:</strong> ${member.address_subdivision}</div>` : ''}
+                                    ${member.address_barangay ? `<div><strong>Barangay:</strong> ${member.address_barangay}</div>` : ''}
+                                    ${member.address_city ? `<div><strong>City/Municipality:</strong> ${member.address_city}</div>` : ''}
+                                    ${member.address_postal_code ? `<div><strong>Postal Code:</strong> ${member.address_postal_code}</div>` : ''}
+                                    ${member.address_country ? `<div><strong>Country:</strong> ${member.address_country}</div>` : ''}
+                                ` : (member.address || '')}
+                            </span>
+                        </div>
+                        ` : ''}
+
+                        ${member.emergency_contact_name || member.emergency_contact_number ? `
+                        <div class="detail-row">
+                            <span class="detail-label">Emergency Contact:</span>
+                            <span class="detail-value">
+                                ${member.emergency_contact_name || ''}${member.emergency_contact_name && member.emergency_contact_number ? ' - ' : ''}${member.emergency_contact_number || ''}
+                            </span>
+                        </div>
+                        ` : ''}
+                    </div>
+
+                    <div class="review-application-column">
+                        <h3 class="review-section-title">Eligibility Criteria</h3>
+                        ${buildEligibilityReviewHtml(member)}
+                    </div>
+
+                    <div class="review-application-full">
+                ${member.status === 'Rejected' && (member.rejection_reason || member.notes) ? `
+                        <div class="detail-row">
+                            <span class="detail-label">Rejection Details:</span>
+                            <span class="detail-value">
+                                ${member.rejection_reason ? `<div><strong>Reason:</strong> ${member.rejection_reason}</div>` : ''}
+                                ${member.notes ? `<div style="margin-top:0.35rem;"><strong>Notes:</strong> ${member.notes}</div>` : ''}
+                            </span>
+                        </div>
+                ` : ''}
+
+                        <div class="detail-row">
+                            <span class="detail-label">Uploaded Photos / Documents:</span>
+                            <div class="detail-value review-photo-grid">
+                                ${member.photo_data ? `
+                                <div class="review-photo-card">
+                                    <span style="font-size: 0.85rem; color: var(--text-secondary);">Member Photo</span>
+                                    <img src="${member.photo_data}" alt="Member Photo" onclick="viewPhoto(this.src)">
+                                </div>
+                                ` : ''}
+                                ${member.photo_id_data ? `
+                                <div class="review-photo-card">
+                                    <span style="font-size: 0.85rem; color: var(--text-secondary);">Valid ID</span>
+                                    <img src="${member.photo_id_data}" alt="Photo ID" onclick="viewPhoto(this.src)">
+                                </div>
+                                ` : `
+                                <span style="color: var(--text-secondary); font-style: italic;">No photo ID uploaded</span>
+                                `}
+                                ${member.barangay_clearance_data ? (
+                                    /\.pdf($|\?)/i.test(String(member.barangay_clearance_data))
+                                        ? `
+                                <div class="review-photo-card">
+                                    <span style="font-size: 0.85rem; color: var(--text-secondary);">Barangay Clearance</span>
+                                    <a href="${member.barangay_clearance_data}" target="_blank" rel="noopener noreferrer" style="display:inline-flex;align-items:center;gap:0.4rem;color:var(--primary-color);font-weight:600;">
+                                        <i class="fas fa-file-pdf"></i> View PDF
+                                    </a>
+                                </div>
+                                        `
+                                        : `
+                                <div class="review-photo-card">
+                                    <span style="font-size: 0.85rem; color: var(--text-secondary);">Barangay Clearance</span>
+                                    <img src="${member.barangay_clearance_data}" alt="Barangay Clearance" onclick="viewPhoto(this.src)">
+                                </div>
+                                        `
+                                ) : `
+                                <span style="color: var(--text-secondary); font-style: italic;">No barangay clearance uploaded</span>
+                                `}
+                            </div>
+                        </div>
                     </div>
                 </div>
             `;
