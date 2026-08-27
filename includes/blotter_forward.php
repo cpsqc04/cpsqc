@@ -89,7 +89,7 @@ function buildBlotterForwardPayload(array $complaint): array
         'incident_time' => $time,
         'date_time' => trim($date . ' ' . $time),
         'description' => $statusDescription,
-        'narrative' => $statusDescription,
+        // Do not send narrative — IR create_blotter inserts it and their DB has no narrative column (HTTP 500).
         'defendant_name' => $complaint['defendant_name'] ?? '',
         'defendant_address' => $complaint['defendant_address'] ?? '',
         'defendant_contact_number' => $complaint['defendant_contact_number'] ?? '',

@@ -95,7 +95,7 @@ function buildTipIncidentPayload(array $tip): array
         'location' => $location,
         'incident_type' => 'Community Tip',
         'description' => $narrative,
-        'narrative' => $narrative,
+        // Do not send narrative — IR create_blotter inserts it and their DB has no narrative column (HTTP 500).
         'tip_id' => $tipId,
         'date_time' => $eventAtIso,
         'incident_at' => $eventAtIso,
