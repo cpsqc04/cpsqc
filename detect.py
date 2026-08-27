@@ -196,7 +196,7 @@ RECORDING_BUCKET_SECONDS = 1800  # Align filenames to 30-minute windows
 RECORDING_CODEC = 'avc1'  # H.264 for browser playback (fallback: mp4v)
 RECORDING_EXTENSION = '.mp4'  # File extension for recordings
 RECORDING_RETENTION_DAYS = 7  # Auto-delete recordings older than N days
-RECORDING_MAX_STORAGE_BYTES = 2 * 1024 * 1024 * 1024  # 2 GB FIFO cap for Playback storage
+RECORDING_MAX_STORAGE_BYTES = 20 * 1024 * 1024 * 1024  # 20 GB FIFO (~7 days of continuous clips)
 # Idle / activity-aware recording (saves disk + CPU when nothing is happening)
 RECORD_ACTIVITY_HOLD_SECONDS = 45  # Full-rate record this long after motion/detection
 IDLE_RECORD_EVERY_N = 5  # legacy; recording now uses wall-clock pacing at RECORDING_FPS
@@ -631,7 +631,7 @@ def init_cctv_upload_from_env():
     except ValueError:
         pass
 
-    # Recording policy overrides (defaults: 30-min chunks / 7-day / 2GB FIFO).
+    # Recording policy overrides (defaults: 30-min chunks / 7-day / 20GB FIFO).
     global RECORDING_CHUNK_DURATION, RECORDING_BUCKET_SECONDS, RECORDING_RETENTION_DAYS
     global RECORDING_MAX_STORAGE_BYTES, MIN_RECORDING_DURATION
     try:
@@ -3596,7 +3596,7 @@ def cleanup_old_recordings(retention_days=RECORDING_RETENTION_DAYS):
 def cleanup_recordings_fifo(max_bytes=None):
     """
     Keep Playback storage under the cap by deleting oldest recordings first (FIFO).
-    Default cap: RECORDING_MAX_STORAGE_BYTES (2 GB).
+    Default cap: RECORDING_MAX_STORAGE_BYTES (20 GB).
     """
     if max_bytes is None:
         max_bytes = RECORDING_MAX_STORAGE_BYTES

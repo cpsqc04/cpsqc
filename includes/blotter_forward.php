@@ -149,7 +149,7 @@ function forwardComplaintToBlotter(array $complaint): array
     if ($responseBody === false) {
         return [
             'success' => false,
-            'message' => 'Failed to reach Digital Blotter API: ' . ($curlError ?: 'Unknown error'),
+            'message' => 'Failed to reach Incident Logging API: ' . ($curlError ?: 'Unknown error'),
         ];
     }
 
@@ -157,13 +157,13 @@ function forwardComplaintToBlotter(array $complaint): array
     if (!is_array($decoded)) {
         return [
             'success' => false,
-            'message' => 'Digital Blotter API returned an invalid response (HTTP ' . $httpCode . ').',
+            'message' => 'Incident Logging API returned an invalid response (HTTP ' . $httpCode . ').',
             'http_code' => $httpCode,
         ];
     }
 
     if ($httpCode < 200 || $httpCode >= 300) {
-        $message = trim($decoded['message'] ?? $decoded['error'] ?? 'Digital Blotter API request failed.');
+        $message = trim($decoded['message'] ?? $decoded['error'] ?? 'Incident Logging API request failed.');
         return [
             'success' => false,
             'message' => $message . ' (HTTP ' . $httpCode . ')',
@@ -174,7 +174,7 @@ function forwardComplaintToBlotter(array $complaint): array
     if (!partnerApiResponseSucceeded($decoded)) {
         return [
             'success' => false,
-            'message' => trim($decoded['message'] ?? $decoded['error'] ?? 'Digital Blotter API rejected the complaint.'),
+            'message' => trim($decoded['message'] ?? $decoded['error'] ?? 'Incident Logging API rejected the complaint.'),
             'http_code' => $httpCode,
         ];
     }

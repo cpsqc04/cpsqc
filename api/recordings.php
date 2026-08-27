@@ -137,8 +137,8 @@ if ($action === 'list') {
         'count' => count($segments),
         'recordings_dir' => RECORDINGS_DIR_NAME,
         'chunk_duration_seconds' => RECORDING_CHUNK_SECONDS,
-        'retention_days' => RECORDING_RETENTION_DAYS,
-        'max_storage_bytes' => RECORDING_MAX_STORAGE_BYTES,
+        'retention_days' => recordingRetentionDays(),
+        'max_storage_bytes' => recordingMaxStorageBytes(),
         'storage_bytes' => recordingsStorageBytes(),
         'data' => $segments,
     ]);

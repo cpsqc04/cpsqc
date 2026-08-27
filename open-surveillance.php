@@ -214,21 +214,28 @@ ensureLocalDetectionStarted();
             max-height: calc(75vh + 2rem);
             display: flex;
             flex-direction: column;
-            min-height: 420px;
+            min-height: 520px;
             min-width: 0;
         }
         .detection-panel h3 {
-            margin: 0 0 0.85rem;
+            margin: 0 0 0.5rem;
             font-size: 1.05rem;
             color: var(--tertiary-color);
             font-weight: 700;
         }
+        .detection-set-meta {
+            margin: 0 0 0.75rem;
+            font-size: 0.8rem;
+            color: var(--text-secondary, #64748b);
+            font-weight: 600;
+        }
         .detection-cards {
             display: grid;
-            gap: 0.85rem;
+            gap: 0.75rem;
             overflow-y: auto;
             padding-right: 0.25rem;
             flex: 1;
+            align-content: start;
         }
         .detection-card {
             background: #f8fafc;
@@ -575,6 +582,7 @@ ensureLocalDetectionStarted();
                         <div class="detection-panel">
                             <p id="suspiciousBanner" class="suspicious-banner"></p>
                             <h3><i class="fas fa-list"></i> Detected Objects</h3>
+                            <p id="detectionSetMeta" class="detection-set-meta" hidden></p>
                             <div class="detection-cards" id="detectionList">
                                 <p class="detection-empty">No objects detected yet.</p>
                             </div>
@@ -1284,6 +1292,87 @@ ensureLocalDetectionStarted();
         let lastOverlayDetections = [];
         let lastOverlayFrameSize = { w: 0, h: 0 };
 
+        // Show only a small set of cards; rotate when more objects (or a new wave) appear.
+        const DETECTION_CARD_LIMIT = 3;
+        const DETECTION_SET_ROTATE_MS = 4000;
+        let detectionDisplayPage = 0;
+        let lastDetectionSignature = '';
+        let lastDetectionPageAdvanceAt = 0;
+        let sortedDetectionsCache = [];
+
+        function detectionItemKey(item) {
+            const bbox = item && item.bbox ? item.bbox : {};
+            return [
+                item.track_id != null ? item.track_id : '',
+                item.category || '',
+                item.class || '',
+                Math.round(Number(bbox.x1) || 0),
+                Math.round(Number(bbox.y1) || 0),
+                Math.round(Number(bbox.x2) || 0),
+                Math.round(Number(bbox.y2) || 0)
+            ].join('|');
+        }
+
+        function detectionSetSignature(items) {
+            return items.map(detectionItemKey).sort().join(';;');
+        }
+
+        function updateDetectionSetMeta(total, page, pageCount) {
+            const meta = document.getElementById('detectionSetMeta');
+            if (!meta) return;
+            if (total <= 0) {
+                meta.hidden = true;
+                meta.textContent = '';
+                return;
+            }
+            meta.hidden = false;
+            if (total <= DETECTION_CARD_LIMIT) {
+                meta.textContent = total + ' object' + (total === 1 ? '' : 's') + ' detected';
+            } else {
+                meta.textContent = 'Showing set ' + (page + 1) + ' of ' + pageCount
+                    + ' · ' + total + ' objects (up to ' + DETECTION_CARD_LIMIT + ' at a time)';
+            }
+        }
+
+        function renderDetectionListPage(sorted) {
+            const list = document.getElementById('detectionList');
+            if (!list) return;
+
+            sortedDetectionsCache = sorted;
+            const total = sorted.length;
+            if (!total) {
+                list.innerHTML = '<p class="detection-empty">No objects detected yet.</p>';
+                updateDetectionSetMeta(0, 0, 1);
+                lastDetectionSignature = '';
+                detectionDisplayPage = 0;
+                return;
+            }
+
+            const pageCount = Math.max(1, Math.ceil(total / DETECTION_CARD_LIMIT));
+            const signature = detectionSetSignature(sorted);
+            const now = Date.now();
+
+            if (signature !== lastDetectionSignature) {
+                // New / changed detections → start a fresh set (highest-priority items first).
+                detectionDisplayPage = 0;
+                lastDetectionSignature = signature;
+                lastDetectionPageAdvanceAt = now;
+            } else if (pageCount > 1 && (now - lastDetectionPageAdvanceAt) >= DETECTION_SET_ROTATE_MS) {
+                // Same scene but more than the limit → rotate to the next set.
+                detectionDisplayPage = (detectionDisplayPage + 1) % pageCount;
+                lastDetectionPageAdvanceAt = now;
+            }
+
+            if (detectionDisplayPage >= pageCount) {
+                detectionDisplayPage = 0;
+            }
+
+            const start = detectionDisplayPage * DETECTION_CARD_LIMIT;
+            const pageItems = sorted.slice(start, start + DETECTION_CARD_LIMIT);
+            list.innerHTML = pageItems.map(renderDetectionCard).join('');
+            updateDetectionSetMeta(total, detectionDisplayPage, pageCount);
+        }
+
         function clearDetectionOverlay() {
             const canvas = document.getElementById('detectionOverlay');
             if (!canvas) return;
@@ -1384,6 +1473,7 @@ ensureLocalDetectionStarted();
                     const list = document.getElementById('detectionList');
                     const banner = document.getElementById('suspiciousBanner');
                     if (list) list.innerHTML = '<p class="detection-empty">Camera not found — detection paused.</p>';
+                    updateDetectionSetMeta(0, 0, 1);
                     if (banner) {
                         banner.textContent = '';
                         banner.classList.remove('show');
@@ -1399,6 +1489,9 @@ ensureLocalDetectionStarted();
                 const banner = document.getElementById('suspiciousBanner');
                 if (!detections.length) {
                     list.innerHTML = '<p class="detection-empty">No objects detected yet.</p>';
+                    updateDetectionSetMeta(0, 0, 1);
+                    lastDetectionSignature = '';
+                    detectionDisplayPage = 0;
                     if (banner) {
                         banner.textContent = '';
                         banner.classList.remove('show');
@@ -1422,13 +1515,17 @@ ensureLocalDetectionStarted();
 
                 const priority = { person: 0, crowd: 1, group: 2, phone: 3, backpack: 4, suitcase: 5, weapon: 6, vehicle: 7, animal: 8, plant: 9 };
                 const sorted = detections.slice().sort((a, b) => {
+                    // Suspicious alerts first, then category priority, then confidence.
+                    const sa = a.suspicious ? 0 : 1;
+                    const sb = b.suspicious ? 0 : 1;
+                    if (sa !== sb) return sa - sb;
                     const pa = priority[a.category] ?? 99;
                     const pb = priority[b.category] ?? 99;
                     if (pa !== pb) return pa - pb;
                     return (b.confidence || 0) - (a.confidence || 0);
                 });
 
-                list.innerHTML = sorted.map(renderDetectionCard).join('');
+                renderDetectionListPage(sorted);
             } catch (e) {
                 console.error('Detection poll failed', e);
             }
