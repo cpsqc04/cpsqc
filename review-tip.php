@@ -481,6 +481,7 @@ require_once __DIR__ . '/db.php';
     </style>
     <link rel="stylesheet" href="css/mobile-responsive.css">
     <link rel="stylesheet" href="css/table-pagination.css">
+    <link rel="stylesheet" href="css/detail-view-two-column.css">
 </head>
 <body>
     <aside class="sidebar" id="sidebar">
@@ -685,13 +686,13 @@ require_once __DIR__ . '/db.php';
     </div>
 
     <!-- View Tip Modal (details only) -->
-    <div id="viewTipModal" class="modal">
+    <div id="viewTipModal" class="modal detail-view-modal">
         <div class="modal-content">
             <div class="modal-header">
                 <h2>Tip Details</h2>
                 <span class="close" onclick="closeViewTipModal()">&times;</span>
             </div>
-            <div id="viewTipContent" class="tip-details"></div>
+            <div id="viewTipContent" class="tip-details detail-view-layout"></div>
             <div class="form-actions">
                 <button type="button" class="btn-cancel" onclick="closeViewTipModal()">Close</button>
             </div>
@@ -1209,26 +1210,62 @@ require_once __DIR__ . '/db.php';
             let photoHtml = '';
             if (tip.photo_data) {
                 const photoId = 'tip-photo-' + id;
-                photoHtml = `<p><strong>Photo:</strong></p><img id="${photoId}" src="${tip.photo_data}" alt="Tip Photo" class="tip-photo-full" style="cursor: pointer;">`;
+                photoHtml = `
+                    <div class="detail-row">
+                        <span class="detail-label">Photo Evidence</span>
+                        <img id="${photoId}" src="${tip.photo_data}" alt="Tip Photo" class="tip-photo-full" style="cursor: pointer; max-width: 280px; max-height: 200px; object-fit: contain; border-radius: 8px; border: 1px solid var(--border-color);">
+                    </div>`;
             } else if (tipHasPhoto(tip)) {
-                photoHtml = '<p><strong>Photo:</strong> Unable to load photo.</p>';
+                photoHtml = '<div class="detail-row"><span class="detail-value" style="font-style: italic;">Photo unavailable</span></div>';
             }
 
             const reportHtml = tip.resolution_report
-                ? `<p><strong>BPSO Report:</strong><br>${escapeHtml(tip.resolution_report)}</p>`
+                ? `<div class="detail-row"><span class="detail-label">BPSO Report</span><div class="detail-value description">${escapeHtml(tip.resolution_report)}</div></div>`
                 : '';
 
             document.getElementById('viewTipContent').innerHTML = `
-                <p><strong>Tip ID:</strong> ${escapeHtml(tip.tip_id || '')}</p>
-                <p><strong>Incident date/time:</strong> ${escapeHtml(incidentAt || '—')}</p>
-                <p><strong>Submitted:</strong> ${escapeHtml(submittedAt || '—')}</p>
-                <p><strong>Location:</strong> ${escapeHtml(tip.location || '')}</p>
-                <p><strong>Assigned To:</strong> ${escapeHtml(tip.assigned_to || 'Not assigned')}</p>
-                <p><strong>Outcome:</strong> ${escapeHtml(displayTipOutcome(tip))}</p>
-                <p><strong>Inter-Agency Status:</strong> ${backupStatusBadgeHtml(tip)}</p>
-                <p><strong>Tip Description:</strong><br>${escapeHtml(tip.description || '')}</p>
-                ${reportHtml}
-                ${photoHtml}
+                <div class="detail-view-column">
+                    <h3 class="detail-section-title">Tip Information</h3>
+                    <div class="detail-row inline">
+                        <span class="detail-label">Tip ID:</span>
+                        <span class="detail-value"><strong>${escapeHtml(tip.tip_id || '')}</strong></span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Incident date/time:</span>
+                        <span class="detail-value">${escapeHtml(incidentAt || '—')}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Submitted:</span>
+                        <span class="detail-value">${escapeHtml(submittedAt || '—')}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Location:</span>
+                        <span class="detail-value">${escapeHtml(tip.location || '')}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Assigned To:</span>
+                        <span class="detail-value">${escapeHtml(tip.assigned_to || 'Not assigned')}</span>
+                    </div>
+                </div>
+                <div class="detail-view-column">
+                    <h3 class="detail-section-title">Status &amp; Description</h3>
+                    <div class="detail-row">
+                        <span class="detail-label">Outcome:</span>
+                        <span class="detail-value">${escapeHtml(displayTipOutcome(tip))}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Inter-Agency Status:</span>
+                        <span class="detail-value">${backupStatusBadgeHtml(tip)}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Tip Description:</span>
+                        <div class="detail-value description">${escapeHtml(tip.description || '')}</div>
+                    </div>
+                </div>
+                <div class="detail-view-full">
+                    ${reportHtml}
+                    ${photoHtml}
+                </div>
             `;
 
             if (tip.photo_data) {

@@ -1361,6 +1361,7 @@ require_once __DIR__ . '/db.php';
     </style>
     <link rel="stylesheet" href="css/mobile-responsive.css">
     <link rel="stylesheet" href="css/table-pagination.css">
+    <link rel="stylesheet" href="css/detail-view-two-column.css">
 </head>
 <body>
     <!-- Sidebar Navigation -->
@@ -1577,7 +1578,7 @@ require_once __DIR__ . '/db.php';
     </div>
     
     <!-- Complaint Details Modal -->
-    <div id="complaintModal" class="modal">
+    <div id="complaintModal" class="modal detail-view-modal">
         <div class="modal-content">
             <div class="modal-header">
                 <h2>Complaint Details</h2>
@@ -2045,102 +2046,97 @@ require_once __DIR__ . '/db.php';
             
             // Build the details HTML
             let detailsHTML = `
-                <div class="detail-row inline">
-                    <span class="detail-label">Complaint ID:</span>
-                    <span class="detail-value"><strong>${complaint.complaint_id}</strong></span>
-                </div>
-                
-                <div class="detail-row inline">
-                    <span class="detail-label">Status:</span>
-                    <span class="status-badge status-${statusClass(complaint.status)}">${complaint.status}</span>
-                </div>
-                
-                <div class="detail-row">
-                    <span class="detail-label">Complainant's Name:</span>
-                    <span class="detail-value">${complaint.complainant_name}</span>
-                </div>
-                
-                <div class="detail-row">
-                    <span class="detail-label">Complainant's Address:</span>
-                    <span class="detail-value">${complaint.address}</span>
-                </div>
-                
-                <div class="detail-row">
-                    <span class="detail-label">Complainant's Contact Number:</span>
-                    <span class="detail-value">${complaint.contact_number}</span>
-                </div>
+                <div class="detail-view-layout">
+                    <div class="detail-view-column">
+                        <h3 class="detail-section-title">Complainant</h3>
+                        <div class="detail-row inline">
+                            <span class="detail-label">Complaint ID:</span>
+                            <span class="detail-value"><strong>${complaint.complaint_id}</strong></span>
+                        </div>
+                        <div class="detail-row inline">
+                            <span class="detail-label">Status:</span>
+                            <span class="status-badge status-${statusClass(complaint.status)}">${complaint.status}</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">Complainant's Name:</span>
+                            <span class="detail-value">${complaint.complainant_name}</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">Complainant's Address:</span>
+                            <span class="detail-value">${complaint.address}</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">Complainant's Contact Number:</span>
+                            <span class="detail-value">${complaint.contact_number}</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">Date:</span>
+                            <span class="detail-value">${formattedIncidentDate}</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">Time:</span>
+                            <span class="detail-value">${formattedTime}</span>
+                        </div>
+                    </div>
 
-                <div class="detail-row">
-                    <span class="detail-label">Date:</span>
-                    <span class="detail-value">${formattedIncidentDate}</span>
-                </div>
+                    <div class="detail-view-column">
+                        <h3 class="detail-section-title">Defendant &amp; Type</h3>
+                        <div class="detail-row">
+                            <span class="detail-label">Defendant's Name:</span>
+                            <span class="detail-value">${complaint.defendant_name || 'N/A'}</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">Defendant's Address:</span>
+                            <span class="detail-value">${complaint.defendant_address || 'N/A'}</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">Defendant's Contact Number:</span>
+                            <span class="detail-value">${complaint.defendant_contact_number || 'N/A'}</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">Complaint Type:</span>
+                            <span class="detail-value">${formatComplaintTypeLabel(complaint)}</span>
+                        </div>
+                        ${!isComplaintForwarded(complaint) ? `
+                        <div class="detail-row">
+                            <span class="detail-label">Assigned To:</span>
+                            <span class="detail-value">${complaint.assigned_to || 'Pending Assignment'}</span>
+                        </div>
+                        ` : ''}
+                    </div>
 
-                <div class="detail-row">
-                    <span class="detail-label">Time:</span>
-                    <span class="detail-value">${formattedTime}</span>
-                </div>
-
-                <div class="detail-row">
-                    <span class="detail-label">Defendant's Name:</span>
-                    <span class="detail-value">${complaint.defendant_name || 'N/A'}</span>
-                </div>
-
-                <div class="detail-row">
-                    <span class="detail-label">Defendant's Address:</span>
-                    <span class="detail-value">${complaint.defendant_address || 'N/A'}</span>
-                </div>
-
-                <div class="detail-row">
-                    <span class="detail-label">Defendant's Contact Number:</span>
-                    <span class="detail-value">${complaint.defendant_contact_number || 'N/A'}</span>
-                </div>
-                
-                <div class="detail-row">
-                    <span class="detail-label">Complaint Type:</span>
-                    <span class="detail-value">${formatComplaintTypeLabel(complaint)}</span>
-                </div>
-                
-                <div class="detail-row">
-                    <span class="detail-label">Description:</span>
-                    <div class="detail-value description">${complaint.description}</div>
-                </div>
-                
-                ${!isComplaintForwarded(complaint) ? `
-                <div class="detail-row">
-                    <span class="detail-label">Assigned To:</span>
-                    <span class="detail-value">${complaint.assigned_to || 'Pending Assignment'}</span>
-                </div>
-                ` : ''}
-                
-                <div class="detail-row">
-                    <span class="detail-label">BPSO Resolution:</span>
-                    <div class="detail-value description">${complaint.resolution_report || 'No BPSO resolution report yet.'}</div>
-                </div>
-                
-                ${complaint.resolved_at ? `
-                <div class="detail-row">
-                    <span class="detail-label">Resolved At:</span>
-                    <span class="detail-value">${new Date(complaint.resolved_at).toLocaleString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: true })}</span>
-                </div>
-                ` : ''}
-                
-                ${complaint.blotter_reference_id ? `
-                <div class="detail-row">
-                    <span class="detail-label">Incident Logging Reference:</span>
-                    <span class="detail-value"><strong>${complaint.blotter_reference_id}</strong></span>
-                </div>
-                ` : ''}
-
-                ${complaint.forwarded_at ? `
-                <div class="detail-row">
-                    <span class="detail-label">Forwarded At:</span>
-                    <span class="detail-value">${new Date(complaint.forwarded_at).toLocaleString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: true })}</span>
-                </div>
-                ` : ''}
-                
-                <div class="detail-row">
-                    <span class="detail-label">Last Updated:</span>
-                    <span class="detail-value">${lastUpdated}</span>
+                    <div class="detail-view-full">
+                        <div class="detail-row">
+                            <span class="detail-label">Description:</span>
+                            <div class="detail-value description">${complaint.description}</div>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">BPSO Resolution:</span>
+                            <div class="detail-value description">${complaint.resolution_report || 'No BPSO resolution report yet.'}</div>
+                        </div>
+                        ${complaint.resolved_at ? `
+                        <div class="detail-row">
+                            <span class="detail-label">Resolved At:</span>
+                            <span class="detail-value">${new Date(complaint.resolved_at).toLocaleString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: true })}</span>
+                        </div>
+                        ` : ''}
+                        ${complaint.blotter_reference_id ? `
+                        <div class="detail-row">
+                            <span class="detail-label">Incident Logging Reference:</span>
+                            <span class="detail-value"><strong>${complaint.blotter_reference_id}</strong></span>
+                        </div>
+                        ` : ''}
+                        ${complaint.forwarded_at ? `
+                        <div class="detail-row">
+                            <span class="detail-label">Forwarded At:</span>
+                            <span class="detail-value">${new Date(complaint.forwarded_at).toLocaleString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: true })}</span>
+                        </div>
+                        ` : ''}
+                        <div class="detail-row">
+                            <span class="detail-label">Last Updated:</span>
+                            <span class="detail-value">${lastUpdated}</span>
+                        </div>
+                    </div>
                 </div>
             `;
             

@@ -176,6 +176,7 @@ define('NW_PAGE_MODE', 'incidents');
     </style>
     <link rel="stylesheet" href="css/mobile-responsive.css">
     <link rel="stylesheet" href="css/table-pagination.css">
+    <link rel="stylesheet" href="css/detail-view-two-column.css">
 </head>
 <body>
     <aside class="sidebar" id="sidebar">
@@ -360,7 +361,7 @@ define('NW_PAGE_MODE', 'incidents');
         </main>
     </div>
 
-    <div id="viewModal" class="modal">
+    <div id="viewModal" class="modal detail-view-modal">
         <div class="modal-content">
             <div class="modal-header">
                 <h2 id="viewModalTitle">Incident Report</h2>
@@ -438,23 +439,33 @@ define('NW_PAGE_MODE', 'incidents');
         function buildReportDetailsHtml(report) {
             let photoHtml = '';
             if (report.photo_data) {
-                photoHtml = '<div class="detail-row"><div class="detail-label">Photo</div>'
+                photoHtml = '<div class="detail-row"><span class="detail-label">Photo</span>'
                     + '<img src="' + report.photo_data + '" alt="Incident photo" class="incident-photo" '
                     + 'onclick="viewIncidentPhoto(' + Number(report.id) + ')" title="Click to view full size"></div>';
             }
 
             return ''
-                + '<div class="detail-row"><div class="detail-label">Member</div><div class="detail-value">' + escapeHtml(report.member_name) + ' (' + escapeHtml(report.member_contact) + ')</div></div>'
-                + '<div class="detail-row"><div class="detail-label">Email</div><div class="detail-value">' + escapeHtml(report.member_email) + '</div></div>'
-                + '<div class="detail-row"><div class="detail-label">Location</div><div class="detail-value">' + escapeHtml(report.location) + '</div></div>'
-                + '<div class="detail-row"><div class="detail-label">Description</div><div class="detail-value">' + escapeHtml(report.description) + '</div></div>'
-                + '<div class="detail-row"><div class="detail-label">Status</div><div class="detail-value">' + escapeHtml(report.status) + '</div></div>'
-                + '<div class="detail-row"><div class="detail-label">Assigned To</div><div class="detail-value">' + escapeHtml(report.assigned_to || 'Unassigned') + '</div></div>'
-                + (report.resolution_report ? '<div class="detail-row"><div class="detail-label">Personnel Resolution</div><div class="detail-value">' + escapeHtml(report.resolution_report) + '</div></div>' : '')
-                + '<div class="detail-row"><div class="detail-label">Submitted</div><div class="detail-value">' + formatDateTime(report.created_at) + '</div></div>'
-                + (report.assigned_at ? '<div class="detail-row"><div class="detail-label">Assigned At</div><div class="detail-value">' + formatDateTime(report.assigned_at) + '</div></div>' : '')
-                + (report.resolved_at ? '<div class="detail-row"><div class="detail-label">Resolved At</div><div class="detail-value">' + formatDateTime(report.resolved_at) + '</div></div>' : '')
-                + photoHtml;
+                + '<div class="detail-view-layout">'
+                + '<div class="detail-view-column">'
+                + '<h3 class="detail-section-title">Reporter</h3>'
+                + '<div class="detail-row"><span class="detail-label">Member</span><div class="detail-value">' + escapeHtml(report.member_name) + ' (' + escapeHtml(report.member_contact) + ')</div></div>'
+                + '<div class="detail-row"><span class="detail-label">Email</span><div class="detail-value">' + escapeHtml(report.member_email) + '</div></div>'
+                + '<div class="detail-row"><span class="detail-label">Location</span><div class="detail-value">' + escapeHtml(report.location) + '</div></div>'
+                + '</div>'
+                + '<div class="detail-view-column">'
+                + '<h3 class="detail-section-title">Assignment &amp; Status</h3>'
+                + '<div class="detail-row"><span class="detail-label">Status</span><div class="detail-value">' + escapeHtml(report.status) + '</div></div>'
+                + '<div class="detail-row"><span class="detail-label">Assigned To</span><div class="detail-value">' + escapeHtml(report.assigned_to || 'Unassigned') + '</div></div>'
+                + '<div class="detail-row"><span class="detail-label">Submitted</span><div class="detail-value">' + formatDateTime(report.created_at) + '</div></div>'
+                + (report.assigned_at ? '<div class="detail-row"><span class="detail-label">Assigned At</span><div class="detail-value">' + formatDateTime(report.assigned_at) + '</div></div>' : '')
+                + (report.resolved_at ? '<div class="detail-row"><span class="detail-label">Resolved At</span><div class="detail-value">' + formatDateTime(report.resolved_at) + '</div></div>' : '')
+                + '</div>'
+                + '<div class="detail-view-full">'
+                + '<div class="detail-row"><span class="detail-label">Description</span><div class="detail-value description">' + escapeHtml(report.description) + '</div></div>'
+                + (report.resolution_report ? '<div class="detail-row"><span class="detail-label">Personnel Resolution</span><div class="detail-value description">' + escapeHtml(report.resolution_report) + '</div></div>' : '')
+                + photoHtml
+                + '</div>'
+                + '</div>';
         }
 
         function getFilteredNwReports() {

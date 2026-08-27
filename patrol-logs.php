@@ -470,6 +470,7 @@ require_once __DIR__ . '/db.php';
     </style>
     <link rel="stylesheet" href="css/mobile-responsive.css">
     <link rel="stylesheet" href="css/table-pagination.css">
+    <link rel="stylesheet" href="css/detail-view-two-column.css">
 </head>
 <body>
     <aside class="sidebar" id="sidebar">
@@ -673,7 +674,7 @@ require_once __DIR__ . '/db.php';
     </div>
 
     <!-- View Patrol Log Modal -->
-    <div id="viewLogModal" class="modal">
+    <div id="viewLogModal" class="modal detail-view-modal">
         <div class="modal-content">
             <div class="modal-header">
                 <h2>Patrol Log Details</h2>
@@ -1024,28 +1025,64 @@ require_once __DIR__ . '/db.php';
 
             const statusClassName = statusClass(log.status);
             const sentNote = log.campaign_forwarded_at
-                ? `<p><strong>Campaign:</strong> Sent ${escapeHtml(new Date(log.campaign_forwarded_at).toLocaleString())}${log.campaign_reference_id ? ' — Ref: ' + escapeHtml(log.campaign_reference_id) : ''}</p>`
+                ? `<div class="detail-row"><span class="detail-label">Campaign</span><span class="detail-value">Sent ${escapeHtml(new Date(log.campaign_forwarded_at).toLocaleString())}${log.campaign_reference_id ? ' — Ref: ' + escapeHtml(log.campaign_reference_id) : ''}</span></div>`
                 : '';
 
-            let photoHtml = '<p><strong>Documentation Photo:</strong><br><span class="log-photo-missing">No photo uploaded</span></p>';
+            let photoHtml = '';
             const photoSrc = String(log.documentation_photo || '');
             if (photoSrc.indexOf('data:image/') === 0) {
-                photoHtml = '<p><strong>Documentation Photo:</strong><br>'
+                photoHtml = '<div class="detail-row"><span class="detail-label">Documentation Photo</span>'
                     + '<img src="' + photoSrc + '" alt="Documentation photo" class="log-photo" '
-                    + 'onclick="viewPatrolPhoto(\'' + String(id).replace(/'/g, '') + '\')" title="Click to view full size"></p>';
+                    + 'onclick="viewPatrolPhoto(\'' + String(id).replace(/'/g, '') + '\')" title="Click to view full size"></div>';
+            } else {
+                photoHtml = '<div class="detail-row"><span class="detail-value" style="font-style: italic;">No photo uploaded</span></div>';
             }
 
             const content = `
-                <p><strong>Date:</strong> ${escapeHtml(log.date)}</p>
-                <p><strong>Time:</strong> ${escapeHtml(log.time)}</p>
-                <p><strong>Patrol:</strong> ${escapeHtml(log.personnel_name)}</p>
-                <p><strong>Route:</strong> ${escapeHtml(log.route)}</p>
-                <p><strong>Location:</strong> ${escapeHtml(log.location)}</p>
-                <p><strong>Status:</strong> <span class="status-badge ${statusClassName}">${escapeHtml(log.status)}</span></p>
-                <p><strong>Incidents:</strong> ${escapeHtml(log.incidents)}</p>
-                <p><strong>Details:</strong><br>${escapeHtml(log.details)}</p>
-                ${photoHtml}
-                ${sentNote}
+                <div class="detail-view-layout">
+                    <div class="detail-view-column">
+                        <h3 class="detail-section-title">Patrol Details</h3>
+                        <div class="detail-row inline">
+                            <span class="detail-label">Date:</span>
+                            <span class="detail-value">${escapeHtml(log.date)}</span>
+                        </div>
+                        <div class="detail-row inline">
+                            <span class="detail-label">Time:</span>
+                            <span class="detail-value">${escapeHtml(log.time)}</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">Patrol:</span>
+                            <span class="detail-value">${escapeHtml(log.personnel_name)}</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">Route:</span>
+                            <span class="detail-value">${escapeHtml(log.route)}</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">Location:</span>
+                            <span class="detail-value">${escapeHtml(log.location)}</span>
+                        </div>
+                        <div class="detail-row inline">
+                            <span class="detail-label">Status:</span>
+                            <span class="status-badge ${statusClassName}">${escapeHtml(log.status)}</span>
+                        </div>
+                    </div>
+                    <div class="detail-view-column">
+                        <h3 class="detail-section-title">Incident Notes</h3>
+                        <div class="detail-row">
+                            <span class="detail-label">Incidents:</span>
+                            <span class="detail-value">${escapeHtml(log.incidents)}</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">Details:</span>
+                            <div class="detail-value description">${escapeHtml(log.details)}</div>
+                        </div>
+                    </div>
+                    <div class="detail-view-full">
+                        ${photoHtml}
+                        ${sentNote}
+                    </div>
+                </div>
             `;
 
             document.getElementById('viewLogContent').innerHTML = content;
