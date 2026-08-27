@@ -345,6 +345,10 @@ require_once __DIR__ . '/db.php';
         .btn-add { padding: 0.75rem 1.5rem; background: var(--primary-color); color: #fff; border: none; border-radius: 8px; font-size: 0.95rem; font-weight: 600; cursor: pointer; transition: all 0.2s ease; display: inline-flex; align-items: center; gap: 0.5rem; white-space: nowrap; flex-shrink: 0; }
         .btn-add:hover { background: #4ca8a6; transform: translateY(-2px); box-shadow: 0 4px 8px rgba(76, 138, 137, 0.3); }
         .btn-add i { font-size: 1rem; }
+        .demo-banner { margin-bottom: 1rem; padding: 0.75rem 1rem; background: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 8px; color: #065f46; font-size: 0.92rem; line-height: 1.5; }
+        .empty-demo-panel { text-align: center; padding: 2rem 1rem; color: var(--text-secondary); }
+        .empty-demo-panel p { margin: 0 0 1rem 0; max-width: 36rem; margin-left: auto; margin-right: auto; line-height: 1.6; }
+        .empty-demo-panel .btn-add { margin-top: 0.25rem; }
         .table-container { overflow-x: auto; border-radius: 8px; border: 1px solid var(--border-color); }
         table { width: 100%; border-collapse: collapse; background: var(--card-bg); }
         thead { background: var(--tertiary-color); color: #fff; }
@@ -539,10 +543,14 @@ require_once __DIR__ . '/db.php';
         </header>
         <main class="content-area">
             <div class="page-content">
+                <div id="eventsDemoBanner" class="demo-banner" hidden></div>
                 <div class="search-container">
                     <div class="search-box">
                         <input type="text" id="searchInput" placeholder="Search events by ID, name, date, or type..." onkeyup="filterEvents()">
                     </div>
+                    <button type="button" class="btn-add" id="btnLoadDemoEvents" onclick="loadEventsDemo()">
+                        <i class="fas fa-database"></i> Load demo data
+                    </button>
                 </div>
                 <div class="table-container">
                     <table id="eventsTable">
@@ -591,6 +599,7 @@ require_once __DIR__ . '/db.php';
     </div>
 
     <script src="js/table-pagination.js"></script>
+    <script src="js/awareness-demo.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             const sidebar = document.getElementById('sidebar');
@@ -685,13 +694,26 @@ require_once __DIR__ . '/db.php';
             return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
         }
 
+        async function loadEventsDemo() {
+            await AwarenessDemo.loadAndReload(loadEvents, 'eventsDemoBanner', document.getElementById('btnLoadDemoEvents'));
+        }
+
         async function loadEvents() {
             const tbody = document.getElementById('eventsTableBody');
             try {
                 const res = await fetch('api/awareness_events.php?record_type=event');
                 const result = await res.json();
                 if (!result.success) throw new Error(result.message || 'Failed to load events');
-                renderEvents(result.data || []);
+                const data = result.data || [];
+                if (data.length === 0) {
+                    const seeded = await AwarenessDemo.tryAutoSeed('eventsDemoBanner');
+                    if (seeded) {
+                        return loadEvents();
+                    }
+                } else {
+                    AwarenessDemo.hideBanner('eventsDemoBanner');
+                }
+                renderEvents(data);
                 const urlId = new URLSearchParams(window.location.search).get('id');
                 if (urlId && eventData[urlId]) {
                     viewEvent(urlId);
@@ -728,9 +750,14 @@ require_once __DIR__ . '/db.php';
             const pageRows = eventsPager.slice(filtered);
 
             if (filtered.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--text-secondary);">'
-                    + (allEvents.length === 0 ? 'No events found.' : 'No events match your search.')
-                    + '</td></tr>';
+                if (allEvents.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="8"><div class="empty-demo-panel">'
+                        + '<p>No outreach events yet. Load realistic Brgy. San Agustin sample events — peace and order forums, neighborhood watch orientations, anti-drug symposiums, evacuation drills, and more.</p>'
+                        + '<button type="button" class="btn-add" onclick="loadEventsDemo()"><i class="fas fa-database"></i> Load demo data</button>'
+                        + '</div></td></tr>';
+                } else {
+                    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--text-secondary);">No events match your search.</td></tr>';
+                }
                 return;
             }
 

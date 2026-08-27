@@ -3,7 +3,7 @@
  * Sample data for awareness events (Event List) and event reports.
  *
  * CLI:  php api/seed_awareness_events_sample.php
- * Web:  logged-in Admin → /api/seed_awareness_events_sample.php
+ * Web:  called from Event List / Event Reports via "Load demo data" (admin session)
  */
 
 if (PHP_SAPI !== 'cli') {
