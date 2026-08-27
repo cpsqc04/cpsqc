@@ -1758,7 +1758,7 @@ require_once __DIR__ . '/db.php';
                     <td>
                         <div class="action-buttons">
                             <button class="btn-view" onclick="viewComplaint('${c.complaint_id}')">View</button>
-                            ${String(c.status || '').toLowerCase() !== 'resolved'
+                            ${(!alreadyForwarded && String(c.status || '').toLowerCase() !== 'resolved')
                                 ? `<button class="btn-manage" onclick="manageComplaint('${c.complaint_id}')">Assign Patrol</button>`
                                 : ''}
                         </div>
