@@ -73,7 +73,7 @@ if ($method === 'POST') {
             $complaintId = generateYearlySequentialId($pdo, 'complaints', 'complaint_id', 'COMP-');
         }
 
-        if ($complainantName === '' || $contactNumber === '' || $address === '' || $incidentDate === '' || $incidentTime === '' || $defendantName === '' || $defendantAddress === '' || $complaintType === '' || $description === '') {
+        if ($complainantName === '' || $contactNumber === '' || $address === '' || $incidentDate === '' || $incidentTime === '' || $complaintType === '' || $description === '') {
             http_response_code(400);
             echo json_encode(['success' => false, 'message' => 'Missing required fields.']);
             exit;

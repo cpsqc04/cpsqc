@@ -99,7 +99,7 @@ $autoOpenLogin = false;
                             Your details help officers contact you for updates and clarification.
                         </p>
                         <ul class="how-it-works">
-                            <li>Open the form and fill in complainant and defendant information.</li>
+                            <li>Open the form and fill in complainant details (defendant info is optional).</li>
                             <li>Describe what happened, including date, time, and complaint type.</li>
                             <li>Submit to get a complaint ID for tracking and review.</li>
                         </ul>
@@ -215,12 +215,12 @@ $autoOpenLogin = false;
                     <input id="complainantContact" name="complainantContact" type="tel" class="contact-number-input" placeholder="" required>
                 </div>
                 <div class="field">
-                    <label for="defendantName">Defendant's Name *</label>
-                    <input id="defendantName" name="defendantName" type="text" required>
+                    <label for="defendantName">Defendant's Name</label>
+                    <input id="defendantName" name="defendantName" type="text">
                 </div>
                 <div class="field">
-                    <label for="defendantAddress">Defendant's Address *</label>
-                    <input id="defendantAddress" name="defendantAddress" type="text" required>
+                    <label for="defendantAddress">Defendant's Address</label>
+                    <input id="defendantAddress" name="defendantAddress" type="text">
                 </div>
                 <div class="field">
                     <label for="defendantContact">Defendant's Contact Number</label>

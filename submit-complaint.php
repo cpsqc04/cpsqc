@@ -1305,13 +1305,13 @@ require_once __DIR__ . '/db.php';
                     </div>
 
                     <div class="form-group">
-                        <label for="defendantName">Defendant's Name *</label>
-                        <input type="text" id="defendantName" name="defendantName" required>
+                        <label for="defendantName">Defendant's Name</label>
+                        <input type="text" id="defendantName" name="defendantName">
                     </div>
 
                     <div class="form-group">
-                        <label for="defendantAddress">Defendant's Address *</label>
-                        <input type="text" id="defendantAddress" name="defendantAddress" required>
+                        <label for="defendantAddress">Defendant's Address</label>
+                        <input type="text" id="defendantAddress" name="defendantAddress">
                     </div>
 
                     <div class="form-group">
