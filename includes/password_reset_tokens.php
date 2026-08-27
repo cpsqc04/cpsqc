@@ -14,11 +14,47 @@ function ensurePasswordResetTokensTable(PDO $pdo): void
         token_hash VARCHAR(64) NOT NULL,
         expires_at DATETIME NOT NULL,
         used_at DATETIME DEFAULT NULL,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        INDEX idx_token_hash (token_hash),
-        INDEX idx_account (account_type, account_id),
-        INDEX idx_expires (expires_at)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+    $columns = [];
+    foreach ($pdo->query('SHOW COLUMNS FROM password_reset_tokens') as $row) {
+        $columns[$row['Field']] = true;
+    }
+
+    $alterations = [
+        'account_type' => 'ALTER TABLE password_reset_tokens ADD COLUMN account_type VARCHAR(20) NOT NULL DEFAULT \'admin\' AFTER id',
+        'account_id' => 'ALTER TABLE password_reset_tokens ADD COLUMN account_id INT NOT NULL DEFAULT 0 AFTER account_type',
+        'email' => 'ALTER TABLE password_reset_tokens ADD COLUMN email VARCHAR(255) NOT NULL DEFAULT \'\' AFTER account_id',
+        'token_hash' => 'ALTER TABLE password_reset_tokens ADD COLUMN token_hash VARCHAR(64) NOT NULL DEFAULT \'\' AFTER email',
+        'expires_at' => 'ALTER TABLE password_reset_tokens ADD COLUMN expires_at DATETIME NULL AFTER token_hash',
+        'used_at' => 'ALTER TABLE password_reset_tokens ADD COLUMN used_at DATETIME DEFAULT NULL AFTER expires_at',
+        'created_at' => 'ALTER TABLE password_reset_tokens ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP AFTER used_at',
+    ];
+
+    foreach ($alterations as $column => $sql) {
+        if (!isset($columns[$column])) {
+            $pdo->exec($sql);
+        }
+    }
+
+    try {
+        $indexes = [];
+        foreach ($pdo->query('SHOW INDEX FROM password_reset_tokens') as $row) {
+            $indexes[$row['Key_name']] = true;
+        }
+        if (empty($indexes['idx_token_hash'])) {
+            $pdo->exec('ALTER TABLE password_reset_tokens ADD INDEX idx_token_hash (token_hash)');
+        }
+        if (empty($indexes['idx_account'])) {
+            $pdo->exec('ALTER TABLE password_reset_tokens ADD INDEX idx_account (account_type, account_id)');
+        }
+        if (empty($indexes['idx_expires'])) {
+            $pdo->exec('ALTER TABLE password_reset_tokens ADD INDEX idx_expires (expires_at)');
+        }
+    } catch (PDOException $e) {
+        // Indexes are optional for functionality.
+    }
 }
 
 /**
@@ -35,13 +71,13 @@ function createPasswordResetToken(PDO $pdo, string $accountType, int $accountId,
     }
 
     // Invalidate prior unused tokens for this account.
-    $invalidate = $pdo->prepare("
+    $invalidate = $pdo->prepare('
         UPDATE password_reset_tokens
         SET used_at = NOW()
         WHERE account_type = :account_type
           AND account_id = :account_id
           AND used_at IS NULL
-    ");
+    ');
     $invalidate->execute([
         ':account_type' => $accountType,
         ':account_id' => $accountId,
@@ -51,10 +87,10 @@ function createPasswordResetToken(PDO $pdo, string $accountType, int $accountId,
     $tokenHash = hash('sha256', $rawToken);
     $expiresAt = date('Y-m-d H:i:s', time() + max(5, $ttlMinutes) * 60);
 
-    $insert = $pdo->prepare("
+    $insert = $pdo->prepare('
         INSERT INTO password_reset_tokens (account_type, account_id, email, token_hash, expires_at)
         VALUES (:account_type, :account_id, :email, :token_hash, :expires_at)
-    ");
+    ');
     $insert->execute([
         ':account_type' => $accountType,
         ':account_id' => $accountId,
@@ -78,14 +114,14 @@ function findValidPasswordResetToken(PDO $pdo, string $rawToken): ?array
     }
 
     $tokenHash = hash('sha256', $rawToken);
-    $stmt = $pdo->prepare("
+    $stmt = $pdo->prepare('
         SELECT id, account_type, account_id, email
         FROM password_reset_tokens
         WHERE token_hash = :token_hash
           AND used_at IS NULL
           AND expires_at > NOW()
         LIMIT 1
-    ");
+    ');
     $stmt->execute([':token_hash' => $tokenHash]);
     $row = $stmt->fetch(PDO::FETCH_ASSOC);
     if (!$row) {

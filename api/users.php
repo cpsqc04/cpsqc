@@ -432,13 +432,33 @@ if ($method === 'GET') {
         }
 
         try {
-            $rawToken = createPasswordResetToken($pdo, $parsed['type'], $parsed['id'], $email, 60);
+            $accountType = $parsed['type'] !== ''
+                ? $parsed['type']
+                : (string) ($user['account_type'] ?? '');
+            $accountId = $parsed['id'] > 0
+                ? $parsed['id']
+                : (int) ($user['numeric_id'] ?? 0);
+
+            if (!in_array($accountType, ['admin', 'bpso', 'nw'], true) || $accountId <= 0) {
+                ob_clean();
+                http_response_code(400);
+                echo json_encode(['success' => false, 'error' => 'Unsupported account type for password reset.']);
+                exit;
+            }
+
+            $rawToken = createPasswordResetToken($pdo, $accountType, $accountId, $email, 60);
             $resetUrl = buildPasswordResetUrl($rawToken);
-            $portal = $parsed['type'] === 'bpso' ? 'bpso' : ($parsed['type'] === 'nw' ? 'nw' : 'admin');
+            $portal = $accountType === 'bpso' ? 'bpso' : ($accountType === 'nw' ? 'nw' : 'admin');
+            if (!function_exists('sendPasswordResetLinkEmail')) {
+                ob_clean();
+                http_response_code(500);
+                echo json_encode(['success' => false, 'error' => 'Password reset email helper is missing on the server. Redeploy the latest code.']);
+                exit;
+            }
             if (!sendPasswordResetLinkEmail($email, $resetUrl, $portal, (string) ($user['full_name'] ?? ''))) {
                 ob_clean();
                 http_response_code(500);
-                echo json_encode(['success' => false, 'error' => 'Failed to send reset email. Check mail configuration.']);
+                echo json_encode(['success' => false, 'error' => 'Failed to send reset email. Check mail configuration in .env (MAIL_USERNAME / MAIL_PASSWORD).']);
                 exit;
             }
 
@@ -453,7 +473,10 @@ if ($method === 'GET') {
             error_log('send_reset_link failed: ' . $e->getMessage());
             ob_clean();
             http_response_code(500);
-            echo json_encode(['success' => false, 'error' => 'Failed to create reset link.']);
+            echo json_encode([
+                'success' => false,
+                'error' => 'Failed to create reset link: ' . $e->getMessage(),
+            ]);
         }
         exit;
     }
