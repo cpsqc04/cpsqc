@@ -105,10 +105,13 @@ function buildCctvEvidencePayload(array $request, array $segments): array
     $requestId = trim((string) ($request['request_id'] ?? ''));
     $totalSize = 0;
     $segmentPayload = [];
+    $videoUrls = [];
 
     foreach ($segments as $segment) {
         $sizeBytes = (int) ($segment['size_bytes'] ?? 0);
         $totalSize += $sizeBytes;
+        $downloadUrl = buildCctvEvidenceDownloadUrl($requestId, $segment['filename'], $config['api_key']);
+        $videoUrls[] = $downloadUrl;
         $segmentPayload[] = [
             'filename' => $segment['filename'],
             'start_at' => $segment['start_at'],
@@ -117,14 +120,23 @@ function buildCctvEvidencePayload(array $request, array $segments): array
             'size_label' => $segment['size_label'] ?? formatBytes($sizeBytes),
             'playable' => (bool) ($segment['playable'] ?? false),
             'status' => $segment['status'] ?? 'ready',
-            'download_url' => buildCctvEvidenceDownloadUrl($requestId, $segment['filename'], $config['api_key']),
+            'download_url' => $downloadUrl,
+            // Incident Reporting (cctv_footage_receive.php) requires these aliases.
+            'cctv_url' => $downloadUrl,
+            'video_url' => $downloadUrl,
         ];
     }
+
+    $primaryUrl = $videoUrls[0] ?? '';
 
     return [
         'source' => 'alertaraqc',
         'record_type' => 'cctv_evidence',
         'source_request_id' => $requestId,
+        // Required by Incident Reporting cctv_footage_receive.php
+        'cctv_url' => $primaryUrl,
+        'video_url' => $primaryUrl,
+        'video_urls' => $videoUrls,
         'request' => [
             'requesting_agency' => $request['requesting_agency'] ?? '',
             'contact_person' => $request['contact_person'] ?? '',
@@ -151,6 +163,9 @@ function buildCctvEvidencePayload(array $request, array $segments): array
             'segment_count' => count($segmentPayload),
             'total_size_bytes' => $totalSize,
             'total_size_label' => formatBytes($totalSize),
+            'cctv_url' => $primaryUrl,
+            'video_url' => $primaryUrl,
+            'video_urls' => $videoUrls,
             'segments' => $segmentPayload,
         ],
         'metadata' => [

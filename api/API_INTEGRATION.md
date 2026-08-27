@@ -472,6 +472,8 @@ or
   "source": "alertaraqc",
   "record_type": "cctv_evidence",
   "source_request_id": "CCTV-REQ-2026-001",
+  "cctv_url": "https://policy.alertaraqc.com/api/cctv_evidence_download.php?request_id=CCTV-REQ-2026-001&file=recording_20260711_151655.mp4&api_key=YOUR_KEY",
+  "video_url": "https://policy.alertaraqc.com/api/cctv_evidence_download.php?request_id=CCTV-REQ-2026-001&file=recording_20260711_151655.mp4&api_key=YOUR_KEY",
   "request": {
     "requesting_agency": "Barangay San Agustin Legal Office",
     "case_reference": "CASE-2026-014",
@@ -487,10 +489,14 @@ or
   "footage": {
     "segment_count": 1,
     "total_size_bytes": 52428800,
+    "cctv_url": "https://policy.alertaraqc.com/api/cctv_evidence_download.php?...",
+    "video_url": "https://policy.alertaraqc.com/api/cctv_evidence_download.php?...",
     "segments": [
       {
         "filename": "recording_20260711_151655.mp4",
-        "download_url": "http://localhost/cpsqc-main/api/cctv_evidence_download.php?request_id=CCTV-REQ-2026-001&file=recording_20260711_151655.mp4&api_key=YOUR_KEY"
+        "download_url": "https://policy.alertaraqc.com/api/cctv_evidence_download.php?request_id=CCTV-REQ-2026-001&file=recording_20260711_151655.mp4&api_key=YOUR_KEY",
+        "cctv_url": "https://policy.alertaraqc.com/api/cctv_evidence_download.php?request_id=CCTV-REQ-2026-001&file=recording_20260711_151655.mp4&api_key=YOUR_KEY",
+        "video_url": "https://policy.alertaraqc.com/api/cctv_evidence_download.php?request_id=CCTV-REQ-2026-001&file=recording_20260711_151655.mp4&api_key=YOUR_KEY"
       }
     ]
   }
