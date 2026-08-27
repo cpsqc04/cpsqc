@@ -501,7 +501,7 @@ function sendPasswordResetLinkEmail(string $email, string $resetUrl, string $por
                 <p>Hello {$safeName},</p>
                 <p>An administrator requested a password reset for your account. Click the button below to choose a new password:</p>
                 <div class='cta'><a href='{$safeUrl}'>Reset Password</a></div>
-                <p>This link expires in 60 minutes and can be used only once.</p>
+                <p>This link expires in 10 minutes and can be used only once.</p>
                 <p class='disclaimer'>If you did not expect this email, please contact your barangay administrator.</p>
             </div>
             <div class='footer'>

@@ -269,7 +269,7 @@ function ensurePasswordResetTokensTable(PDO $pdo): void
 /**
  * Create a one-time reset token and return the raw token (for email URL).
  */
-function createPasswordResetToken(PDO $pdo, string $accountType, int $accountId, string $email, int $ttlMinutes = 60): string
+function createPasswordResetToken(PDO $pdo, string $accountType, int $accountId, string $email, int $ttlMinutes = 10): string
 {
     ensurePasswordResetTokensTable($pdo);
 

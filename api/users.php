@@ -446,7 +446,7 @@ if ($method === 'GET') {
                 exit;
             }
 
-            $rawToken = createPasswordResetToken($pdo, $accountType, $accountId, $email, 60);
+            $rawToken = createPasswordResetToken($pdo, $accountType, $accountId, $email, 10);
             $resetUrl = buildPasswordResetUrl($rawToken);
             $portal = $accountType === 'bpso' ? 'bpso' : ($accountType === 'nw' ? 'nw' : 'admin');
             if (!function_exists('sendPasswordResetLinkEmail')) {
