@@ -304,6 +304,9 @@
     function closeEligibilityModal() {
         var modal = $('eligibilityModal');
         if (!modal) return;
+        if (typeof clearRequiredFieldErrors === 'function') {
+            clearRequiredFieldErrors(modal);
+        }
         modal.classList.remove('open');
         resetEligibilityForm();
         if (![].slice.call(document.querySelectorAll('.modal-overlay.open')).length) {
@@ -507,6 +510,9 @@
     function closeRegisterModal() {
         var modal = $('registerModal');
         if (!modal) return;
+        if (typeof clearRequiredFieldErrors === 'function') {
+            clearRequiredFieldErrors(modal);
+        }
         modal.classList.remove('open');
         var form = $('memberApplicationForm');
         if (form) form.reset();

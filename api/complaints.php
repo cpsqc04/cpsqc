@@ -266,7 +266,7 @@ if ($method === 'POST') {
                 http_response_code(400);
                 echo json_encode([
                     'success' => false,
-                    'message' => 'This complaint was already forwarded to Incident Logging.',
+                    'message' => 'This complaint was already forwarded to the Digital Blotter System.',
                     'data' => [
                         'forwarded_at' => $complaint['forwarded_at'],
                         'blotter_reference_id' => $complaint['blotter_reference_id'] ?? '',
@@ -288,12 +288,12 @@ if ($method === 'POST') {
             $timestamp = date('Y-m-d H:i:s');
             $referenceId = trim($forwardResult['blotter_reference_id'] ?? '');
             $referenceNote = $referenceId !== '' ? " (Ref: {$referenceId})" : '';
-            $noteEntry = "[{$timestamp}] Forwarded to Incident Logging{$referenceNote}.";
+            $noteEntry = "[{$timestamp}] Forwarded to Digital Blotter System{$referenceNote}.";
             $updatedNotes = trim(($complaint['notes'] ?? '') . "\n\n" . $noteEntry);
 
             $updateStmt = $pdo->prepare('UPDATE complaints SET status = :status, forwarded_at = :forwarded_at, blotter_reference_id = :blotter_reference_id, notes = :notes WHERE id = :id');
             $updateStmt->execute([
-                ':status' => 'Forwarded to Incident Logging',
+                ':status' => 'Forwarded to Digital Blotter',
                 ':forwarded_at' => $timestamp,
                 ':blotter_reference_id' => $referenceId !== '' ? $referenceId : null,
                 ':notes' => $updatedNotes,
@@ -302,9 +302,9 @@ if ($method === 'POST') {
 
             echo json_encode([
                 'success' => true,
-                'message' => $forwardResult['message'] ?? 'Complaint forwarded to Incident Logging.',
+                'message' => $forwardResult['message'] ?? 'Complaint forwarded to Digital Blotter System.',
                 'data' => [
-                    'status' => 'Forwarded to Incident Logging',
+                    'status' => 'Forwarded to Digital Blotter',
                     'forwarded_at' => $timestamp,
                     'blotter_reference_id' => $referenceId,
                 ],
@@ -337,7 +337,7 @@ if ($method === 'POST') {
             exit;
         }
 
-        $allowedStatuses = ['Pending', 'Processing', 'Resolved', 'Rejected', 'Forwarded to Digital Blotter', 'Forwarded to Incident Logging'];
+        $allowedStatuses = ['Pending', 'Processing', 'Resolved', 'Rejected', 'Forwarded to Digital Blotter'];
         if (!in_array($status, $allowedStatuses, true)) {
             http_response_code(400);
             echo json_encode(['success' => false, 'message' => 'Invalid status value.']);
@@ -354,9 +354,9 @@ if ($method === 'POST') {
                 exit;
             }
 
-            if (!empty($current['forwarded_at']) && $status !== 'Forwarded to Digital Blotter' && $status !== 'Forwarded to Incident Logging') {
+            if (!empty($current['forwarded_at']) && $status !== 'Forwarded to Digital Blotter') {
                 http_response_code(400);
-                echo json_encode(['success' => false, 'message' => 'Status cannot be changed after forwarding to Incident Logging.']);
+                echo json_encode(['success' => false, 'message' => 'Status cannot be changed after forwarding to the Digital Blotter.']);
                 exit;
             }
 

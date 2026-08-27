@@ -139,11 +139,158 @@ $autoOpenLogin = !empty($autoOpenLogin);
         function closeLoginModal() {
             const modal = document.getElementById('loginModal');
             if (!modal) return;
+            clearRequiredFieldErrors(modal);
             modal.classList.remove('open');
             if (![...document.querySelectorAll('.modal-overlay.open')].length) {
                 document.body.style.overflow = '';
             }
         }
+
+        function clearRequiredFieldErrors(modal) {
+            if (!modal) return;
+            modal.querySelectorAll('.js-required-error').forEach((el) => el.remove());
+            modal.querySelectorAll('.js-required-icon').forEach((el) => el.remove());
+            modal.querySelectorAll('.js-required-tip').forEach((el) => el.remove());
+            modal.querySelectorAll('.input-invalid').forEach((el) => {
+                el.classList.remove('input-invalid');
+            });
+            modal.querySelectorAll('.has-required-warning').forEach((el) => {
+                el.classList.remove('has-required-warning');
+            });
+        }
+
+        function isRequiredControlEmpty(el) {
+            if (!el || el.disabled) return false;
+            const type = (el.type || '').toLowerCase();
+            if (type === 'checkbox' || type === 'radio') {
+                if (!el.required) return false;
+                if (type === 'radio') {
+                    const group = el.form
+                        ? el.form.querySelectorAll('input[type="radio"][name="' + CSS.escape(el.name) + '"]')
+                        : [el];
+                    return ![...group].some((r) => r.checked);
+                }
+                return !el.checked;
+            }
+            if (type === 'file') {
+                return el.required && !(el.files && el.files.length);
+            }
+            return el.required && !String(el.value || '').trim();
+        }
+
+        function ensureRequiredIconHost(el) {
+            const eligibilityChoices = el.closest('.eligibility-choices');
+            if (eligibilityChoices) {
+                eligibilityChoices.classList.add('field-input-wrap');
+                const item = eligibilityChoices.closest('.eligibility-item');
+                if (item) item.classList.add('has-required-warning');
+                return eligibilityChoices;
+            }
+
+            const existing = el.closest('.field-input-wrap');
+            if (existing) return existing;
+
+            const wrap = document.createElement('div');
+            wrap.className = 'field-input-wrap';
+            el.parentNode.insertBefore(wrap, el);
+            wrap.appendChild(el);
+            return wrap;
+        }
+
+        function attachRequiredIcon(host, focusEl) {
+            host.classList.add('has-required-warning');
+            let btn = host.querySelector(':scope > .js-required-icon');
+            let tip = host.querySelector(':scope > .js-required-tip');
+            if (!btn) {
+                btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'field-required-icon js-required-icon';
+                btn.setAttribute('aria-label', 'Fill out this field');
+                btn.innerHTML = '<i class="fas fa-exclamation-circle" aria-hidden="true"></i>';
+                tip = document.createElement('span');
+                tip.className = 'field-required-tip js-required-tip';
+                tip.hidden = true;
+                tip.textContent = 'Fill out this field';
+                btn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const willShow = tip.hidden;
+                    document.querySelectorAll('.js-required-tip').forEach((t) => { t.hidden = true; });
+                    tip.hidden = !willShow;
+                });
+                host.appendChild(btn);
+                host.appendChild(tip);
+            }
+            tip.hidden = true;
+            if (focusEl) focusEl.classList.add('input-invalid');
+            return btn;
+        }
+
+        function clearRequiredWarningForControl(el) {
+            if (!el) return;
+            el.classList.remove('input-invalid');
+            const host = el.closest('.field-input-wrap') || el.closest('.eligibility-choices');
+            if (!host) return;
+            const stillEmpty = [...host.querySelectorAll('input, select, textarea')].some(isRequiredControlEmpty);
+            if (stillEmpty) return;
+            host.classList.remove('has-required-warning');
+            const item = host.closest('.eligibility-item');
+            if (item) item.classList.remove('has-required-warning');
+            host.querySelectorAll('.js-required-icon, .js-required-tip').forEach((n) => n.remove());
+        }
+
+        /** Keep locked modals open on outside click; show ! icon on empty required fields. */
+        function promptRequiredFieldsInModal(modal) {
+            if (!modal || !modal.classList.contains('open')) return false;
+            const form = modal.querySelector('form');
+            if (!form) return false;
+
+            clearRequiredFieldErrors(modal);
+            let firstInvalid = null;
+            const seenRadio = new Set();
+
+            form.querySelectorAll('input, select, textarea').forEach((el) => {
+                if (el.type === 'hidden') return;
+                const type = (el.type || '').toLowerCase();
+                if (type === 'radio') {
+                    if (seenRadio.has(el.name)) return;
+                    seenRadio.add(el.name);
+                }
+                if (!isRequiredControlEmpty(el)) return;
+
+                const host = ensureRequiredIconHost(el);
+                attachRequiredIcon(host, el);
+                if (!firstInvalid) firstInvalid = el;
+            });
+
+            if (firstInvalid) {
+                try { firstInvalid.focus({ preventScroll: false }); } catch (e) { firstInvalid.focus(); }
+            }
+            return true;
+        }
+
+        function bindRequiredFieldClear(modal) {
+            if (!modal || modal.dataset.requiredClearBound === '1') return;
+            modal.dataset.requiredClearBound = '1';
+            const clearIfFilled = (el) => {
+                if (!el) return;
+                if (isRequiredControlEmpty(el)) return;
+                clearRequiredWarningForControl(el);
+            };
+            modal.addEventListener('input', (e) => clearIfFilled(e.target));
+            modal.addEventListener('change', (e) => clearIfFilled(e.target));
+            document.addEventListener('click', (e) => {
+                if (!modal.classList.contains('open')) return;
+                if (e.target.closest('.js-required-icon') || e.target.closest('.js-required-tip')) return;
+                modal.querySelectorAll('.js-required-tip').forEach((t) => { t.hidden = true; });
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            bindRequiredFieldClear(document.getElementById('loginModal'));
+            bindRequiredFieldClear(document.getElementById('registerModal'));
+            bindRequiredFieldClear(document.getElementById('eligibilityModal'));
+        });
 
         function openLegalModal(key, event) {
             if (event) {
@@ -382,30 +529,45 @@ $autoOpenLogin = !empty($autoOpenLogin);
         });
 
         window.addEventListener('click', (event) => {
-            if (event.target === document.getElementById('loginModal')) closeLoginModal();
+            const loginModal = document.getElementById('loginModal');
+            const registerModal = document.getElementById('registerModal');
+            const eligibilityModal = document.getElementById('eligibilityModal');
+            // Locked modals: outside click does NOT close — show required-field icons instead.
+            if (event.target === loginModal) {
+                promptRequiredFieldsInModal(loginModal);
+                return;
+            }
+            if (event.target === registerModal) {
+                promptRequiredFieldsInModal(registerModal);
+                return;
+            }
+            if (event.target === eligibilityModal) {
+                promptRequiredFieldsInModal(eligibilityModal);
+                return;
+            }
             if (event.target === document.getElementById('legalModal')) closeLegalModal();
             if (event.target === document.getElementById('forgotPasswordModal')) closeForgotPasswordModal();
             if (event.target === document.getElementById('successModal')) closeSuccessModal();
-            if (event.target === document.getElementById('registerModal') && typeof closeRegisterModal === 'function') {
-                closeRegisterModal();
-            }
-            if (event.target === document.getElementById('eligibilityModal') && typeof closeEligibilityModal === 'function') {
-                closeEligibilityModal();
-            }
             if (event.target === document.getElementById('registrationSuccessModal') && typeof closeRegistrationSuccessModal === 'function') {
                 closeRegistrationSuccessModal();
             }
         });
         document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') {
-                closeLoginModal();
-                closeLegalModal();
-                closeForgotPasswordModal();
-                closeSuccessModal();
-                if (typeof closeRegisterModal === 'function') closeRegisterModal();
-                if (typeof closeEligibilityModal === 'function') closeEligibilityModal();
-                if (typeof closeRegistrationSuccessModal === 'function') closeRegistrationSuccessModal();
+            if (e.key !== 'Escape') return;
+            // Login / Register / Eligibility stay open unless closed via X or Cancel.
+            const loginOpen = document.getElementById('loginModal')?.classList.contains('open');
+            const registerOpen = document.getElementById('registerModal')?.classList.contains('open');
+            const eligibilityOpen = document.getElementById('eligibilityModal')?.classList.contains('open');
+            if (loginOpen || registerOpen || eligibilityOpen) {
+                if (loginOpen) promptRequiredFieldsInModal(document.getElementById('loginModal'));
+                if (registerOpen) promptRequiredFieldsInModal(document.getElementById('registerModal'));
+                if (eligibilityOpen) promptRequiredFieldsInModal(document.getElementById('eligibilityModal'));
+                return;
             }
+            closeLegalModal();
+            closeForgotPasswordModal();
+            closeSuccessModal();
+            if (typeof closeRegistrationSuccessModal === 'function') closeRegistrationSuccessModal();
         });
     </script>
 </body>

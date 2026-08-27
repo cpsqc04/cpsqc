@@ -1544,6 +1544,80 @@ $autoOpenSetPassword = !empty($showSetPasswordModal);
             color: rgba(255,255,255,0.78);
             font-weight: 500;
         }
+        .field-error {
+            margin: 0.35rem 0 0;
+            font-size: 0.86rem;
+            color: #f87171;
+            line-height: 1.4;
+        }
+        .field-error[hidden] { display: none; }
+        .field-input-wrap {
+            position: relative;
+            display: grid;
+            width: 100%;
+        }
+        .field-input-wrap > input,
+        .field-input-wrap > select,
+        .field-input-wrap > textarea {
+            width: 100%;
+            padding-right: 2.6rem;
+            box-sizing: border-box;
+        }
+        .field-required-icon {
+            position: absolute;
+            top: 50%;
+            right: 0.7rem;
+            transform: translateY(-50%);
+            width: 1.5rem;
+            height: 1.5rem;
+            border: 0;
+            padding: 0;
+            margin: 0;
+            background: transparent;
+            color: #f87171;
+            font-size: 1.05rem;
+            line-height: 1;
+            cursor: pointer;
+            z-index: 2;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .field-required-icon:hover,
+        .field-required-icon:focus-visible {
+            color: #fecaca;
+            outline: none;
+        }
+        .field-required-tip {
+            position: absolute;
+            right: 0.35rem;
+            bottom: calc(100% + 0.4rem);
+            z-index: 5;
+            max-width: 220px;
+            padding: 0.45rem 0.65rem;
+            border-radius: 8px;
+            background: #7f1d1d;
+            color: #fff;
+            font-size: 0.8rem;
+            line-height: 1.35;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+            white-space: nowrap;
+        }
+        .field-required-tip::after {
+            content: '';
+            position: absolute;
+            top: 100%;
+            right: 0.85rem;
+            border: 6px solid transparent;
+            border-top-color: #7f1d1d;
+        }
+        .field-required-tip[hidden] { display: none !important; }
+        .field input.input-invalid,
+        .field select.input-invalid,
+        .field textarea.input-invalid {
+            border-color: rgba(248, 113, 113, 0.75);
+            box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.18);
+        }
         .login-actions {
             display: flex;
             justify-content: space-between;
@@ -2222,16 +2296,160 @@ $autoOpenSetPassword = !empty($showSetPasswordModal);
         };
 
         function openLoginModal() {
-            document.getElementById('loginModal').classList.add('open');
+            const modal = document.getElementById('loginModal');
+            if (!modal) return;
+            modal.classList.add('open');
             document.body.style.overflow = 'hidden';
             const email = document.getElementById('email');
             if (email) setTimeout(() => email.focus(), 120);
         }
         function closeLoginModal() {
-            document.getElementById('loginModal').classList.remove('open');
+            const modal = document.getElementById('loginModal');
+            if (!modal) return;
+            clearRequiredFieldErrors(modal);
+            modal.classList.remove('open');
             if (![...document.querySelectorAll('.modal-overlay.open')].length) {
                 document.body.style.overflow = '';
             }
+        }
+
+        function clearRequiredFieldErrors(modal) {
+            if (!modal) return;
+            modal.querySelectorAll('.js-required-error').forEach((el) => el.remove());
+            modal.querySelectorAll('.js-required-icon').forEach((el) => el.remove());
+            modal.querySelectorAll('.js-required-tip').forEach((el) => el.remove());
+            modal.querySelectorAll('.input-invalid').forEach((el) => {
+                el.classList.remove('input-invalid');
+            });
+            modal.querySelectorAll('.has-required-warning').forEach((el) => {
+                el.classList.remove('has-required-warning');
+            });
+        }
+
+        function isRequiredControlEmpty(el) {
+            if (!el || el.disabled) return false;
+            const type = (el.type || '').toLowerCase();
+            if (type === 'checkbox' || type === 'radio') {
+                if (!el.required) return false;
+                if (type === 'radio') {
+                    const group = el.form
+                        ? el.form.querySelectorAll('input[type="radio"][name="' + CSS.escape(el.name) + '"]')
+                        : [el];
+                    return ![...group].some((r) => r.checked);
+                }
+                return !el.checked;
+            }
+            if (type === 'file') {
+                return el.required && !(el.files && el.files.length);
+            }
+            return el.required && !String(el.value || '').trim();
+        }
+
+        function ensureRequiredIconHost(el) {
+            const eligibilityChoices = el.closest('.eligibility-choices');
+            if (eligibilityChoices) {
+                eligibilityChoices.classList.add('field-input-wrap');
+                const item = eligibilityChoices.closest('.eligibility-item');
+                if (item) item.classList.add('has-required-warning');
+                return eligibilityChoices;
+            }
+
+            const existing = el.closest('.field-input-wrap');
+            if (existing) return existing;
+
+            const wrap = document.createElement('div');
+            wrap.className = 'field-input-wrap';
+            el.parentNode.insertBefore(wrap, el);
+            wrap.appendChild(el);
+            return wrap;
+        }
+
+        function attachRequiredIcon(host, focusEl) {
+            host.classList.add('has-required-warning');
+            let btn = host.querySelector(':scope > .js-required-icon');
+            let tip = host.querySelector(':scope > .js-required-tip');
+            if (!btn) {
+                btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'field-required-icon js-required-icon';
+                btn.setAttribute('aria-label', 'Fill out this field');
+                btn.innerHTML = '<i class="fas fa-exclamation-circle" aria-hidden="true"></i>';
+                tip = document.createElement('span');
+                tip.className = 'field-required-tip js-required-tip';
+                tip.hidden = true;
+                tip.textContent = 'Fill out this field';
+                btn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const willShow = tip.hidden;
+                    document.querySelectorAll('.js-required-tip').forEach((t) => { t.hidden = true; });
+                    tip.hidden = !willShow;
+                });
+                host.appendChild(btn);
+                host.appendChild(tip);
+            }
+            tip.hidden = true;
+            if (focusEl) focusEl.classList.add('input-invalid');
+            return btn;
+        }
+
+        function clearRequiredWarningForControl(el) {
+            if (!el) return;
+            el.classList.remove('input-invalid');
+            const host = el.closest('.field-input-wrap') || el.closest('.eligibility-choices');
+            if (!host) return;
+            const stillEmpty = [...host.querySelectorAll('input, select, textarea')].some(isRequiredControlEmpty);
+            if (stillEmpty) return;
+            host.classList.remove('has-required-warning');
+            const item = host.closest('.eligibility-item');
+            if (item) item.classList.remove('has-required-warning');
+            host.querySelectorAll('.js-required-icon, .js-required-tip').forEach((n) => n.remove());
+        }
+
+        function promptRequiredFieldsInModal(modal) {
+            if (!modal || !modal.classList.contains('open')) return false;
+            const form = modal.querySelector('form');
+            if (!form) return false;
+
+            clearRequiredFieldErrors(modal);
+            let firstInvalid = null;
+            const seenRadio = new Set();
+
+            form.querySelectorAll('input, select, textarea').forEach((el) => {
+                if (el.type === 'hidden') return;
+                const type = (el.type || '').toLowerCase();
+                if (type === 'radio') {
+                    if (seenRadio.has(el.name)) return;
+                    seenRadio.add(el.name);
+                }
+                if (!isRequiredControlEmpty(el)) return;
+
+                const host = ensureRequiredIconHost(el);
+                attachRequiredIcon(host, el);
+                if (!firstInvalid) firstInvalid = el;
+            });
+
+            if (firstInvalid) {
+                try { firstInvalid.focus({ preventScroll: false }); } catch (e) { firstInvalid.focus(); }
+            }
+            return true;
+        }
+
+        function bindRequiredFieldClear(modal) {
+            if (!modal || modal.dataset.requiredClearBound === '1') return;
+            modal.dataset.requiredClearBound = '1';
+            const clearIfFilled = (el) => {
+                if (!el) return;
+                if (isRequiredControlEmpty(el)) return;
+                clearRequiredWarningForControl(el);
+            };
+            modal.addEventListener('input', (e) => clearIfFilled(e.target));
+            modal.addEventListener('change', (e) => clearIfFilled(e.target));
+            document.addEventListener('click', (e) => {
+                if (!modal.classList.contains('open')) return;
+                if (e.target.closest('.js-required-icon') || e.target.closest('.js-required-tip')) return;
+                modal.querySelectorAll('.js-required-tip').forEach((t) => { t.hidden = true; });
+            });
         }
 
         function openLegalModal(key) {
@@ -2460,21 +2678,29 @@ $autoOpenSetPassword = !empty($showSetPasswordModal);
                 openForgotPasswordModal();
                 window.history.replaceState({}, document.title, window.location.pathname);
             }
+            bindRequiredFieldClear(document.getElementById('loginModal'));
         });
 
         window.addEventListener('click', (event) => {
-            if (event.target === document.getElementById('loginModal')) closeLoginModal();
+            const loginModal = document.getElementById('loginModal');
+            if (event.target === loginModal) {
+                promptRequiredFieldsInModal(loginModal);
+                return;
+            }
             if (event.target === document.getElementById('legalModal')) closeLegalModal();
             if (event.target === document.getElementById('forgotPasswordModal')) closeForgotPasswordModal();
             if (event.target === document.getElementById('successModal')) closeSuccessModal();
         });
         document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') {
-                closeLoginModal();
-                closeLegalModal();
-                closeForgotPasswordModal();
-                closeSuccessModal();
+            if (e.key !== 'Escape') return;
+            const loginModal = document.getElementById('loginModal');
+            if (loginModal && loginModal.classList.contains('open')) {
+                promptRequiredFieldsInModal(loginModal);
+                return;
             }
+            closeLegalModal();
+            closeForgotPasswordModal();
+            closeSuccessModal();
         });
     </script>
 </body>

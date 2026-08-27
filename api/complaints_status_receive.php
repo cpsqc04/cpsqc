@@ -53,7 +53,7 @@ $complaintId = trim($input['complaint_id'] ?? $input['source_complaint_id'] ?? $
 $status = trim($input['status'] ?? '');
 $notes = trim($input['notes'] ?? $input['status_description'] ?? '');
 
-$allowedStatuses = ['Pending', 'Processing', 'Resolved', 'Rejected', 'Forwarded to Digital Blotter', 'Forwarded to Incident Logging'];
+$allowedStatuses = ['Pending', 'Processing', 'Resolved', 'Rejected', 'Forwarded to Digital Blotter'];
 
 if ($complaintId === '') {
     http_response_code(400);

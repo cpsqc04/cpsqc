@@ -6,23 +6,8 @@
 const RECORDING_MIN_BYTES = 1024;
 const RECORDING_CHUNK_SECONDS = 1800; // 30-minute Playback segments
 const RECORDING_RETENTION_DAYS = 7;
-// 20 GB default — 2 GB filled in ~1 day of continuous upload and wiped older days via FIFO.
-const RECORDING_MAX_STORAGE_BYTES = 21474836480;
+const RECORDING_MAX_STORAGE_BYTES = 2147483648; // 2 GB FIFO cap
 const RECORDINGS_DIR_NAME = 'recordings';
-
-function recordingRetentionDays(): int
-{
-    $raw = $_ENV['CCTV_RECORDING_RETENTION_DAYS'] ?? getenv('CCTV_RECORDING_RETENTION_DAYS');
-    $days = is_numeric($raw) ? (int) $raw : RECORDING_RETENTION_DAYS;
-    return max(1, $days > 0 ? $days : RECORDING_RETENTION_DAYS);
-}
-
-function recordingMaxStorageBytes(): int
-{
-    $raw = $_ENV['CCTV_RECORDING_MAX_STORAGE_BYTES'] ?? getenv('CCTV_RECORDING_MAX_STORAGE_BYTES');
-    $bytes = is_numeric($raw) ? (int) $raw : RECORDING_MAX_STORAGE_BYTES;
-    return max(1024 * 1024, $bytes > 0 ? $bytes : RECORDING_MAX_STORAGE_BYTES);
-}
 
 function recordingsDirectory(): string
 {
@@ -288,9 +273,8 @@ function recordingsStorageBytes(): int
 /**
  * Delete oldest recordings first until total size is under the cap (FIFO).
  */
-function cleanupFifoRecordings(?int $maxBytes = null): int
+function cleanupFifoRecordings(int $maxBytes = RECORDING_MAX_STORAGE_BYTES): int
 {
-    $maxBytes = $maxBytes ?? recordingMaxStorageBytes();
     ensureRecordingsDirectory();
     $dir = recordingsDirectory();
     if (!is_dir($dir) || $maxBytes < 1) {
@@ -344,10 +328,8 @@ function cleanupFifoRecordings(?int $maxBytes = null): int
     return $removed;
 }
 
-function cleanupExpiredRecordings(?int $retentionDays = null): int
+function cleanupExpiredRecordings(int $retentionDays = RECORDING_RETENTION_DAYS): int
 {
-    $retentionDays = $retentionDays ?? recordingRetentionDays();
-    $maxBytes = recordingMaxStorageBytes();
     ensureRecordingsDirectory();
     $dir = recordingsDirectory();
     if (!is_dir($dir)) {
@@ -358,7 +340,7 @@ function cleanupExpiredRecordings(?int $retentionDays = null): int
     $forceFifo = false;
     if (is_file($stampFile) && (time() - (int) filemtime($stampFile)) < 3600) {
         // Still enforce FIFO if over cap even within the hourly throttle window.
-        if (recordingsStorageBytes() <= $maxBytes) {
+        if (recordingsStorageBytes() <= RECORDING_MAX_STORAGE_BYTES) {
             return 0;
         }
         $forceFifo = true;
@@ -400,7 +382,7 @@ function cleanupExpiredRecordings(?int $retentionDays = null): int
         }
     }
 
-    $removed += cleanupFifoRecordings($maxBytes);
+    $removed += cleanupFifoRecordings();
     @touch($stampFile);
     return $removed;
 }

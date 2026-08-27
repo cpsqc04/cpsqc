@@ -1540,8 +1540,8 @@ require_once __DIR__ . '/db.php';
                     <button type="button" class="btn-export export-select-only" id="btnExportSelectedComplaints" onclick="exportSelectedComplaints()" disabled>
                         <i class="fas fa-file-export"></i> Export Selected
                     </button>
-                    <button type="button" class="btn-forward blotter-enter-only" id="btnEnterBlotterSelect" onclick="enterBlotterSelectMode()">Forward to Incident Logging</button>
-                    <button type="button" class="btn-forward blotter-select-only" id="toolbarForwardBtn" onclick="forwardSelectedComplaints()" disabled>Forward to Incident Logging</button>
+                    <button type="button" class="btn-forward blotter-enter-only" id="btnEnterBlotterSelect" onclick="enterBlotterSelectMode()">Forward to Digital Blotter</button>
+                    <button type="button" class="btn-forward blotter-select-only" id="toolbarForwardBtn" onclick="forwardSelectedComplaints()" disabled>Forward to Digital Blotter</button>
                     <button type="button" class="btn-cancel select-mode-only" onclick="exitActiveComplaintSelectMode()">Cancel</button>
                 </div>
                 
@@ -1758,7 +1758,7 @@ require_once __DIR__ . '/db.php';
                     <td>
                         <div class="action-buttons">
                             <button class="btn-view" onclick="viewComplaint('${c.complaint_id}')">View</button>
-                            ${(!alreadyForwarded && String(c.status || '').toLowerCase() !== 'resolved')
+                            ${String(c.status || '').toLowerCase() !== 'resolved'
                                 ? `<button class="btn-manage" onclick="manageComplaint('${c.complaint_id}')">Assign Patrol</button>`
                                 : ''}
                         </div>
@@ -1792,8 +1792,7 @@ require_once __DIR__ . '/db.php';
                 'Processing': 'processing',
                 'Resolved': 'resolved',
                 'Rejected': 'rejected',
-                'Forwarded to Digital Blotter': 'forwarded',
-                'Forwarded to Incident Logging': 'forwarded'
+                'Forwarded to Digital Blotter': 'forwarded'
             };
             return map[status] || String(status || '').toLowerCase().replace(/\s+/g, '-');
         }
@@ -1820,7 +1819,7 @@ require_once __DIR__ . '/db.php';
         }
 
         function isComplaintForwarded(complaint) {
-            return Boolean(complaint && (complaint.forwarded_at || complaint.status === 'Forwarded to Digital Blotter' || complaint.status === 'Forwarded to Incident Logging'));
+            return Boolean(complaint && (complaint.forwarded_at || complaint.status === 'Forwarded to Digital Blotter'));
         }
 
         function showToast(message, variant) {
@@ -2126,7 +2125,7 @@ require_once __DIR__ . '/db.php';
                 
                 ${complaint.blotter_reference_id ? `
                 <div class="detail-row">
-                    <span class="detail-label">Incident Logging Reference:</span>
+                    <span class="detail-label">Digital Blotter Reference:</span>
                     <span class="detail-value"><strong>${complaint.blotter_reference_id}</strong></span>
                 </div>
                 ` : ''}
@@ -2186,7 +2185,7 @@ require_once __DIR__ . '/db.php';
                 });
             }
             if (complaint.blotter_reference_id) {
-                fields.push({ label: 'Incident Logging Reference', value: complaint.blotter_reference_id });
+                fields.push({ label: 'Digital Blotter Reference', value: complaint.blotter_reference_id });
             }
             if (complaint.forwarded_at) {
                 fields.push({
@@ -2286,7 +2285,7 @@ require_once __DIR__ . '/db.php';
                 return complaint ? complaint.complaint_id : ('#' + id);
             });
 
-            if (!window.confirm('Forward ' + labels.join(', ') + ' to Incident Logging now?')) {
+            if (!window.confirm('Forward ' + labels.join(', ') + ' to the Digital Blotter now?')) {
                 return;
             }
 
@@ -2317,7 +2316,7 @@ require_once __DIR__ . '/db.php';
             }
 
             if (isComplaintForwarded(complaint)) {
-                alert('Assignment cannot be changed after forwarding to Incident Logging.');
+                alert('Assignment cannot be changed after forwarding to the Digital Blotter.');
                 return;
             }
 
@@ -2378,7 +2377,7 @@ require_once __DIR__ . '/db.php';
                         throw new Error(data.message || 'Failed to forward complaint.');
                     }
 
-                    complaint.status = data.data?.status || 'Forwarded to Incident Logging';
+                    complaint.status = data.data?.status || 'Forwarded to Digital Blotter';
                     complaint.forwarded_at = data.data?.forwarded_at || new Date().toISOString();
                     complaint.blotter_reference_id = data.data?.blotter_reference_id || '';
                     successCount += 1;
@@ -2391,13 +2390,13 @@ require_once __DIR__ . '/db.php';
             exitBlotterSelectMode();
 
             if (forwardBtn) {
-                forwardBtn.textContent = 'Forward to Incident Logging';
+                forwardBtn.textContent = 'Forward to Digital Blotter';
             }
 
             if (successCount > 0 && errors.length === 0) {
                 showToast(successCount === 1
-                    ? 'Successfully forwarded to Incident Logging.'
-                    : ('Successfully forwarded ' + successCount + ' complaints to Incident Logging.'), 'success');
+                    ? 'Successfully forwarded to Digital Blotter.'
+                    : ('Successfully forwarded ' + successCount + ' complaints to Digital Blotter.'), 'success');
             } else if (successCount > 0) {
                 showToast('Forwarded ' + successCount + '. Some failed: ' + errors.join('; '), 'warning');
             } else {
