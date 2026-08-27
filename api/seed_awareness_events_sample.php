@@ -124,24 +124,6 @@ $events = [
         'submitted_at' => '2026-08-01 11:45:00',
     ],
     [
-        'event_id' => 'EVT-2026-006',
-        'source' => 'sample_seed',
-        'source_group' => 'campaign',
-        'source_reference_id' => 'SEED-EVT-006',
-        'event_name' => 'CCTV and Community Safety Walkthrough',
-        'event_date' => '2026-08-23',
-        'event_time' => '15:00:00',
-        'organizer' => 'CCTV Monitoring Desk — AlertaraQC',
-        'event_type' => 'Awareness',
-        'venue' => 'Susano Road Corridor, Brgy. San Agustin',
-        'status' => 'Completed',
-        'description' => 'Community walkthrough explaining CCTV coverage areas, privacy reminders, and how footage requests are processed for investigations.',
-        'contact_person' => 'Admin Surveillance Desk',
-        'contact_number' => '09221234506',
-        'contact_email' => 'cctv@alertaraqc.com',
-        'submitted_at' => '2026-08-10 16:00:00',
-    ],
-    [
         'event_id' => 'EVT-2026-007',
         'source' => 'sample_seed',
         'source_group' => 'campaign',
@@ -158,24 +140,6 @@ $events = [
         'contact_number' => '09231234507',
         'contact_email' => 'vawc@brgysanagustin.gov.ph',
         'submitted_at' => '2026-08-15 09:20:00',
-    ],
-    [
-        'event_id' => 'EVT-2026-008',
-        'source' => 'sample_seed',
-        'source_group' => 'campaign',
-        'source_reference_id' => 'SEED-EVT-008',
-        'event_name' => 'Traffic and Road Safety Awareness Day',
-        'event_date' => '2026-09-05',
-        'event_time' => '07:30:00',
-        'organizer' => 'Barangay Traffic Aide Unit',
-        'event_type' => 'Awareness',
-        'venue' => 'Quezon Avenue Extension / Susano Road junction',
-        'status' => 'Scheduled',
-        'description' => 'Road safety campaign for motorists and pedestrians near school zones, including helmet reminders and designated drop-off points.',
-        'contact_person' => 'Traffic Aide Lead Paolo Cruz',
-        'contact_number' => '09241234508',
-        'contact_email' => 'traffic@brgysanagustin.gov.ph',
-        'submitted_at' => '2026-08-20 14:05:00',
     ],
     [
         'event_id' => 'EVT-2026-010',
@@ -320,23 +284,6 @@ $reports = [
         'submitted_at' => '2026-08-16 14:30:00',
     ],
     [
-        'report_id' => 'EVT-RPT-2026-006',
-        'event_id' => 'EVT-2026-006',
-        'source' => 'sample_seed',
-        'source_group' => 'campaign',
-        'source_reference_id' => 'SEED-RPT-006',
-        'title' => 'CCTV and Community Safety Walkthrough — Post-Event Report',
-        'event_date' => '2026-08-23',
-        'attendance_count' => 44,
-        'organizer' => 'CCTV Monitoring Desk — AlertaraQC',
-        'survey_result' => '90% Positive',
-        'evaluation_score' => '4.5/5',
-        'event_outcome' => 'Coverage map shared with 8 purok leaders; 2 blind spots flagged.',
-        'location' => 'Susano Road Corridor, Brgy. San Agustin',
-        'description' => 'Residents and purok leaders walked camera coverage points along Susano Road. Footage request process and privacy rules for investigations were explained.',
-        'submitted_at' => '2026-08-24 09:15:00',
-    ],
-    [
         'report_id' => 'EVT-RPT-2026-007',
         'event_id' => 'EVT-2026-007',
         'source' => 'sample_seed',
@@ -372,25 +319,38 @@ $reports = [
     ],
 ];
 
-// Drop retired sample (Anonymous Tip Line Community Briefing) if it was seeded earlier.
+// Drop retired sample events if they were seeded earlier.
 $removed = 0;
+$retiredEventIds = ['EVT-2026-009', 'EVT-2026-006', 'EVT-2026-008'];
+$retiredNamePatterns = [
+    '%Anonymous Tip Line%',
+    '%CCTV and Community Safety%',
+    '%Traffic and Road Safety%',
+];
 try {
+    $idPlaceholders = implode(',', array_fill(0, count($retiredEventIds), '?'));
+    $namePlaceholders = implode(' OR title LIKE ', array_fill(0, count($retiredNamePatterns), '?'));
+    $namePlaceholders = 'title LIKE ' . $namePlaceholders;
+
     $delReports = $pdo->prepare(
         "DELETE FROM awareness_event_reports
-         WHERE event_id = 'EVT-2026-009'
-            OR source_reference_id = 'SEED-EVT-009'
-            OR title LIKE '%Anonymous Tip Line%'"
+         WHERE event_id IN ({$idPlaceholders})
+            OR source_reference_id IN ('SEED-EVT-009', 'SEED-EVT-006', 'SEED-EVT-008', 'SEED-RPT-006')
+            OR {$namePlaceholders}"
     );
-    $delReports->execute();
+    $delReports->execute(array_merge($retiredEventIds, $retiredNamePatterns));
     $removed += $delReports->rowCount();
+
+    $eventNamePlaceholders = implode(' OR event_name LIKE ', array_fill(0, count($retiredNamePatterns), '?'));
+    $eventNamePlaceholders = 'event_name LIKE ' . $eventNamePlaceholders;
 
     $delEvents = $pdo->prepare(
         "DELETE FROM awareness_events
-         WHERE event_id = 'EVT-2026-009'
-            OR source_reference_id = 'SEED-EVT-009'
-            OR event_name LIKE '%Anonymous Tip Line%'"
+         WHERE event_id IN ({$idPlaceholders})
+            OR source_reference_id IN ('SEED-EVT-009', 'SEED-EVT-006', 'SEED-EVT-008')
+            OR {$eventNamePlaceholders}"
     );
-    $delEvents->execute();
+    $delEvents->execute(array_merge($retiredEventIds, $retiredNamePatterns));
     $removed += $delEvents->rowCount();
 } catch (PDOException $e) {
     // ignore cleanup failures
