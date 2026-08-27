@@ -874,7 +874,8 @@ ensureLocalDetectionStarted();
                 }
             };
             refresh();
-            jpegFeedTimer = setInterval(refresh, 350);
+            // Shared hosting: ~1 fps JPEG fallback (WebRTC is preferred when available).
+            jpegFeedTimer = setInterval(refresh, 1000);
             return true;
         }
 

@@ -189,7 +189,7 @@
         loadNotifications();
 
         if (!refreshTimer) {
-            refreshTimer = window.setInterval(loadNotifications, 30000);
+            refreshTimer = window.setInterval(loadNotifications, 60000);
         }
     }
 

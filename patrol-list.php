@@ -1194,7 +1194,7 @@ require_once __DIR__ . '/db.php';
         setInterval(updateDateTime, 1000);
 
         // Live availability: Assigned / On Patrol (and other statuses) update without full page reload
-        setInterval(refreshPatrolAvailabilityLive, 8000);
+        setInterval(refreshPatrolAvailabilityLive, 30000);
         document.addEventListener('visibilitychange', function() {
             if (!document.hidden) {
                 refreshPatrolAvailabilityLive();

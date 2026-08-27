@@ -120,8 +120,25 @@ if ($method === 'GET' || ($method === 'POST' && ($action === 'update' || $action
 if ($method === 'GET') {
     // Return all neighborhood watch members
     try {
-        $stmt = $pdo->query('SELECT id, name, first_name, middle_name, last_name, gender, marital_status, contact, email, address, address_unit_street, address_subdivision, address_barangay, address_city, address_postal_code, address_country, birthday, id_number, category, skills, availability, status, notes, photo_data, photo_id_data, barangay_clearance_data, eligibility_answers, rejection_reason, certifications_data, certifications_description, emergency_contact_name, emergency_contact_number, created_at FROM nw_members ORDER BY id DESC');
+        $memberId = (int) ($_GET['id'] ?? 0);
+        if ($memberId > 0) {
+            $stmt = $pdo->prepare('SELECT id, name, first_name, middle_name, last_name, gender, marital_status, contact, email, address, address_unit_street, address_subdivision, address_barangay, address_city, address_postal_code, address_country, birthday, id_number, category, skills, availability, status, notes, photo_data, photo_id_data, barangay_clearance_data, eligibility_answers, rejection_reason, certifications_data, certifications_description, emergency_contact_name, emergency_contact_number, created_at FROM nw_members WHERE id = :id LIMIT 1');
+            $stmt->execute([':id' => $memberId]);
+            $member = $stmt->fetch(PDO::FETCH_ASSOC);
+            if (!$member) {
+                http_response_code(404);
+                echo json_encode(['success' => false, 'message' => 'Member not found.']);
+                exit;
+            }
+            echo json_encode(['success' => true, 'data' => $member]);
+            exit;
+        }
+
+        // List: omit certifications_data (can be large). Keep media paths; drop legacy base64 data URLs.
+        $stmt = $pdo->query('SELECT id, name, first_name, middle_name, last_name, gender, marital_status, contact, email, address, address_unit_street, address_subdivision, address_barangay, address_city, address_postal_code, address_country, birthday, id_number, category, skills, availability, status, notes, photo_data, photo_id_data, barangay_clearance_data, eligibility_answers, rejection_reason, certifications_description, emergency_contact_name, emergency_contact_number, created_at, CASE WHEN certifications_data IS NOT NULL AND certifications_data != \'\' AND certifications_data != \'[]\' AND certifications_data != \'null\' THEN 1 ELSE 0 END AS has_certifications FROM nw_members ORDER BY id DESC');
         $nw_members = $stmt->fetchAll();
+
+        require_once __DIR__ . '/../includes/volunteer_media.php';
 
         foreach ($nw_members as &$member) {
             if (!empty($member['name'])) {
@@ -138,12 +155,13 @@ if ($method === 'GET') {
                     $member['name'] ?? null
                 );
             }
-            // Keep photo paths/URLs so admin View/Review modals can display uploaded documents.
-            // Files are stored as lightweight paths (uploads/volunteers/...), not large base64 blobs.
             foreach (['photo_data', 'photo_id_data', 'barangay_clearance_data'] as $mediaKey) {
                 $mediaValue = trim((string) ($member[$mediaKey] ?? ''));
-                $member[$mediaKey] = $mediaValue !== '' ? $mediaValue : null;
+                // List keeps file paths only; legacy base64 data URLs are loaded via ?id=
+                $member[$mediaKey] = ($mediaValue !== '' && !volunteerMediaIsDataUrl($mediaValue)) ? $mediaValue : null;
             }
+            $member['has_certifications'] = (int) ($member['has_certifications'] ?? 0) === 1;
+            $member['certifications_data'] = null;
         }
         unset($member);
 

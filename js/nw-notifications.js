@@ -176,7 +176,7 @@
 
         loadNotifications();
         if (!refreshTimer) {
-            refreshTimer = setInterval(loadNotifications, 30000);
+            refreshTimer = setInterval(loadNotifications, 60000);
         }
     }
 

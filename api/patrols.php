@@ -135,17 +135,25 @@ if ($method === 'GET') {
         $stmt = $pdo->query('SELECT id, bpso_personnel_id, personnel_name, contact_number, email, schedule, duty_shift, status, created_at FROM patrols ORDER BY id DESC');
         $patrols = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+        // Use stored status on list reads (mutations already call refreshPatrolAvailabilityStatus).
+        // Optional ?resolve=1 re-computes live status (expensive: several queries per officer).
+        $resolveLive = isset($_GET['resolve']) && (string) $_GET['resolve'] === '1';
+
         foreach ($patrols as $index => $patrol) {
-            $resolved = resolvePatrolAvailabilityStatus(
-                $pdo,
-                (int) ($patrol['id'] ?? 0),
-                (string) ($patrol['status'] ?? 'Available')
-            );
-            if ($resolved !== normalizePatrolAvailabilityStatus((string) ($patrol['status'] ?? ''))) {
-                setPatrolAvailabilityStatus($pdo, (int) $patrol['id'], $resolved);
+            $status = normalizePatrolAvailabilityStatus((string) ($patrol['status'] ?? 'Available'));
+            if ($resolveLive) {
+                $resolved = resolvePatrolAvailabilityStatus(
+                    $pdo,
+                    (int) ($patrol['id'] ?? 0),
+                    $status
+                );
+                if ($resolved !== $status) {
+                    setPatrolAvailabilityStatus($pdo, (int) $patrol['id'], $resolved);
+                }
+                $status = $resolved;
             }
-            $patrols[$index]['status'] = $resolved;
-            $patrols[$index]['status_class'] = patrolAvailabilityStatusCssClass($resolved);
+            $patrols[$index]['status'] = $status;
+            $patrols[$index]['status_class'] = patrolAvailabilityStatusCssClass($status);
         }
 
         echo json_encode([

@@ -46,11 +46,40 @@ if ($method === 'GET') {
     }
 
     try {
+        $singleId = (int) ($_GET['id'] ?? 0);
+        $listColumns = 'id, patrol_id, schedule_id, personnel_name, route, date, time, status, incidents, details, location, campaign_forwarded_at, campaign_reference_id, created_at, CASE WHEN documentation_photo IS NOT NULL AND documentation_photo != \'\' THEN 1 ELSE 0 END AS has_documentation_photo';
+        $detailColumns = 'id, patrol_id, schedule_id, personnel_name, route, date, time, status, incidents, details, location, documentation_photo, campaign_forwarded_at, campaign_reference_id, created_at, CASE WHEN documentation_photo IS NOT NULL AND documentation_photo != \'\' THEN 1 ELSE 0 END AS has_documentation_photo';
+
+        if ($singleId > 0) {
+            if (isBpsoLoggedIn()) {
+                $stmt = $pdo->prepare("SELECT {$detailColumns} FROM patrol_logs WHERE id = :id AND patrol_id = :patrol_id LIMIT 1");
+                $stmt->execute([':id' => $singleId, ':patrol_id' => getBpsoPatrolId()]);
+            } else {
+                $stmt = $pdo->prepare("SELECT {$detailColumns} FROM patrol_logs WHERE id = :id LIMIT 1");
+                $stmt->execute([':id' => $singleId]);
+            }
+            $row = $stmt->fetch(PDO::FETCH_ASSOC);
+            if (!$row) {
+                http_response_code(404);
+                echo json_encode(['success' => false, 'message' => 'Patrol log not found.']);
+                exit;
+            }
+            $row['has_documentation_photo'] = (int) ($row['has_documentation_photo'] ?? 0) === 1;
+            if (isBpsoLoggedIn()) {
+                require_once __DIR__ . '/bpso_attendance_schema.php';
+                ensureBpsoAttendanceTable($pdo);
+                $row['can_edit'] = isPatrolClockedOn($pdo, getBpsoPatrolId()) && (($row['status'] ?? '') !== 'Scheduled');
+            }
+            echo json_encode(['success' => true, 'data' => $row]);
+            exit;
+        }
+
+        // List omits base64 documentation_photo (multi-MB payloads). Use ?id= for photo.
         if (isBpsoLoggedIn()) {
-            $stmt = $pdo->prepare('SELECT id, patrol_id, schedule_id, personnel_name, route, date, time, status, incidents, details, location, documentation_photo, campaign_forwarded_at, campaign_reference_id, created_at FROM patrol_logs WHERE patrol_id = :patrol_id ORDER BY date DESC, id DESC');
+            $stmt = $pdo->prepare("SELECT {$listColumns} FROM patrol_logs WHERE patrol_id = :patrol_id ORDER BY date DESC, id DESC");
             $stmt->execute([':patrol_id' => getBpsoPatrolId()]);
         } else {
-            $stmt = $pdo->query('SELECT id, patrol_id, schedule_id, personnel_name, route, date, time, status, incidents, details, location, documentation_photo, campaign_forwarded_at, campaign_reference_id, created_at FROM patrol_logs ORDER BY date DESC, id DESC');
+            $stmt = $pdo->query("SELECT {$listColumns} FROM patrol_logs ORDER BY date DESC, id DESC");
         }
 
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -61,6 +90,13 @@ if ($method === 'GET') {
             $canEdit = isPatrolClockedOn($pdo, getBpsoPatrolId());
             foreach ($rows as $index => $row) {
                 $rows[$index]['can_edit'] = $canEdit && (($row['status'] ?? '') !== 'Scheduled');
+                $rows[$index]['has_documentation_photo'] = (int) ($row['has_documentation_photo'] ?? 0) === 1;
+                $rows[$index]['documentation_photo'] = null;
+            }
+        } else {
+            foreach ($rows as $index => $row) {
+                $rows[$index]['has_documentation_photo'] = (int) ($row['has_documentation_photo'] ?? 0) === 1;
+                $rows[$index]['documentation_photo'] = null;
             }
         }
 

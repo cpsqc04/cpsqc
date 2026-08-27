@@ -126,11 +126,17 @@ function enforceAdminPasswordChangeGate(): void
  */
 function ensureAdminRolesNormalized(PDO $pdo): void
 {
+    // Once per session — previously ran 2 UPDATEs on every authenticated request.
+    if (!empty($_SESSION['admin_roles_normalized_v1'])) {
+        return;
+    }
+
     try {
         // Legacy "User" rows were BPSO mirrors; keep them out of Admin access.
         $pdo->exec("UPDATE admins SET role = 'BPSO Personnel' WHERE role = 'User'");
         // Canonicalize Admin casing / blanks so every Admin can open User Management.
         $pdo->exec("UPDATE admins SET role = 'Admin' WHERE role IS NULL OR TRIM(role) = '' OR LOWER(TRIM(role)) = 'admin'");
+        $_SESSION['admin_roles_normalized_v1'] = true;
     } catch (PDOException $e) {
         error_log('Failed to normalize admin roles: ' . $e->getMessage());
     }

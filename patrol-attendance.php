@@ -2271,23 +2271,39 @@ $personnelCode = htmlspecialchars(getBpsoPersonnelCode());
         }
 
         function renderDocumentationCell(row) {
-            const hasPhoto = !!(row.documentation_photo);
+            const hasPhoto = !!(row.has_documentation_photo || row.documentation_photo);
             if (hasPhoto) {
                 return `<div class="doc-cell">
-                    <img class="doc-thumb" src="${escapeHtml(row.documentation_photo)}" alt="Documentation photo" onclick="viewDocumentationPhoto(${row.id})" title="View photo">
+                    <button type="button" class="doc-thumb-btn" onclick="viewDocumentationPhoto(${row.id})" title="View photo">View photo</button>
                 </div>`;
             }
             return `<div class="doc-cell"><span class="doc-empty">No photo</span></div>`;
         }
 
-        function viewDocumentationPhoto(reportId) {
+        async function ensureReportDocumentationPhoto(reportId) {
             const report = portalReports.find(r => Number(r.id) === Number(reportId));
-            if (!report || !report.documentation_photo) return;
+            if (!report) return null;
+            if (report.documentation_photo) return report.documentation_photo;
+            if (!report.has_documentation_photo) return null;
+            try {
+                const res = await fetch('api/patrol_logs.php?id=' + encodeURIComponent(reportId));
+                const result = await res.json();
+                if (!result.success || !result.data) return null;
+                report.documentation_photo = result.data.documentation_photo || '';
+                return report.documentation_photo || null;
+            } catch (e) {
+                return null;
+            }
+        }
+
+        async function viewDocumentationPhoto(reportId) {
+            const photo = await ensureReportDocumentationPhoto(reportId);
+            if (!photo) return;
             if (window.AlertaraPhotoLightbox) {
-                AlertaraPhotoLightbox.open(report.documentation_photo, 'Documentation photo');
+                AlertaraPhotoLightbox.open(photo, 'Documentation photo');
                 return;
             }
-            window.open(report.documentation_photo, '_blank');
+            window.open(photo, '_blank');
         }
 
         function setReportDocumentationPreview(photoData) {
@@ -2358,7 +2374,7 @@ $personnelCode = htmlspecialchars(getBpsoPersonnelCode());
             }).join('');
         }
 
-        function openEditReport(id) {
+        async function openEditReport(id) {
             const report = portalReports.find(r => Number(r.id) === Number(id));
             if (!report) return;
             if (!report.can_edit) {
@@ -2384,17 +2400,19 @@ $personnelCode = htmlspecialchars(getBpsoPersonnelCode());
                 fileInput.value = '';
                 fileInput.required = false;
             }
-            setReportDocumentationPreview(report.documentation_photo || '');
+            const photo = await ensureReportDocumentationPhoto(id);
+            setReportDocumentationPreview(photo || '');
             setReportFormVisible(true, false);
             document.getElementById('reportAlert').innerHTML = '';
             document.getElementById('reportDetails')?.focus();
         }
 
-        function openReportModal(id) {
+        async function openReportModal(id) {
             const report = portalReports.find(r => Number(r.id) === Number(id));
             if (!report) return;
-            const photoHtml = report.documentation_photo
-                ? `<div class="complaint-detail"><strong>Documentation:</strong><br><img class="doc-modal-photo" src="${escapeHtml(report.documentation_photo)}" alt="Documentation photo" onclick="AlertaraPhotoLightbox.open(this.src, 'Documentation photo')" title="Click to view full size"></div>`
+            const photo = await ensureReportDocumentationPhoto(id);
+            const photoHtml = photo
+                ? `<div class="complaint-detail"><strong>Documentation:</strong><br><img class="doc-modal-photo" src="${escapeHtml(photo)}" alt="Documentation photo" onclick="AlertaraPhotoLightbox.open(this.src, 'Documentation photo')" title="Click to view full size"></div>`
                 : `<div class="complaint-detail"><strong>Documentation:</strong> No photo uploaded</div>`;
             document.getElementById('reportDetailContent').innerHTML = `
                 <div class="complaint-detail"><strong>Date:</strong> ${escapeHtml(report.date)} ${escapeHtml(report.time || '')}</div>

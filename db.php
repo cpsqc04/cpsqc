@@ -94,23 +94,22 @@ if ($isProd) {
 }
 
 try {
-    // Attempt to connect to MySQL server without specifying a database
-    $pdo_no_db = new PDO("mysql:host={$dbHost};port={$dbPort};charset=utf8mb4", $dbUser, $dbPass, [
+    $pdoOptions = [
         PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
         PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
         PDO::ATTR_EMULATE_PREPARES   => false,
-    ]);
-
-    // Create the database if it doesn't exist
-    $pdo_no_db->exec("CREATE DATABASE IF NOT EXISTS `{$dbName}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
-
-    // Now connect to the specific database
+    ];
     $dsn = "mysql:host={$dbHost};port={$dbPort};dbname={$dbName};charset=utf8mb4";
-    $pdo = new PDO($dsn, $dbUser, $dbPass, [
-        PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
-        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-        PDO::ATTR_EMULATE_PREPARES   => false,
-    ]);
+
+    if ($isProd) {
+        // Production: single connection. Skip CREATE DATABASE (expensive on every request / CCTV upload).
+        $pdo = new PDO($dsn, $dbUser, $dbPass, $pdoOptions);
+    } else {
+        // Local: bootstrap database if missing, then connect.
+        $pdo_no_db = new PDO("mysql:host={$dbHost};port={$dbPort};charset=utf8mb4", $dbUser, $dbPass, $pdoOptions);
+        $pdo_no_db->exec("CREATE DATABASE IF NOT EXISTS `{$dbName}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
+        $pdo = new PDO($dsn, $dbUser, $dbPass, $pdoOptions);
+    }
 
     // Use Philippines timezone for all MySQL NOW(), CURRENT_TIMESTAMP, etc.
     $pdo->exec("SET time_zone = '+08:00'");

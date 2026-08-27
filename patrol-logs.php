@@ -983,6 +983,7 @@ require_once __DIR__ . '/db.php';
                         details: row.details || '',
                         location: row.location || '',
                         documentation_photo: row.documentation_photo || '',
+                        has_documentation_photo: !!(row.has_documentation_photo || row.documentation_photo),
                         campaign_forwarded_at: row.campaign_forwarded_at || null,
                         campaign_reference_id: row.campaign_reference_id || ''
                     };
@@ -1001,10 +1002,31 @@ require_once __DIR__ . '/db.php';
             return div.innerHTML;
         }
 
-        function viewPatrolPhoto(logId) {
+        async function ensurePatrolLogPhoto(logId) {
             const log = patrolLogData[logId];
-            const photoSrc = log && log.documentation_photo ? String(log.documentation_photo) : '';
-            if (!photoSrc || photoSrc.indexOf('data:image/') !== 0) {
+            if (!log) return null;
+            if (log.documentation_photo && String(log.documentation_photo).indexOf('data:image/') === 0) {
+                return log.documentation_photo;
+            }
+            if (!log.has_documentation_photo) return null;
+            try {
+                const response = await fetch('api/patrol_logs.php?id=' + encodeURIComponent(logId));
+                const result = await response.json();
+                if (!result.success || !result.data) return null;
+                const photo = result.data.documentation_photo || '';
+                if (photo) {
+                    log.documentation_photo = photo;
+                    patrolLogData[logId].documentation_photo = photo;
+                }
+                return photo || null;
+            } catch (e) {
+                return null;
+            }
+        }
+
+        async function viewPatrolPhoto(logId) {
+            const photoSrc = await ensurePatrolLogPhoto(logId);
+            if (!photoSrc || String(photoSrc).indexOf('data:image/') !== 0) {
                 alert('No documentation photo available for this report.');
                 return;
             }
@@ -1015,7 +1037,7 @@ require_once __DIR__ . '/db.php';
             alert('Photo viewer is unavailable.');
         }
 
-        function viewLog(id) {
+        async function viewLog(id) {
             const log = patrolLogData[id];
             if (!log) {
                 alert('Log not found');
@@ -1028,11 +1050,13 @@ require_once __DIR__ . '/db.php';
                 : '';
 
             let photoHtml = '<p><strong>Documentation Photo:</strong><br><span class="log-photo-missing">No photo uploaded</span></p>';
-            const photoSrc = String(log.documentation_photo || '');
-            if (photoSrc.indexOf('data:image/') === 0) {
-                photoHtml = '<p><strong>Documentation Photo:</strong><br>'
-                    + '<img src="' + photoSrc + '" alt="Documentation photo" class="log-photo" '
-                    + 'onclick="viewPatrolPhoto(\'' + String(id).replace(/'/g, '') + '\')" title="Click to view full size"></p>';
+            if (log.has_documentation_photo || log.documentation_photo) {
+                const photoSrc = await ensurePatrolLogPhoto(id);
+                if (photoSrc && String(photoSrc).indexOf('data:image/') === 0) {
+                    photoHtml = '<p><strong>Documentation Photo:</strong><br>'
+                        + '<img src="' + photoSrc + '" alt="Documentation photo" class="log-photo" '
+                        + 'onclick="viewPatrolPhoto(\'' + String(id).replace(/'/g, '') + '\')" title="Click to view full size"></p>';
+                }
             }
 
             const content = `

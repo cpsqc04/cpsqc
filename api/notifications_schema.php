@@ -5,6 +5,12 @@
  */
 function ensureNotificationsTable(PDO $pdo): void
 {
+    static $ensured = false;
+    if ($ensured) {
+        return;
+    }
+    $ensured = true;
+
     $pdo->exec("CREATE TABLE IF NOT EXISTS notifications (
         id INT AUTO_INCREMENT PRIMARY KEY,
         user_id INT DEFAULT NULL,
@@ -30,8 +36,6 @@ function ensureNotificationsTable(PDO $pdo): void
 
     if (!isset($columns['user_id'])) {
         $pdo->exec('ALTER TABLE notifications ADD COLUMN user_id INT DEFAULT NULL AFTER id');
-    } else {
-        $pdo->exec('ALTER TABLE notifications MODIFY COLUMN user_id INT DEFAULT NULL');
     }
     if (!isset($columns['patrol_id'])) {
         $pdo->exec('ALTER TABLE notifications ADD COLUMN patrol_id INT DEFAULT NULL AFTER user_id');

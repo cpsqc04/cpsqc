@@ -1355,8 +1355,25 @@ $nwSearchPlaceholder = $nwIsMemberList
             }
         }
 
-        function reviewMember(id) {
-            const member = memberData[id];
+        async function ensureMemberDetail(id) {
+            const cached = memberData[id];
+            if (!cached) return null;
+            try {
+                const response = await fetch('api/neighborhood-watcher-members.php?id=' + encodeURIComponent(id));
+                const result = await response.json();
+                if (result.success && result.data) {
+                    memberData[id] = Object.assign({}, cached, result.data, {
+                        display_id: cached.display_id || result.data.display_id || null
+                    });
+                }
+            } catch (e) {
+                /* keep cached */
+            }
+            return memberData[id];
+        }
+
+        async function reviewMember(id) {
+            const member = await ensureMemberDetail(id);
             if (!member) {
                 alert('Member not found!');
                 return;

@@ -45,9 +45,12 @@ if ($providedKey === '' || !hash_equals($expectedKey, $providedKey)) {
 // Live upload rate / size (LAN high-quality allowed; clamp for shared hosting safety)
 $rateFile = dirname(__DIR__) . DIRECTORY_SEPARATOR . 'cctv_upload_rate.tmp';
 $now = microtime(true);
-$minInterval = (float) ($_ENV['CCTV_UPLOAD_SERVER_MIN_INTERVAL'] ?? getenv('CCTV_UPLOAD_SERVER_MIN_INTERVAL') ?: 0.08);
-if ($minInterval < 0.05) {
-    $minInterval = 0.05;
+// Hostinger shared hosting: default ~2.5 fps. Local can go faster via .env.
+$defaultMinInterval = isProduction() ? 0.4 : 0.08;
+$minInterval = (float) ($_ENV['CCTV_UPLOAD_SERVER_MIN_INTERVAL'] ?? getenv('CCTV_UPLOAD_SERVER_MIN_INTERVAL') ?: $defaultMinInterval);
+$floor = isProduction() ? 0.25 : 0.05;
+if ($minInterval < $floor) {
+    $minInterval = $floor;
 }
 if (is_file($rateFile)) {
     $last = (float) @file_get_contents($rateFile);
