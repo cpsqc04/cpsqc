@@ -10,28 +10,11 @@ require_once __DIR__ . '/../includes/contact_validation.php';
 require_once __DIR__ . '/../includes/patrol_shifts.php';
 require_once __DIR__ . '/../includes/patrol_availability.php';
 require_once __DIR__ . '/../includes/bpso_credentials.php';
+require_once __DIR__ . '/../includes/managed_user_display_ids.php';
 
 $autoloadPath = __DIR__ . '/../vendor/autoload.php';
 if (file_exists($autoloadPath)) {
     require_once $autoloadPath;
-}
-
-/**
- * Generate the next BPSO personnel ID in PER-XX format.
- */
-function generateNextBpsoPersonnelId(PDO $pdo): string
-{
-    $stmt = $pdo->query('SELECT bpso_personnel_id FROM patrols');
-    $max = 0;
-
-    while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
-        $id = strtoupper(trim((string)($row['bpso_personnel_id'] ?? '')));
-        if (preg_match('/^PER-(\d+)$/', $id, $matches)) {
-            $max = max($max, (int)$matches[1]);
-        }
-    }
-
-    return sprintf('PER-%02d', $max + 1);
 }
 
 /**
@@ -116,6 +99,8 @@ function ensurePatrolsTable(PDO $pdo): void
     } catch (PDOException $e) {
         // Ignore if update fails
     }
+
+    syncBpsoPersonnelIdsToPatFormat($pdo);
 }
 
 try {

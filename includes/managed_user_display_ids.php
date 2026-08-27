@@ -83,3 +83,79 @@ function buildNwMemberDisplayIdMap(array $rows): array
 
     return $displayMap;
 }
+
+function resolveNwMemberDisplayCode(PDO $pdo, int $memberId): string
+{
+    $stmt = $pdo->query('SELECT id, status FROM nw_members ORDER BY id ASC');
+    $displayMap = buildNwMemberDisplayIdMap($stmt->fetchAll(PDO::FETCH_ASSOC));
+
+    return $displayMap[$memberId] ?? formatNwMemberDisplayId(max(1, count($displayMap) + 1));
+}
+
+function syncBpsoPersonnelIdsToPatFormat(PDO $pdo): void
+{
+    require_once __DIR__ . '/public_id.php';
+
+    if (getAppMeta($pdo, 'bpso_personnel_ids_pat_v1') === '1') {
+        return;
+    }
+
+    try {
+        $stmt = $pdo->query('SELECT id FROM patrols ORDER BY id ASC');
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        if (!$rows) {
+            setAppMeta($pdo, 'bpso_personnel_ids_pat_v1', '1');
+            return;
+        }
+
+        $displayMap = buildBpsoDisplayIdMap($rows);
+        $updatePatrol = $pdo->prepare('UPDATE patrols SET bpso_personnel_id = :code WHERE id = :id');
+        $updateAttendance = $pdo->prepare('UPDATE bpso_attendance SET bpso_personnel_id = :code WHERE patrol_id = :id');
+
+        foreach ($displayMap as $id => $code) {
+            $updatePatrol->execute([':code' => $code, ':id' => $id]);
+            try {
+                $updateAttendance->execute([':code' => $code, ':id' => $id]);
+            } catch (PDOException $e) {
+                // Attendance table may not exist yet.
+            }
+        }
+
+        setAppMeta($pdo, 'bpso_personnel_ids_pat_v1', '1');
+    } catch (Throwable $e) {
+        // Best-effort migration only.
+    }
+}
+
+function syncNwMemberCodesToDisplayIds(PDO $pdo): void
+{
+    require_once __DIR__ . '/public_id.php';
+
+    if (getAppMeta($pdo, 'nw_member_codes_display_v1') === '1') {
+        return;
+    }
+
+    try {
+        $stmt = $pdo->query('SELECT id, status FROM nw_members ORDER BY id ASC');
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $displayMap = buildNwMemberDisplayIdMap($rows);
+        $update = $pdo->prepare('UPDATE nw_members SET member_code = :code WHERE id = :id');
+
+        foreach ($displayMap as $id => $code) {
+            $update->execute([':code' => $code, ':id' => $id]);
+        }
+
+        setAppMeta($pdo, 'nw_member_codes_display_v1', '1');
+    } catch (Throwable $e) {
+        // Best-effort migration only.
+    }
+}
+
+function generateNextBpsoPersonnelId(PDO $pdo): string
+{
+    syncBpsoPersonnelIdsToPatFormat($pdo);
+
+    $count = (int) $pdo->query('SELECT COUNT(*) FROM patrols')->fetchColumn();
+
+    return formatBpsoDisplayId($count + 1);
+}

@@ -47,24 +47,10 @@ function nwMemberPasswordRequirementMessage(): string
 
 function generateNwMemberCode(PDO $pdo, int $volunteerId): string
 {
-    $year = date('Y');
-    $baseCode = sprintf('NW-%s-%03d', $year, $volunteerId);
+    require_once __DIR__ . '/managed_user_display_ids.php';
+    syncNwMemberCodesToDisplayIds($pdo);
 
-    $stmt = $pdo->prepare('SELECT COUNT(*) FROM nw_members WHERE member_code = :code AND id != :id');
-    $stmt->execute([':code' => $baseCode, ':id' => $volunteerId]);
-    if ((int) $stmt->fetchColumn() === 0) {
-        return $baseCode;
-    }
-
-    for ($attempt = 1; $attempt <= 99; $attempt++) {
-        $code = sprintf('NW-%s-%03d-%02d', $year, $volunteerId, $attempt);
-        $stmt->execute([':code' => $code, ':id' => $volunteerId]);
-        if ((int) $stmt->fetchColumn() === 0) {
-            return $code;
-        }
-    }
-
-    return $baseCode . '-' . bin2hex(random_bytes(2));
+    return resolveNwMemberDisplayCode($pdo, $volunteerId);
 }
 
 /**

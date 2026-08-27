@@ -8,6 +8,7 @@ require_once __DIR__ . '/neighborhood-watcher-members-schema.php';
 require_once __DIR__ . '/../includes/contact_validation.php';
 require_once __DIR__ . '/../includes/neighborhood-watcher-member-auth.php';
 require_once __DIR__ . '/../includes/neighborhood-watcher-member-credentials.php';
+require_once __DIR__ . '/../includes/managed_user_display_ids.php';
 require_once __DIR__ . '/notifications_schema.php';
 
 if (!isNwMemberLoggedIn()) {
@@ -40,6 +41,7 @@ function fetchMemberProfile(PDO $pdo, int $memberId): ?array
 
 if ($method === 'GET') {
     try {
+        syncNwMemberCodesToDisplayIds($pdo);
         $member = fetchMemberProfile($pdo, $memberId);
         if (!$member) {
             http_response_code(404);

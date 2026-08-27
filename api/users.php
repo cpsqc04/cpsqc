@@ -217,6 +217,7 @@ function fetchAllManagedUsers(PDO $pdo): array
     }
 
     try {
+        syncBpsoPersonnelIdsToPatFormat($pdo);
         $stmt = $pdo->query('SELECT id, bpso_personnel_id, personnel_name, email, status, created_at FROM patrols ORDER BY created_at DESC');
         $bpsoRows = $stmt->fetchAll(PDO::FETCH_ASSOC);
     } catch (PDOException $e) {
@@ -225,6 +226,7 @@ function fetchAllManagedUsers(PDO $pdo): array
 
     try {
         ensureNwMembersTable($pdo);
+        syncNwMemberCodesToDisplayIds($pdo);
         $table = nwMembersTableName();
         $stmt = $pdo->query("SELECT id, name, email, member_code, status, created_at FROM {$table} WHERE status = 'Active' ORDER BY created_at DESC");
         $nwRows = $stmt->fetchAll(PDO::FETCH_ASSOC);

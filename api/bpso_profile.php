@@ -4,6 +4,7 @@ header('Content-Type: application/json; charset=utf-8');
 
 require_once __DIR__ . '/../db.php';
 require_once __DIR__ . '/../includes/bpso_auth.php';
+require_once __DIR__ . '/../includes/managed_user_display_ids.php';
 require_once __DIR__ . '/notifications_schema.php';
 
 if (!isBpsoLoggedIn()) {
@@ -55,6 +56,7 @@ function fetchPatrolAccount(PDO $pdo, int $patrolId): ?array
 
 try {
     if ($method === 'GET') {
+        syncBpsoPersonnelIdsToPatFormat($pdo);
         $profile = fetchPatrolAccount($pdo, $patrolId);
         if (!$profile) {
             http_response_code(404);
