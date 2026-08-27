@@ -3,7 +3,7 @@
  * Sample data for awareness events (Event List) and event reports.
  *
  * CLI:  php api/seed_awareness_events_sample.php
- * Web:  called from Event List / Event Reports via "Load demo data" (admin session)
+ * Web:  auto-runs from Event List / Event Reports when admin opens the page
  */
 
 if (PHP_SAPI !== 'cli') {
@@ -176,24 +176,6 @@ $events = [
         'contact_number' => '09241234508',
         'contact_email' => 'traffic@brgysanagustin.gov.ph',
         'submitted_at' => '2026-08-20 14:05:00',
-    ],
-    [
-        'event_id' => 'EVT-2026-009',
-        'source' => 'sample_seed',
-        'source_group' => 'campaign',
-        'source_reference_id' => 'SEED-EVT-009',
-        'event_name' => 'Anonymous Tip Line Community Briefing',
-        'event_date' => '2026-09-12',
-        'event_time' => '16:00:00',
-        'organizer' => 'Anonymous Tip Line Desk — AlertaraQC',
-        'event_type' => 'Briefing',
-        'venue' => 'Barangay San Agustin Hall',
-        'status' => 'Pending',
-        'description' => 'Briefing for purok leaders and residents on how to submit anonymous tips safely, what information helps responders, and privacy safeguards.',
-        'contact_person' => 'Tip Desk Officer Hannah Lim',
-        'contact_number' => '09251234509',
-        'contact_email' => 'tips@alertaraqc.com',
-        'submitted_at' => '2026-08-22 11:10:00',
     ],
     [
         'event_id' => 'EVT-2026-010',
@@ -390,6 +372,30 @@ $reports = [
     ],
 ];
 
+// Drop retired sample (Anonymous Tip Line Community Briefing) if it was seeded earlier.
+$removed = 0;
+try {
+    $delReports = $pdo->prepare(
+        "DELETE FROM awareness_event_reports
+         WHERE event_id = 'EVT-2026-009'
+            OR source_reference_id = 'SEED-EVT-009'
+            OR title LIKE '%Anonymous Tip Line%'"
+    );
+    $delReports->execute();
+    $removed += $delReports->rowCount();
+
+    $delEvents = $pdo->prepare(
+        "DELETE FROM awareness_events
+         WHERE event_id = 'EVT-2026-009'
+            OR source_reference_id = 'SEED-EVT-009'
+            OR event_name LIKE '%Anonymous Tip Line%'"
+    );
+    $delEvents->execute();
+    $removed += $delEvents->rowCount();
+} catch (PDOException $e) {
+    // ignore cleanup failures
+}
+
 $eventInserted = 0;
 $eventSkipped = 0;
 foreach ($events as $event) {
@@ -446,11 +452,12 @@ foreach ($reports as $report) {
 
 $summary = [
     'success' => true,
-    'message' => "Events inserted {$eventInserted}, skipped {$eventSkipped}. Reports inserted {$reportInserted}, skipped {$reportSkipped}.",
+    'message' => "Events inserted {$eventInserted}, skipped {$eventSkipped}. Reports inserted {$reportInserted}, skipped {$reportSkipped}. Removed {$removed} retired sample row(s).",
     'events_inserted' => $eventInserted,
     'events_skipped' => $eventSkipped,
     'reports_inserted' => $reportInserted,
     'reports_skipped' => $reportSkipped,
+    'removed' => $removed,
 ];
 
 if (PHP_SAPI === 'cli') {

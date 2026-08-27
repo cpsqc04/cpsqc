@@ -1,6 +1,6 @@
 /**
- * Load realistic Brgy. San Agustin demo data into Event List / Event Reports.
- * Used from the Awareness module UI — admins never need a separate seed URL.
+ * Auto-load realistic Brgy. San Agustin demo data into Event List / Event Reports.
+ * Runs quietly from the Awareness module — no admin seed URL or toolbar button needed.
  */
 (function (global) {
     'use strict';
@@ -8,18 +8,6 @@
     var seedUrl = 'api/seed_awareness_events_sample.php';
     var loading = false;
     var autoSeedAttempted = false;
-
-    function showBanner(bannerId, message) {
-        var banner = document.getElementById(bannerId);
-        if (!banner) return;
-        banner.textContent = message;
-        banner.hidden = false;
-    }
-
-    function hideBanner(bannerId) {
-        var banner = document.getElementById(bannerId);
-        if (banner) banner.hidden = true;
-    }
 
     async function loadDemoData() {
         if (loading) {
@@ -42,63 +30,34 @@
         }
     }
 
-    function formatSeedMessage(result) {
-        var inserted = (result.events_inserted || 0) + (result.reports_inserted || 0);
-        var skipped = (result.events_skipped || 0) + (result.reports_skipped || 0);
-        if (inserted > 0) {
-            return 'Demo data loaded — ' + inserted + ' Brgy. San Agustin outreach record(s) added.';
+    function seedChanged(result) {
+        if (!result) {
+            return false;
         }
-        if (skipped > 0) {
-            return 'Demo data is already in the system (' + skipped + ' record(s) skipped as duplicates).';
-        }
-        return 'Demo data load finished.';
+        return (
+            (result.events_inserted || 0) > 0 ||
+            (result.reports_inserted || 0) > 0 ||
+            (result.removed || 0) > 0
+        );
     }
 
-    async function tryAutoSeed(bannerId) {
+    async function tryAutoSeed() {
         if (autoSeedAttempted) {
             return null;
         }
         autoSeedAttempted = true;
         try {
             var result = await loadDemoData();
-            if (result && ((result.events_inserted || 0) > 0 || (result.reports_inserted || 0) > 0)) {
-                showBanner(bannerId, formatSeedMessage(result));
-                return result;
-            }
+            return seedChanged(result) ? result : null;
         } catch (e) {
             console.warn('Awareness demo auto-seed skipped:', e);
-        }
-        return null;
-    }
-
-    async function loadAndReload(reloadFn, bannerId, buttonEl) {
-        if (buttonEl) {
-            buttonEl.disabled = true;
-            buttonEl.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Loading demo data…';
-        }
-        try {
-            var result = await loadDemoData();
-            showBanner(bannerId, formatSeedMessage(result));
-            if (typeof reloadFn === 'function') {
-                await reloadFn();
-            }
-        } catch (e) {
-            console.error(e);
-            alert(e.message || 'Failed to load demo data. Please try again.');
-        } finally {
-            if (buttonEl) {
-                buttonEl.disabled = false;
-                buttonEl.innerHTML = '<i class="fas fa-database"></i> Load demo data';
-            }
+            return null;
         }
     }
 
     global.AwarenessDemo = {
         loadDemoData: loadDemoData,
         tryAutoSeed: tryAutoSeed,
-        loadAndReload: loadAndReload,
-        showBanner: showBanner,
-        hideBanner: hideBanner,
-        formatSeedMessage: formatSeedMessage
+        seedChanged: seedChanged
     };
 })(window);

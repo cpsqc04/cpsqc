@@ -363,28 +363,6 @@ require_once __DIR__ . '/db.php';
         .reports-toolbar .btn-export:disabled { opacity: 0.55; cursor: not-allowed; }
         .reports-toolbar .btn-cancel-export { background: #6c757d; }
         .reports-toolbar .btn-cancel-export:hover { background: #5a6268; }
-        .reports-toolbar .btn-demo {
-            padding: 0.75rem 1.25rem;
-            border: none;
-            border-radius: 8px;
-            font-size: 0.95rem;
-            font-weight: 600;
-            cursor: pointer;
-            display: inline-flex;
-            align-items: center;
-            gap: 0.5rem;
-            white-space: nowrap;
-            flex-shrink: 0;
-            color: #fff;
-            background: var(--tertiary-color);
-        }
-        .reports-toolbar .btn-demo:hover:not(:disabled) { background: #2d4a6f; }
-        .reports-toolbar .btn-demo:disabled { opacity: 0.55; cursor: not-allowed; }
-        .demo-banner { margin-bottom: 1rem; padding: 0.75rem 1rem; background: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 8px; color: #065f46; font-size: 0.92rem; line-height: 1.5; }
-        .empty-demo-panel { text-align: center; padding: 2rem 1rem; color: var(--text-secondary); }
-        .empty-demo-panel p { margin: 0 0 1rem 0; max-width: 36rem; margin-left: auto; margin-right: auto; line-height: 1.6; }
-        .empty-demo-panel .btn-demo { margin-top: 0.25rem; padding: 0.75rem 1.25rem; border: none; border-radius: 8px; font-size: 0.95rem; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 0.5rem; color: #fff; background: var(--tertiary-color); }
-        .empty-demo-panel .btn-demo:hover { background: #2d4a6f; }
         #reportsTable th.col-select, #reportsTable td.col-select { width: 42px; text-align: center; }
         body:not(.export-select-mode) #reportsTable .col-select { display: none; }
         body:not(.export-select-mode) .export-select-only { display: none !important; }
@@ -594,14 +572,10 @@ require_once __DIR__ . '/db.php';
         </header>
         <main class="content-area">
             <div class="page-content">
-                <div id="reportsDemoBanner" class="demo-banner" hidden></div>
                 <div class="reports-toolbar">
                     <div class="search-box">
                         <input type="text" id="searchInput" placeholder="Search event reports by ID, title, date, or organizer..." onkeyup="filterReports()">
                     </div>
-                    <button type="button" class="btn-demo" id="btnLoadDemoReports" onclick="loadReportsDemo()">
-                        <i class="fas fa-database"></i> Load demo data
-                    </button>
                     <button type="button" class="btn-export export-enter-only" id="btnEnterEventExportSelect" onclick="enterEventExportSelectMode()">
                         <i class="fas fa-file-export"></i> Export
                     </button>
@@ -738,24 +712,18 @@ require_once __DIR__ . '/db.php';
             renderEventReportsTable();
         }
 
-        async function loadReportsDemo() {
-            await AwarenessDemo.loadAndReload(loadReports, 'reportsDemoBanner', document.getElementById('btnLoadDemoReports'));
-        }
-
         async function loadReports() {
             const tbody = document.getElementById('reportsTableBody');
             try {
+                const seeded = await AwarenessDemo.tryAutoSeed();
                 const res = await fetch('api/awareness_events.php?record_type=report');
                 const result = await res.json();
                 if (!result.success) throw new Error(result.message || 'Failed to load reports');
-                const data = result.data || [];
-                if (data.length === 0) {
-                    const seeded = await AwarenessDemo.tryAutoSeed('reportsDemoBanner');
-                    if (seeded) {
-                        return loadReports();
-                    }
-                } else {
-                    AwarenessDemo.hideBanner('reportsDemoBanner');
+                let data = result.data || [];
+                if (seeded) {
+                    const res2 = await fetch('api/awareness_events.php?record_type=report');
+                    const result2 = await res2.json();
+                    if (result2.success) data = result2.data || [];
                 }
                 renderReports(data);
                 const urlId = new URLSearchParams(window.location.search).get('id');
@@ -796,14 +764,9 @@ require_once __DIR__ . '/db.php';
             const pageRows = eventReportsPager.slice(filtered);
 
             if (filtered.length === 0) {
-                if (allEventReports.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="8"><div class="empty-demo-panel">'
-                        + '<p>No event reports yet. Load realistic post-event reports with attendance counts, survey results, and Brgy. San Agustin outreach summaries.</p>'
-                        + '<button type="button" class="btn-demo" onclick="loadReportsDemo()"><i class="fas fa-database"></i> Load demo data</button>'
-                        + '</div></td></tr>';
-                } else {
-                    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--text-secondary);">No reports match your search.</td></tr>';
-                }
+                tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--text-secondary);">'
+                    + (allEventReports.length === 0 ? 'No event reports found.' : 'No reports match your search.')
+                    + '</td></tr>';
                 updateEventExportButtonState();
                 return;
             }
