@@ -1489,6 +1489,7 @@ if (!isAdminUser()) {
             if (!filter) return allUsers.slice();
             return allUsers.filter(function(user) {
                 const haystack = [
+                    user.display_id,
                     user.id,
                     user.full_name,
                     user.username,
@@ -1542,7 +1543,7 @@ if (!isAdminUser()) {
                     : (isActive ? 'status-active' : 'status-inactive');
 
                 tr.innerHTML = `
-                    <td>${user.id}</td>
+                    <td>${user.display_id || user.id}</td>
                     <td>${user.full_name || '-'}</td>
                     <td>${user.username || '-'}</td>
                     <td>${user.email || '-'}</td>

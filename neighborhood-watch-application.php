@@ -648,6 +648,9 @@ $nwSearchPlaceholder = $nwIsMemberList
                     <table id="membersTable">
                         <thead>
                             <tr>
+                                <?php if ($nwIsMemberList): ?>
+                                <th>ID</th>
+                                <?php endif; ?>
                                 <th>First Name</th>
                                 <th>Last Name</th>
                                 <th>Gender</th>
@@ -1230,7 +1233,12 @@ $nwSearchPlaceholder = $nwIsMemberList
             // Members manage their own profile; applications are resident-submitted — admin View/Review only.
             const editButtonHtml = '';
             
+            const idCellHtml = NW_PAGE_MODE === 'members'
+                ? `<td>${member.display_id || '—'}</td>`
+                : '';
+
             row.innerHTML = `
+                ${idCellHtml}
                 <td>${member.first_name || ''}</td>
                 <td>${member.last_name || ''}</td>
                 <td>${member.gender || '—'}</td>

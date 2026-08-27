@@ -18,6 +18,7 @@ require_once __DIR__ . '/../includes/password_reset_tokens.php';
 require_once __DIR__ . '/../includes/login_otp.php';
 require_once __DIR__ . '/../includes/app_url.php';
 require_once __DIR__ . '/../includes/admin_credentials.php';
+require_once __DIR__ . '/../includes/managed_user_display_ids.php';
 
 if (!isAdminUser()) {
     ob_clean();
@@ -203,20 +204,21 @@ function mapAdminUser(array $row): array
 function fetchAllManagedUsers(PDO $pdo): array
 {
     $users = [];
+    $adminRows = [];
+    $bpsoRows = [];
+    $nwRows = [];
 
     $stmt = $pdo->query('SELECT id, full_name, username, email, role, status, created_at FROM admins ORDER BY created_at DESC');
-    foreach ($stmt->fetchAll() as $row) {
+    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
         if (isBpsoPersonnelRole($row['role'] ?? '')) {
             continue;
         }
-        $users[] = mapAdminUser($row);
+        $adminRows[] = $row;
     }
 
     try {
         $stmt = $pdo->query('SELECT id, bpso_personnel_id, personnel_name, email, status, created_at FROM patrols ORDER BY created_at DESC');
-        foreach ($stmt->fetchAll() as $row) {
-            $users[] = mapBpsoUser($row);
-        }
+        $bpsoRows = $stmt->fetchAll(PDO::FETCH_ASSOC);
     } catch (PDOException $e) {
         // Patrol table may not exist yet on older installs.
     }
@@ -225,14 +227,74 @@ function fetchAllManagedUsers(PDO $pdo): array
         ensureNwMembersTable($pdo);
         $table = nwMembersTableName();
         $stmt = $pdo->query("SELECT id, name, email, member_code, status, created_at FROM {$table} WHERE status = 'Active' ORDER BY created_at DESC");
-        foreach ($stmt->fetchAll() as $row) {
-            $users[] = mapNwUser($row);
-        }
+        $nwRows = $stmt->fetchAll(PDO::FETCH_ASSOC);
     } catch (Throwable $e) {
         // NW table may not exist yet, or schema prep failed — still return other users.
     }
 
+    $adminDisplayMap = buildAdminDisplayIdMap($adminRows);
+    $bpsoDisplayMap = buildBpsoDisplayIdMap($bpsoRows);
+    $nwDisplayMap = buildNwMemberDisplayIdMap($nwRows);
+
+    foreach ($adminRows as $row) {
+        $user = mapAdminUser($row);
+        $user['display_id'] = $adminDisplayMap[(int) $row['id']] ?? formatAdminDisplayId(1);
+        $users[] = $user;
+    }
+
+    foreach ($bpsoRows as $row) {
+        $user = mapBpsoUser($row);
+        $user['display_id'] = $bpsoDisplayMap[(int) $row['id']] ?? formatBpsoDisplayId(1);
+        $users[] = $user;
+    }
+
+    foreach ($nwRows as $row) {
+        $user = mapNwUser($row);
+        $user['display_id'] = $nwDisplayMap[(int) $row['id']] ?? formatNwMemberDisplayId(1);
+        $users[] = $user;
+    }
+
     return $users;
+}
+
+function attachManagedUserDisplayId(PDO $pdo, array $user): array
+{
+    $type = $user['account_type'] ?? '';
+    $numericId = (int) ($user['numeric_id'] ?? 0);
+
+    if ($type === 'bpso') {
+        try {
+            $stmt = $pdo->query('SELECT id FROM patrols ORDER BY id ASC');
+            $user['display_id'] = buildBpsoDisplayIdMap($stmt->fetchAll(PDO::FETCH_ASSOC))[$numericId] ?? formatBpsoDisplayId(1);
+        } catch (PDOException $e) {
+            $user['display_id'] = formatBpsoDisplayId(1);
+        }
+        return $user;
+    }
+
+    if ($type === 'nw') {
+        try {
+            ensureNwMembersTable($pdo);
+            $table = nwMembersTableName();
+            $stmt = $pdo->query("SELECT id, status FROM {$table} WHERE status = 'Active' ORDER BY id ASC");
+            $user['display_id'] = buildNwMemberDisplayIdMap($stmt->fetchAll(PDO::FETCH_ASSOC))[$numericId] ?? formatNwMemberDisplayId(1);
+        } catch (Throwable $e) {
+            $user['display_id'] = formatNwMemberDisplayId(1);
+        }
+        return $user;
+    }
+
+    $adminRows = [];
+    $stmt = $pdo->query('SELECT id, role FROM admins ORDER BY id ASC');
+    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+        if (isBpsoPersonnelRole($row['role'] ?? '')) {
+            continue;
+        }
+        $adminRows[] = $row;
+    }
+    $user['display_id'] = buildAdminDisplayIdMap($adminRows)[$numericId] ?? formatAdminDisplayId(1);
+
+    return $user;
 }
 
 function parseManagedUserId($rawId): array
@@ -269,7 +331,7 @@ function fetchManagedUser(PDO $pdo, string $rawId): ?array
         $stmt = $pdo->prepare('SELECT id, bpso_personnel_id, personnel_name, email, status, created_at FROM patrols WHERE id = :id');
         $stmt->execute([':id' => $parsed['id']]);
         $row = $stmt->fetch();
-        return $row ? mapBpsoUser($row) : null;
+        return $row ? attachManagedUserDisplayId($pdo, mapBpsoUser($row)) : null;
     }
 
     if ($parsed['type'] === 'nw') {
@@ -279,7 +341,7 @@ function fetchManagedUser(PDO $pdo, string $rawId): ?array
             $stmt = $pdo->prepare("SELECT id, name, email, member_code, status, created_at FROM {$table} WHERE id = :id");
             $stmt->execute([':id' => $parsed['id']]);
             $row = $stmt->fetch();
-            return $row ? mapNwUser($row) : null;
+            return $row ? attachManagedUserDisplayId($pdo, mapNwUser($row)) : null;
         } catch (PDOException $e) {
             return null;
         }
@@ -288,7 +350,7 @@ function fetchManagedUser(PDO $pdo, string $rawId): ?array
     $stmt = $pdo->prepare('SELECT id, full_name, username, email, role, status, created_at FROM admins WHERE id = :id');
     $stmt->execute([':id' => $parsed['id']]);
     $row = $stmt->fetch();
-    return $row ? mapAdminUser($row) : null;
+    return $row ? attachManagedUserDisplayId($pdo, mapAdminUser($row)) : null;
 }
 
 function validatePassword(string $password): bool

@@ -9,6 +9,7 @@ require_once __DIR__ . '/../includes/contact_validation.php';
 require_once __DIR__ . '/../includes/volunteer_media.php';
 require_once __DIR__ . '/../includes/volunteer_notifications.php';
 require_once __DIR__ . '/../includes/neighborhood-watcher-member-credentials.php';
+require_once __DIR__ . '/../includes/managed_user_display_ids.php';
 require_once __DIR__ . '/../includes/app_url.php';
 
 function nwNormalizeGender(?string $gender): ?string
@@ -137,6 +138,13 @@ if ($method === 'GET') {
                 );
             }
             unset($member['photo_data'], $member['photo_id_data'], $member['barangay_clearance_data']);
+        }
+        unset($member);
+
+        $displayIdMap = buildNwMemberDisplayIdMap($nw_members);
+        foreach ($nw_members as &$member) {
+            $memberId = (int) ($member['id'] ?? 0);
+            $member['display_id'] = $displayIdMap[$memberId] ?? null;
         }
         unset($member);
 
