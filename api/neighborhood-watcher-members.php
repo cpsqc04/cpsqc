@@ -138,7 +138,12 @@ if ($method === 'GET') {
                     $member['name'] ?? null
                 );
             }
-            unset($member['photo_data'], $member['photo_id_data'], $member['barangay_clearance_data']);
+            // Keep photo paths/URLs so admin View/Review modals can display uploaded documents.
+            // Files are stored as lightweight paths (uploads/volunteers/...), not large base64 blobs.
+            foreach (['photo_data', 'photo_id_data', 'barangay_clearance_data'] as $mediaKey) {
+                $mediaValue = trim((string) ($member[$mediaKey] ?? ''));
+                $member[$mediaKey] = $mediaValue !== '' ? $mediaValue : null;
+            }
         }
         unset($member);
 
