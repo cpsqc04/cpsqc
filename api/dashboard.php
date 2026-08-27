@@ -35,6 +35,20 @@ function tableExists(PDO $pdo, $tableName): bool
     }
 }
 
+/**
+ * Awareness events live in awareness_events; legacy installs may still have events.
+ */
+function dashboardEventsTable(PDO $pdo): ?string
+{
+    if (tableExists($pdo, 'awareness_events')) {
+        return 'awareness_events';
+    }
+    if (tableExists($pdo, 'events')) {
+        return 'events';
+    }
+    return null;
+}
+
 try {
     $response = [
         'success' => true,
@@ -75,13 +89,13 @@ try {
         $stats['complaintsResolvedThisWeek'] = 0;
     }
     
-    // Pending Tips
-    if (tableExists($pdo, 'events')) {
-        $stmt = $pdo->query("SELECT COUNT(*) as count FROM events WHERE event_date >= CURRENT_DATE()");
+    // Upcoming / weekly awareness events
+    $eventsTable = dashboardEventsTable($pdo);
+    if ($eventsTable !== null) {
+        $stmt = $pdo->query("SELECT COUNT(*) as count FROM {$eventsTable} WHERE event_date >= CURRENT_DATE()");
         $stats['upcomingEvents'] = (int)$stmt->fetch()['count'];
-        
-        // Events this week
-        $stmt = $pdo->query("SELECT COUNT(*) as count FROM events WHERE WEEK(event_date) = WEEK(CURRENT_DATE()) AND YEAR(event_date) = YEAR(CURRENT_DATE())");
+
+        $stmt = $pdo->query("SELECT COUNT(*) as count FROM {$eventsTable} WHERE WEEK(event_date) = WEEK(CURRENT_DATE()) AND YEAR(event_date) = YEAR(CURRENT_DATE())");
         $stats['eventsThisWeek'] = (int)$stmt->fetch()['count'];
     } else {
         $stats['upcomingEvents'] = 0;
@@ -212,11 +226,12 @@ try {
         $charts['membersByStatus'] = [];
     }
 
-    // Events overview (upcoming vs past)
-    if (tableExists($pdo, 'events')) {
-        $stmt = $pdo->query("SELECT COUNT(*) as count FROM events WHERE event_date >= CURRENT_DATE()");
+    // Events overview (upcoming vs past) — Awareness Event List data
+    $eventsTable = dashboardEventsTable($pdo);
+    if ($eventsTable !== null) {
+        $stmt = $pdo->query("SELECT COUNT(*) as count FROM {$eventsTable} WHERE event_date >= CURRENT_DATE()");
         $upcoming = (int)$stmt->fetch()['count'];
-        $stmt = $pdo->query("SELECT COUNT(*) as count FROM events WHERE event_date < CURRENT_DATE()");
+        $stmt = $pdo->query("SELECT COUNT(*) as count FROM {$eventsTable} WHERE event_date < CURRENT_DATE()");
         $past = (int)$stmt->fetch()['count'];
         $charts['eventsOverview'] = [
             'Upcoming' => $upcoming,
@@ -258,9 +273,22 @@ try {
         }
     }
     
-    // Recent Events
-    if (tableExists($pdo, 'events')) {
-        $stmt = $pdo->query("SELECT event_name, event_date, event_time, location, created_at FROM events ORDER BY created_at DESC LIMIT 10");
+    // Recent awareness / outreach events
+    $eventsTable = dashboardEventsTable($pdo);
+    if ($eventsTable === 'awareness_events') {
+        $stmt = $pdo->query('SELECT event_name, event_date, event_time, venue, submitted_at FROM awareness_events ORDER BY submitted_at DESC LIMIT 10');
+        while ($row = $stmt->fetch()) {
+            $eventDate = $row['event_date'] ? date('F j, Y', strtotime($row['event_date'])) : '';
+            $location = $row['venue'] ?? 'Community Center';
+            $recentActivity[] = [
+                'type' => 'event',
+                'title' => 'Outreach Event',
+                'details' => $row['event_name'] . ($eventDate ? ' - ' . $eventDate : '') . ' at ' . $location,
+                'time' => $row['submitted_at'],
+            ];
+        }
+    } elseif ($eventsTable === 'events') {
+        $stmt = $pdo->query('SELECT event_name, event_date, event_time, location, created_at FROM events ORDER BY created_at DESC LIMIT 10');
         while ($row = $stmt->fetch()) {
             $eventDate = $row['event_date'] ? date('F j, Y', strtotime($row['event_date'])) : '';
             $location = $row['location'] ?? 'Community Center';
@@ -268,7 +296,7 @@ try {
                 'type' => 'event',
                 'title' => 'Community Meeting Scheduled',
                 'details' => $row['event_name'] . ($eventDate ? ' - ' . $eventDate : '') . ' at ' . $location,
-                'time' => $row['created_at']
+                'time' => $row['created_at'],
             ];
         }
     }
