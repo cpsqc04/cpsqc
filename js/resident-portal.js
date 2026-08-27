@@ -83,6 +83,7 @@
         if (!group || !input) return;
         var showOther = type === 'Other';
         group.hidden = !showOther;
+        group.style.display = showOther ? '' : 'none';
         input.required = showOther;
         if (!showOther) {
             input.value = '';
@@ -92,6 +93,7 @@
     function openComplaintModal() {
         closeTipModal();
         openModal('complaintModal');
+        toggleComplaintTypeOtherField();
         var first = $('complaintDate');
         if (first) setTimeout(function () { first.focus(); }, 120);
     }

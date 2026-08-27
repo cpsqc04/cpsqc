@@ -9,7 +9,7 @@ $autoOpenLogin = false;
     <title>Resident Portal - AlerTara QC</title>
     <link rel="icon" type="image/x-icon" href="images/favicon.ico">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="css/portal-landing.css?v=20260721b">
+    <link rel="stylesheet" href="css/portal-landing.css?v=20260827a">
     <link rel="stylesheet" href="css/mobile-responsive.css">
 </head>
 <body>
@@ -300,7 +300,7 @@ $autoOpenLogin = false;
     </div>
 
     <script src="js/form-contact-validation.js"></script>
-    <script src="js/resident-portal.js"></script>
+    <script src="js/resident-portal.js?v=20260827a"></script>
 
 <?php
 $forgotApiEndpoint = 'api/forgot-password.php';
