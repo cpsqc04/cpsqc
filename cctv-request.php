@@ -21,6 +21,7 @@ $cctvNavActive = 'cctv-request';
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="css/theme.css">
     <link rel="stylesheet" href="css/admin-sidebar.css">
+    <link rel="stylesheet" href="css/table-pagination.css">
     <style>
         body { margin: 0; padding: 0; font-family: var(--font-family); background-color: var(--bg-color); display: flex; min-height: 100vh; }
         .sidebar { width: 320px; background: var(--tertiary-color); color: #fff; position: fixed; left: 0; top: 0; height: 100vh; overflow: hidden; box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1); z-index: 1000; transition: width 0.3s ease; display: flex; flex-direction: column; }
@@ -565,6 +566,13 @@ $cctvNavActive = 'cctv-request';
                     <div id="requestsList" class="request-list">
                         <div class="request-list-empty">Loading requests...</div>
                     </div>
+                    <div class="table-pagination">
+                        <div class="page-info" id="requestsPageInfo">Page 1 of 1</div>
+                        <div class="page-buttons">
+                            <button type="button" id="requestsPrevBtn" onclick="changeRequestsPage(-1)" disabled>Previous</button>
+                            <button type="button" id="requestsNextBtn" onclick="changeRequestsPage(1)" disabled>Next</button>
+                        </div>
+                    </div>
                 </div>
             </div>
         </main>
@@ -617,6 +625,7 @@ $cctvNavActive = 'cctv-request';
         </div>
     </div>
 
+    <script src="js/table-pagination.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             const sidebar = document.getElementById('sidebar');
@@ -637,6 +646,13 @@ $cctvNavActive = 'cctv-request';
         let activeRequestId = null;
         let selectedFootageFilename = null;
         let selectedCameraId = null;
+        const requestsPager = AlertaraTablePager.create({
+            pageSize: 10,
+            pageInfoId: 'requestsPageInfo',
+            prevBtnId: 'requestsPrevBtn',
+            nextBtnId: 'requestsNextBtn',
+            itemLabel: 'requests'
+        });
         let footageSegments = {};
 
         function escapeHtml(value) {
@@ -714,13 +730,10 @@ $cctvNavActive = 'cctv-request';
             }
         }
 
-        function filterRequests() {
+        function getFilteredRequests() {
             const query = document.getElementById('searchInput').value.trim().toLowerCase();
             const dateFilter = document.getElementById('dateFilter').value;
-            const list = document.getElementById('requestsList');
-            list.innerHTML = '';
-
-            const filtered = allRequests.filter(item => {
+            return allRequests.filter(item => {
                 const haystack = [
                     item.request_id, item.requesting_agency, item.contact_person,
                     item.contact_number, item.contact_email, item.incident_location,
@@ -730,13 +743,31 @@ $cctvNavActive = 'cctv-request';
                 const matchesDate = dateFilter === '' || String(item.incident_date || '').startsWith(dateFilter) || String(item.submitted_at || '').startsWith(dateFilter);
                 return matchesQuery && matchesDate;
             });
+        }
 
+        function filterRequests() {
+            requestsPager.reset();
+            renderRequestsList();
+        }
+
+        function changeRequestsPage(delta) {
+            requestsPager.change(delta, getFilteredRequests().length);
+            renderRequestsList();
+        }
+
+        function renderRequestsList() {
+            const list = document.getElementById('requestsList');
+            list.innerHTML = '';
+
+            const filtered = getFilteredRequests();
             if (!filtered.length) {
                 list.innerHTML = '<div class="request-list-empty">No footage requests found.</div>';
+                requestsPager.slice([]);
                 return;
             }
 
-            filtered.forEach(item => {
+            const pageRows = requestsPager.slice(filtered);
+            pageRows.forEach(item => {
                 const button = document.createElement('button');
                 button.type = 'button';
                 button.className = 'request-list-item' + (activeRequestId === item.request_id ? ' is-active' : '');
@@ -771,7 +802,7 @@ $cctvNavActive = 'cctv-request';
             selectedCameraId = item.approved_camera_id || item.camera_id || null;
             hideRejectPanel();
             hideSelectFootagePanel();
-            filterRequests();
+            renderRequestsList();
 
             const docButton = item.has_supporting_document
                 ? `<button class="btn-view" type="button" onclick="viewDocument(${item.id})">View Document</button>`
@@ -830,7 +861,7 @@ $cctvNavActive = 'cctv-request';
             activeRequestId = null;
             hideRejectPanel();
             hideSelectFootagePanel();
-            filterRequests();
+            renderRequestsList();
         }
 
         function startReject() {
