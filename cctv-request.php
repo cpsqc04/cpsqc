@@ -17,6 +17,10 @@ $cctvNavActive = 'cctv-request';
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Footage Request - Alertara</title>
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <!-- ui-build: 20260827-send-btn -->
     <link rel="icon" type="image/x-icon" href="images/favicon.ico">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="css/theme.css">
@@ -669,7 +673,7 @@ $cctvNavActive = 'cctv-request';
                 </div>
                 <div class="form-actions">
                     <button type="button" class="btn-cancel" onclick="hideSelectFootagePanel()">Close</button>
-                    <button type="button" class="btn-incident-reporting" id="sendToIncidentReportingBtn" onclick="sendFootageToIncidentReporting()">Send</button>
+                    <button type="button" class="btn-incident-reporting" id="sendToIncidentReportingBtn" onclick="sendFootageToIncidentReporting()" data-label-idle="Send">Send</button>
                 </div>
                 <div id="incidentReportingEvidenceStatus" class="incident-reporting-status"></div>
             </div>
@@ -931,8 +935,9 @@ $cctvNavActive = 'cctv-request';
             const incidentReportingBtn = document.getElementById('sendToIncidentReportingBtn');
             const incidentReportingStatus = document.getElementById('incidentReportingEvidenceStatus');
             const blocked = ['Rejected', 'Cancelled'].includes(item.status);
+            const idleLabel = incidentReportingBtn.getAttribute('data-label-idle') || 'Send';
             incidentReportingBtn.disabled = Boolean(item.forwarded_to_incident_reporting_at) || blocked;
-            incidentReportingBtn.textContent = item.forwarded_to_incident_reporting_at ? 'Already sent' : 'Send to Incident Reporting';
+            incidentReportingBtn.textContent = item.forwarded_to_incident_reporting_at ? 'Already sent' : idleLabel;
             if (item.forwarded_to_incident_reporting_at) {
                 incidentReportingStatus.style.display = 'block';
                 incidentReportingStatus.innerHTML = `<strong>Incident Reporting:</strong> Sent ${escapeHtml(formatDateTime(item.forwarded_to_incident_reporting_at))}${item.incident_reporting_evidence_reference_id ? ' — Ref: ' + escapeHtml(item.incident_reporting_evidence_reference_id) : ''}`;
@@ -1224,8 +1229,8 @@ $cctvNavActive = 'cctv-request';
             })
             .catch(err => {
                 btn.disabled = false;
-                btn.textContent = 'Send to Incident Reporting';
-                alert(err.message || 'Failed to send footage to Incident Reporting.');
+                btn.textContent = btn.getAttribute('data-label-idle') || 'Send';
+                alert(err.message || 'Failed to send footage.');
             });
         }
 
