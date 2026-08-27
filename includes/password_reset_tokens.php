@@ -7,15 +7,29 @@
 function passwordResetTokensColumns(PDO $pdo): array
 {
     $columns = [];
-    foreach ($pdo->query('SHOW COLUMNS FROM password_reset_tokens') as $row) {
-        $columns[$row['Field']] = $row;
+    try {
+        foreach ($pdo->query('SHOW COLUMNS FROM password_reset_tokens') as $row) {
+            $columns[$row['Field']] = $row;
+        }
+    } catch (PDOException $e) {
+        // Table may not exist yet.
     }
     return $columns;
 }
 
-function ensurePasswordResetTokensTable(PDO $pdo): void
+function passwordResetTokensTableExists(PDO $pdo): bool
 {
-    $pdo->exec("CREATE TABLE IF NOT EXISTS password_reset_tokens (
+    try {
+        $stmt = $pdo->query("SHOW TABLES LIKE 'password_reset_tokens'");
+        return $stmt !== false && $stmt->rowCount() > 0;
+    } catch (PDOException $e) {
+        return false;
+    }
+}
+
+function passwordResetTokensCreateFreshTable(PDO $pdo): void
+{
+    $pdo->exec("CREATE TABLE password_reset_tokens (
         id INT AUTO_INCREMENT PRIMARY KEY,
         account_type VARCHAR(20) NOT NULL,
         account_id INT NOT NULL,
@@ -23,10 +37,83 @@ function ensurePasswordResetTokensTable(PDO $pdo): void
         token_hash VARCHAR(64) NOT NULL,
         expires_at DATETIME NOT NULL,
         used_at DATETIME DEFAULT NULL,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_token_hash (token_hash),
+        INDEX idx_account (account_type, account_id),
+        INDEX idx_expires (expires_at)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+}
+
+function passwordResetTokensDropForeignKeysOnUserId(PDO $pdo): void
+{
+    try {
+        $fkStmt = $pdo->query("
+            SELECT CONSTRAINT_NAME
+            FROM information_schema.KEY_COLUMN_USAGE
+            WHERE TABLE_SCHEMA = DATABASE()
+              AND TABLE_NAME = 'password_reset_tokens'
+              AND COLUMN_NAME = 'user_id'
+              AND REFERENCED_TABLE_NAME IS NOT NULL
+        ");
+        foreach ($fkStmt->fetchAll(PDO::FETCH_ASSOC) as $fkRow) {
+            $constraint = preg_replace('/[^a-zA-Z0-9_]/', '', (string) ($fkRow['CONSTRAINT_NAME'] ?? ''));
+            if ($constraint !== '') {
+                $pdo->exec('ALTER TABLE password_reset_tokens DROP FOREIGN KEY `' . $constraint . '`');
+            }
+        }
+    } catch (PDOException $e) {
+        // Best-effort FK cleanup.
+    }
+
+    // Also try common Hostinger/MySQL auto constraint names.
+    foreach (['password_reset_tokens_ibfk_1', 'password_reset_tokens_ibfk_2', 'fk_password_reset_user'] as $constraint) {
+        try {
+            $pdo->exec('ALTER TABLE password_reset_tokens DROP FOREIGN KEY `' . $constraint . '`');
+        } catch (PDOException $e) {
+            // Ignore missing constraints.
+        }
+    }
+}
+
+function passwordResetTokensIsLegacyIncompatible(array $columns): bool
+{
+    if (!isset($columns['user_id'])) {
+        return false;
+    }
+
+    $null = strtoupper((string) ($columns['user_id']['Null'] ?? ''));
+    $default = $columns['user_id']['Default'] ?? null;
+    // Required user_id with no default blocks NW/Patrol inserts.
+    return $null === 'NO' && ($default === null || $default === '');
+}
+
+function ensurePasswordResetTokensTable(PDO $pdo): void
+{
+    if (!passwordResetTokensTableExists($pdo)) {
+        passwordResetTokensCreateFreshTable($pdo);
+        return;
+    }
 
     $columns = passwordResetTokensColumns($pdo);
+
+    // Soften or replace incompatible legacy schemas that require user_id.
+    if (passwordResetTokensIsLegacyIncompatible($columns)) {
+        passwordResetTokensDropForeignKeysOnUserId($pdo);
+        try {
+            $pdo->exec('ALTER TABLE password_reset_tokens MODIFY COLUMN user_id INT NULL DEFAULT NULL');
+        } catch (PDOException $e) {
+            // Fall through to rebuild check below.
+        }
+
+        $columns = passwordResetTokensColumns($pdo);
+        if (passwordResetTokensIsLegacyIncompatible($columns)) {
+            // Last resort: move the broken table aside and create a clean one.
+            $backup = 'password_reset_tokens_legacy_' . date('Ymd_His');
+            $pdo->exec('RENAME TABLE password_reset_tokens TO `' . str_replace('`', '``', $backup) . '`');
+            passwordResetTokensCreateFreshTable($pdo);
+            $columns = passwordResetTokensColumns($pdo);
+        }
+    }
 
     $alterations = [
         'account_type' => 'ALTER TABLE password_reset_tokens ADD COLUMN account_type VARCHAR(20) NOT NULL DEFAULT \'admin\' AFTER id',
@@ -44,35 +131,14 @@ function ensurePasswordResetTokensTable(PDO $pdo): void
         }
     }
 
-    // Legacy installs may have a required user_id column (sometimes FK to admins).
-    // Soften it so Admin / Patrol / NW password resets can all insert successfully.
     if (isset($columns['user_id'])) {
-        try {
-            $fkStmt = $pdo->query("
-                SELECT CONSTRAINT_NAME
-                FROM information_schema.KEY_COLUMN_USAGE
-                WHERE TABLE_SCHEMA = DATABASE()
-                  AND TABLE_NAME = 'password_reset_tokens'
-                  AND COLUMN_NAME = 'user_id'
-                  AND REFERENCED_TABLE_NAME IS NOT NULL
-            ");
-            foreach ($fkStmt->fetchAll(PDO::FETCH_ASSOC) as $fkRow) {
-                $constraint = preg_replace('/[^a-zA-Z0-9_]/', '', (string) ($fkRow['CONSTRAINT_NAME'] ?? ''));
-                if ($constraint !== '') {
-                    $pdo->exec('ALTER TABLE password_reset_tokens DROP FOREIGN KEY `' . $constraint . '`');
-                }
-            }
-        } catch (PDOException $e) {
-            // Best-effort FK cleanup.
-        }
-
+        passwordResetTokensDropForeignKeysOnUserId($pdo);
         try {
             $pdo->exec('ALTER TABLE password_reset_tokens MODIFY COLUMN user_id INT NULL DEFAULT NULL');
         } catch (PDOException $e) {
             // Column may already be nullable.
         }
 
-        // Backfill account_id from legacy user_id when missing.
         try {
             $pdo->exec("UPDATE password_reset_tokens
                 SET account_id = user_id
@@ -131,13 +197,12 @@ function createPasswordResetToken(PDO $pdo, string $accountType, int $accountId,
             WHERE used_at IS NULL
               AND (
                     (account_type = :account_type AND account_id = :account_id)
-                 OR (account_type = :account_type2 AND user_id = :user_id)
+                 OR user_id = :user_id
               )
         ');
         $invalidate->execute([
             ':account_type' => $accountType,
             ':account_id' => $accountId,
-            ':account_type2' => $accountType,
             ':user_id' => $accountId,
         ]);
     } else {
@@ -158,26 +223,66 @@ function createPasswordResetToken(PDO $pdo, string $accountType, int $accountId,
     $tokenHash = hash('sha256', $rawToken);
     $expiresAt = date('Y-m-d H:i:s', time() + max(5, $ttlMinutes) * 60);
 
+    $attempts = [];
     if ($hasUserId) {
-        // Populate legacy user_id for older schemas. Retry with NULL if a leftover
-        // admins FK rejects Patrol / NW account IDs.
-        try {
-            $insert = $pdo->prepare('
-                INSERT INTO password_reset_tokens (account_type, account_id, user_id, email, token_hash, expires_at)
-                VALUES (:account_type, :account_id, :user_id, :email, :token_hash, :expires_at)
-            ');
-            $insert->execute([
+        $attempts[] = [
+            'sql' => 'INSERT INTO password_reset_tokens (account_type, account_id, user_id, email, token_hash, expires_at)
+                      VALUES (:account_type, :account_id, :user_id, :email, :token_hash, :expires_at)',
+            'params' => [
                 ':account_type' => $accountType,
                 ':account_id' => $accountId,
                 ':user_id' => $accountId,
                 ':email' => $email,
                 ':token_hash' => $tokenHash,
                 ':expires_at' => $expiresAt,
-            ]);
+            ],
+        ];
+        $attempts[] = [
+            'sql' => 'INSERT INTO password_reset_tokens (account_type, account_id, user_id, email, token_hash, expires_at)
+                      VALUES (:account_type, :account_id, NULL, :email, :token_hash, :expires_at)',
+            'params' => [
+                ':account_type' => $accountType,
+                ':account_id' => $accountId,
+                ':email' => $email,
+                ':token_hash' => $tokenHash,
+                ':expires_at' => $expiresAt,
+            ],
+        ];
+    }
+    $attempts[] = [
+        'sql' => 'INSERT INTO password_reset_tokens (account_type, account_id, email, token_hash, expires_at)
+                  VALUES (:account_type, :account_id, :email, :token_hash, :expires_at)',
+        'params' => [
+            ':account_type' => $accountType,
+            ':account_id' => $accountId,
+            ':email' => $email,
+            ':token_hash' => $tokenHash,
+            ':expires_at' => $expiresAt,
+        ],
+    ];
+
+    $lastError = null;
+    foreach ($attempts as $attempt) {
+        try {
+            $insert = $pdo->prepare($attempt['sql']);
+            $insert->execute($attempt['params']);
+            return $rawToken;
         } catch (PDOException $e) {
+            $lastError = $e;
+        }
+    }
+
+    // If every insert path failed because of legacy user_id, rebuild once and retry.
+    if ($lastError && str_contains($lastError->getMessage(), 'user_id')) {
+        $backup = 'password_reset_tokens_legacy_' . date('Ymd_His');
+        try {
+            if (passwordResetTokensTableExists($pdo)) {
+                $pdo->exec('RENAME TABLE password_reset_tokens TO `' . str_replace('`', '``', $backup) . '`');
+            }
+            passwordResetTokensCreateFreshTable($pdo);
             $insert = $pdo->prepare('
-                INSERT INTO password_reset_tokens (account_type, account_id, user_id, email, token_hash, expires_at)
-                VALUES (:account_type, :account_id, NULL, :email, :token_hash, :expires_at)
+                INSERT INTO password_reset_tokens (account_type, account_id, email, token_hash, expires_at)
+                VALUES (:account_type, :account_id, :email, :token_hash, :expires_at)
             ');
             $insert->execute([
                 ':account_type' => $accountType,
@@ -186,22 +291,18 @@ function createPasswordResetToken(PDO $pdo, string $accountType, int $accountId,
                 ':token_hash' => $tokenHash,
                 ':expires_at' => $expiresAt,
             ]);
+            return $rawToken;
+        } catch (Throwable $rebuildError) {
+            throw new RuntimeException(
+                'Password reset token storage is incompatible on this server. '
+                . $rebuildError->getMessage(),
+                0,
+                $rebuildError
+            );
         }
-    } else {
-        $insert = $pdo->prepare('
-            INSERT INTO password_reset_tokens (account_type, account_id, email, token_hash, expires_at)
-            VALUES (:account_type, :account_id, :email, :token_hash, :expires_at)
-        ');
-        $insert->execute([
-            ':account_type' => $accountType,
-            ':account_id' => $accountId,
-            ':email' => $email,
-            ':token_hash' => $tokenHash,
-            ':expires_at' => $expiresAt,
-        ]);
     }
 
-    return $rawToken;
+    throw $lastError ?: new RuntimeException('Failed to create password reset token.');
 }
 
 /**
