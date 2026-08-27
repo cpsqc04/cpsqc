@@ -110,14 +110,19 @@ function syncBpsoPersonnelIdsToPatFormat(PDO $pdo): void
 
         $displayMap = buildBpsoDisplayIdMap($rows);
         $updatePatrol = $pdo->prepare('UPDATE patrols SET bpso_personnel_id = :code WHERE id = :id');
-        $updateAttendance = $pdo->prepare('UPDATE bpso_attendance SET bpso_personnel_id = :code WHERE patrol_id = :id');
+        $attendanceTableExists = publicIdTableExists($pdo, 'bpso_attendance');
+        $updateAttendance = $attendanceTableExists
+            ? $pdo->prepare('UPDATE bpso_attendance SET bpso_personnel_id = :code WHERE patrol_id = :id')
+            : null;
 
         foreach ($displayMap as $id => $code) {
             $updatePatrol->execute([':code' => $code, ':id' => $id]);
-            try {
-                $updateAttendance->execute([':code' => $code, ':id' => $id]);
-            } catch (PDOException $e) {
-                // Attendance table may not exist yet.
+            if ($updateAttendance) {
+                try {
+                    $updateAttendance->execute([':code' => $code, ':id' => $id]);
+                } catch (PDOException $e) {
+                    // Best-effort attendance sync only.
+                }
             }
         }
 

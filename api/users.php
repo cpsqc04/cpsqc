@@ -217,7 +217,6 @@ function fetchAllManagedUsers(PDO $pdo): array
     }
 
     try {
-        syncBpsoPersonnelIdsToPatFormat($pdo);
         $stmt = $pdo->query('SELECT id, bpso_personnel_id, personnel_name, email, status, created_at FROM patrols ORDER BY created_at DESC');
         $bpsoRows = $stmt->fetchAll(PDO::FETCH_ASSOC);
     } catch (PDOException $e) {
@@ -226,7 +225,6 @@ function fetchAllManagedUsers(PDO $pdo): array
 
     try {
         ensureNwMembersTable($pdo);
-        syncNwMemberCodesToDisplayIds($pdo);
         $table = nwMembersTableName();
         $stmt = $pdo->query("SELECT id, name, email, member_code, status, created_at FROM {$table} WHERE status = 'Active' ORDER BY created_at DESC");
         $nwRows = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -388,12 +386,21 @@ if ($method === 'GET') {
             echo json_encode(['success' => true, 'user' => $user]);
         } else {
             ob_clean();
-            echo json_encode(['success' => true, 'users' => fetchAllManagedUsers($pdo)]);
+            $users = fetchAllManagedUsers($pdo);
+            $payload = json_encode(['success' => true, 'users' => $users]);
+            if ($payload === false) {
+                throw new RuntimeException('Failed to encode users response.');
+            }
+            echo $payload;
         }
     } catch (PDOException $e) {
         ob_clean();
         http_response_code(500);
         echo json_encode(['success' => false, 'error' => 'Failed to fetch users: ' . $e->getMessage()]);
+    } catch (Throwable $e) {
+        ob_clean();
+        http_response_code(500);
+        echo json_encode(['success' => false, 'error' => 'Failed to fetch users.']);
     }
 } elseif ($method === 'POST') {
     $data = json_decode(file_get_contents('php://input'), true) ?? [];
