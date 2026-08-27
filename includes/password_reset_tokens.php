@@ -44,28 +44,104 @@ function passwordResetTokensCreateFreshTable(PDO $pdo): void
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 }
 
-function passwordResetTokensDropForeignKeysOnUserId(PDO $pdo): void
+function passwordResetTokensSupportedColumns(): array
+{
+    return [
+        'id' => true,
+        'account_type' => true,
+        'account_id' => true,
+        'email' => true,
+        'token_hash' => true,
+        'expires_at' => true,
+        'used_at' => true,
+        'created_at' => true,
+        // Optional legacy column we can populate safely.
+        'user_id' => true,
+    ];
+}
+
+function passwordResetTokensColumnRequiresValue(array $columnMeta): bool
+{
+    $null = strtoupper((string) ($columnMeta['Null'] ?? ''));
+    $default = $columnMeta['Default'] ?? null;
+    $extra = strtolower((string) ($columnMeta['Extra'] ?? ''));
+
+    if ($null !== 'NO') {
+        return false;
+    }
+    if ($default !== null && $default !== '') {
+        return false;
+    }
+    // Auto-increment / timestamp defaults are fine.
+    if (str_contains($extra, 'auto_increment')) {
+        return false;
+    }
+    if (str_contains($extra, 'default_generated') || str_contains($extra, 'on update')) {
+        return false;
+    }
+
+    return true;
+}
+
+/**
+ * True when the live table has required legacy fields (otp, token, etc.)
+ * that the link-based reset flow does not populate.
+ */
+function passwordResetTokensIsLegacyIncompatible(array $columns): bool
+{
+    $supported = passwordResetTokensSupportedColumns();
+
+    foreach ($columns as $name => $meta) {
+        if (isset($supported[$name])) {
+            // Legacy required user_id is still incompatible for NW/Patrol unless nullable.
+            if ($name === 'user_id' && passwordResetTokensColumnRequiresValue($meta)) {
+                return true;
+            }
+            continue;
+        }
+
+        if (passwordResetTokensColumnRequiresValue($meta)) {
+            return true;
+        }
+    }
+
+    // New flow requires these columns.
+    foreach (['account_type', 'account_id', 'token_hash', 'expires_at'] as $required) {
+        if (!isset($columns[$required])) {
+            // Missing columns can be added, but if OTP-era schema is present prefer rebuild.
+            if (isset($columns['otp']) || isset($columns['token']) || isset($columns['code'])) {
+                return true;
+            }
+        }
+    }
+
+    return isset($columns['otp']) || isset($columns['token']) || isset($columns['code']);
+}
+
+function passwordResetTokensDropAllForeignKeys(PDO $pdo): void
 {
     try {
         $fkStmt = $pdo->query("
-            SELECT CONSTRAINT_NAME
+            SELECT DISTINCT CONSTRAINT_NAME
             FROM information_schema.KEY_COLUMN_USAGE
             WHERE TABLE_SCHEMA = DATABASE()
               AND TABLE_NAME = 'password_reset_tokens'
-              AND COLUMN_NAME = 'user_id'
               AND REFERENCED_TABLE_NAME IS NOT NULL
         ");
         foreach ($fkStmt->fetchAll(PDO::FETCH_ASSOC) as $fkRow) {
             $constraint = preg_replace('/[^a-zA-Z0-9_]/', '', (string) ($fkRow['CONSTRAINT_NAME'] ?? ''));
             if ($constraint !== '') {
-                $pdo->exec('ALTER TABLE password_reset_tokens DROP FOREIGN KEY `' . $constraint . '`');
+                try {
+                    $pdo->exec('ALTER TABLE password_reset_tokens DROP FOREIGN KEY `' . $constraint . '`');
+                } catch (PDOException $e) {
+                    // Ignore missing constraints.
+                }
             }
         }
     } catch (PDOException $e) {
         // Best-effort FK cleanup.
     }
 
-    // Also try common Hostinger/MySQL auto constraint names.
     foreach (['password_reset_tokens_ibfk_1', 'password_reset_tokens_ibfk_2', 'fk_password_reset_user'] as $constraint) {
         try {
             $pdo->exec('ALTER TABLE password_reset_tokens DROP FOREIGN KEY `' . $constraint . '`');
@@ -75,16 +151,14 @@ function passwordResetTokensDropForeignKeysOnUserId(PDO $pdo): void
     }
 }
 
-function passwordResetTokensIsLegacyIncompatible(array $columns): bool
+function passwordResetTokensRebuildCleanTable(PDO $pdo): void
 {
-    if (!isset($columns['user_id'])) {
-        return false;
+    passwordResetTokensDropAllForeignKeys($pdo);
+    $backup = 'password_reset_tokens_legacy_' . date('Ymd_His');
+    if (passwordResetTokensTableExists($pdo)) {
+        $pdo->exec('RENAME TABLE password_reset_tokens TO `' . str_replace('`', '``', $backup) . '`');
     }
-
-    $null = strtoupper((string) ($columns['user_id']['Null'] ?? ''));
-    $default = $columns['user_id']['Default'] ?? null;
-    // Required user_id with no default blocks NW/Patrol inserts.
-    return $null === 'NO' && ($default === null || $default === '');
+    passwordResetTokensCreateFreshTable($pdo);
 }
 
 function ensurePasswordResetTokensTable(PDO $pdo): void
@@ -96,21 +170,27 @@ function ensurePasswordResetTokensTable(PDO $pdo): void
 
     $columns = passwordResetTokensColumns($pdo);
 
-    // Soften or replace incompatible legacy schemas that require user_id.
+    // OTP-era / admin-only schemas are incompatible with link-based multi-account resets.
     if (passwordResetTokensIsLegacyIncompatible($columns)) {
-        passwordResetTokensDropForeignKeysOnUserId($pdo);
-        try {
-            $pdo->exec('ALTER TABLE password_reset_tokens MODIFY COLUMN user_id INT NULL DEFAULT NULL');
-        } catch (PDOException $e) {
-            // Fall through to rebuild check below.
+        // Try softening only user_id first when that is the sole blocker.
+        $onlyUserIdBlocker = isset($columns['user_id'])
+            && passwordResetTokensColumnRequiresValue($columns['user_id'])
+            && !isset($columns['otp'])
+            && !isset($columns['token'])
+            && !isset($columns['code']);
+
+        if ($onlyUserIdBlocker) {
+            passwordResetTokensDropAllForeignKeys($pdo);
+            try {
+                $pdo->exec('ALTER TABLE password_reset_tokens MODIFY COLUMN user_id INT NULL DEFAULT NULL');
+            } catch (PDOException $e) {
+                // Fall through to rebuild.
+            }
+            $columns = passwordResetTokensColumns($pdo);
         }
 
-        $columns = passwordResetTokensColumns($pdo);
         if (passwordResetTokensIsLegacyIncompatible($columns)) {
-            // Last resort: move the broken table aside and create a clean one.
-            $backup = 'password_reset_tokens_legacy_' . date('Ymd_His');
-            $pdo->exec('RENAME TABLE password_reset_tokens TO `' . str_replace('`', '``', $backup) . '`');
-            passwordResetTokensCreateFreshTable($pdo);
+            passwordResetTokensRebuildCleanTable($pdo);
             $columns = passwordResetTokensColumns($pdo);
         }
     }
@@ -131,8 +211,9 @@ function ensurePasswordResetTokensTable(PDO $pdo): void
         }
     }
 
+    $columns = passwordResetTokensColumns($pdo);
     if (isset($columns['user_id'])) {
-        passwordResetTokensDropForeignKeysOnUserId($pdo);
+        passwordResetTokensDropAllForeignKeys($pdo);
         try {
             $pdo->exec('ALTER TABLE password_reset_tokens MODIFY COLUMN user_id INT NULL DEFAULT NULL');
         } catch (PDOException $e) {
@@ -151,6 +232,18 @@ function ensurePasswordResetTokensTable(PDO $pdo): void
                   AND user_id IS NOT NULL");
         } catch (PDOException $e) {
             // Best-effort backfill only.
+        }
+    }
+
+    // Soften leftover required legacy columns if rebuild was skipped somehow.
+    foreach (['otp', 'token', 'code'] as $legacyCol) {
+        if (!isset($columns[$legacyCol])) {
+            continue;
+        }
+        try {
+            $pdo->exec('ALTER TABLE password_reset_tokens MODIFY COLUMN `' . $legacyCol . '` VARCHAR(255) NULL DEFAULT NULL');
+        } catch (PDOException $e) {
+            // Ignore; rebuild path handles hard failures.
         }
     }
 
@@ -272,14 +365,18 @@ function createPasswordResetToken(PDO $pdo, string $accountType, int $accountId,
         }
     }
 
-    // If every insert path failed because of legacy user_id, rebuild once and retry.
-    if ($lastError && str_contains($lastError->getMessage(), 'user_id')) {
-        $backup = 'password_reset_tokens_legacy_' . date('Ymd_His');
+    // Rebuild on any legacy "Field X doesn't have a default value" / schema mismatch.
+    $message = $lastError ? $lastError->getMessage() : '';
+    $shouldRebuild = $lastError && (
+        str_contains($message, "doesn't have a default value")
+        || str_contains($message, 'user_id')
+        || str_contains($message, 'otp')
+        || str_contains($message, 'Unknown column')
+    );
+
+    if ($shouldRebuild) {
         try {
-            if (passwordResetTokensTableExists($pdo)) {
-                $pdo->exec('RENAME TABLE password_reset_tokens TO `' . str_replace('`', '``', $backup) . '`');
-            }
-            passwordResetTokensCreateFreshTable($pdo);
+            passwordResetTokensRebuildCleanTable($pdo);
             $insert = $pdo->prepare('
                 INSERT INTO password_reset_tokens (account_type, account_id, email, token_hash, expires_at)
                 VALUES (:account_type, :account_id, :email, :token_hash, :expires_at)
