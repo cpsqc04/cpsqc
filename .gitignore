@@ -1,0 +1,68 @@
+# OS Files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Logs
+*.log
+logs/
+
+# Environment variables
+.env
+.env.local
+.env.onsite
+
+# Dependencies (if using package managers)
+node_modules/
+vendor/
+
+# Temporary files
+*.tmp
+*.temp
+*.cache
+
+# Python caches
+__pycache__/
+*.pyc
+
+# CCTV / detection generated artifacts (keep local, don't commit)
+cameras.json
+recordings/
+detected_objects/
+current_frame*.jpg
+detect.lock
+detections.json
+detection_heartbeat.json
+detection_control.log
+camera_scan_job.json
+camera_encoding_job.json
+camera_encoding.json
+camera_scan_result_tmp.json
+camera_config_revision.json
+webrtc_status.json
+go2rtc.yaml
+go2rtc.pid
+go2rtc.log
+webrtc_tunnel_url.txt
+cloudflared.pid
+tools/go2rtc/
+tools/cloudflared/
+
+# ML model weights (large; download separately)
+*.pt
+
+# OpenH264 codec (download via install_openh264.bat)
+openh264*.dll
+openh264*.dll.bz2
+
+
+# User-uploaded media / documents
+uploads/
+

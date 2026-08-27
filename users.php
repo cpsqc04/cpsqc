@@ -1,0 +1,1859 @@
+<?php
+session_start();
+
+// Check if user is logged in, redirect to login if not
+if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
+    header('Location: login.php');
+    exit;
+}
+require_once __DIR__ . '/db.php';
+
+if (!isAdminUser()) {
+    header('Location: index.php');
+    exit;
+}
+
+?>
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Users</title>
+    <link rel="icon" type="image/x-icon" href="images/favicon.ico">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="css/theme.css">
+    <link rel="stylesheet" href="css/admin-sidebar.css">
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: var(--font-family);
+            background-color: var(--bg-color);
+            display: flex;
+            min-height: 100vh;
+        }
+        
+        /* Sidebar Navigation */
+        .sidebar {
+            width: 320px;
+            background: var(--tertiary-color);
+            color: #fff;
+            position: fixed;
+            left: 0;
+            top: 0;
+            height: 100vh;
+            overflow: hidden;
+            box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
+            z-index: 1000;
+            transition: width 0.3s ease;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .sidebar.collapsed {
+            width: 80px;
+        }
+        
+        .sidebar-header {
+            padding: 1.5rem 1rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            min-height: 160px;
+        }
+        
+        .logo-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.5rem;
+            transition: all 0.3s ease;
+        }
+        
+        .logo-container a {
+            text-decoration: none;
+            display: block;
+            transition: all 0.3s ease;
+        }
+        
+        .logo-container a:hover {
+            opacity: 0.8;
+            transform: scale(1.05);
+        }
+        
+        .logo-container img {
+            height: 130px;
+            width: 130px;
+            object-fit: contain;
+            transition: all 0.3s ease;
+        }
+        
+        .sidebar.collapsed .logo-container img {
+            height: 70px;
+            width: 70px;
+        }
+        
+        .user-name-display {
+            color: rgba(255, 255, 255, 0.9);
+            font-size: 0.95rem;
+            font-weight: 500;
+            text-align: center;
+            padding: 0.5rem 1rem;
+            transition: all 0.3s ease;
+            word-break: break-word;
+            max-width: 100%;
+        }
+        
+        .sidebar.collapsed .user-name-display {
+            opacity: 0;
+            height: 0;
+            padding: 0;
+            overflow: hidden;
+            font-size: 0;
+        }
+        
+        .sidebar-nav {
+            padding: 0.5rem 0;
+            overflow-y: auto;
+            overflow-x: hidden;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+            scrollbar-width: thin;
+            scrollbar-color: rgba(255, 255, 255, 0.3) transparent;
+        }
+        
+        .sidebar-nav::-webkit-scrollbar {
+            width: 6px;
+        }
+        
+        .sidebar-nav::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        
+        .sidebar-nav::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 3px;
+        }
+        
+        .sidebar-nav::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.5);
+        }
+        
+        .sidebar.collapsed .sidebar-nav {
+            overflow-y: auto;
+            overflow-x: hidden;
+            display: flex !important;
+            flex-direction: column;
+            padding: 0.5rem 0;
+            position: relative;
+        }
+        
+        .nav-module-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.875rem 1.5rem;
+            color: rgba(255, 255, 255, 0.9);
+            cursor: pointer;
+            transition: background-color 0.2s ease, padding 0.3s ease;
+            font-weight: 500;
+            user-select: none;
+            white-space: normal;
+            overflow: visible;
+            font-size: 0.9rem;
+            position: relative;
+            gap: 0.75rem;
+            line-height: 1.4;
+        }
+        
+        .sidebar.collapsed .nav-module-header {
+            padding: 0.75rem;
+            justify-content: center;
+            min-height: 48px;
+            max-height: 48px;
+            display: flex !important;
+            visibility: visible !important;
+            cursor: pointer;
+            margin: 0.25rem 0.5rem;
+            border-radius: 8px;
+            position: relative;
+        }
+        
+        .nav-module-header:hover {
+            background: rgba(255, 255, 255, 0.08);
+            color: #fff;
+        }
+        
+        .nav-module-header.active {
+            background: rgba(76, 138, 137, 0.25);
+            border-left: 3px solid #4c8a89;
+        }
+        
+        .nav-module-icon {
+            font-size: 1.4rem;
+            width: 28px;
+            height: 28px;
+            display: flex !important;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            transition: font-size 0.3s ease;
+            opacity: 1 !important;
+            visibility: visible !important;
+            position: relative;
+        }
+        
+        .nav-module-icon i {
+            font-size: 1.2rem;
+            color: rgba(255, 255, 255, 0.9);
+        }
+        
+        .sidebar.collapsed .nav-module-icon {
+            font-size: 1.5rem;
+            width: auto;
+            height: auto;
+            margin: 0;
+            padding: 0;
+            display: flex !important;
+            opacity: 1 !important;
+            visibility: visible !important;
+            position: relative;
+            transform: none;
+        }
+        
+        .sidebar.collapsed .nav-module-icon i {
+            font-size: 1.3rem;
+        }
+        
+        .nav-module-header-text {
+            flex: 1;
+            transition: opacity 0.3s ease;
+            opacity: 1;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+            min-width: 0;
+        }
+        
+        .sidebar.collapsed .nav-module-header-text {
+            opacity: 0;
+            width: 0;
+            overflow: hidden;
+        }
+        
+        .nav-module {
+            margin-bottom: 0.125rem;
+        }
+        
+        .nav-module-header .arrow {
+            font-size: 0.7rem;
+            transition: transform 0.3s ease, opacity 0.3s ease;
+            color: rgba(255, 255, 255, 0.6);
+            flex-shrink: 0;
+            margin-left: 0.5rem;
+        }
+        
+        .nav-module.active .nav-module-header .arrow {
+            transform: rotate(90deg);
+        }
+        
+        .nav-module.active .nav-module-header {
+            background: rgba(255, 255, 255, 0.1);
+            color: #fff;
+        }
+        
+        .nav-submodules {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease;
+            background: rgba(0, 0, 0, 0.15);
+        }
+        
+        .nav-module.active .nav-submodules {
+            max-height: 500px;
+        }
+        
+        .nav-submodule {
+            padding: 0.75rem 1.5rem 0.75rem 3.5rem;
+            color: rgba(255, 255, 255, 0.75);
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            transition: all 0.2s ease;
+            font-size: 0.85rem;
+            white-space: nowrap;
+            overflow: hidden;
+            position: relative;
+        }
+        
+        .nav-submodule:hover {
+            background: rgba(255, 255, 255, 0.05);
+            color: #fff;
+            padding-left: 4rem;
+        }
+        
+        .nav-submodule.active {
+            background: rgba(76, 138, 137, 0.25);
+            color: #4c8a89;
+            border-left: 3px solid #4c8a89;
+            font-weight: 500;
+        }
+        
+        .nav-submodule-icon {
+            font-size: 1.1rem;
+            width: 22px;
+            height: 22px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+        
+        .nav-submodule-icon i {
+            font-size: 0.95rem;
+            color: rgba(255, 255, 255, 0.75);
+        }
+        
+        .nav-submodule-text {
+            flex: 1;
+        }
+        
+        .main-wrapper {
+            margin-left: 320px;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            transition: margin-left 0.3s ease;
+        }
+        
+        body.sidebar-collapsed .main-wrapper {
+            margin-left: 80px;
+        }
+        
+        .top-header {
+            background: var(--header-bg);
+            padding: 1.5rem 2rem 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        .top-header-content {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+        
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-left: 2rem;
+        }
+        
+        .user-info span {
+            color: var(--text-color);
+            font-weight: 500;
+        }
+        
+        /* Notification Bell */
+        .notification-container { position: relative; display: flex; align-items: center; }
+        .notification-bell { position: relative; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; background: transparent; border: none; color: var(--text-color); font-size: 1.25rem; cursor: pointer; border-radius: 8px; transition: all 0.2s ease; }
+        .notification-bell:hover { background: rgba(28, 37, 65, 0.05); color: var(--primary-color); }
+        .notification-badge { position: absolute; top: 4px; right: 4px; background: #ef4444; color: white; font-size: 0.7rem; font-weight: 600; padding: 2px 6px; border-radius: 10px; min-width: 18px; text-align: center; display: none; }
+        .notification-badge.show { display: block; }
+        .notification-dropdown { position: absolute; top: calc(100% + 10px); right: 0; width: 380px; max-height: 500px; background: white; border-radius: 12px; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15); display: none; flex-direction: column; z-index: 1000; overflow: hidden; }
+        .notification-dropdown.show { display: flex; }
+        .notification-header { padding: 1.25rem; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; background: var(--header-bg); }
+        .notification-header h3 { margin: 0; font-size: 1.1rem; font-weight: 600; color: var(--text-color); }
+        .notification-header button { background: transparent; border: none; color: var(--primary-color); font-size: 0.85rem; cursor: pointer; padding: 0.25rem 0.5rem; border-radius: 4px; transition: background 0.2s ease; }
+        .notification-header button:hover { background: rgba(76, 138, 137, 0.1); }
+        .notification-list { flex: 1; overflow-y: auto; max-height: 400px; }
+        .notification-item { padding: 1rem 1.25rem; border-bottom: 1px solid var(--border-color); cursor: pointer; transition: background 0.2s ease; display: flex; gap: 0.75rem; position: relative; }
+        .notification-item:hover { background: #f8f9fa; }
+        .notification-item.unread { background: #f0f9ff; border-left: 3px solid var(--primary-color); }
+        .notification-item.unread::before { content: ''; position: absolute; left: 0; top: 50%; transform: translateY(-50%); width: 6px; height: 6px; background: var(--primary-color); border-radius: 50%; }
+        .notification-icon { width: 40px; height: 40px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; flex-shrink: 0; }
+        .notification-icon.complaint { background: #fee2e2; color: #dc2626; }
+        .notification-icon.tip { background: #fef3c7; color: #d97706; }
+        .notification-icon.volunteer { background: #dbeafe; color: #2563eb; }
+        .notification-icon.event { background: #d1fae5; color: #059669; }
+        .notification-icon.login { background: #dbeafe; color: #2563eb; }
+        .notification-icon.logout { background: #e0e7ff; color: #6366f1; }
+        .notification-content { flex: 1; min-width: 0; }
+        .notification-title { font-weight: 600; color: var(--text-color); font-size: 0.95rem; margin: 0 0 0.25rem 0; }
+        .notification-message { color: var(--text-secondary); font-size: 0.85rem; margin: 0 0 0.5rem 0; line-height: 1.4; }
+        .notification-time { color: var(--text-secondary); font-size: 0.75rem; }
+        .notification-empty { padding: 3rem 1.5rem; text-align: center; color: var(--text-secondary); }
+        .notification-empty i { font-size: 3rem; margin-bottom: 1rem; opacity: 0.3; }
+        .datetime-display { display: flex; align-items: center; gap: 0.75rem; color: var(--text-color); font-size: 0.9rem; font-weight: 500; margin-right: 1rem; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        .datetime-display .date-part { color: var(--text-secondary); }
+        .datetime-display .time-part { color: var(--text-color); font-weight: 600; }
+        
+        /* Sidebar Logout Button */
+        .sidebar-footer {
+            margin-top: auto;
+            padding: 1rem;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .sidebar-logout-btn {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.875rem 1.5rem;
+            background: rgba(239, 68, 68, 0.1);
+            color: rgba(255, 255, 255, 0.9);
+            text-decoration: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            border: 1px solid rgba(239, 68, 68, 0.2);
+            width: 100%;
+            box-sizing: border-box;
+        }
+        
+        .sidebar-logout-btn:hover {
+            background: rgba(239, 68, 68, 0.2);
+            border-color: rgba(239, 68, 68, 0.4);
+            color: #fff;
+        }
+        
+        .sidebar-logout-btn i {
+            font-size: 1.1rem;
+            flex-shrink: 0;
+        }
+        
+        .sidebar-logout-btn span {
+            flex: 1;
+            transition: opacity 0.3s ease;
+        }
+        
+        .sidebar.collapsed .sidebar-logout-btn span {
+            opacity: 0;
+            width: 0;
+            overflow: hidden;
+        }
+        
+        .sidebar.collapsed .sidebar-logout-btn {
+            justify-content: center;
+            padding: 0.875rem;
+        }
+        
+        /* Top header logout button (removed, keeping for backward compatibility) */
+        .logout-btn {
+            padding: 0.5rem 1rem;
+            background: var(--primary-color);
+            color: #fff;
+            text-decoration: none;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            transition: background 0.2s ease;
+            display: none; /* Hide from header */
+        }
+        
+        .logout-btn:hover {
+            background: #4ca8a6;
+        }
+        
+        .content-burger-btn {
+            background: transparent;
+            border: none;
+            color: var(--tertiary-color);
+            width: 40px;
+            height: 40px;
+            border-radius: 8px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+            flex-shrink: 0;
+            padding: 0;
+        }
+        
+        .content-burger-btn:hover {
+            background: rgba(28, 37, 65, 0.05);
+        }
+        
+        .content-burger-btn span {
+            display: block;
+            width: 22px;
+            height: 1.5px;
+            background: var(--tertiary-color);
+            position: relative;
+            transition: all 0.3s ease;
+        }
+        
+        .content-burger-btn span::before,
+        .content-burger-btn span::after {
+            content: '';
+            position: absolute;
+            width: 22px;
+            height: 1.5px;
+            background: var(--tertiary-color);
+            transition: all 0.3s ease;
+        }
+        
+        .content-burger-btn span::before {
+            top: -7px;
+        }
+        
+        .content-burger-btn span::after {
+            bottom: -7px;
+        }
+        
+        .page-title {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--tertiary-color);
+            margin: 0;
+        }
+        
+        .content-area {
+            flex: 1;
+            padding: 2rem;
+            overflow-y: auto;
+            background: #f5f5f5;
+        }
+        
+        .page-content {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 2rem;
+            box-shadow: 0 2px 8px var(--shadow);
+            margin-top: 1.5rem;
+        }
+        
+        .search-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+            gap: 1rem;
+        }
+        
+        .search-box {
+            flex: 1;
+            position: relative;
+        }
+        
+        .search-box input {
+            width: 100%;
+            padding: 0.75rem 1rem 0.75rem 2.5rem;
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            font-size: 0.95rem;
+            background: var(--card-bg);
+            color: var(--text-color);
+            transition: all 0.2s ease;
+        }
+        
+        .search-box input:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(76, 138, 137, 0.1);
+        }
+        
+        .search-box::before {
+            content: "🔍";
+            position: absolute;
+            left: 0.75rem;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 1rem;
+            pointer-events: none;
+        }
+        
+        .btn-add {
+            padding: 0.75rem 1.5rem;
+            background: var(--primary-color);
+            color: #fff;
+            border: none;
+            border-radius: var(--radius);
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            transition: all 0.2s ease;
+        }
+        
+        .btn-add:hover {
+            background: #4ca8a6;
+            transform: translateY(-1px);
+        }
+        
+        .table-container {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            overflow: hidden;
+            box-shadow: 0 2px 8px var(--shadow);
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        thead {
+            background: var(--tertiary-color);
+            color: #fff;
+        }
+        
+        th {
+            padding: 1rem;
+            text-align: left;
+            font-weight: 600;
+            font-size: 0.95rem;
+        }
+        
+        td {
+            padding: 1rem;
+            border-top: 1px solid var(--border-color);
+            color: var(--text-color);
+        }
+        
+        tbody tr:hover {
+            background: rgba(76, 138, 137, 0.05);
+        }
+        
+        .status-toggle {
+            position: relative;
+            display: inline-block;
+            width: 50px;
+            height: 26px;
+        }
+        
+        .status-toggle input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        
+        .status-toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: 0.4s;
+            border-radius: 26px;
+        }
+        
+        .status-toggle-slider:before {
+            position: absolute;
+            content: "";
+            height: 20px;
+            width: 20px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: 0.4s;
+            border-radius: 50%;
+        }
+        
+        .status-toggle input:checked + .status-toggle-slider {
+            background-color: #4c8a89;
+        }
+        
+        .status-toggle input:checked + .status-toggle-slider:before {
+            transform: translateX(24px);
+        }
+        
+        .status-badge {
+            padding: 0.25rem 0.75rem;
+            border-radius: 12px;
+            font-size: 0.875rem;
+            font-weight: 500;
+        }
+        
+        .status-active {
+            background: #d1fae5;
+            color: #065f46;
+        }
+        
+        .status-inactive {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .status-available { background: #d1e7dd; color: #0f5132; }
+        .status-assigned { background: #cfe2ff; color: #084298; }
+        .status-simulation { background: #ffe5d0; color: #9a3412; }
+        .status-on-patrol { background: #fff3cd; color: #856404; }
+        .status-on-reporting { background: #e9d5ff; color: #6b21a8; }
+        .status-unavailable { background: #f8d7da; color: #842029; }
+        
+        .btn-action {
+            padding: 0.5rem 1rem;
+            border: none;
+            border-radius: var(--radius);
+            cursor: pointer;
+            font-size: 0.875rem;
+            transition: all 0.2s ease;
+            margin-right: 0.5rem;
+        }
+        
+        .btn-edit {
+            background: var(--primary-color);
+            color: #fff;
+        }
+        
+        .btn-edit:hover {
+            background: #4ca8a6;
+        }
+        
+        .action-cell {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+        
+        /* Modal Styles - Fixed to page instead of overlay */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 2000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(11, 19, 43, 0.55);
+            backdrop-filter: blur(4px);
+            align-items: center;
+            justify-content: center;
+            padding: 1rem;
+            box-sizing: border-box;
+        }
+        
+        .modal.active {
+            display: flex;
+        }
+        
+        .modal-content {
+            background: linear-gradient(160deg, #243356 0%, var(--tertiary-color) 48%, #152038 100%);
+            border: 1px solid rgba(76, 138, 137, 0.35);
+            border-radius: 16px;
+            box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+            padding: 0;
+            max-width: 520px;
+            width: min(520px, 94vw);
+            max-height: 90vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+
+        .modal-content::before {
+            content: '';
+            position: absolute;
+            inset: 0 0 auto 0;
+            height: 4px;
+            background: linear-gradient(90deg, var(--primary-color), #7ec8c6, var(--primary-color));
+        }
+        
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 1rem;
+            padding: 1.5rem 1.75rem 1rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .modal-header h2 {
+            margin: 0;
+            color: #f8fafc;
+            font-size: 1.35rem;
+            font-weight: 700;
+            letter-spacing: 0.01em;
+        }
+
+        .modal-subtitle {
+            margin: 0.35rem 0 0;
+            color: rgba(255, 255, 255, 0.65);
+            font-size: 0.88rem;
+            line-height: 1.4;
+            font-weight: 400;
+        }
+
+        .modal-body {
+            padding: 1.25rem 1.75rem 0.5rem;
+            overflow-y: auto;
+            flex: 1;
+        }
+        
+        .close {
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 1.5rem;
+            cursor: pointer;
+            width: 36px;
+            height: 36px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 10px;
+            transition: all 0.2s ease;
+            flex-shrink: 0;
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            line-height: 1;
+        }
+        
+        .close:hover {
+            color: #fff;
+            background: rgba(239, 68, 68, 0.25);
+            border-color: rgba(239, 68, 68, 0.35);
+        }
+        
+        .field {
+            margin-bottom: 1.15rem;
+        }
+        
+        .field label {
+            display: block;
+            margin-bottom: 0.45rem;
+            color: rgba(255, 255, 255, 0.82);
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+        
+        .field input,
+        .field select,
+        #editRoleLocked {
+            width: 100%;
+            padding: 0.8rem 0.95rem;
+            border: 1px solid rgba(255, 255, 255, 0.14);
+            border-radius: 10px;
+            font: inherit;
+            font-size: 0.95rem;
+            color: #f8fafc;
+            background: rgba(255, 255, 255, 0.07);
+            box-sizing: border-box;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+        }
+
+        .field input[readonly],
+        #editRoleLocked {
+            background: rgba(255, 255, 255, 0.04);
+            color: rgba(255, 255, 255, 0.72);
+            cursor: not-allowed;
+        }
+        
+        .field select {
+            padding-right: 2.5rem;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23f8fafc' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 1rem center;
+            background-size: 12px;
+            appearance: none;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            cursor: pointer;
+        }
+        
+        .field select option {
+            background: #1c2541;
+            color: #f8fafc;
+            padding: 0.75rem 1rem;
+        }
+        
+        .field select::-ms-expand {
+            display: none;
+        }
+        
+        .field input:focus,
+        .field select:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(76, 138, 137, 0.28);
+            background-color: rgba(255, 255, 255, 0.1);
+        }
+        
+        .field select:hover {
+            background-color: rgba(255, 255, 255, 0.1);
+            border-color: rgba(255, 255, 255, 0.22);
+        }
+
+        .field-hint {
+            margin: 0.45rem 0 0;
+            font-size: 0.8rem;
+            line-height: 1.4;
+            color: rgba(215, 236, 235, 0.72);
+        }
+
+        .toast-popup {
+            position: fixed;
+            top: 1.25rem;
+            right: 1.25rem;
+            z-index: 4000;
+            display: none;
+            align-items: flex-start;
+            gap: 0.75rem;
+            max-width: min(420px, calc(100vw - 2rem));
+            padding: 0.95rem 1.1rem;
+            border-radius: 12px;
+            background: #1c2541;
+            border: 1px solid rgba(76, 138, 137, 0.45);
+            box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35);
+            color: #f8fafc;
+            font-size: 0.9rem;
+            line-height: 1.45;
+        }
+
+        .toast-popup.show {
+            display: flex;
+            animation: toastIn 0.25s ease;
+        }
+
+        .toast-popup i {
+            color: #7ec8c6;
+            margin-top: 0.15rem;
+            flex-shrink: 0;
+        }
+
+        @keyframes toastIn {
+            from { opacity: 0; transform: translateY(-8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .reset-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            margin-top: 0.65rem;
+            color: #7ec8c6;
+            font-size: 0.9rem;
+            font-weight: 600;
+            text-decoration: underline;
+            text-underline-offset: 3px;
+            cursor: pointer;
+            background: none;
+            border: none;
+            padding: 0;
+            font-family: inherit;
+        }
+
+        .reset-link:hover:not(:disabled) {
+            color: #a8e4e2;
+        }
+
+        .reset-link:disabled {
+            opacity: 0.65;
+            cursor: wait;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 0.85rem;
+            padding: 1rem 1.75rem 1.5rem;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            background: rgba(0, 0, 0, 0.12);
+        }
+        
+        .button-group .btn {
+            flex: 1;
+            padding: 0.85rem 1.25rem;
+            border: none;
+            border-radius: 10px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        
+        .button-group .btn-primary {
+            background: var(--primary-color);
+            color: #fff;
+            box-shadow: 0 8px 18px rgba(76, 138, 137, 0.28);
+        }
+        
+        .button-group .btn-primary:hover {
+            background: #4ca8a6;
+            transform: translateY(-1px);
+        }
+        
+        .button-group .btn-secondary {
+            background: transparent;
+            color: rgba(255, 255, 255, 0.9);
+            border: 1px solid rgba(255, 255, 255, 0.28);
+        }
+        
+        .button-group .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+        
+        .error-message {
+            color: #fecaca;
+            font-size: 0.85rem;
+            margin-top: 0.5rem;
+            display: none;
+        }
+    </style>
+    <link rel="stylesheet" href="css/mobile-responsive.css">
+    <link rel="stylesheet" href="css/table-pagination.css">
+</head>
+<body>
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <div class="logo-container">
+                <a href="index.php" style="display: block; cursor: pointer;">
+                    <img src="images/tara.png" alt="Alertara Logo" style="display: block;">
+                </a>
+                <div class="user-name-display">
+                    <?php echo htmlspecialchars(getAdminDisplayName()); ?>
+                </div>
+            </div>
+        </div>
+        <nav class="sidebar-nav">
+            <?php require __DIR__ . '/includes/admin_nav_dashboard.php'; ?>
+            
+            <!-- User Management Module (Admin Only) -->
+            <?php if (isAdminUser()): ?>
+            <div class="nav-module <?php echo (basename($_SERVER['PHP_SELF']) == 'users.php' || basename($_SERVER['PHP_SELF']) == 'login-history.php') ? 'active' : ''; ?>">
+                <div class="nav-module-header" onclick="toggleModule(this)" data-tooltip="User Management">
+                    <span class="nav-module-icon"><i class="fas fa-users-cog"></i></span>
+                    <span class="nav-module-header-text">User Management</span>
+                    <span class="arrow">▶</span>
+                </div>
+                <div class="nav-submodules">
+                    <a href="users.php" class="nav-submodule <?php echo basename($_SERVER['PHP_SELF']) == 'users.php' ? 'active' : ''; ?>" data-tooltip="Users">
+                        <span class="nav-submodule-icon"><i class="fas fa-users"></i></span>
+                        <span class="nav-submodule-text">Users</span>
+                    </a>
+                    <a href="login-history.php" class="nav-submodule <?php echo basename($_SERVER['PHP_SELF']) == 'login-history.php' ? 'active' : ''; ?>" data-tooltip="Audit Trails">
+                        <span class="nav-submodule-icon"><i class="fas fa-history"></i></span>
+                        <span class="nav-submodule-text">Audit Trails</span>
+                    </a>
+                </div>
+            </div>
+            <?php endif; ?>
+            
+            <div class="nav-module">
+                <div class="nav-module-header" onclick="toggleModule(this)" data-tooltip="Neighborhood Watch Coordination">
+                    <span class="nav-module-icon"><i class="fas fa-users"></i></span>
+                    <span class="nav-module-header-text">Neighborhood Watch Coordination</span>
+                    <span class="arrow">▶</span>
+                </div>
+                <div class="nav-submodules">
+                    <?php require __DIR__ . '/includes/neighborhood_watch_nav_submodules.php'; ?>
+                </div>
+            </div>
+            
+            <div class="nav-module">
+                <div class="nav-module-header" onclick="toggleModule(this)" data-tooltip="CCTV Monitoring System">
+                    <span class="nav-module-icon"><i class="fas fa-video"></i></span>
+                    <span class="nav-module-header-text">CCTV Monitoring System</span>
+                    <span class="arrow">▶</span>
+                </div>
+                <div class="nav-submodules">
+                    <?php $cctvNavActive = $cctvNavActive ?? ''; require __DIR__ . '/includes/cctv_nav_submodules.php'; ?>
+                </div>
+            </div>
+            
+            <div class="nav-module">
+                <div class="nav-module-header" onclick="toggleModule(this)" data-tooltip="Community Complaint Logging and Resolution">
+                    <span class="nav-module-icon"><i class="fas fa-file-alt"></i></span>
+                    <span class="nav-module-header-text">Community Complaint Logging and Resolution</span>
+                    <span class="arrow">▶</span>
+                </div>
+                <div class="nav-submodules">
+                    <a href="submit-complaint.php" class="nav-submodule" data-tooltip="Submit Complaint">
+                        <span class="nav-submodule-icon"><i class="fas fa-edit"></i></span>
+                        <span class="nav-submodule-text">Submit Complaint</span>
+                    </a>
+                    <a href="track-complaint.php" class="nav-submodule" data-tooltip="Track Complaint">
+                        <span class="nav-submodule-icon"><i class="fas fa-search"></i></span>
+                        <span class="nav-submodule-text">Track Complaint</span>
+                    </a>
+                </div>
+            </div>
+            
+            
+            <div class="nav-module">
+                <div class="nav-module-header" onclick="toggleModule(this)" data-tooltip="Patrol Scheduling and Monitoring">
+                    <span class="nav-module-icon"><i class="fas fa-walking"></i></span>
+                    <span class="nav-module-header-text">Patrol Scheduling and Monitoring</span>
+                    <span class="arrow">▶</span>
+                </div>
+                <div class="nav-submodules">
+                    <?php $patrolNavActive = $patrolNavActive ?? ''; require __DIR__ . '/includes/patrol_nav_submodules.php'; ?>
+                </div>
+            </div>
+            
+            <div class="nav-module">
+                <div class="nav-module-header" onclick="toggleModule(this)" data-tooltip="Awareness and Outreach Event Tracking">
+                    <span class="nav-module-icon"><i class="fas fa-bullhorn"></i></span>
+                    <span class="nav-module-header-text">Awareness and Outreach Event Tracking</span>
+                    <span class="arrow">▶</span>
+                </div>
+                <div class="nav-submodules">
+                    <a href="event-list.php" class="nav-submodule" data-tooltip="Event List">
+                        <span class="nav-submodule-icon"><i class="fas fa-list"></i></span>
+                        <span class="nav-submodule-text">Event List</span>
+                    </a>
+                    <a href="event-reports.php" class="nav-submodule" data-tooltip="Event Reports">
+                        <span class="nav-submodule-icon"><i class="fas fa-chart-line"></i></span>
+                        <span class="nav-submodule-text">Event Reports</span>
+                    </a>
+                </div>
+            </div>
+            
+            <div class="nav-module">
+                <div class="nav-module-header" onclick="toggleModule(this)" data-tooltip="Anonymous Tip Line System">
+                    <span class="nav-module-icon"><i class="fas fa-comments"></i></span>
+                    <span class="nav-module-header-text">Anonymous Tip Line System</span>
+                    <span class="arrow">▶</span>
+                </div>
+                <div class="nav-submodules">
+                    <a href="review-tip.php" class="nav-submodule" data-tooltip="Review Tip">
+                        <span class="nav-submodule-icon"><i class="fas fa-eye"></i></span>
+                        <span class="nav-submodule-text">Review Tip</span>
+                    </a>
+                </div>
+            </div>
+        </nav>
+        
+        <!-- Sidebar Footer with Logout -->
+        <div class="sidebar-footer">
+            <a href="logout.php" class="sidebar-logout-btn" data-tooltip="Logout">
+                <i class="fas fa-sign-out-alt"></i>
+                <span>Logout</span>
+            </a>
+        </div>
+    </aside>
+    
+    <!-- Main Content -->
+    <div class="main-wrapper">
+        <header class="top-header">
+            <div class="top-header-content">
+                <button class="content-burger-btn" onclick="toggleSidebar()" aria-label="Toggle sidebar">
+                    <span></span>
+                </button>
+                <h1 class="page-title">Users</h1>
+            </div>
+            <div class="user-info">
+                <div class="datetime-display">
+                    <span class="date-part" id="currentDate"></span>
+                    <span class="time-part" id="currentTime"></span>
+                </div>
+                <div class="notification-container">
+                    <button class="notification-bell" type="button" onclick="toggleNotifications(event)" aria-label="Notifications">
+                        <i class="fas fa-bell"></i>
+                        <span class="notification-badge" id="notificationBadge"></span>
+                    </button>
+                    <div class="notification-dropdown" id="notificationDropdown">
+                        <div class="notification-header">
+                            <h3>Notifications</h3>
+                            <button onclick="markAllAsRead()">Mark all as read</button>
+                        </div>
+                        <div class="notification-list" id="notificationList">
+                            <div class="notification-empty">
+                                <i class="fas fa-bell-slash"></i>
+                                <p>No notifications</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </header>
+        
+        <main class="content-area">
+            <div class="page-content">
+                <div class="search-container">
+                    <div class="search-box">
+                        <input type="text" id="searchInput" placeholder="Search users by name, username, email, or role..." onkeyup="filterUsers()">
+                    </div>
+                    <button class="btn-add" onclick="openAddUserModal()">
+                        <i class="fas fa-plus"></i> Add User
+                    </button>
+                </div>
+                
+                <div class="table-container">
+                    <table id="usersTable">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Full Name</th>
+                                <th>Username / Personnel ID</th>
+                                <th>Email</th>
+                                <th>Role</th>
+                                <th>Status</th>
+                                <th>Created</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="usersTableBody">
+                            <!-- Users will be loaded here -->
+                        </tbody>
+                    </table>
+                </div>
+                <div class="table-pagination">
+                    <div class="page-info" id="usersPageInfo">Page 1 of 1</div>
+                    <div class="page-buttons">
+                        <button type="button" id="usersPrevBtn" onclick="changeUsersPage(-1)" disabled>Previous</button>
+                        <button type="button" id="usersNextBtn" onclick="changeUsersPage(1)" disabled>Next</button>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+    
+    <!-- Add User Modal -->
+    <div id="addUserModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div>
+                    <h2>Add User</h2>
+                    <p class="modal-subtitle">Create an Admin account with emailed temporary access.</p>
+                </div>
+                <span class="close" onclick="closeAddUserModal()" aria-label="Close">&times;</span>
+            </div>
+            <form id="addUserForm" onsubmit="saveUser(event)">
+                <div class="modal-body">
+                    <div class="field">
+                        <label for="fullName">Full Name *</label>
+                        <input type="text" id="fullName" name="full_name" required>
+                    </div>
+                    <div class="field">
+                        <label for="username">Username *</label>
+                        <input type="text" id="username" name="username" required>
+                    </div>
+                    <div class="field">
+                        <label for="email">Email Address *</label>
+                        <input type="email" id="email" name="email" required>
+                    </div>
+                    <div class="field">
+                        <label for="role">Role *</label>
+                        <select id="role" name="role" required>
+                            <option value="Admin" selected>Admin</option>
+                        </select>
+                    </div>
+                    <div class="error-message" id="formError"></div>
+                </div>
+                <div class="button-group">
+                    <button type="button" class="btn btn-secondary" onclick="closeAddUserModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Add as Admin</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="userToast" class="toast-popup" role="status" aria-live="polite">
+        <i class="fas fa-envelope"></i>
+        <div id="userToastMessage"></div>
+    </div>
+    
+    <!-- Edit User Modal -->
+    <div id="editUserModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div>
+                    <h2>Edit User</h2>
+                    <p class="modal-subtitle">Update account details and manage password access.</p>
+                </div>
+                <span class="close" onclick="closeEditUserModal()" aria-label="Close">&times;</span>
+            </div>
+            <form id="editUserForm" onsubmit="saveEditUser(event)">
+                <input type="hidden" id="editUserId" name="user_id">
+                <div class="modal-body">
+                    <div class="field">
+                        <label for="editFullName">Full Name *</label>
+                        <input type="text" id="editFullName" name="full_name" required>
+                    </div>
+                    <div class="field">
+                        <label for="editUsername">Username *</label>
+                        <input type="text" id="editUsername" name="username" required>
+                    </div>
+                    <div class="field">
+                        <label for="editEmail">Email Address *</label>
+                        <input type="email" id="editEmail" name="email" required>
+                    </div>
+                    <div class="field">
+                        <label for="editRole">Role *</label>
+                        <select id="editRole" name="role">
+                            <option value="Admin">Admin</option>
+                        </select>
+                        <input type="text" id="editRoleLocked" readonly style="display: none;">
+                        <button type="button" class="reset-link" id="sendResetLinkBtn" onclick="sendPasswordResetLink()">
+                            Send Password Reset Link
+                        </button>
+                        <p class="field-hint" id="resetLinkHint"></p>
+                    </div>
+                    <div class="error-message" id="editFormError"></div>
+                </div>
+                <div class="button-group">
+                    <button type="button" class="btn btn-secondary" onclick="closeEditUserModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Update User</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <script src="js/table-pagination.js"></script>
+    <script>
+        // Load users on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            loadUsers();
+            
+            // Ensure sidebar is expanded when Users page is loaded
+            const sidebar = document.getElementById('sidebar');
+            sidebar.classList.remove('collapsed');
+            document.body.classList.remove('sidebar-collapsed');
+            localStorage.setItem('sidebarCollapsed', 'false');
+            
+            // Expand User Management module
+            const userManagementModule = document.querySelector('.nav-module:has(.nav-module-header-text)');
+            const allModules = document.querySelectorAll('.nav-module');
+            allModules.forEach(module => {
+                const headerText = module.querySelector('.nav-module-header-text');
+                if (headerText && headerText.textContent.trim() === 'User Management') {
+                    module.classList.add('active');
+                }
+            });
+        });
+        
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const isCollapsed = sidebar.classList.contains('collapsed');
+            
+            if (isCollapsed) {
+                sidebar.classList.remove('collapsed');
+                document.body.classList.remove('sidebar-collapsed');
+            } else {
+                sidebar.classList.add('collapsed');
+                document.body.classList.add('sidebar-collapsed');
+            }
+            
+            localStorage.setItem('sidebarCollapsed', !isCollapsed);
+        }
+        
+        function toggleModule(element) {
+            const sidebar = document.getElementById('sidebar');
+            const module = element.closest('.nav-module');
+            const isActive = module.classList.contains('active');
+            const isCollapsed = sidebar.classList.contains('collapsed');
+            
+            // When collapsed, expand sidebar and navigate to first submodule
+            if (isCollapsed) {
+                // Expand the sidebar
+                sidebar.classList.remove('collapsed');
+                document.body.classList.remove('sidebar-collapsed');
+                localStorage.setItem('sidebarCollapsed', 'false');
+                
+                // Activate the clicked module
+                document.querySelectorAll('.nav-module').forEach(m => {
+                    m.classList.remove('active');
+                });
+                module.classList.add('active');
+                
+                // Navigate to first submodule
+                const firstSubmodule = module.querySelector('.nav-submodule');
+                if (firstSubmodule && firstSubmodule.href && firstSubmodule.href !== '#') {
+                    window.location.href = firstSubmodule.href;
+                }
+                return;
+            }
+            
+            // Normal behavior when expanded
+            // Close all modules
+            document.querySelectorAll('.nav-module').forEach(m => {
+                m.classList.remove('active');
+            });
+            
+            // Open clicked module if it wasn't active
+            if (!isActive) {
+                module.classList.add('active');
+            }
+        }
+        
+        let allUsers = [];
+        const usersPager = AlertaraTablePager.create({
+            pageSize: 10,
+            pageInfoId: 'usersPageInfo',
+            prevBtnId: 'usersPrevBtn',
+            nextBtnId: 'usersNextBtn',
+            itemLabel: 'users'
+        });
+
+        function showUsersLoadError(message) {
+            const tbody = document.getElementById('usersTableBody');
+            tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:2rem;color:#b42318;">'
+                + message + '</td></tr>';
+            usersPager.reset();
+            usersPager.slice([]);
+        }
+
+        async function loadUsers() {
+            try {
+                const response = await fetch('api/users.php');
+                let result;
+                try {
+                    result = await response.json();
+                } catch (parseError) {
+                    showUsersLoadError('Could not load users. The server returned an invalid response — please refresh or contact support.');
+                    console.error('Error parsing users response:', parseError);
+                    return;
+                }
+
+                if (result.success) {
+                    allUsers = result.users || [];
+                    usersPager.reset();
+                    renderUsersTable();
+                } else {
+                    showUsersLoadError(result.error || 'Failed to load users.');
+                    console.error('Failed to load users:', result.error);
+                }
+            } catch (error) {
+                showUsersLoadError('Could not load users. Please check your connection and try again.');
+                console.error('Error loading users:', error);
+            }
+        }
+        
+        function formatRoleLabel(role) {
+            if (!role || role.toLowerCase() === 'user') {
+                return 'BPSO Personnel';
+            }
+            return role;
+        }
+
+        function isBpsoAccount(user) {
+            return user.account_type === 'bpso' || formatRoleLabel(user.role) === 'BPSO Personnel';
+        }
+
+        function isNwAccount(user) {
+            return user.account_type === 'nw' || formatRoleLabel(user.role) === 'Neighborhood Watcher';
+        }
+
+        function isRoleLockedAccount(user) {
+            return !!(user.role_locked || isBpsoAccount(user) || isNwAccount(user));
+        }
+
+        function normalizeBpsoStatus(status) {
+            const raw = String(status || 'Available').trim();
+            const map = {
+                'Available': 'Available',
+                'Assigned': 'Assigned',
+                'Assigned to Simulation': 'Assigned to Simulation',
+                'On Patrol': 'On Patrol',
+                'On Reporting': 'On Reporting',
+                'Unavailable': 'Unavailable',
+                'Off Duty': 'Unavailable',
+                'Off-Duty': 'Unavailable'
+            };
+            return map[raw] || 'Available';
+        }
+
+        function bpsoStatusClass(status) {
+            switch (normalizeBpsoStatus(status)) {
+                case 'Available': return 'status-available';
+                case 'Assigned': return 'status-assigned';
+                case 'Assigned to Simulation': return 'status-simulation';
+                case 'On Patrol': return 'status-on-patrol';
+                case 'On Reporting': return 'status-on-reporting';
+                case 'Unavailable': return 'status-unavailable';
+                default: return 'status-available';
+            }
+        }
+
+        function isAccountActive(user) {
+            if (isBpsoAccount(user)) {
+                return normalizeBpsoStatus(user.status) !== 'Unavailable';
+            }
+            return user.status === 'Active';
+        }
+
+        function getFilteredUsers() {
+            const input = document.getElementById('searchInput');
+            const filter = (input && input.value ? input.value : '').toLowerCase().trim();
+            if (!filter) return allUsers.slice();
+            return allUsers.filter(function(user) {
+                const haystack = [
+                    user.display_id,
+                    user.id,
+                    user.full_name,
+                    user.username,
+                    user.email,
+                    formatRoleLabel(user.role),
+                    user.status
+                ].join(' ').toLowerCase();
+                return haystack.indexOf(filter) > -1;
+            });
+        }
+
+        function filterUsers() {
+            usersPager.reset();
+            renderUsersTable();
+        }
+
+        function changeUsersPage(delta) {
+            usersPager.change(delta, getFilteredUsers().length);
+            renderUsersTable();
+        }
+
+        function displayUsers(users) {
+            allUsers = Array.isArray(users) ? users : [];
+            usersPager.reset();
+            renderUsersTable();
+        }
+
+        function renderUsersTable() {
+            const tbody = document.getElementById('usersTableBody');
+            tbody.innerHTML = '';
+            const filtered = getFilteredUsers();
+            const pageUsers = usersPager.slice(filtered);
+
+            if (filtered.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:2rem;color:var(--text-secondary);">'
+                    + (allUsers.length === 0 ? 'No users found.' : 'No users match your search.')
+                    + '</td></tr>';
+                return;
+            }
+
+            pageUsers.forEach(user => {
+                const tr = document.createElement('tr');
+                const isActive = isAccountActive(user);
+                const isBpso = isBpsoAccount(user);
+                const isNw = isNwAccount(user);
+                const accountType = user.account_type || (isBpso ? 'bpso' : (isNw ? 'nw' : 'admin'));
+                const roleLabel = formatRoleLabel(user.role);
+                const statusLabel = isBpso ? normalizeBpsoStatus(user.status) : (user.status || 'Active');
+                const statusClass = isBpso
+                    ? bpsoStatusClass(statusLabel)
+                    : (isActive ? 'status-active' : 'status-inactive');
+
+                tr.innerHTML = `
+                    <td>${user.display_id || user.id}</td>
+                    <td>${user.full_name || '-'}</td>
+                    <td>${user.username || '-'}</td>
+                    <td>${user.email || '-'}</td>
+                    <td>${roleLabel}</td>
+                    <td>
+                        <span class="status-badge ${statusClass}" id="status-badge-${user.id}">
+                            ${statusLabel}
+                        </span>
+                    </td>
+                    <td>${user.created_at || '-'}</td>
+                    <td>
+                        <div class="action-cell">
+                            <label class="status-toggle">
+                                <input type="checkbox" ${isActive ? 'checked' : ''} onchange="toggleUserStatus('${user.id}', this.checked, '${accountType}')">
+                                <span class="status-toggle-slider"></span>
+                            </label>
+                            <button class="btn-action btn-edit" onclick="editUser('${user.id}')">Edit</button>
+                        </div>
+                    </td>
+                `;
+
+                tbody.appendChild(tr);
+            });
+        }
+
+        async function toggleUserStatus(userId, isActive, accountType) {
+            const newStatus = accountType === 'bpso'
+                ? (isActive ? 'Available' : 'Unavailable')
+                : (isActive ? 'Active' : 'Inactive');
+            const statusBadge = document.getElementById(`status-badge-${userId}`);
+
+            if (statusBadge) {
+                statusBadge.textContent = newStatus;
+                statusBadge.className = `status-badge ${accountType === 'bpso' ? (isActive ? 'status-available' : 'status-unavailable') : (isActive ? 'status-active' : 'status-inactive')}`;
+            }
+
+            try {
+                const response = await fetch('api/users.php', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        id: userId,
+                        status: newStatus
+                    })
+                });
+
+                const result = await response.json();
+
+                if (!result.success) {
+                    alert('Failed to update user status: ' + result.error);
+                    loadUsers();
+                }
+            } catch (error) {
+                console.error('Error updating user status:', error);
+                alert('Error updating user status');
+                loadUsers();
+            }
+        }
+        
+        let toastTimer = null;
+
+        function showUserToast(message) {
+            const toast = document.getElementById('userToast');
+            const text = document.getElementById('userToastMessage');
+            if (!toast || !text) return;
+            text.textContent = message;
+            toast.classList.add('show');
+            if (toastTimer) clearTimeout(toastTimer);
+            toastTimer = setTimeout(function () {
+                toast.classList.remove('show');
+            }, 4500);
+        }
+
+        function openAddUserModal() {
+            document.getElementById('addUserModal').classList.add('active');
+            document.getElementById('addUserForm').reset();
+            document.getElementById('role').value = 'Admin';
+            document.getElementById('formError').style.display = 'none';
+        }
+        
+        function closeAddUserModal() {
+            document.getElementById('addUserModal').classList.remove('active');
+            document.getElementById('addUserForm').reset();
+            document.getElementById('formError').style.display = 'none';
+        }
+        
+        async function saveUser(event) {
+            event.preventDefault();
+            
+            const form = document.getElementById('addUserForm');
+            const formData = new FormData(form);
+            const submitBtn = form.querySelector('button[type="submit"]');
+            
+            const data = {
+                full_name: formData.get('full_name'),
+                username: formData.get('username'),
+                email: formData.get('email'),
+                role: formData.get('role') || 'Admin'
+            };
+
+            document.getElementById('formError').style.display = 'none';
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.textContent = 'Adding...';
+            }
+            
+            try {
+                const response = await fetch('api/users.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    closeAddUserModal();
+                    loadUsers();
+                    showUserToast(
+                        result.email_sent === false
+                            ? (result.message || 'Admin account created, but the welcome email could not be sent.')
+                            : 'A temporary password will be sent to the registered email. The new admin must change it before accessing the portal.'
+                    );
+                } else {
+                    document.getElementById('formError').textContent = result.error || 'Failed to create user';
+                    document.getElementById('formError').style.display = 'block';
+                }
+            } catch (error) {
+                console.error('Error creating user:', error);
+                document.getElementById('formError').textContent = 'Network error. Please try again.';
+                document.getElementById('formError').style.display = 'block';
+            } finally {
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Add as Admin';
+                }
+            }
+        }
+        
+        async function editUser(userId) {
+            try {
+                const response = await fetch('api/users.php?id=' + encodeURIComponent(userId));
+                const result = await response.json();
+
+                if (result.success && result.user) {
+                    const user = result.user;
+                    const roleLocked = isRoleLockedAccount(user);
+                    const roleLabel = formatRoleLabel(user.role);
+                    const roleSelect = document.getElementById('editRole');
+                    const roleLockedInput = document.getElementById('editRoleLocked');
+
+                    document.getElementById('editUserId').value = user.id;
+                    document.getElementById('editFullName').value = user.full_name || '';
+                    document.getElementById('editUsername').value = user.username || '';
+                    document.getElementById('editEmail').value = user.email || '';
+                    document.getElementById('editUsername').disabled = roleLocked;
+                    document.getElementById('editFormError').style.display = 'none';
+                    document.getElementById('resetLinkHint').textContent = '';
+                    document.getElementById('sendResetLinkBtn').disabled = false;
+
+                    if (roleLocked) {
+                        roleSelect.style.display = 'none';
+                        roleSelect.disabled = true;
+                        roleSelect.removeAttribute('required');
+                        roleLockedInput.style.display = 'block';
+                        roleLockedInput.value = roleLabel;
+                    } else {
+                        roleSelect.style.display = 'block';
+                        roleSelect.disabled = false;
+                        roleSelect.setAttribute('required', 'required');
+                        roleSelect.innerHTML = '<option value="Admin">Admin</option>';
+                        roleSelect.value = 'Admin';
+                        roleLockedInput.style.display = 'none';
+                    }
+
+                    document.getElementById('editUserModal').classList.add('active');
+                } else {
+                    alert('Failed to load user data: ' + (result.error || 'Unknown error'));
+                }
+            } catch (error) {
+                console.error('Error loading user:', error);
+                alert('Error loading user data. Please try again.');
+            }
+        }
+
+        function closeEditUserModal() {
+            document.getElementById('editUserModal').classList.remove('active');
+            document.getElementById('editUserForm').reset();
+            const roleSelect = document.getElementById('editRole');
+            const roleLockedInput = document.getElementById('editRoleLocked');
+            roleSelect.disabled = false;
+            roleSelect.style.display = 'block';
+            roleSelect.setAttribute('required', 'required');
+            roleSelect.innerHTML = '<option value="Admin">Admin</option>';
+            roleLockedInput.style.display = 'none';
+            document.getElementById('editUsername').disabled = false;
+            document.getElementById('editFormError').style.display = 'none';
+            document.getElementById('resetLinkHint').textContent = '';
+            document.getElementById('sendResetLinkBtn').disabled = false;
+        }
+
+        async function sendPasswordResetLink() {
+            const userId = document.getElementById('editUserId').value;
+            const btn = document.getElementById('sendResetLinkBtn');
+            const hint = document.getElementById('resetLinkHint');
+            if (!userId) {
+                return;
+            }
+
+            btn.disabled = true;
+            hint.textContent = 'Sending reset link...';
+
+            try {
+                const response = await fetch('api/users.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'send_reset_link', id: userId })
+                });
+                const result = await response.json();
+                if (result.success) {
+                    hint.textContent = result.message || 'Reset link sent.';
+                    if (typeof showUserToast === 'function') {
+                        showUserToast(result.message || 'Password reset link sent to the user\'s email.');
+                    }
+                } else {
+                    hint.textContent = result.error || 'Failed to send reset link.';
+                }
+            } catch (error) {
+                console.error('Error sending reset link:', error);
+                hint.textContent = 'Network error. Please try again.';
+            } finally {
+                btn.disabled = false;
+            }
+        }
+
+        async function saveEditUser(event) {
+            event.preventDefault();
+
+            const form = document.getElementById('editUserForm');
+            const formData = new FormData(form);
+            const roleSelect = document.getElementById('editRole');
+            const roleLockedInput = document.getElementById('editRoleLocked');
+            const roleValue = roleSelect.style.display === 'none'
+                ? roleLockedInput.value
+                : (formData.get('role') || 'Admin');
+
+            const data = {
+                id: formData.get('user_id'),
+                full_name: formData.get('full_name'),
+                username: formData.get('username'),
+                email: formData.get('email'),
+                role: roleValue
+            };
+
+            try {
+                const response = await fetch('api/users.php', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    closeEditUserModal();
+                    loadUsers();
+                } else {
+                    document.getElementById('editFormError').textContent = result.error || 'Failed to update user';
+                    document.getElementById('editFormError').style.display = 'block';
+                }
+            } catch (error) {
+                console.error('Error updating user:', error);
+                document.getElementById('editFormError').textContent = 'Network error. Please try again.';
+                document.getElementById('editFormError').style.display = 'block';
+            }
+        }
+        
+        // Close modal when clicking outside (only if clicking the modal backdrop)
+        window.onclick = function(event) {
+            const addModal = document.getElementById('addUserModal');
+            const editModal = document.getElementById('editUserModal');
+            if (event.target === addModal) {
+                closeAddUserModal();
+            }
+            if (event.target === editModal) {
+                closeEditUserModal();
+            }
+        }
+        
+        // Date and Time Display
+        function updateDateTime() {
+            const now = new Date();
+            const dateOptions = { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' };
+            const timeOptions = { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true };
+            
+            const dateStr = now.toLocaleDateString('en-US', dateOptions);
+            const timeStr = now.toLocaleTimeString('en-US', timeOptions);
+            
+            const dateEl = document.getElementById('currentDate');
+            const timeEl = document.getElementById('currentTime');
+            
+            if (dateEl) dateEl.textContent = dateStr;
+            if (timeEl) timeEl.textContent = timeStr;
+        }
+        
+        updateDateTime();
+        setInterval(updateDateTime, 1000);
+    </script>
+    <?php require __DIR__ . '/includes/admin_notifications_script.php'; ?>
+    <script src="js/mobile-shell.js"></script>
+</body>
+</html>
+
