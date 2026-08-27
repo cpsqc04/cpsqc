@@ -4,7 +4,6 @@ require_once __DIR__ . '/includes/neighborhood-watcher-member-auth.php';
 requireNwMemberLogin();
 requireNwMemberPasswordChanged();
 
-$memberName = htmlspecialchars(getNwMemberName());
 $nwActiveNav = 'account';
 ?>
 <!doctype html>
@@ -25,8 +24,10 @@ $nwActiveNav = 'account';
         .logo-container { display: flex; flex-direction: column; align-items: center; gap: 0.5rem; }
         .logo-container img { height: 130px; width: 130px; object-fit: contain; transition: all 0.3s ease; }
         .sidebar.collapsed .logo-container img { height: 70px; width: 70px; }
-        .user-name-display { color: rgba(255, 255, 255, 0.9); font-size: 0.95rem; font-weight: 500; text-align: center; padding: 0.5rem 1rem; word-break: break-word; max-width: 100%; }
-        .sidebar.collapsed .user-name-display { opacity: 0; height: 0; padding: 0; overflow: hidden; font-size: 0; }
+        .user-name-display { color: rgba(255, 255, 255, 0.9); font-size: 0.88rem; font-weight: 500; text-align: center; padding: 0.25rem 0.75rem 0; word-break: break-word; max-width: 100%; line-height: 1.3; }
+        .user-id-display { color: rgba(255, 255, 255, 0.7); font-size: 0.78rem; font-weight: 500; text-align: center; padding: 0.15rem 0.75rem 0; word-break: break-word; max-width: 100%; line-height: 1.3; }
+        .sidebar.collapsed .user-name-display,
+        .sidebar.collapsed .user-id-display { opacity: 0; height: 0; padding: 0; overflow: hidden; font-size: 0; }
         .sidebar-nav { padding: 0.5rem 0; overflow-y: auto; flex: 1; display: flex; flex-direction: column; min-height: 0; }
         .nav-submodule { padding: 0.75rem 1.5rem !important; color: rgba(255, 255, 255, 0.75); text-decoration: none; display: flex; align-items: center; gap: 0.75rem; transition: all 0.2s ease; font-size: 0.84rem !important; position: relative; }
         .nav-submodule:hover { background: rgba(255, 255, 255, 0.08); color: #fff; padding-left: 1.5rem !important; }
@@ -82,14 +83,7 @@ $nwActiveNav = 'account';
 </head>
 <body>
     <aside class="sidebar" id="sidebar">
-        <div class="sidebar-header">
-            <div class="logo-container">
-                <a href="neighborhood-watcher-dashboard.php">
-                    <img src="images/tara.png" alt="Alertara Logo">
-                </a>
-                <div class="user-name-display" id="sidebarMemberName"><?php echo $memberName; ?></div>
-            </div>
-        </div>
+        <?php require __DIR__ . '/includes/neighborhood-watcher-portal-sidebar-header.php'; ?>
         <nav class="sidebar-nav">
             <?php require __DIR__ . '/includes/neighborhood-watcher-portal-sidebar-nav.php'; ?>
         </nav>
@@ -157,8 +151,8 @@ $nwActiveNav = 'account';
                                 <input id="profileEmail" type="email" required>
                             </div>
                             <div class="form-group">
-                                <label for="profileMemberCode">Member Code</label>
-                                <input id="profileMemberCode" type="text" readonly>
+                                <label for="profileMemberId">Member ID</label>
+                                <input id="profileMemberId" type="text" readonly>
                             </div>
                             <div class="form-group full-width">
                                 <label for="profileAddress">Address *</label>
@@ -246,12 +240,14 @@ $nwActiveNav = 'account';
             document.getElementById('profileName').value = data.name || '';
             document.getElementById('profileContact').value = data.contact || '';
             document.getElementById('profileEmail').value = data.email || '';
-            document.getElementById('profileMemberCode').value = data.member_code || '';
+            document.getElementById('profileMemberId').value = data.member_code || '';
             document.getElementById('profileAddress').value = data.address || '';
             document.getElementById('profileEmergencyName').value = data.emergency_contact_name || '';
             document.getElementById('profileEmergencyContact').value = data.emergency_contact_number || '';
             const sidebarName = document.getElementById('sidebarMemberName');
             if (sidebarName && data.name) sidebarName.textContent = data.name;
+            const sidebarId = document.getElementById('sidebarMemberId');
+            if (sidebarId && data.member_code) sidebarId.textContent = data.member_code;
         }
 
         async function loadProfile() {

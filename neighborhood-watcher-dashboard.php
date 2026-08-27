@@ -5,7 +5,6 @@ require_once __DIR__ . '/includes/neighborhood-watcher-incident-terms.php';
 requireNwMemberLogin();
 requireNwMemberPasswordChanged();
 
-$memberName = htmlspecialchars(getNwMemberName());
 $memberEmail = htmlspecialchars(getNwMemberEmail());
 $passwordChanged = isset($_GET['password_changed']);
 $nwActiveNav = 'bulletin';
@@ -30,8 +29,10 @@ $nwActiveNav = 'bulletin';
         .logo-container { display: flex; flex-direction: column; align-items: center; gap: 0.5rem; }
         .logo-container img { height: 130px; width: 130px; object-fit: contain; transition: all 0.3s ease; }
         .sidebar.collapsed .logo-container img { height: 70px; width: 70px; }
-        .user-name-display { color: rgba(255, 255, 255, 0.9); font-size: 0.95rem; font-weight: 500; text-align: center; padding: 0.5rem 1rem; word-break: break-word; max-width: 100%; }
-        .sidebar.collapsed .user-name-display { opacity: 0; height: 0; padding: 0; overflow: hidden; font-size: 0; }
+        .user-name-display { color: rgba(255, 255, 255, 0.9); font-size: 0.88rem; font-weight: 500; text-align: center; padding: 0.25rem 0.75rem 0; word-break: break-word; max-width: 100%; line-height: 1.3; }
+        .user-id-display { color: rgba(255, 255, 255, 0.7); font-size: 0.78rem; font-weight: 500; text-align: center; padding: 0.15rem 0.75rem 0; word-break: break-word; max-width: 100%; line-height: 1.3; }
+        .sidebar.collapsed .user-name-display,
+        .sidebar.collapsed .user-id-display { opacity: 0; height: 0; padding: 0; overflow: hidden; font-size: 0; }
         .sidebar-nav { padding: 0.5rem 0; overflow-y: auto; flex: 1; display: flex; flex-direction: column; min-height: 0; }
         .nav-submodule { padding: 0.75rem 1.5rem !important; color: rgba(255, 255, 255, 0.75); text-decoration: none; display: flex; align-items: center; gap: 0.75rem; transition: all 0.2s ease; font-size: 0.84rem !important; cursor: pointer; border: none; background: none; width: 100%; text-align: left; font-family: inherit; position: relative; }
         .nav-submodule:hover { background: rgba(255, 255, 255, 0.08); color: #fff; padding-left: 1.5rem !important; }
@@ -168,14 +169,7 @@ $nwActiveNav = 'bulletin';
 </head>
 <body>
     <aside class="sidebar" id="sidebar">
-        <div class="sidebar-header">
-            <div class="logo-container">
-                <a href="neighborhood-watcher-dashboard.php">
-                    <img src="images/tara.png" alt="Alertara Logo">
-                </a>
-                <div class="user-name-display"><?php echo $memberName; ?></div>
-            </div>
-        </div>
+        <?php require __DIR__ . '/includes/neighborhood-watcher-portal-sidebar-header.php'; ?>
         <nav class="sidebar-nav">
             <?php require __DIR__ . '/includes/neighborhood-watcher-portal-sidebar-nav.php'; ?>
         </nav>
