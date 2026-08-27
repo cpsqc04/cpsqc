@@ -354,7 +354,7 @@ require_once __DIR__ . '/db.php';
                     <div class="search-container">
                         <div class="search-box">
                             <i class="fas fa-search" aria-hidden="true"></i>
-                            <input type="text" id="logSearch" placeholder="Search by personnel ID or name..." onkeyup="filterAttendanceLog()">
+                            <input type="text" id="logSearch" placeholder="Search by patrol ID or name..." onkeyup="filterAttendanceLog()">
                         </div>
                         <div class="date-filter">
                             <label for="historyDate">Date:</label>
@@ -368,8 +368,8 @@ require_once __DIR__ . '/db.php';
                         <table>
                             <thead>
                                 <tr>
-                                    <th>Personnel ID</th>
-                                    <th>Name</th>
+                                    <th>Patrol ID</th>
+                                    <th>Patrol Name</th>
                                     <th>Duty</th>
                                     <th>Clock On Date</th>
                                     <th>Clock On Time</th>

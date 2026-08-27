@@ -977,11 +977,11 @@ $personnelCode = htmlspecialchars(getBpsoPersonnelCode());
                         <form id="accountEmailForm" autocomplete="off">
                             <div class="form-grid form-grid-split">
                                 <div class="form-group">
-                                    <label for="accountPersonnelName">Personnel Name</label>
+                                    <label for="accountPersonnelName">Patrol Name</label>
                                     <input id="accountPersonnelName" type="text" readonly>
                                 </div>
                                 <div class="form-group">
-                                    <label for="accountPersonnelCode">Personnel ID</label>
+                                    <label for="accountPersonnelCode">Patrol ID</label>
                                     <input id="accountPersonnelCode" type="text" readonly>
                                 </div>
                                 <div class="form-group" style="grid-column: 1 / -1;">

@@ -55,7 +55,7 @@ if ($method === 'GET') {
 
             $out = fopen('php://output', 'w');
             fprintf($out, chr(0xEF) . chr(0xBB) . chr(0xBF));
-            fputcsv($out, ['Personnel ID', 'Name', 'Duty', 'Duration', 'Overtime', 'Clock On Date', 'Clock On Time', 'Clock Out', 'Status', 'Date']);
+            fputcsv($out, ['Patrol ID', 'Name', 'Duty', 'Duration', 'Overtime', 'Clock On Date', 'Clock On Time', 'Clock Out', 'Status', 'Date']);
 
             foreach ($rows as $row) {
                 $enriched = enrichAttendanceRow($row, $pdo);

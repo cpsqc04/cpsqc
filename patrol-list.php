@@ -566,7 +566,7 @@ require_once __DIR__ . '/db.php';
             <div class="page-content">
                 <div class="search-container">
                     <div class="search-box">
-                        <input type="text" id="searchInput" placeholder="Search BPSO personnel by name, personnel ID, or duty shift..." onkeyup="filterPatrolOfficers()">
+                        <input type="text" id="searchInput" placeholder="Search patrol by name, patrol ID, or duty shift..." onkeyup="filterPatrolOfficers()">
                     </div>
                     <button class="btn-add" onclick="openAddOfficerModal()">
                         <i class="fas fa-plus"></i> Add Patrol
@@ -576,8 +576,8 @@ require_once __DIR__ . '/db.php';
                     <table id="patrolOfficersTable">
                         <thead>
                             <tr>
-                                <th>BPSO Personnel ID</th>
-                                <th>Personnel Name</th>
+                                <th>Patrol ID</th>
+                                <th>Patrol Name</th>
                                 <th>Contact Number</th>
                                 <th>Duty Shift</th>
                                 <th>Status</th>
@@ -600,20 +600,20 @@ require_once __DIR__ . '/db.php';
         </main>
     </div>
 
-    <!-- Add BPSO Personnel Modal -->
+    <!-- Add Patrol Modal -->
     <div id="addOfficerModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h2>Add BPSO Personnel</h2>
+                <h2>Add Patrol</h2>
                 <span class="close" onclick="closeAddOfficerModal()">&times;</span>
             </div>
             <form id="addOfficerForm" onsubmit="saveOfficer(event)" autocomplete="off">
                 <div class="form-group">
-                    <label for="officerBadgeNumber">BPSO Personnel ID *</label>
+                    <label for="officerBadgeNumber">Patrol ID *</label>
                     <input type="text" id="officerBadgeNumber" name="badgeNumber" readonly required>
                 </div>
                 <div class="form-group">
-                    <label for="officerName">Personnel Name *</label>
+                    <label for="officerName">Patrol Name *</label>
                     <input type="text" id="officerName" name="name" required>
                 </div>
                 <div class="form-group">
@@ -623,7 +623,7 @@ require_once __DIR__ . '/db.php';
                 <div class="form-group">
                     <label for="officerEmail">Email Address *</label>
                     <input type="email" id="officerEmail" name="email" required>
-                    <small style="display:block;margin-top:0.35rem;color:var(--text-secondary);font-size:0.85rem;">A temporary password and the Patrol Portal link will be emailed to this address. The personnel must set a new password on first login.</small>
+                    <small style="display:block;margin-top:0.35rem;color:var(--text-secondary);font-size:0.85rem;">A temporary password and the Patrol Portal link will be emailed to this address. The patrol officer must set a new password on first login.</small>
                 </div>
                 <div class="form-group">
                     <label for="officerDutyShift">Duty Shift *</label>
@@ -645,17 +645,17 @@ require_once __DIR__ . '/db.php';
                 </div>
                 <div class="form-actions">
                     <button type="button" class="btn-cancel" onclick="closeAddOfficerModal()">Cancel</button>
-                    <button type="submit" class="btn-save">Add BPSO Personnel</button>
+                    <button type="submit" class="btn-save">Add Patrol</button>
                 </div>
             </form>
         </div>
     </div>
 
-    <!-- View BPSO Personnel Modal -->
+    <!-- View Patrol Modal -->
     <div id="viewOfficerModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h2>BPSO Personnel Details</h2>
+                <h2>Patrol Details</h2>
                 <span class="close" onclick="closeViewOfficerModal()">&times;</span>
             </div>
             <div id="viewOfficerContent">
@@ -667,21 +667,21 @@ require_once __DIR__ . '/db.php';
         </div>
     </div>
 
-    <!-- Edit BPSO Personnel Modal -->
+    <!-- Edit Patrol Modal -->
     <div id="editOfficerModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h2>Edit BPSO Personnel</h2>
+                <h2>Edit Patrol</h2>
                 <span class="close" onclick="closeEditOfficerModal()">&times;</span>
             </div>
             <form id="editOfficerForm" onsubmit="updateOfficer(event)" autocomplete="off">
                 <input type="hidden" id="editOfficerId" name="id">
                 <div class="form-group">
-                    <label for="editOfficerBadgeNumber">BPSO Personnel ID *</label>
+                    <label for="editOfficerBadgeNumber">Patrol ID *</label>
                     <input type="text" id="editOfficerBadgeNumber" name="badgeNumber" readonly required>
                 </div>
                 <div class="form-group">
-                    <label for="editOfficerName">Personnel Name *</label>
+                    <label for="editOfficerName">Patrol Name *</label>
                     <input type="text" id="editOfficerName" name="name" required>
                 </div>
                 <div class="form-group">
@@ -720,7 +720,7 @@ require_once __DIR__ . '/db.php';
                 </div>
                 <div class="form-actions">
                     <button type="button" class="btn-cancel" onclick="closeEditOfficerModal()">Cancel</button>
-                    <button type="submit" class="btn-save">Update BPSO Personnel</button>
+                    <button type="submit" class="btn-save">Update Patrol</button>
                 </div>
             </form>
         </div>
@@ -819,7 +819,7 @@ require_once __DIR__ . '/db.php';
 
             if (filteredIds.length === 0) {
                 tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:2rem;color:#666;">'
-                    + (patrolIdOrder.length === 0 ? 'No BPSO personnel found.' : 'No personnel match your search.')
+                    + (patrolIdOrder.length === 0 ? 'No patrol found.' : 'No patrol match your search.')
                     + '</td></tr>';
                 return;
             }
@@ -835,7 +835,7 @@ require_once __DIR__ . '/db.php';
             pageInfoId: 'patrolsPageInfo',
             prevBtnId: 'patrolsPrevBtn',
             nextBtnId: 'patrolsNextBtn',
-            itemLabel: 'personnel'
+            itemLabel: 'patrol'
         });
         
         // Load patrols from database
@@ -973,12 +973,12 @@ require_once __DIR__ . '/db.php';
                     document.getElementById('officerBadgeNumber').value = result.data.bpso_personnel_id;
                 } else {
                     document.getElementById('officerBadgeNumber').value = '';
-                    alert(result.message || 'Failed to generate BPSO Personnel ID.');
+                    alert(result.message || 'Failed to generate Patrol ID.');
                 }
             } catch (err) {
-                console.error('Error generating BPSO Personnel ID:', err);
+                console.error('Error generating Patrol ID:', err);
                 document.getElementById('officerBadgeNumber').value = '';
-                alert('Failed to generate BPSO Personnel ID.');
+                alert('Failed to generate Patrol ID.');
             }
         }
 
@@ -992,8 +992,8 @@ require_once __DIR__ . '/db.php';
             
             const content = `
                 <div style="line-height: 1.8;">
-                    <p><strong>BPSO Personnel ID:</strong> ${officer.bpso_personnel_id || ''}</p>
-                    <p><strong>Personnel Name:</strong> ${officer.personnel_name || ''}</p>
+                    <p><strong>Patrol ID:</strong> ${officer.bpso_personnel_id || ''}</p>
+                    <p><strong>Patrol Name:</strong> ${officer.personnel_name || ''}</p>
                     <p><strong>Contact Number:</strong> ${officer.contact_number || ''}</p>
                     <p><strong>Email Address:</strong> ${officer.email || ''}</p>
                     <p><strong>Duty Shift:</strong> ${officer.duty_shift || officer.schedule || ''}</p>
@@ -1035,12 +1035,12 @@ require_once __DIR__ . '/db.php';
         }
 
         function editOfficer(id) {
-            alert('BPSO personnel details are managed in their Account Settings. Admins can only View or Add Patrol.');
+            alert('Patrol details are managed in their Account Settings. Admins can only View or Add Patrol.');
             return;
         }
 
         function deleteOfficer(id) {
-            if (!confirm('Are you sure you want to delete this BPSO personnel record?')) {
+            if (!confirm('Are you sure you want to delete this patrol record?')) {
                 return;
             }
             
@@ -1057,17 +1057,17 @@ require_once __DIR__ . '/db.php';
             .then(res => res.json())
             .then(result => {
                 if (!result.success) {
-                    alert(result.message || 'Failed to delete BPSO personnel.');
+                    alert(result.message || 'Failed to delete patrol.');
                     return;
                 }
                 
                 // Reload patrols to refresh the table
                 loadPatrols();
-                alert('BPSO personnel deleted successfully!');
+                alert('Patrol deleted successfully!');
             })
             .catch(err => {
-                console.error('Error deleting BPSO personnel:', err);
-                alert('Error deleting BPSO personnel. Please try again.');
+                console.error('Error deleting patrol:', err);
+                alert('Error deleting patrol. Please try again.');
             });
         }
 
@@ -1092,7 +1092,7 @@ require_once __DIR__ . '/db.php';
 
             const previewId = (formData.get('badgeNumber') || '').trim();
             if (!previewId || previewId === 'Generating...') {
-                alert('BPSO Personnel ID is still being generated. Please wait a moment and try again.');
+                alert('Patrol ID is still being generated. Please wait a moment and try again.');
                 return;
             }
 
@@ -1127,23 +1127,23 @@ require_once __DIR__ . '/db.php';
             })
             .then(result => {
                 if (!result.success) {
-                    showToast(result.message || 'Failed to save BPSO personnel.', true);
+                    showToast(result.message || 'Failed to save patrol.', true);
                     return;
                 }
                 
                 loadPatrols();
-                showToast('BPSO Personnel was successfully added and will receive an email.');
+                showToast('Patrol was successfully added and will receive an email.');
                 closeAddOfficerModal();
             })
             .catch(err => {
-                console.error('Error saving BPSO personnel:', err);
-                showToast('Error saving BPSO personnel: ' + (err.message || 'Please try again.'), true);
+                console.error('Error saving patrol:', err);
+                showToast('Error saving patrol: ' + (err.message || 'Please try again.'), true);
             });
         }
 
         function updateOfficer(event) {
             event.preventDefault();
-            alert('BPSO personnel details are managed in their Account Settings. Admins can only View or Add Patrol.');
+            alert('Patrol details are managed in their Account Settings. Admins can only View or Add Patrol.');
         }
 
         // Close modals when clicking outside

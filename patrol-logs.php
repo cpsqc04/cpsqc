@@ -631,7 +631,7 @@ require_once __DIR__ . '/db.php';
             <div class="page-content">
                 <div class="logs-toolbar">
                     <div class="search-box">
-                        <input type="text" id="searchInput" placeholder="Search patrol logs by date, BPSO personnel, or incident..." onkeyup="filterLogs()">
+                        <input type="text" id="searchInput" placeholder="Search patrol logs by date, patrol, or incident..." onkeyup="filterLogs()">
                     </div>
                     <button type="button" class="btn-export export-enter-only" id="btnEnterLogExportSelect" onclick="enterLogExportSelectMode()">
                         <i class="fas fa-file-export"></i> Export
@@ -649,7 +649,7 @@ require_once __DIR__ . '/db.php';
                             <tr>
                                 <th class="col-select"><input type="checkbox" id="selectAllLogs" title="Select all" onchange="toggleSelectAll(this)"></th>
                                 <th>Date & Time</th>
-                                <th>BPSO Personnel</th>
+                                <th>Patrol</th>
                                 <th>Route</th>
                                 <th>Incidents</th>
                                 <th>Status</th>
@@ -1038,7 +1038,7 @@ require_once __DIR__ . '/db.php';
             const content = `
                 <p><strong>Date:</strong> ${escapeHtml(log.date)}</p>
                 <p><strong>Time:</strong> ${escapeHtml(log.time)}</p>
-                <p><strong>BPSO Personnel:</strong> ${escapeHtml(log.personnel_name)}</p>
+                <p><strong>Patrol:</strong> ${escapeHtml(log.personnel_name)}</p>
                 <p><strong>Route:</strong> ${escapeHtml(log.route)}</p>
                 <p><strong>Location:</strong> ${escapeHtml(log.location)}</p>
                 <p><strong>Status:</strong> <span class="status-badge ${statusClassName}">${escapeHtml(log.status)}</span></p>

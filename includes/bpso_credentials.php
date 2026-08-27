@@ -106,12 +106,12 @@ function sendBpsoWelcomeCredentialsEmail(
         <div class='email-container'>
             <div class='body-content'>
                 <p>Dear {$safeName},</p>
-                <p>Your BPSO personnel account has been created in AlerTara QC. Use the temporary credentials below to sign in to the Patrol Portal.</p>
+                <p>Your patrol account has been created in AlerTara QC. Use the temporary credentials below to sign in to the Patrol Portal.</p>
                 <div class='credentials-box'>
                     <p class='credentials-title'>Temporary Sign-In Credentials</p>
                     <p><strong>Patrol Portal:</strong> <a href='{$safePortalUrl}' style='color:#2a5a59;'>{$safePortalUrl}</a></p>
                     <p><strong>Email Address:</strong> {$safeEmail}</p>
-                    <p><strong>BPSO Personnel ID:</strong> {$safeCode}</p>
+                    <p><strong>Patrol ID:</strong> {$safeCode}</p>
                     <p><strong>Temporary Password:</strong> <span class='temp-password'>{$safeTempPassword}</span></p>
                     <p class='credentials-note'>On first login you must set a new password before you can access the portal. Your new password must include uppercase, lowercase, and a number or special character (e.g. @, #, _).</p>
                 </div>

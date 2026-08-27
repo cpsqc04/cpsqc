@@ -651,7 +651,7 @@ require_once __DIR__ . '/db.php';
                 <div id="scheduleSection">
                     <div class="schedule-toolbar">
                         <div class="search-box">
-                            <input type="text" id="searchInput" placeholder="Search by personnel, patrol zone, shift, status, or date..." onkeyup="filterPatrols()">
+                            <input type="text" id="searchInput" placeholder="Search by patrol, patrol zone, shift, status, or date..." onkeyup="filterPatrols()">
                         </div>
                         <button type="button" class="btn-high-risk" id="btnOpenHighRisk" onclick="showHighRiskSection()">
                             <i class="fas fa-exclamation-triangle"></i>
@@ -666,7 +666,7 @@ require_once __DIR__ . '/db.php';
                         <table id="patrolsTable">
                             <thead>
                                 <tr>
-                                    <th>BPSO Personnel</th>
+                                    <th>Patrol</th>
                                     <th>Shift</th>
                                     <th>Patrol Zone</th>
                                     <th>Date</th>
@@ -750,9 +750,9 @@ require_once __DIR__ . '/db.php';
                 <input type="hidden" id="linkedPatrolRequestCode" name="linked_request_code" value="">
                 <input type="hidden" id="assignSlotsRemaining" value="">
                 <div class="form-group">
-                    <label for="patrolOfficer">BPSO Personnel *</label>
+                    <label for="patrolOfficer">Patrol *</label>
                     <select id="patrolOfficer" name="patrol_id" required onchange="onPatrolOfficerSelectionChange()">
-                        <option value="">Select BPSO Personnel</option>
+                        <option value="">Select Patrol</option>
                     </select>
                 </div>
                 <div class="form-group" id="patrolShiftGroup">
@@ -1308,7 +1308,7 @@ require_once __DIR__ . '/db.php';
 
             patrolOfficerSelect.innerHTML = maxSelectable > 1
                 ? ''
-                : '<option value="">Select BPSO Personnel</option>';
+                : '<option value="">Select Patrol</option>';
 
             try {
                 const [patrolResponse, hallResponse] = await Promise.all([
@@ -1351,7 +1351,7 @@ require_once __DIR__ . '/db.php';
                     }
                 }
             } catch (e) {
-                console.error('Error loading BPSO personnel:', e);
+                console.error('Error loading patrol:', e);
             }
 
             onPatrolOfficerSelectionChange();
@@ -1467,7 +1467,7 @@ require_once __DIR__ . '/db.php';
             const zone = schedule.patrol_zone || schedule.location || schedule.route || '—';
             const content = `
                 <div style="line-height: 1.8;">
-                    <p><strong>BPSO Personnel:</strong> ${escapeHtml(schedule.personnel_name)}</p>
+                    <p><strong>Patrol:</strong> ${escapeHtml(schedule.personnel_name)}</p>
                     <p><strong>Shift:</strong> ${escapeHtml(formatShiftWithHours(schedule.shift))}</p>
                     <p><strong>Patrol Zone:</strong> ${escapeHtml(zone)}</p>
                     <p><strong>Date:</strong> ${escapeHtml(schedule.schedule_date)}</p>
@@ -1517,7 +1517,7 @@ require_once __DIR__ . '/db.php';
             const selectedOptions = getSelectedPatrolOptions();
 
             if (!selectedOptions.length) {
-                alert('Please select Available BPSO personnel.');
+                alert('Please select Available patrol.');
                 return;
             }
 
