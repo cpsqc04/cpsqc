@@ -215,13 +215,13 @@ $cctvNavActive = 'cctv-request';
             display: flex;
             gap: 0.75rem;
             flex-wrap: wrap;
-            margin-top: 1.5rem;
-            padding-top: 1.25rem;
+            margin-top: 1rem;
+            padding-top: 0.9rem;
             border-top: 1px solid var(--border-color);
         }
         .reject-panel, .select-footage-panel {
-            margin-top: 1.25rem;
-            padding: 1.1rem 1.15rem;
+            margin-top: 1rem;
+            padding: 1rem 1.05rem;
             border: 1px solid var(--border-color);
             border-radius: 10px;
             background: #f8fafb;
@@ -229,19 +229,25 @@ $cctvNavActive = 'cctv-request';
         }
         .reject-panel.show, .select-footage-panel.show { display: block; }
         .select-footage-panel h3, .reject-panel h3 {
-            margin: 0 0 0.85rem;
+            margin: 0 0 0.5rem;
             font-size: 1rem;
             color: var(--tertiary-color);
+        }
+        .select-footage-panel .panel-hint {
+            margin: 0 0 0.75rem;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            line-height: 1.4;
         }
         .footage-filters {
             display: flex;
             flex-wrap: wrap;
             gap: 0.75rem;
             align-items: flex-end;
-            margin-bottom: 1rem;
+            margin-bottom: 0.85rem;
         }
         .footage-filters .form-group { margin: 0; min-width: 160px; flex: 1; }
-        .footage-results { display: flex; flex-direction: column; gap: 0.65rem; max-height: 320px; overflow-y: auto; }
+        .footage-results { display: flex; flex-direction: column; gap: 0.55rem; max-height: 220px; overflow-y: auto; }
         .footage-item {
             display: grid;
             grid-template-columns: 1fr auto;
@@ -290,12 +296,57 @@ $cctvNavActive = 'cctv-request';
         }
         .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 2000; align-items: center; justify-content: center; }
         .modal.active { display: flex; }
-        .modal-content { background: var(--card-bg); border-radius: 12px; padding: 2rem; width: 90%; max-width: 760px; max-height: 90vh; overflow-y: auto; }
-        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; padding-bottom: 1rem; border-bottom: 1px solid var(--border-color); }
-        .modal-header h2 { margin: 0; color: var(--tertiary-color); }
+        .modal-content { background: var(--card-bg); border-radius: 12px; padding: 1.5rem 1.75rem; width: 92%; max-width: 720px; max-height: 88vh; overflow-y: auto; }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; padding-bottom: 0.85rem; border-bottom: 1px solid var(--border-color); }
+        .modal-header h2 { margin: 0; color: var(--tertiary-color); font-size: 1.15rem; }
         .close-modal { background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--text-secondary); }
-        .detail-row { display: grid; grid-template-columns: 180px 1fr; gap: 0.75rem; margin-bottom: 0.85rem; }
-        .detail-label { font-weight: 600; color: var(--text-secondary); }
+        .request-summary {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.65rem 1rem;
+            margin-bottom: 0.5rem;
+        }
+        .request-summary .detail-row {
+            display: flex;
+            flex-direction: column;
+            gap: 0.2rem;
+            margin: 0;
+        }
+        .request-summary .detail-row.full { grid-column: 1 / -1; }
+        .detail-label { font-weight: 600; color: var(--text-secondary); font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.02em; }
+        .detail-value { color: var(--tertiary-color); font-size: 0.95rem; line-height: 1.4; word-break: break-word; }
+        .more-details {
+            margin: 0.5rem 0 0;
+            border-top: 1px dashed var(--border-color);
+            padding-top: 0.65rem;
+        }
+        .more-details summary {
+            cursor: pointer;
+            color: var(--primary-color);
+            font-weight: 600;
+            font-size: 0.9rem;
+            user-select: none;
+        }
+        .more-details[open] summary { margin-bottom: 0.65rem; }
+        .more-details .detail-row {
+            display: grid;
+            grid-template-columns: 150px 1fr;
+            gap: 0.5rem;
+            margin-bottom: 0.55rem;
+            font-size: 0.9rem;
+        }
+        .selected-footage-note {
+            display: none;
+            margin: 0 0 0.85rem;
+            padding: 0.65rem 0.8rem;
+            border-radius: 8px;
+            background: #ecfdf5;
+            color: #0f5132;
+            border: 1px solid #a7f3d0;
+            font-size: 0.88rem;
+            font-weight: 600;
+        }
+        .selected-footage-note.show { display: block; }
         .form-group { margin-bottom: 1rem; }
         .form-group label { display: block; margin-bottom: 0.4rem; font-weight: 500; }
         .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 8px; box-sizing: border-box; font: inherit; }
@@ -336,8 +387,8 @@ $cctvNavActive = 'cctv-request';
             gap: 0.75rem;
             justify-content: flex-end;
             align-items: center;
-            margin-top: 1.25rem;
-            padding-top: 1.1rem;
+            margin-top: 1rem;
+            padding-top: 0.9rem;
             border-top: 1px solid var(--border-color);
         }
         .btn-save {
@@ -599,7 +650,8 @@ $cctvNavActive = 'cctv-request';
             </div>
             <div id="selectFootagePanel" class="select-footage-panel">
                 <h3>Select Footage</h3>
-                <p style="margin:0 0 0.85rem;font-size:0.9rem;color:var(--text-secondary);">Search recordings by date and location to match this request.</p>
+                <p class="panel-hint">Click a recording to attach it to this request. Then send it to Incident Reporting if needed.</p>
+                <div id="selectedFootageNote" class="selected-footage-note"></div>
                 <div class="footage-filters">
                     <div class="form-group">
                         <label for="footageDate">Date</label>
@@ -616,8 +668,7 @@ $cctvNavActive = 'cctv-request';
                     <div class="request-list-empty">Enter a date and search for recordings.</div>
                 </div>
                 <div class="form-actions">
-                    <button type="button" class="btn-cancel" onclick="hideSelectFootagePanel()">Cancel</button>
-                    <button type="button" class="btn-approve" id="confirmFootageBtn" onclick="confirmSelectedFootage()" disabled>Confirm Selected Footage</button>
+                    <button type="button" class="btn-cancel" onclick="hideSelectFootagePanel()">Close</button>
                     <button type="button" class="btn-incident-reporting" id="sendToIncidentReportingBtn" onclick="sendFootageToIncidentReporting()">Send to Incident Reporting</button>
                 </div>
                 <div id="incidentReportingEvidenceStatus" class="incident-reporting-status"></div>
@@ -790,15 +841,39 @@ $cctvNavActive = 'cctv-request';
             });
         }
 
-        function detailRow(label, valueHtml) {
-            return `<div class="detail-row"><span class="detail-label">${escapeHtml(label)}</span><span>${valueHtml}</span></div>`;
+        function detailRow(label, valueHtml, extraClass) {
+            return `<div class="detail-row${extraClass ? ' ' + extraClass : ''}"><span class="detail-label">${escapeHtml(label)}</span><span class="detail-value">${valueHtml}</span></div>`;
+        }
+
+        function optionalDetailRow(label, value) {
+            const text = String(value == null ? '' : value).trim();
+            if (!text || text === '—') return '';
+            return detailRow(label, escapeHtml(text));
+        }
+
+        function selectedFootageLabelFromNotes(notes) {
+            const text = String(notes || '');
+            const match = text.match(/Selected footage:\s*([^\s(]+)/i);
+            return match ? match[1] : '';
+        }
+
+        function updateSelectedFootageNote(filename) {
+            const note = document.getElementById('selectedFootageNote');
+            if (!note) return;
+            if (!filename) {
+                note.classList.remove('show');
+                note.textContent = '';
+                return;
+            }
+            note.textContent = 'Selected: ' + filename;
+            note.classList.add('show');
         }
 
         function viewRequest(requestId) {
             const item = requestData[requestId];
             if (!item) return;
             activeRequestId = requestId;
-            selectedFootageFilename = null;
+            selectedFootageFilename = selectedFootageLabelFromNotes(item.fulfillment_notes) || null;
             selectedCameraId = item.approved_camera_id || item.camera_id || null;
             hideRejectPanel();
             hideSelectFootagePanel();
@@ -806,37 +881,48 @@ $cctvNavActive = 'cctv-request';
 
             const docButton = item.has_supporting_document
                 ? `<button class="btn-view" type="button" onclick="viewDocument(${item.id})">View Document</button>`
-                : 'None';
+                : '';
 
-            document.getElementById('viewDetails').innerHTML = [
+            const summary = [
                 detailRow('Request ID', escapeHtml(item.request_id)),
-                detailRow('Agency', escapeHtml(item.requesting_agency || '—')),
-                detailRow('Contact Number', escapeHtml(item.contact_number || '—')),
-                detailRow('Email', escapeHtml(item.contact_email || '—')),
+                detailRow('Status', `<span class="status-badge status-${statusClass(item.status)}">${escapeHtml(item.status || 'Pending')}</span>`),
+                detailRow('Agency', escapeHtml(item.requesting_agency || '—'), 'full'),
                 detailRow('Case Reference', escapeHtml(item.case_reference || '—')),
-                detailRow('Purpose', escapeHtml(purposeLabel(item))),
-                detailRow('Legal Basis', escapeHtml(item.legal_basis || '—')),
-                detailRow('Incident Location', escapeHtml(item.incident_location || '—')),
                 detailRow('Camera', escapeHtml(cameraLabel(item.camera_id))),
-                detailRow('Footage Window', escapeHtml(`${formatDate(item.incident_date)} ${formatTime(item.footage_start_time)} - ${formatTime(item.footage_end_time)}`)),
-                detailRow('Incident Description', escapeHtml(item.incident_description || '—')),
-                detailRow('Delivery Method', escapeHtml(item.delivery_method || '—')),
-                detailRow('Supporting Document', docButton),
-                detailRow('Review Notes', escapeHtml(item.review_notes || '—')),
-                detailRow('Date Submitted', escapeHtml(formatDateTime(item.submitted_at))),
-                detailRow('Status', `<span class="status-badge status-${statusClass(item.status)}">${escapeHtml(item.status || 'Pending')}</span>`)
+                detailRow('Footage Window', escapeHtml(`${formatDate(item.incident_date)} ${formatTime(item.footage_start_time)} – ${formatTime(item.footage_end_time)}`), 'full'),
+                detailRow('Location', escapeHtml(item.incident_location || '—'), 'full'),
             ].join('');
 
-            const blocked = ['Rejected', 'Cancelled', 'Fulfilled'].includes(item.status);
+            const more = [
+                optionalDetailRow('Contact Number', item.contact_number),
+                optionalDetailRow('Email', item.contact_email),
+                optionalDetailRow('Purpose', purposeLabel(item)),
+                optionalDetailRow('Legal Basis', item.legal_basis),
+                optionalDetailRow('Incident Description', item.incident_description),
+                optionalDetailRow('Delivery Method', item.delivery_method),
+                docButton ? detailRow('Supporting Document', docButton) : '',
+                optionalDetailRow('Review Notes', item.review_notes),
+                optionalDetailRow('Date Submitted', formatDateTime(item.submitted_at)),
+            ].filter(Boolean).join('');
+
+            document.getElementById('viewDetails').innerHTML =
+                `<div class="request-summary">${summary}</div>`
+                + (more
+                    ? `<details class="more-details"><summary>More details</summary>${more}</details>`
+                    : '');
+
             const actions = document.getElementById('detailActions');
-            const rejectDisabled = item.status === 'Rejected' || item.status === 'Cancelled' || item.status === 'Fulfilled';
+            const canReject = !['Rejected', 'Cancelled', 'Fulfilled'].includes(item.status);
+            const canSelectFootage = !['Rejected', 'Cancelled'].includes(item.status);
+            const approveLabel = ['Approved', 'Fulfilled'].includes(item.status) ? 'Select / Send Footage' : 'Approve & Select Footage';
             actions.innerHTML = `
-                <button type="button" class="btn-approve" ${blocked ? 'disabled style="opacity:0.55;cursor:not-allowed;"' : ''} onclick="startApprove()"><i class="fas fa-check"></i> Approve</button>
-                <button type="button" class="btn-reject" ${rejectDisabled ? 'disabled style="opacity:0.55;cursor:not-allowed;"' : ''} onclick="startReject()"><i class="fas fa-times"></i> Reject</button>
+                <button type="button" class="btn-approve" ${canSelectFootage ? '' : 'disabled style="opacity:0.55;cursor:not-allowed;"'} onclick="startApprove()"><i class="fas fa-video"></i> ${approveLabel}</button>
+                <button type="button" class="btn-reject" ${canReject ? '' : 'disabled style="opacity:0.55;cursor:not-allowed;"'} onclick="startReject()"><i class="fas fa-times"></i> Reject</button>
             `;
 
             document.getElementById('footageDate').value = item.incident_date || '';
             document.getElementById('footageLocation').value = item.incident_location || item.location_description || '';
+            updateSelectedFootageNote(selectedFootageFilename);
             updateIncidentReportingButtons(item);
             document.getElementById('viewModal').classList.add('active');
         }
@@ -901,12 +987,13 @@ $cctvNavActive = 'cctv-request';
         async function startApprove() {
             const item = requestData[activeRequestId];
             if (!item) return;
+            if (['Rejected', 'Cancelled'].includes(item.status)) return;
             hideRejectPanel();
             document.getElementById('selectFootagePanel').classList.add('show');
             document.getElementById('footageDate').value = item.incident_date || '';
             document.getElementById('footageLocation').value = item.incident_location || item.location_description || '';
-            selectedFootageFilename = null;
-            document.getElementById('confirmFootageBtn').disabled = true;
+            selectedFootageFilename = selectedFootageLabelFromNotes(item.fulfillment_notes) || selectedFootageFilename;
+            updateSelectedFootageNote(selectedFootageFilename);
             updateIncidentReportingButtons(item);
             await searchFootage();
             try {
@@ -923,10 +1010,11 @@ $cctvNavActive = 'cctv-request';
                     if (result.success) {
                         item.status = 'Approved';
                         requestData[item.request_id] = item;
-                        filterRequests();
-                        const statusRow = document.querySelector('#viewDetails .detail-row:last-child span:last-child');
-                        if (statusRow) {
-                            statusRow.innerHTML = `<span class="status-badge status-approved">Approved</span>`;
+                        renderRequestsList();
+                        const badge = document.querySelector('#viewDetails .status-badge');
+                        if (badge) {
+                            badge.className = 'status-badge status-approved';
+                            badge.textContent = 'Approved';
                         }
                     }
                 }
@@ -937,8 +1025,6 @@ $cctvNavActive = 'cctv-request';
 
         function hideSelectFootagePanel() {
             document.getElementById('selectFootagePanel').classList.remove('show');
-            selectedFootageFilename = null;
-            document.getElementById('confirmFootageBtn').disabled = true;
         }
 
         function matchingCameras(locationQuery) {
@@ -1031,10 +1117,11 @@ $cctvNavActive = 'cctv-request';
 
         function selectFootage(filename) {
             selectedFootageFilename = filename;
-            document.getElementById('confirmFootageBtn').disabled = !filename;
             document.querySelectorAll('.footage-item').forEach(el => {
                 el.classList.toggle('selected', el.dataset.filename === filename);
             });
+            updateSelectedFootageNote(filename);
+            saveSelectedFootage(filename);
         }
 
         async function updateRequestStatus(id, payload) {
@@ -1046,24 +1133,28 @@ $cctvNavActive = 'cctv-request';
             return res.json();
         }
 
-        async function confirmSelectedFootage() {
+        async function saveSelectedFootage(filename) {
             const item = requestData[activeRequestId];
-            if (!item || !selectedFootageFilename) return;
-            const segment = footageSegments[selectedFootageFilename];
+            if (!item || !filename) return;
+            const segment = footageSegments[filename];
             if (!segment) {
                 alert('Selected recording was not found. Search again.');
                 return;
             }
 
             const cameraId = selectedCameraId || item.approved_camera_id || item.camera_id || '';
-            const noteLine = 'Selected footage: ' + selectedFootageFilename
+            const noteLine = 'Selected footage: ' + filename
                 + (cameraId ? ' (camera ' + cameraId + ')' : '')
                 + ' · ' + (segment.start_at || '') + ' – ' + (segment.end_at || '');
-            const fulfillmentNotes = [item.fulfillment_notes || '', noteLine].filter(Boolean).join('\n');
+            const previousNotes = String(item.fulfillment_notes || '')
+                .split(/\r?\n/)
+                .filter(line => line.trim() && !/^Selected footage:/i.test(line.trim()))
+                .join('\n');
+            const fulfillmentNotes = [previousNotes, noteLine].filter(Boolean).join('\n');
 
             try {
                 const result = await updateRequestStatus(item.id, {
-                    status: 'Approved',
+                    status: item.status === 'Fulfilled' ? 'Fulfilled' : 'Approved',
                     approved_camera_id: cameraId,
                     actual_footage_start: (segment.start_time || '').slice(0, 8),
                     actual_footage_end: (segment.end_time || '').slice(0, 8),
@@ -1072,11 +1163,16 @@ $cctvNavActive = 'cctv-request';
                     fulfillment_notes: fulfillmentNotes
                 });
                 if (!result.success) throw new Error(result.message || 'Failed to save selected footage');
-                alert('Footage selected and request approved.');
-                closeViewModal();
-                await loadRequests();
+                item.status = item.status === 'Fulfilled' ? 'Fulfilled' : 'Approved';
+                item.fulfillment_notes = fulfillmentNotes;
+                item.approved_camera_id = cameraId;
+                item.actual_footage_start = (segment.start_time || '').slice(0, 8);
+                item.actual_footage_end = (segment.end_time || '').slice(0, 8);
+                requestData[item.request_id] = item;
+                renderRequestsList();
+                updateIncidentReportingButtons(item);
             } catch (err) {
-                alert(err.message || 'Failed to confirm footage.');
+                alert(err.message || 'Failed to save selected footage.');
             }
         }
 
