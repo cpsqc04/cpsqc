@@ -502,9 +502,70 @@ $nwSearchPlaceholder = $nwIsMemberList
         .eligibility-answer.yes { background: #d1e7dd; color: #0f5132; }
         .eligibility-answer.no { background: #f8d7da; color: #842029; }
         .review-actions { display: flex; gap: 1rem; justify-content: flex-end; margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid var(--border-color); }
-        .review-photo-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 1rem; }
-        .review-photo-card { display: flex; flex-direction: column; gap: 0.5rem; }
-        .review-photo-card img { width: 100%; max-width: 180px; height: 140px; object-fit: cover; border-radius: 8px; border: 2px solid var(--border-color); cursor: pointer; }
+        .review-photo-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 1rem;
+        }
+        .review-photo-card {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            padding: 0.75rem;
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            background: #f8fafc;
+            min-width: 0;
+        }
+        .review-photo-card-label {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--text-color);
+        }
+        .review-photo-preview {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 180px;
+            background: #fff;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        .review-photo-preview img {
+            max-width: 100%;
+            max-height: 100%;
+            width: auto;
+            height: auto;
+            object-fit: contain;
+            cursor: pointer;
+        }
+        .review-photo-preview.is-empty {
+            color: var(--text-secondary);
+            font-style: italic;
+            font-size: 0.88rem;
+            text-align: center;
+            padding: 0.75rem;
+        }
+        .review-photo-preview.is-pdf a {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            width: 100%;
+            height: 100%;
+            color: var(--primary-color);
+            font-weight: 600;
+            text-decoration: none;
+        }
+        .review-photo-preview.is-pdf a i { font-size: 2rem; }
+        .review-photo-hint {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            text-align: center;
+        }
+        .review-documents-section { display: flex; flex-direction: column; gap: 0.75rem; }
         /* View Modal Styles */
         .complaint-details { display: flex; flex-direction: column; gap: 1.25rem; }
         .detail-row { display: flex; flex-direction: column; gap: 0.5rem; }
@@ -512,7 +573,7 @@ $nwSearchPlaceholder = $nwIsMemberList
         .detail-value { color: var(--text-secondary); font-size: 0.95rem; line-height: 1.6; }
         .detail-row.inline { flex-direction: row; align-items: center; gap: 1rem; }
         .detail-row.inline .detail-label { min-width: 120px; }
-        @media (max-width: 768px) { .sidebar { width: 320px; transform: translateX(-100%); transition: transform 0.3s ease; } .sidebar.mobile-open { transform: translateX(0); } .sidebar.collapsed { width: 80px; transform: translateX(0); } .main-wrapper { margin-left: 0; } body.sidebar-collapsed .main-wrapper { margin-left: 80px; } .toolbar { flex-direction: column; } .search-box { width: 100%; } .form-row { grid-template-columns: 1fr; } .review-application-layout { grid-template-columns: 1fr; gap: 1.25rem; } #reviewMemberModal .modal-content { max-width: 95vw; padding: 1.25rem; } }
+        @media (max-width: 768px) { .sidebar { width: 320px; transform: translateX(-100%); transition: transform 0.3s ease; } .sidebar.mobile-open { transform: translateX(0); } .sidebar.collapsed { width: 80px; transform: translateX(0); } .main-wrapper { margin-left: 0; } body.sidebar-collapsed .main-wrapper { margin-left: 80px; } .toolbar { flex-direction: column; } .search-box { width: 100%; } .form-row { grid-template-columns: 1fr; } .review-application-layout { grid-template-columns: 1fr; gap: 1.25rem; } .review-photo-grid { grid-template-columns: 1fr; } #reviewMemberModal .modal-content { max-width: 95vw; padding: 1.25rem; } }
     </style>
     <link rel="stylesheet" href="css/mobile-responsive.css">
 </head>
@@ -1345,6 +1406,73 @@ $nwSearchPlaceholder = $nwIsMemberList
             return `<ul class="eligibility-review-list">${items}</ul>`;
         }
 
+        function buildReviewDocumentsHtml(member) {
+            function emptyDocumentCard(label) {
+                return `
+                    <div class="review-photo-card">
+                        <span class="review-photo-card-label">${label}</span>
+                        <div class="review-photo-preview is-empty">Not uploaded</div>
+                    </div>
+                `;
+            }
+
+            function imageDocumentCard(label, src, alt) {
+                return `
+                    <div class="review-photo-card">
+                        <span class="review-photo-card-label">${label}</span>
+                        <div class="review-photo-preview">
+                            <img src="${src}" alt="${alt}" onclick="viewPhoto(this.src)">
+                        </div>
+                        <span class="review-photo-hint">Click to view full size</span>
+                    </div>
+                `;
+            }
+
+            const memberPhoto = member.photo_data
+                ? imageDocumentCard('Member Photo', member.photo_data, 'Member Photo')
+                : emptyDocumentCard('Member Photo');
+
+            const validId = member.photo_id_data
+                ? imageDocumentCard('Valid ID', member.photo_id_data, 'Valid ID')
+                : emptyDocumentCard('Valid ID');
+
+            let barangayClearance;
+            if (member.barangay_clearance_data) {
+                if (/\.pdf($|\?)/i.test(String(member.barangay_clearance_data))) {
+                    barangayClearance = `
+                        <div class="review-photo-card">
+                            <span class="review-photo-card-label">Barangay Clearance</span>
+                            <div class="review-photo-preview is-pdf">
+                                <a href="${member.barangay_clearance_data}" target="_blank" rel="noopener noreferrer">
+                                    <i class="fas fa-file-pdf"></i>
+                                    <span>Open PDF</span>
+                                </a>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    barangayClearance = imageDocumentCard(
+                        'Barangay Clearance',
+                        member.barangay_clearance_data,
+                        'Barangay Clearance'
+                    );
+                }
+            } else {
+                barangayClearance = emptyDocumentCard('Barangay Clearance');
+            }
+
+            return `
+                <div class="review-documents-section">
+                    <h3 class="review-section-title">Documents</h3>
+                    <div class="review-photo-grid">
+                        ${memberPhoto}
+                        ${validId}
+                        ${barangayClearance}
+                    </div>
+                </div>
+            `;
+        }
+
         function resetRejectForm() {
             const panel = document.getElementById('rejectFormPanel');
             const buttons = document.getElementById('reviewDecisionButtons');
@@ -1503,44 +1631,7 @@ $nwSearchPlaceholder = $nwIsMemberList
                         </div>
                 ` : ''}
 
-                        <div class="detail-row">
-                            <span class="detail-label">Uploaded Photos / Documents:</span>
-                            <div class="detail-value review-photo-grid">
-                                ${member.photo_data ? `
-                                <div class="review-photo-card">
-                                    <span style="font-size: 0.85rem; color: var(--text-secondary);">Member Photo</span>
-                                    <img src="${member.photo_data}" alt="Member Photo" onclick="viewPhoto(this.src)">
-                                </div>
-                                ` : ''}
-                                ${member.photo_id_data ? `
-                                <div class="review-photo-card">
-                                    <span style="font-size: 0.85rem; color: var(--text-secondary);">Valid ID</span>
-                                    <img src="${member.photo_id_data}" alt="Photo ID" onclick="viewPhoto(this.src)">
-                                </div>
-                                ` : `
-                                <span style="color: var(--text-secondary); font-style: italic;">No photo ID uploaded</span>
-                                `}
-                                ${member.barangay_clearance_data ? (
-                                    /\.pdf($|\?)/i.test(String(member.barangay_clearance_data))
-                                        ? `
-                                <div class="review-photo-card">
-                                    <span style="font-size: 0.85rem; color: var(--text-secondary);">Barangay Clearance</span>
-                                    <a href="${member.barangay_clearance_data}" target="_blank" rel="noopener noreferrer" style="display:inline-flex;align-items:center;gap:0.4rem;color:var(--primary-color);font-weight:600;">
-                                        <i class="fas fa-file-pdf"></i> View PDF
-                                    </a>
-                                </div>
-                                        `
-                                        : `
-                                <div class="review-photo-card">
-                                    <span style="font-size: 0.85rem; color: var(--text-secondary);">Barangay Clearance</span>
-                                    <img src="${member.barangay_clearance_data}" alt="Barangay Clearance" onclick="viewPhoto(this.src)">
-                                </div>
-                                        `
-                                ) : `
-                                <span style="color: var(--text-secondary); font-style: italic;">No barangay clearance uploaded</span>
-                                `}
-                            </div>
-                        </div>
+                        ${buildReviewDocumentsHtml(member)}
                     </div>
                 </div>
             `;
