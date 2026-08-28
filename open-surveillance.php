@@ -994,11 +994,35 @@ ensureLocalDetectionStarted();
         }
 
         function shouldUseJpegRelay() {
-            // Production live view must match Reolink app via go2rtc RTSP — never JPEG relay.
-            if (CCTV_FEED_MODE === 'remote' && go2rtcConfigured) {
+            // Local XAMPP uses on-disk JPEG from detect.py.
+            return CCTV_FEED_MODE === 'local';
+        }
+
+        async function remoteUploadedFramesAvailable() {
+            if (CCTV_FEED_MODE !== 'remote') return false;
+            try {
+                const res = await fetch('api/camera_status.php?t=' + Date.now(), {
+                    cache: 'no-store',
+                    credentials: 'same-origin',
+                });
+                const data = await res.json();
+                if (!data || !data.success) return false;
+                if (!(data.available || data.has_frame)) return false;
+                const age = Number(data.age_seconds);
+                return !Number.isFinite(age) || age <= 45;
+            } catch (e) {
                 return false;
             }
-            return CCTV_FEED_MODE === 'local';
+        }
+
+        async function startJpegRelayIfAvailable() {
+            const force = CCTV_FEED_MODE === 'remote';
+            if (!force && !shouldUseJpegRelay()) return false;
+            if (force) {
+                const hasFrames = await remoteUploadedFramesAvailable();
+                if (!hasFrames) return false;
+            }
+            return startJpegRelayFeed(force);
         }
 
         function syncStreamQualitySelect(camera) {
@@ -1155,8 +1179,8 @@ ensureLocalDetectionStarted();
             }
         }
 
-        function startJpegRelayFeed() {
-            if (!shouldUseJpegRelay()) {
+        function startJpegRelayFeed(forceFallback) {
+            if (!forceFallback && !shouldUseJpegRelay()) {
                 return false;
             }
             const webrtc = document.getElementById('webrtcFeed');
@@ -1199,22 +1223,28 @@ ensureLocalDetectionStarted();
             return true;
         }
 
-        function fallbackFromWebRtcFailure(resolvedStream) {
+        async function fallbackFromWebRtcFailure(resolvedStream) {
             const perCamera = go2rtcStreamName(activeCamera);
             if (resolvedStream === perCamera && perCamera !== 'alertara_live' && liveEmbedBases.length) {
                 liveEmbedBaseIndex = 0;
                 applyLiveEmbedBase(liveEmbedBases[0], 'alertara_live');
                 return;
             }
-            if (shouldUseJpegRelay()) {
-                startJpegRelayFeed();
+            if (resolvedStream === 'alertara_live' && perCamera !== 'alertara_live' && liveEmbedBases.length) {
+                liveEmbedBaseIndex = 0;
+                applyLiveEmbedBase(liveEmbedBases[0], perCamera);
+                return;
+            }
+            if (await startJpegRelayIfAvailable()) {
                 return;
             }
             liveTransport = 'connecting';
             setCameraUiState('connecting');
             const placeholderText = document.getElementById('cameraPlaceholderText');
             if (placeholderText) {
-                placeholderText.textContent = 'Connecting…';
+                placeholderText.textContent = go2rtcConfigured
+                    ? 'Connecting… (low-latency stream). If this persists, ensure start_detection_agent.bat is running on-site.'
+                    : 'Waiting for on-site live stream (start_detection_agent.bat)…';
             }
             setTimeout(function() {
                 if (!liveHasPlayed && liveTransport === 'connecting') {
@@ -1254,7 +1284,7 @@ ensureLocalDetectionStarted();
                     return;
                 }
                 fallbackFromWebRtcFailure(resolvedStream);
-            }, 12000);
+            }, 6000);
             return true;
         }
 
@@ -1273,7 +1303,7 @@ ensureLocalDetectionStarted();
                 updateStreamQualityBadge(activeCamera);
             } else if (data.state === 'error' && liveTransport === 'webrtc') {
                 liveEmbedBaseIndex += 1;
-                const resolvedStream = go2rtcStreamName(activeCamera);
+                const resolvedStream = activeLiveStreamName || go2rtcStreamName(activeCamera);
                 if (liveEmbedBaseIndex < liveEmbedBases.length) {
                     applyLiveEmbedBase(liveEmbedBases[liveEmbedBaseIndex], resolvedStream);
                 } else {
@@ -1371,7 +1401,8 @@ ensureLocalDetectionStarted();
 
                 liveEmbedBases = embeddableBases;
                 liveEmbedBaseIndex = 0;
-                return applyLiveEmbedBase(liveEmbedBases[0], go2rtcStreamName(activeCamera));
+                const primaryStream = (data.stream && String(data.stream).trim()) || 'alertara_live';
+                return applyLiveEmbedBase(liveEmbedBases[0], primaryStream);
             } catch (e) {
                 console.warn('WebRTC status check failed', e);
                 return false;
@@ -1398,19 +1429,26 @@ ensureLocalDetectionStarted();
                 applyLocationOverlay(activeCamera);
                 updateStreamQualityBadge(activeCamera);
 
-                // Start WebRTC immediately — same Reolink RTSP path via go2rtc (not JPEG relay).
+                // Start WebRTC immediately — same Reolink RTSP path via go2rtc.
                 const ok = await tryStartWebRtcFeed();
                 ensureDetectionRunning();
+                // On Hostinger, show uploaded frames quickly if low-latency WebRTC is still handshaking.
+                if (CCTV_FEED_MODE === 'remote') {
+                    setTimeout(async function() {
+                        if (!liveHasPlayed && (liveTransport === 'webrtc' || liveTransport === 'connecting')) {
+                            await startJpegRelayIfAvailable();
+                        }
+                    }, 4500);
+                }
                 if (!ok && !liveHasPlayed) {
-                    if (shouldUseJpegRelay()) {
-                        startJpegRelayFeed();
-                    } else {
+                    const jpegOk = await startJpegRelayIfAvailable();
+                    if (!jpegOk) {
                         liveTransport = 'connecting';
                         setCameraUiState('connecting');
                         const placeholderText = document.getElementById('cameraPlaceholderText');
                         if (placeholderText) {
                             placeholderText.textContent = go2rtcConfigured
-                                ? 'Connecting…'
+                                ? 'Connecting… (low-latency stream). If this persists, ensure start_detection_agent.bat is running on-site.'
                                 : 'Waiting for on-site live stream (start_detection_agent.bat)…';
                         }
                     }

@@ -130,7 +130,7 @@ $wsUrl = $wsBase . '/api/ws?src=' . rawurlencode($stream);
             if (statusEl) statusEl.textContent = 'Stream timeout';
             notify('error', 'timeout');
         }
-    }, 12000);
+    }, 8000);
 </script>
 </body>
 </html>
