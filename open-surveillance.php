@@ -1200,6 +1200,12 @@ ensureLocalDetectionStarted();
         }
 
         function fallbackFromWebRtcFailure(resolvedStream) {
+            const perCamera = go2rtcStreamName(activeCamera);
+            if (resolvedStream === perCamera && perCamera !== 'alertara_live' && liveEmbedBases.length) {
+                liveEmbedBaseIndex = 0;
+                applyLiveEmbedBase(liveEmbedBases[0], 'alertara_live');
+                return;
+            }
             if (shouldUseJpegRelay()) {
                 startJpegRelayFeed();
                 return;
@@ -1230,6 +1236,7 @@ ensureLocalDetectionStarted();
                 jpeg.removeAttribute('src');
             }
             const resolvedStream = streamName || go2rtcStreamName(activeCamera);
+            activeLiveStreamName = resolvedStream;
             const embedUrl = buildCleanEmbedUrl(baseUrl, resolvedStream);
             liveTransport = 'webrtc';
             webrtc.src = embedUrl;
@@ -1363,8 +1370,7 @@ ensureLocalDetectionStarted();
 
                 liveEmbedBases = embeddableBases;
                 liveEmbedBaseIndex = 0;
-                const streamName = go2rtcStreamName(activeCamera);
-                return applyLiveEmbedBase(liveEmbedBases[0], data.stream === streamName ? data.stream : streamName);
+                return applyLiveEmbedBase(liveEmbedBases[0], go2rtcStreamName(activeCamera));
             } catch (e) {
                 console.warn('WebRTC status check failed', e);
                 return false;
