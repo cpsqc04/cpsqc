@@ -179,6 +179,22 @@ ensureLocalDetectionStarted();
             background: rgba(76, 138, 137, 0.12);
             color: #0f766e;
         }
+        .stream-quality-select {
+            margin-left: 0.35rem;
+            padding: 0.28rem 0.55rem;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            font-size: 0.82rem;
+            font-weight: 600;
+            color: var(--tertiary-color);
+            background: #fff;
+            cursor: pointer;
+        }
+        .stream-quality-select:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(76, 138, 137, 0.12);
+        }
         .video-shell { cursor: pointer; }
         .video-shell.is-grid-open { cursor: default; }
         .camera-grid-overlay {
@@ -305,6 +321,17 @@ ensureLocalDetectionStarted();
         }
         @media (max-width: 640px) {
             .camera-grid { grid-template-columns: 1fr; }
+        }
+        .sr-only {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            white-space: nowrap;
+            border: 0;
         }
         .video-shell:fullscreen,
         .video-shell:-webkit-full-screen { border-radius: 0; border: none; aspect-ratio: auto; max-height: none; min-height: 100vh; width: 100vw; height: 100vh; background: #000; }
@@ -695,7 +722,12 @@ ensureLocalDetectionStarted();
                         </div>
                         <div style="display:flex;align-items:center;gap:0.35rem;flex-wrap:wrap;">
                             <span class="live-badge" id="liveBadge"><span class="dot"></span> Connecting</span>
-                            <span class="stream-quality-badge" id="streamQualityBadge" title="Stream quality">Mid</span>
+                            <label class="sr-only" for="streamQualitySelect">Stream quality</label>
+                            <select id="streamQualitySelect" class="stream-quality-select" title="Same as Reolink app: Clear / Fluent / Balanced">
+                                <option value="high">Clear (High)</option>
+                                <option value="mid" selected>Fluent (Mid)</option>
+                                <option value="low">Balanced (Low)</option>
+                            </select>
                         </div>
                     </div>
 
@@ -782,6 +814,7 @@ ensureLocalDetectionStarted();
             }, 30000);
             initFullscreen();
             initCameraGrid();
+            initStreamQualityControl();
             initDetectionLifecycle();
             window.addEventListener('storage', function(e) {
                 if (e.key === 'cameraConfigUpdated') {
@@ -932,7 +965,8 @@ ensureLocalDetectionStarted();
         let liveBootDeadline = 0;
         let liveViewInFlight = false;
         let liveHasPlayed = false;
-        const LIVE_BOOT_GRACE_MS = 45000;
+        let go2rtcConfigured = false;
+        const LIVE_BOOT_GRACE_MS = 60000;
         const GRID_SLOT_COUNT = 4;
         window.__detectionThumbFallback = function(img) {
             if (!img || !img.parentNode) return;
@@ -953,28 +987,86 @@ ensureLocalDetectionStarted();
 
         function streamQualityLabel(streamType) {
             const quality = normalizeStreamType(streamType);
-            if (quality === 'high') return 'High';
-            if (quality === 'low') return 'Low';
-            return 'Mid';
+            if (quality === 'high') return 'Clear (High)';
+            if (quality === 'low') return 'Balanced (Low)';
+            return 'Fluent (Mid)';
+        }
+
+        function shouldUseJpegRelay() {
+            // Production live view must match Reolink app via go2rtc RTSP — never JPEG relay.
+            if (CCTV_FEED_MODE === 'remote' && go2rtcConfigured) {
+                return false;
+            }
+            return CCTV_FEED_MODE === 'local';
+        }
+
+        function syncStreamQualitySelect(camera) {
+            const select = document.getElementById('streamQualitySelect');
+            if (!select || !camera) return;
+            const quality = normalizeStreamType(camera.streamType);
+            if (select.value !== quality) {
+                select.value = quality;
+            }
+            select.title = 'Stream quality: ' + streamQualityLabel(quality) + ' (matches Reolink app)';
+        }
+
+        function initStreamQualityControl() {
+            const select = document.getElementById('streamQualitySelect');
+            if (!select) return;
+            select.addEventListener('change', function() {
+                changeStreamQuality(select.value);
+            });
+        }
+
+        async function changeStreamQuality(streamType) {
+            const item = activeCamera;
+            if (!item || !item.id) return;
+            const quality = normalizeStreamType(streamType);
+            syncStreamQualitySelect({ streamType: quality });
+            try {
+                const res = await fetch('api/cameras.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        action: 'set_stream_quality',
+                        id: item.id,
+                        streamType: quality
+                    }),
+                    credentials: 'same-origin',
+                    cache: 'no-store'
+                });
+                const result = await res.json();
+                if (!result.success) throw new Error(result.error || result.message || 'Failed to update quality');
+                item.streamType = quality;
+                if (result.camera) {
+                    activeCamera = result.camera;
+                    requestDataRefreshCamera(result.camera);
+                }
+                liveHasPlayed = false;
+                stopLiveFeeds();
+                setCameraUiState('connecting');
+                await startLiveView();
+            } catch (err) {
+                alert(err.message || 'Could not change stream quality.');
+                syncStreamQualitySelect(activeCamera);
+            }
+        }
+
+        function requestDataRefreshCamera(camera) {
+            const idx = allCameras.findIndex(function(c) { return String(c.id) === String(camera.id); });
+            if (idx >= 0) {
+                allCameras[idx] = camera;
+            }
+        }
+
+        function updateStreamQualityBadge(camera) {
+            syncStreamQualitySelect(camera);
         }
 
         function go2rtcStreamName(camera) {
             if (!camera) return 'alertara_live';
             const id = camera.cameraId || camera.id || 'cam';
             return 'alertara_' + String(id).replace(/[^a-zA-Z0-9_-]/g, '_');
-        }
-
-        function updateStreamQualityBadge(camera) {
-            const badge = document.getElementById('streamQualityBadge');
-            if (!badge) return;
-            if (!camera) {
-                badge.textContent = '—';
-                badge.title = 'Stream quality';
-                return;
-            }
-            const label = streamQualityLabel(camera.streamType);
-            badge.textContent = label;
-            badge.title = 'Stream quality: ' + label + ' (matches Camera Management)';
         }
 
         function setLiveModeChip() {
@@ -1063,6 +1155,9 @@ ensureLocalDetectionStarted();
         }
 
         function startJpegRelayFeed() {
+            if (!shouldUseJpegRelay()) {
+                return false;
+            }
             const webrtc = document.getElementById('webrtcFeed');
             const jpeg = document.getElementById('cameraFeed');
             if (!jpeg) return false;
@@ -1103,6 +1198,24 @@ ensureLocalDetectionStarted();
             return true;
         }
 
+        function fallbackFromWebRtcFailure(resolvedStream) {
+            if (shouldUseJpegRelay()) {
+                startJpegRelayFeed();
+                return;
+            }
+            liveTransport = 'connecting';
+            setCameraUiState('connecting');
+            const placeholderText = document.getElementById('cameraPlaceholderText');
+            if (placeholderText) {
+                placeholderText.textContent = 'Connecting to Reolink stream…';
+            }
+            setTimeout(function() {
+                if (!liveHasPlayed && liveTransport === 'connecting') {
+                    tryStartWebRtcFeed();
+                }
+            }, 5000);
+        }
+
         function applyLiveEmbedBase(baseUrl, streamName) {
             const webrtc = document.getElementById('webrtcFeed');
             const jpeg = document.getElementById('cameraFeed');
@@ -1133,8 +1246,8 @@ ensureLocalDetectionStarted();
                     applyLiveEmbedBase(liveEmbedBases[liveEmbedBaseIndex], resolvedStream);
                     return;
                 }
-                startJpegRelayFeed();
-            }, 8000);
+                fallbackFromWebRtcFailure(resolvedStream);
+            }, 12000);
             return true;
         }
 
@@ -1157,7 +1270,7 @@ ensureLocalDetectionStarted();
                 if (liveEmbedBaseIndex < liveEmbedBases.length) {
                     applyLiveEmbedBase(liveEmbedBases[liveEmbedBaseIndex], resolvedStream);
                 } else {
-                    startJpegRelayFeed();
+                    fallbackFromWebRtcFailure(resolvedStream);
                 }
             }
         });
@@ -1215,7 +1328,11 @@ ensureLocalDetectionStarted();
                     credentials: 'same-origin',
                 });
                 const data = await res.json();
-                if (!data || !data.success || !data.running) {
+                go2rtcConfigured = Boolean(data && data.enabled);
+                if (!data || !data.success) {
+                    return false;
+                }
+                if (!data.running) {
                     return false;
                 }
 
@@ -1274,23 +1391,21 @@ ensureLocalDetectionStarted();
                 applyLocationOverlay(activeCamera);
                 updateStreamQualityBadge(activeCamera);
 
-                // Start WebRTC immediately (Reolink-style direct RTSP via go2rtc).
+                // Start WebRTC immediately — same Reolink RTSP path via go2rtc (not JPEG relay).
                 const ok = await tryStartWebRtcFeed();
-                // Detection agent + JPEG relay run in parallel — don't block live view.
                 ensureDetectionRunning();
-                waitForLiveFrame(6000).then(function(hasFrame) {
-                    if (!hasFrame && !liveHasPlayed && liveTransport !== 'webrtc') {
-                        if (!startJpegRelayFeed()) {
-                            setCameraUiState('connecting');
-                        }
-                    }
-                });
-
                 if (!ok && !liveHasPlayed) {
-                    if (!startJpegRelayFeed()) {
+                    if (shouldUseJpegRelay()) {
+                        startJpegRelayFeed();
+                    } else {
                         liveTransport = 'connecting';
-                        stopLiveFeeds();
                         setCameraUiState('connecting');
+                        const placeholderText = document.getElementById('cameraPlaceholderText');
+                        if (placeholderText) {
+                            placeholderText.textContent = go2rtcConfigured
+                                ? 'Connecting to Reolink stream…'
+                                : 'Waiting for on-site live stream (start_detection_agent.bat)…';
+                        }
                     }
                 }
             } finally {

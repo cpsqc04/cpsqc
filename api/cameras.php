@@ -152,6 +152,49 @@ function buildRtspUrl(string $ip, string $port, string $username, string $passwo
     return 'rtsp://' . rawurlencode($username) . ':' . rawurlencode($password) . '@' . $ip . ':' . $port . '/' . $streamPath;
 }
 
+function updateCameraStreamQuality(string $camerasFile, array $data): array
+{
+    $id = trim((string) ($data['id'] ?? ''));
+    if ($id === '') {
+        return ['success' => false, 'error' => 'Camera id is required.', 'code' => 400];
+    }
+
+    $streamType = normalizeStreamType($data['streamType'] ?? 'mid');
+    $cameras = camerasLoad($camerasFile);
+    $index = findCameraIndex($cameras, $id);
+    if ($index < 0) {
+        return ['success' => false, 'error' => 'Camera not found.', 'code' => 404];
+    }
+
+    $camera = $cameras[$index];
+    $ip = trim((string) ($camera['ipAddress'] ?? ''));
+    $port = trim((string) ($camera['port'] ?? '554')) ?: '554';
+    $username = trim((string) ($camera['username'] ?? ''));
+    $password = (string) ($camera['password'] ?? '');
+
+    $camera['streamType'] = $streamType;
+    if ($ip !== '' && $username !== '' && $password !== '') {
+        $camera['rtspUrl'] = buildRtspUrl($ip, $port, $username, $password, $streamType);
+    }
+    $camera['updatedAt'] = date('Y-m-d H:i:s');
+    $cameras[$index] = $camera;
+
+    if (!camerasSave($camerasFile, $cameras)) {
+        return ['success' => false, 'error' => 'Failed to write cameras.json.', 'code' => 500];
+    }
+
+    return [
+        'success' => true,
+        'camera' => $camera,
+        'streamType' => $streamType,
+        'streamQualityLabel' => streamQualityLabel($streamType),
+        'go2rtcStream' => go2rtcStreamName($camera),
+        'message' => 'Stream quality updated to ' . streamQualityLabel($streamType) . '. Live view will refresh.',
+        'updated_at' => camerasRevisionPayload($camerasFile)['updated_at'],
+        'revision' => camerasRevisionPayload($camerasFile)['revision'],
+    ];
+}
+
 function go2rtcStreamName(array $camera): string
 {
     $cameraId = trim((string) ($camera['cameraId'] ?? $camera['id'] ?? 'cam'));
@@ -340,6 +383,8 @@ if ($method === 'POST') {
         $result = updateCamera($camerasFile, $input);
     } elseif ($action === 'delete') {
         $result = deleteCamera($camerasFile, (string) ($input['id'] ?? $_GET['id'] ?? ''));
+    } elseif ($action === 'set_stream_quality') {
+        $result = updateCameraStreamQuality($camerasFile, $input);
     } else {
         http_response_code(400);
         echo json_encode(['success' => false, 'error' => 'Unknown action. Use create, update, or delete.']);

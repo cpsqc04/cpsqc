@@ -185,6 +185,24 @@ def rtsp_path_for_quality(quality: str) -> str:
     return "h264Preview_01_sub"
 
 
+def reolink_path_variants(quality: str) -> List[str]:
+    """Same Reolink tier as the mobile app — alternate firmware path names only."""
+    q = normalize_stream_type(quality)
+    if q == "high":
+        return ["h264Preview_01_main", "Preview_01_main"]
+    if q == "low":
+        return ["h264Preview_01_ext", "Preview_01_ext", "h264Preview_01_sub", "Preview_01_sub"]
+    return ["h264Preview_01_sub", "Preview_01_sub"]
+
+
+def build_reolink_rtsp(ip: str, port: str, user: str, password: str, path: str) -> str:
+    """Direct camera RTSP (TCP) — same source the Reolink app uses."""
+    base = build_rtsp(ip, port, user, password, path.lstrip("/"))
+    if "#" in base:
+        return base
+    return base + "#rtsp_transport=tcp"
+
+
 def go2rtc_stream_name(camera: dict) -> str:
     cid = str(camera.get("cameraId") or camera.get("id") or "cam").strip()
     safe = __import__("re").sub(r"[^a-zA-Z0-9_-]", "_", cid) or "cam"
@@ -214,26 +232,31 @@ def camera_rtsp_urls(camera: dict) -> Tuple[str, str, str]:
 
 
 def stream_sources_for_camera(camera: dict) -> List[str]:
-    """RTSP sources for go2rtc — primary matches Camera Management quality."""
-    main_url, sub_url, ext_url = camera_rtsp_urls(camera)
+    """RTSP sources for go2rtc — locked to Camera Management quality (Reolink app parity)."""
+    ip = str(camera.get("ipAddress") or "").strip()
+    port = str(camera.get("port") or "554").strip() or "554"
+    user = str(camera.get("username") or "admin").strip() or "admin"
+    password = password_from_camera(camera)
     quality = normalize_stream_type((camera or {}).get("streamType"))
     sources: List[str] = []
 
-    if quality == "high" and main_url:
-        sources.append(main_url)
-    elif quality == "low":
-        if ext_url:
-            sources.append(ext_url)
-        if sub_url and sub_url not in sources:
-            sources.append(sub_url)
-    else:
-        if sub_url:
-            sources.append(sub_url)
+    if ip and password:
+        for path in reolink_path_variants(quality):
+            url = build_reolink_rtsp(ip, port, user, password, path)
+            if url not in sources:
+                sources.append(url)
+        return sources
 
-    # Fallbacks when primary path is unavailable on the camera.
-    for fallback in (sub_url, main_url, ext_url):
-        if fallback and fallback not in sources:
-            sources.append(fallback)
+    base = str(camera.get("rtspUrl") or "").strip()
+    if base:
+        primary = swap_stream_path(base, "main" if quality == "high" else "sub")
+        if quality == "low":
+            primary = primary.replace("h264Preview_01_sub", "h264Preview_01_ext").replace(
+                "Preview_01_sub", "Preview_01_ext"
+            )
+        if "#" not in primary:
+            primary += "#rtsp_transport=tcp"
+        sources.append(primary)
     return sources
 
 

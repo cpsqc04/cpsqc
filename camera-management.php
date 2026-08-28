@@ -478,9 +478,9 @@ $cctvNavActive = 'camera-management';
                     <div class="form-group">
                         <label for="cameraStreamType">Stream Type</label>
                         <select id="cameraStreamType">
-                            <option value="high">High (Clear)</option>
-                            <option value="mid">Mid (Fluent)</option>
-                            <option value="low">Low (Balanced)</option>
+                            <option value="high">Clear (High)</option>
+                            <option value="mid">Fluent (Mid)</option>
+                            <option value="low">Balanced (Low)</option>
                         </select>
                         <button type="button" class="btn-secondary" id="detectEncodingBtn" style="margin-top:0.55rem;" onclick="detectReolinkEncoding()">
                             <i class="fas fa-magic"></i> Detect Camera
