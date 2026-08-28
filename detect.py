@@ -312,10 +312,30 @@ def get_rtsp_bases(rtsp_url):
     return base_with_auth, base_no_auth
 
 
+def normalize_stream_type_value(stream_type):
+    value = str(stream_type or "mid").strip().lower()
+    if value in {"high", "main"}:
+        return "high"
+    if value in {"low", "ext"}:
+        return "low"
+    if value in {"mid", "sub"}:
+        return "mid"
+    return "mid"
+
+
+def rtsp_suffix_for_stream_type(stream_type):
+    quality = normalize_stream_type_value(stream_type)
+    if quality == "high":
+        return "h264Preview_01_main"
+    if quality == "low":
+        return "h264Preview_01_ext"
+    return "h264Preview_01_sub"
+
+
 def build_rtsp_url(ip, port, username, password, stream_type):
     """Build a valid RTSP URL with URL-encoded credentials."""
     port = str(port or "554").strip() or "554"
-    suffix = "h264Preview_01_main" if stream_type == "main" else "h264Preview_01_sub"
+    suffix = rtsp_suffix_for_stream_type(stream_type)
     if username:
         user = quote(str(username).strip(), safe="")
         pwd = quote(str(password).strip(), safe="") if password else ""
@@ -430,8 +450,9 @@ def probe_and_sync_reolink_encoding(camera_row, force=False):
                     recommended = result.get("recommendedStream") or cam.get("streamType") or "sub"
                     # Keep user's Camera Management streamType; only store recommendation.
                     user_stream = str(cam.get("streamType") or "sub").strip().lower()
-                    if user_stream not in {"main", "sub"}:
-                        user_stream = recommended if recommended in {"main", "sub"} else "sub"
+                    if user_stream not in {"high", "mid", "low", "main", "sub"}:
+                        user_stream = recommended if recommended in {"high", "mid", "low", "main", "sub"} else "mid"
+                    user_stream = normalize_stream_type_value(user_stream)
                     cam["encoding"] = {
                         "detectedAt": result.get("detectedAt"),
                         "recommendedStream": recommended,
@@ -483,22 +504,19 @@ def load_active_camera_config():
     if selected is None:
         selected = cameras[0]
 
-    stream_type = str(selected.get("streamType", "sub")).strip().lower()
+    stream_type = normalize_stream_type_value(selected.get("streamType", "mid"))
     encoding_meta = selected.get("encoding") if isinstance(selected.get("encoding"), dict) else {}
 
     # Honor Camera Management Stream Type. Env force-main still wins.
     # AUTO_ENCODING may probe quality metadata but must not override the user's choice.
     if CCTV_USE_MAIN_STREAM:
-        stream_type = "main"
+        stream_type = "high"
     elif CCTV_AUTO_ENCODING:
         probe = probe_and_sync_reolink_encoding(selected, force=False)
         if probe:
             apply_display_quality_from_probe(probe.get("displayQuality") or {})
         elif encoding_meta.get("displayQuality"):
             apply_display_quality_from_probe(encoding_meta.get("displayQuality") or {})
-
-    if stream_type not in {"main", "sub"}:
-        stream_type = "sub"
 
     ip = str(selected.get("ipAddress", "")).strip()
     port = str(selected.get("port", "554")).strip() or "554"
@@ -511,16 +529,12 @@ def load_active_camera_config():
         rtsp_url = str(selected.get("rtspUrl", "")).strip()
         if not rtsp_url:
             return None
-        if stream_type == "sub":
-            rtsp_url = (
-                rtsp_url.replace("h264Preview_01_main", "h264Preview_01_sub")
-                .replace("Preview_01_main", "Preview_01_sub")
-            )
-        else:
-            rtsp_url = (
-                rtsp_url.replace("h264Preview_01_sub", "h264Preview_01_main")
-                .replace("Preview_01_sub", "Preview_01_main")
-            )
+        suffix = rtsp_suffix_for_stream_type(stream_type)
+        for old in ("h264Preview_01_main", "h264Preview_01_sub", "h264Preview_01_ext",
+                    "Preview_01_main", "Preview_01_sub"):
+            if old in rtsp_url:
+                rtsp_url = rtsp_url.replace(old, suffix)
+                break
 
     return {
         "camera_id": selected.get("cameraId") or selected.get("id") or "CAMERA",
@@ -548,7 +562,7 @@ def configure_camera_source():
 
     ACTIVE_CAMERA = camera_cfg
     RTSP_URL = camera_cfg["rtsp_url"]
-    PREFER_SUB_STREAM = camera_cfg["stream_type"] != "main"
+    PREFER_SUB_STREAM = normalize_stream_type_value(camera_cfg["stream_type"]) != "high"
     print(f"Using camera {camera_cfg['camera_id']} ({camera_cfg['name']})")
     print(f"Stream type: {camera_cfg['stream_type'].upper()}"
           + (" (from Camera Management)" if not CCTV_USE_MAIN_STREAM else " (forced main)"))

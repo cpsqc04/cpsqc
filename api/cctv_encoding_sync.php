@@ -54,9 +54,29 @@ function encodingJobWrite(string $path, array $job): void
     @file_put_contents($path, json_encode($job, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES), LOCK_EX);
 }
 
+function encodingNormalizeStreamType(string $streamType): string
+{
+    $streamType = strtolower(trim($streamType));
+    if (in_array($streamType, ['high', 'main'], true)) {
+        return 'high';
+    }
+    if (in_array($streamType, ['low', 'ext'], true)) {
+        return 'low';
+    }
+    if (in_array($streamType, ['mid', 'sub'], true)) {
+        return 'mid';
+    }
+    return 'mid';
+}
+
 function encodingBuildRtsp(string $ip, string $port, string $username, string $password, string $streamType): string
 {
-    $path = $streamType === 'main' ? 'h264Preview_01_main' : 'h264Preview_01_sub';
+    $quality = encodingNormalizeStreamType($streamType);
+    $path = match ($quality) {
+        'high' => 'h264Preview_01_main',
+        'low' => 'h264Preview_01_ext',
+        default => 'h264Preview_01_sub',
+    };
     return 'rtsp://' . rawurlencode($username) . ':' . rawurlencode($password) . '@' . $ip . ':' . $port . '/' . $path;
 }
 
@@ -71,9 +91,10 @@ function encodingApplyToCameras(string $camerasFile, array $result, ?string $cam
     }
 
     $recommended = strtolower(trim((string) ($result['recommendedStream'] ?? '')));
-    if ($recommended !== 'main' && $recommended !== 'sub') {
+    if (!in_array($recommended, ['main', 'sub', 'high', 'mid', 'low'], true)) {
         return ['success' => false, 'message' => 'No recommended stream in probe result'];
     }
+    $recommended = encodingNormalizeStreamType($recommended === 'main' ? 'high' : ($recommended === 'sub' ? 'mid' : $recommended));
 
     $updated = 0;
     foreach ($cameras as &$cam) {

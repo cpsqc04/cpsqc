@@ -75,8 +75,32 @@ function getCctvRequestFootageWindow(array $request): array
     ];
 }
 
+function parseSelectedFootageFilenamesFromRequest(array $request): array
+{
+    $notes = (string) ($request['fulfillment_notes'] ?? '');
+    if ($notes === '') {
+        return [];
+    }
+
+    if (!preg_match_all('/Selected footage:\s*([^\s(]+)/i', $notes, $matches)) {
+        return [];
+    }
+
+    $filenames = array_values(array_unique($matches[1]));
+
+    return array_values(array_filter($filenames, 'isValidRecordingFilename'));
+}
+
 function findRecordingsForCctvRequest(array $request): array
 {
+    $selectedFilenames = parseSelectedFootageFilenamesFromRequest($request);
+    if ($selectedFilenames !== []) {
+        $segments = getRecordingSegmentsByFilenames($selectedFilenames);
+        if ($segments !== []) {
+            return $segments;
+        }
+    }
+
     $window = getCctvRequestFootageWindow($request);
     if ($window['date'] === '' || $window['search_start'] === '' || $window['search_end'] === '') {
         return [];

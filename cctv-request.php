@@ -654,7 +654,7 @@ $cctvNavActive = 'cctv-request';
             </div>
             <div id="selectFootagePanel" class="select-footage-panel">
                 <h3>Select Footage</h3>
-                <p class="panel-hint">Click a recording to attach it to this request, then click Send.</p>
+                <p class="panel-hint">Click recordings to select one or more, then click Send.</p>
                 <div id="selectedFootageNote" class="selected-footage-note"></div>
                 <div class="footage-filters">
                     <div class="form-group">
@@ -699,7 +699,7 @@ $cctvNavActive = 'cctv-request';
         let allRequests = [];
         let cameras = [];
         let activeRequestId = null;
-        let selectedFootageFilename = null;
+        let selectedFootageFilenames = new Set();
         let selectedCameraId = null;
         const requestsPager = AlertaraTablePager.create({
             pageSize: 10,
@@ -855,21 +855,27 @@ $cctvNavActive = 'cctv-request';
             return detailRow(label, escapeHtml(text));
         }
 
-        function selectedFootageLabelFromNotes(notes) {
+        function selectedFootageFilenamesFromNotes(notes) {
             const text = String(notes || '');
-            const match = text.match(/Selected footage:\s*([^\s(]+)/i);
-            return match ? match[1] : '';
+            const matches = [...text.matchAll(/Selected footage:\s*([^\s(]+)/gi)];
+            return [...new Set(matches.map(match => match[1]))];
         }
 
-        function updateSelectedFootageNote(filename) {
+        function updateSelectedFootageNote() {
             const note = document.getElementById('selectedFootageNote');
             if (!note) return;
-            if (!filename) {
+            const filenames = Array.from(selectedFootageFilenames);
+            if (!filenames.length) {
                 note.classList.remove('show');
                 note.textContent = '';
                 return;
             }
-            note.textContent = 'Selected: ' + filename;
+            if (filenames.length === 1) {
+                note.textContent = 'Selected: ' + filenames[0];
+            } else {
+                note.innerHTML = 'Selected: ' + filenames.length + ' recordings<br>'
+                    + filenames.map(filename => escapeHtml(filename)).join('<br>');
+            }
             note.classList.add('show');
         }
 
@@ -877,7 +883,7 @@ $cctvNavActive = 'cctv-request';
             const item = requestData[requestId];
             if (!item) return;
             activeRequestId = requestId;
-            selectedFootageFilename = selectedFootageLabelFromNotes(item.fulfillment_notes) || null;
+            selectedFootageFilenames = new Set(selectedFootageFilenamesFromNotes(item.fulfillment_notes));
             selectedCameraId = item.approved_camera_id || item.camera_id || null;
             hideRejectPanel();
             hideSelectFootagePanel();
@@ -926,7 +932,7 @@ $cctvNavActive = 'cctv-request';
 
             document.getElementById('footageDate').value = item.incident_date || '';
             document.getElementById('footageLocation').value = item.incident_location || item.location_description || '';
-            updateSelectedFootageNote(selectedFootageFilename);
+            updateSelectedFootageNote();
             updateIncidentReportingButtons(item);
             document.getElementById('viewModal').classList.add('active');
         }
@@ -997,8 +1003,8 @@ $cctvNavActive = 'cctv-request';
             document.getElementById('selectFootagePanel').classList.add('show');
             document.getElementById('footageDate').value = item.incident_date || '';
             document.getElementById('footageLocation').value = item.incident_location || item.location_description || '';
-            selectedFootageFilename = selectedFootageLabelFromNotes(item.fulfillment_notes) || selectedFootageFilename;
-            updateSelectedFootageNote(selectedFootageFilename);
+            selectedFootageFilenames = new Set(selectedFootageFilenamesFromNotes(item.fulfillment_notes));
+            updateSelectedFootageNote();
             updateIncidentReportingButtons(item);
             await searchFootage();
             try {
@@ -1106,7 +1112,7 @@ $cctvNavActive = 'cctv-request';
 
                 results.innerHTML = segments.map(segment => {
                     footageSegments[segment.filename] = segment;
-                    const selected = selectedFootageFilename === segment.filename;
+                    const selected = selectedFootageFilenames.has(segment.filename);
                     return `<button type="button" class="footage-item${selected ? ' selected' : ''}" data-filename="${escapeHtml(segment.filename)}" onclick="selectFootage(this.dataset.filename)">
                         <div>
                             <div class="footage-item-title">${escapeHtml(segment.filename)}</div>
@@ -1121,12 +1127,16 @@ $cctvNavActive = 'cctv-request';
         }
 
         function selectFootage(filename) {
-            selectedFootageFilename = filename;
+            if (selectedFootageFilenames.has(filename)) {
+                selectedFootageFilenames.delete(filename);
+            } else {
+                selectedFootageFilenames.add(filename);
+            }
             document.querySelectorAll('.footage-item').forEach(el => {
-                el.classList.toggle('selected', el.dataset.filename === filename);
+                el.classList.toggle('selected', selectedFootageFilenames.has(el.dataset.filename));
             });
-            updateSelectedFootageNote(filename);
-            saveSelectedFootage(filename);
+            updateSelectedFootageNote();
+            saveSelectedFootage();
         }
 
         async function updateRequestStatus(id, payload) {
@@ -1138,31 +1148,56 @@ $cctvNavActive = 'cctv-request';
             return res.json();
         }
 
-        async function saveSelectedFootage(filename) {
-            const item = requestData[activeRequestId];
-            if (!item || !filename) return;
-            const segment = footageSegments[filename];
-            if (!segment) {
-                alert('Selected recording was not found. Search again.');
-                return;
-            }
+        function compareTimeValues(a, b) {
+            return String(a || '').localeCompare(String(b || ''));
+        }
 
-            const cameraId = selectedCameraId || item.approved_camera_id || item.camera_id || '';
-            const noteLine = 'Selected footage: ' + filename
-                + (cameraId ? ' (camera ' + cameraId + ')' : '')
-                + ' · ' + (segment.start_at || '') + ' – ' + (segment.end_at || '');
+        async function saveSelectedFootage() {
+            const item = requestData[activeRequestId];
+            if (!item) return;
+
+            const filenames = Array.from(selectedFootageFilenames);
             const previousNotes = String(item.fulfillment_notes || '')
                 .split(/\r?\n/)
                 .filter(line => line.trim() && !/^Selected footage:/i.test(line.trim()))
                 .join('\n');
-            const fulfillmentNotes = [previousNotes, noteLine].filter(Boolean).join('\n');
+
+            const cameraId = selectedCameraId || item.approved_camera_id || item.camera_id || '';
+            let actualStart = item.actual_footage_start || item.footage_start_time || '';
+            let actualEnd = item.actual_footage_end || item.footage_end_time || '';
+            let noteLines = [];
+
+            if (filenames.length) {
+                const segments = filenames
+                    .map(filename => footageSegments[filename])
+                    .filter(Boolean);
+                if (segments.length !== filenames.length) {
+                    alert('Some selected recordings were not found. Search again.');
+                    return;
+                }
+
+                segments.sort((a, b) => compareTimeValues(a.start_at, b.start_at));
+                actualStart = segments.reduce(
+                    (min, segment) => compareTimeValues(segment.start_time, min) < 0 ? segment.start_time : min,
+                    segments[0].start_time
+                );
+                actualEnd = segments.reduce(
+                    (max, segment) => compareTimeValues(segment.end_time, max) > 0 ? segment.end_time : max,
+                    segments[0].end_time
+                );
+                noteLines = segments.map(segment => 'Selected footage: ' + segment.filename
+                    + (cameraId ? ' (camera ' + cameraId + ')' : '')
+                    + ' · ' + (segment.start_at || '') + ' – ' + (segment.end_at || ''));
+            }
+
+            const fulfillmentNotes = [previousNotes, ...noteLines].filter(Boolean).join('\n');
 
             try {
                 const result = await updateRequestStatus(item.id, {
                     status: item.status === 'Fulfilled' ? 'Fulfilled' : 'Approved',
                     approved_camera_id: cameraId,
-                    actual_footage_start: (segment.start_time || '').slice(0, 8),
-                    actual_footage_end: (segment.end_time || '').slice(0, 8),
+                    actual_footage_start: String(actualStart || '').slice(0, 8),
+                    actual_footage_end: String(actualEnd || '').slice(0, 8),
                     review_notes: item.review_notes || '',
                     rejection_reason: '',
                     fulfillment_notes: fulfillmentNotes
@@ -1171,8 +1206,8 @@ $cctvNavActive = 'cctv-request';
                 item.status = item.status === 'Fulfilled' ? 'Fulfilled' : 'Approved';
                 item.fulfillment_notes = fulfillmentNotes;
                 item.approved_camera_id = cameraId;
-                item.actual_footage_start = (segment.start_time || '').slice(0, 8);
-                item.actual_footage_end = (segment.end_time || '').slice(0, 8);
+                item.actual_footage_start = String(actualStart || '').slice(0, 8);
+                item.actual_footage_end = String(actualEnd || '').slice(0, 8);
                 requestData[item.request_id] = item;
                 renderRequestsList();
                 updateIncidentReportingButtons(item);

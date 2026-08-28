@@ -265,6 +265,35 @@ function findRecordingSegmentsForWindow(string $date, string $startTime, string 
     return $matches;
 }
 
+function getRecordingSegmentsByFilenames(array $filenames): array
+{
+    $segments = [];
+    foreach ($filenames as $filename) {
+        $filename = trim((string) $filename);
+        if (!isValidRecordingFilename($filename)) {
+            continue;
+        }
+
+        $filepath = recordingsDirectory() . DIRECTORY_SEPARATOR . $filename;
+        if (!is_file($filepath)) {
+            continue;
+        }
+
+        $parsed = parseRecordingFilename($filename);
+        if (!$parsed) {
+            continue;
+        }
+
+        $segments[] = formatRecordingSegment($parsed, $filepath);
+    }
+
+    usort($segments, static function ($a, $b) {
+        return strcmp($a['start_at'], $b['start_at']);
+    });
+
+    return $segments;
+}
+
 function recordingsStorageBytes(): int
 {
     $dir = recordingsDirectory();

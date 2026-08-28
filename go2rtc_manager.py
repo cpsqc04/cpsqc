@@ -165,8 +165,34 @@ def pick_camera(cameras: list) -> Optional[dict]:
     return None
 
 
-def camera_rtsp_urls(camera: dict) -> Tuple[str, str]:
-    """Return (main_url, sub_url) for live WebRTC/MSE."""
+def normalize_stream_type(value: Any) -> str:
+    v = str(value or "mid").strip().lower()
+    if v in {"high", "main"}:
+        return "high"
+    if v in {"low", "ext"}:
+        return "low"
+    if v in {"mid", "sub"}:
+        return "mid"
+    return "mid"
+
+
+def rtsp_path_for_quality(quality: str) -> str:
+    q = normalize_stream_type(quality)
+    if q == "high":
+        return "h264Preview_01_main"
+    if q == "low":
+        return "h264Preview_01_ext"
+    return "h264Preview_01_sub"
+
+
+def go2rtc_stream_name(camera: dict) -> str:
+    cid = str(camera.get("cameraId") or camera.get("id") or "cam").strip()
+    safe = __import__("re").sub(r"[^a-zA-Z0-9_-]", "_", cid) or "cam"
+    return f"alertara_{safe}"
+
+
+def camera_rtsp_urls(camera: dict) -> Tuple[str, str, str]:
+    """Return (main_url, sub_url, ext_url) for live WebRTC/MSE."""
     ip = str(camera.get("ipAddress") or "").strip()
     port = str(camera.get("port") or "554").strip() or "554"
     user = str(camera.get("username") or "admin").strip() or "admin"
@@ -176,10 +202,39 @@ def camera_rtsp_urls(camera: dict) -> Tuple[str, str]:
     if ip and password:
         main = build_rtsp(ip, port, user, password, "h264Preview_01_main")
         sub = build_rtsp(ip, port, user, password, "h264Preview_01_sub")
-        return main, sub
+        ext = build_rtsp(ip, port, user, password, "h264Preview_01_ext")
+        return main, sub, ext
     if base:
-        return swap_stream_path(base, "main"), swap_stream_path(base, "sub")
-    return "", ""
+        return (
+            swap_stream_path(base, "main"),
+            swap_stream_path(base, "sub"),
+            swap_stream_path(base, "sub").replace("h264Preview_01_sub", "h264Preview_01_ext"),
+        )
+    return "", "", ""
+
+
+def stream_sources_for_camera(camera: dict) -> List[str]:
+    """RTSP sources for go2rtc — primary matches Camera Management quality."""
+    main_url, sub_url, ext_url = camera_rtsp_urls(camera)
+    quality = normalize_stream_type((camera or {}).get("streamType"))
+    sources: List[str] = []
+
+    if quality == "high" and main_url:
+        sources.append(main_url)
+    elif quality == "low":
+        if ext_url:
+            sources.append(ext_url)
+        if sub_url and sub_url not in sources:
+            sources.append(sub_url)
+    else:
+        if sub_url:
+            sources.append(sub_url)
+
+    # Fallbacks when primary path is unavailable on the camera.
+    for fallback in (sub_url, main_url, ext_url):
+        if fallback and fallback not in sources:
+            sources.append(fallback)
+    return sources
 
 
 def write_go2rtc_config(cameras: Optional[list] = None) -> Dict[str, Any]:
@@ -192,15 +247,13 @@ def write_go2rtc_config(cameras: Optional[list] = None) -> Dict[str, Any]:
         cameras = []
 
     cam = pick_camera(cameras)
-    main_url, sub_url = camera_rtsp_urls(cam) if cam else ("", "")
     file_env = load_env(ROOT / ".env")
     transcode = str(
         file_env.get("CCTV_WEBRTC_TRANSCODE", "")
         or os.environ.get("CCTV_WEBRTC_TRANSCODE", "")
         or "false"
     ).strip().lower() in {"1", "true", "yes", "on"}
-    # Prefer Camera Management streamType; env CCTV_WEBRTC_PREFER_MAIN overrides when set.
-    stream_type = str((cam or {}).get("streamType") or "sub").strip().lower()
+    stream_type = normalize_stream_type((cam or {}).get("streamType") if cam else "mid")
     prefer_main_env = (
         file_env.get("CCTV_WEBRTC_PREFER_MAIN", "")
         or os.environ.get("CCTV_WEBRTC_PREFER_MAIN", "")
@@ -210,23 +263,26 @@ def write_go2rtc_config(cameras: Optional[list] = None) -> Dict[str, Any]:
     elif prefer_main_env in {"0", "false", "no", "off"}:
         prefer_main = False
     else:
-        prefer_main = stream_type == "main"
+        prefer_main = stream_type == "high"
 
-    sources: List[str] = []
-    # Zero-copy RTSP (no default ffmpeg) for low delay.
-    if prefer_main:
-        if main_url:
-            sources.append(main_url)
-        if sub_url:
-            sources.append(sub_url)
-    else:
-        if sub_url:
-            sources.append(sub_url)
-        if main_url:
-            sources.append(main_url)
-    if transcode and main_url:
-        # Optional last resort only — not used for "match Reolink delay".
-        sources.append(f"ffmpeg:{main_url}#video=h264#hardware")
+    # Build per-camera streams (Reolink RTSP direct — near app latency).
+    stream_map: Dict[str, List[str]] = {}
+    for row in cameras:
+        if not isinstance(row, dict):
+            continue
+        if not (row.get("ipAddress") or row.get("rtspUrl")):
+            continue
+        name = go2rtc_stream_name(row)
+        sources = stream_sources_for_camera(row)
+        if sources:
+            stream_map[name] = sources
+
+    primary_sources = stream_sources_for_camera(cam) if cam else []
+    if primary_sources:
+        stream_map[STREAM_NAME] = primary_sources
+    elif stream_map:
+        first_key = next(iter(stream_map))
+        stream_map[STREAM_NAME] = list(stream_map[first_key])
 
     listen = (
         file_env.get("CCTV_GO2RTC_LISTEN", "")
@@ -249,23 +305,27 @@ def write_go2rtc_config(cameras: Optional[list] = None) -> Dict[str, Any]:
         f'    - "{lan_ip}:8555"',
         "    - stun:8555",
         "streams:",
-        f"  {STREAM_NAME}:",
     ]
-    if sources:
-        for src in sources:
-            lines.append(f'    - "{src}"')
+    if stream_map:
+        for stream_name, sources in stream_map.items():
+            lines.append(f"  {stream_name}:")
+            for src in sources:
+                lines.append(f'    - "{src}"')
+            if transcode and sources:
+                lines.append(f'    - "ffmpeg:{sources[0]}#video=h264#hardware"')
     else:
+        lines.append(f"  {STREAM_NAME}:")
         lines.append('    - "rtsp://127.0.0.1:554/h264Preview_01_sub"')
 
     CONFIG_PATH.write_text("\n".join(lines) + "\n", encoding="utf-8")
     meta = {
         "stream": STREAM_NAME,
-        "camera_id": (cam or {}).get("id"),
+        "streams": list(stream_map.keys()),
+        "camera_id": (cam or {}).get("cameraId") or (cam or {}).get("id"),
         "camera_name": (cam or {}).get("name") or (cam or {}).get("cameraId"),
         "stream_type": stream_type if cam else None,
         "prefer_main": prefer_main,
-        "has_main": bool(main_url),
-        "has_sub": bool(sub_url),
+        "has_streams": bool(stream_map),
         "transcode": transcode,
         "listen": listen,
         "lan_ip": lan_ip,
@@ -655,8 +715,8 @@ def ensure_https_tunnel() -> str:
 
 
 def player_url_for(base: str, stream: str = STREAM_NAME) -> str:
-    # MSE over HTTPS tunnel embeds cleanly in Hostinger; WebRTC as secondary.
-    return f"{base.rstrip('/')}/stream.html?src={stream}&mode=mse,webrtc"
+    # WebRTC first for lowest delay (Reolink-app-like on LAN/tunnel).
+    return f"{base.rstrip('/')}/stream.html?src={stream}&mode=webrtc,mse"
 
 
 def write_status(running: bool, error: str = "", meta: Optional[dict] = None) -> dict:

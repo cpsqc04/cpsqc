@@ -478,8 +478,9 @@ $cctvNavActive = 'camera-management';
                     <div class="form-group">
                         <label for="cameraStreamType">Stream Type</label>
                         <select id="cameraStreamType">
-                            <option value="main">Main stream (Clear)</option>
-                            <option value="sub">Sub stream (Fluent)</option>
+                            <option value="high">High (Clear)</option>
+                            <option value="mid">Mid (Fluent)</option>
+                            <option value="low">Low (Balanced)</option>
                         </select>
                         <button type="button" class="btn-secondary" id="detectEncodingBtn" style="margin-top:0.55rem;" onclick="detectReolinkEncoding()">
                             <i class="fas fa-magic"></i> Detect Camera
@@ -560,12 +561,27 @@ $cctvNavActive = 'camera-management';
             return set;
         }
 
+        function normalizeStreamType(streamType) {
+            const value = String(streamType || 'mid').trim().toLowerCase();
+            if (value === 'high' || value === 'main') return 'high';
+            if (value === 'low' || value === 'ext') return 'low';
+            if (value === 'mid' || value === 'sub') return 'mid';
+            return 'mid';
+        }
+
+        function streamPathForType(streamType) {
+            const quality = normalizeStreamType(streamType);
+            if (quality === 'high') return 'h264Preview_01_main';
+            if (quality === 'low') return 'h264Preview_01_ext';
+            return 'h264Preview_01_sub';
+        }
+
         function buildRtspUrl(ip, port, username, password, streamType) {
             const safeIp = String(ip || '').trim();
             const safePort = String(port || '554').trim() || '554';
             const user = encodeURIComponent(String(username || '').trim());
             const pass = encodeURIComponent(String(password || ''));
-            const path = String(streamType || 'main') === 'sub' ? 'h264Preview_01_sub' : 'h264Preview_01_main';
+            const path = streamPathForType(streamType);
             if (!safeIp) return '';
             if (username) {
                 return 'rtsp://' + user + ':' + pass + '@' + safeIp + ':' + safePort + '/' + path;
@@ -591,7 +607,7 @@ $cctvNavActive = 'camera-management';
                 // Keep saved URL until IP/credentials fields change enough to rebuild.
                 const sameUser = username === (editingCamera.username || '');
                 const samePort = port === String(editingCamera.port || '554');
-                const sameStream = streamType === (editingCamera.streamType || 'main');
+                const sameStream = normalizeStreamType(streamType) === normalizeStreamType(editingCamera.streamType || 'mid');
                 if (sameUser && samePort && sameStream) {
                     rtspInput.value = editingCamera.rtspUrl;
                     return;
@@ -660,7 +676,7 @@ $cctvNavActive = 'camera-management';
             openCameraModal();
             document.getElementById('cameraIp').value = cam.ip || '';
             document.getElementById('cameraPort').value = String(cam.rtsp_port || 554);
-            document.getElementById('cameraStreamType').value = cam.suggested_stream_type || 'sub';
+            document.getElementById('cameraStreamType').value = cam.suggested_stream_type ? normalizeStreamType(cam.suggested_stream_type) : 'mid';
             if (!document.getElementById('cameraUsername').value) {
                 document.getElementById('cameraUsername').value = 'admin';
             }
@@ -831,7 +847,7 @@ $cctvNavActive = 'camera-management';
                                 const updated = cameras.find(function(c) { return c.id === editingCamera.id; });
                                 if (updated) {
                                     editingCamera = updated;
-                                    document.getElementById('cameraStreamType').value = updated.streamType || 'sub';
+                                    document.getElementById('cameraStreamType').value = normalizeStreamType(updated.streamType || 'mid');
                                     refreshRtspPreview();
                                 }
                             }
@@ -931,7 +947,7 @@ $cctvNavActive = 'camera-management';
                 ? 'Leave blank to keep current password'
                 : 'Camera login password';
             document.getElementById('passwordHint').style.display = camera ? 'block' : 'none';
-            document.getElementById('cameraStreamType').value = camera ? (camera.streamType || 'main') : 'main';
+            document.getElementById('cameraStreamType').value = normalizeStreamType(camera ? camera.streamType : 'mid');
             document.getElementById('cameraStatus').value = camera ? (camera.status || 'Online') : 'Online';
             document.getElementById('cameraDescription').value = camera ? (camera.description || '') : '';
 

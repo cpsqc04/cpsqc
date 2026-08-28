@@ -109,17 +109,54 @@ function camerasRevisionPayload(string $camerasFile): array
     ];
 }
 
-function buildRtspUrl(string $ip, string $port, string $username, string $password, string $streamType): string
-{
-    // Reolink-compatible main/sub paths (detect.py also tries Preview_01_* fallbacks).
-    $streamPath = $streamType === 'main' ? 'h264Preview_01_main' : 'h264Preview_01_sub';
-    return 'rtsp://' . rawurlencode($username) . ':' . rawurlencode($password) . '@' . $ip . ':' . $port . '/' . $streamPath;
-}
-
 function normalizeStreamType($streamType): string
 {
     $streamType = strtolower(trim((string) $streamType));
-    return $streamType === 'sub' ? 'sub' : 'main';
+    if (in_array($streamType, ['high', 'main'], true)) {
+        return 'high';
+    }
+    if (in_array($streamType, ['low', 'ext'], true)) {
+        return 'low';
+    }
+    if (in_array($streamType, ['mid', 'sub'], true)) {
+        return 'mid';
+    }
+    return 'mid';
+}
+
+function streamPathForType(string $streamType): string
+{
+    $streamType = normalizeStreamType($streamType);
+    if ($streamType === 'high') {
+        return 'h264Preview_01_main';
+    }
+    if ($streamType === 'low') {
+        return 'h264Preview_01_ext';
+    }
+    return 'h264Preview_01_sub';
+}
+
+function streamQualityLabel(string $streamType): string
+{
+    $streamType = normalizeStreamType($streamType);
+    return match ($streamType) {
+        'high' => 'High',
+        'low' => 'Low',
+        default => 'Mid',
+    };
+}
+
+function buildRtspUrl(string $ip, string $port, string $username, string $password, string $streamType): string
+{
+    $streamPath = streamPathForType($streamType);
+    return 'rtsp://' . rawurlencode($username) . ':' . rawurlencode($password) . '@' . $ip . ':' . $port . '/' . $streamPath;
+}
+
+function go2rtcStreamName(array $camera): string
+{
+    $cameraId = trim((string) ($camera['cameraId'] ?? $camera['id'] ?? 'cam'));
+    $safe = preg_replace('/[^a-zA-Z0-9_-]/', '_', $cameraId) ?: 'cam';
+    return 'alertara_' . $safe;
 }
 
 function findCameraIndex(array $cameras, string $id): int
@@ -150,7 +187,7 @@ function createCamera(string $camerasFile, array $data): array
     $port = trim((string) ($data['port'] ?? '554')) ?: '554';
     $username = trim((string) ($data['username'] ?? ''));
     $password = (string) ($data['password'] ?? '');
-    $streamType = normalizeStreamType($data['streamType'] ?? 'main');
+    $streamType = normalizeStreamType($data['streamType'] ?? 'mid');
 
     if ($ip === '' || $username === '' || trim((string) ($data['name'] ?? '')) === '' || trim((string) ($data['location'] ?? '')) === '') {
         return ['success' => false, 'error' => 'Name, location, IP address, and username are required.', 'code' => 400];

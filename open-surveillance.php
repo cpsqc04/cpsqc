@@ -165,9 +165,147 @@ ensureLocalDetectionStarted();
         .video-shell:fullscreen .webrtc-frame,
         .video-shell:-webkit-full-screen .webrtc-frame { width: 100%; height: 100%; }
         .fullscreen-btn { pointer-events: auto; }
-        .live-mode-chip { display: inline-flex; align-items: center; gap: 0.35rem; margin-left: 0.5rem; padding: 0.2rem 0.55rem; border-radius: 999px; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.02em; background: rgba(15, 23, 42, 0.08); color: var(--text-secondary); }
-        .live-mode-chip.webrtc { background: rgba(76, 138, 137, 0.15); color: #0f766e; }
-        .live-mode-chip.jpeg { background: rgba(234, 179, 8, 0.18); color: #854d0e; }
+        .live-mode-chip { display: none !important; }
+        .stream-quality-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            margin-left: 0.5rem;
+            padding: 0.2rem 0.65rem;
+            border-radius: 999px;
+            font-size: 0.78rem;
+            font-weight: 700;
+            letter-spacing: 0.02em;
+            background: rgba(76, 138, 137, 0.12);
+            color: #0f766e;
+        }
+        .video-shell { cursor: pointer; }
+        .video-shell.is-grid-open { cursor: default; }
+        .camera-grid-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            z-index: 2000;
+            background: rgba(15, 23, 42, 0.72);
+            align-items: center;
+            justify-content: center;
+            padding: 1.5rem;
+            box-sizing: border-box;
+        }
+        .camera-grid-overlay.show { display: flex; }
+        .camera-grid-panel {
+            background: #fff;
+            border-radius: 14px;
+            width: min(960px, 100%);
+            max-height: min(90vh, 820px);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.25);
+        }
+        .camera-grid-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 1rem 1.25rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .camera-grid-header h3 { margin: 0; font-size: 1.1rem; color: var(--tertiary-color); }
+        .camera-grid-close {
+            border: none;
+            background: transparent;
+            font-size: 1.25rem;
+            cursor: pointer;
+            color: var(--text-secondary);
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+        }
+        .camera-grid-close:hover { background: #f1f5f9; color: var(--text-color); }
+        .camera-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 1rem;
+            padding: 1.25rem;
+            overflow-y: auto;
+        }
+        .camera-grid-cell {
+            aspect-ratio: 16 / 10;
+            border-radius: 10px;
+            border: 2px solid var(--border-color);
+            background: #0f172a;
+            position: relative;
+            overflow: hidden;
+            cursor: pointer;
+            transition: border-color 0.2s ease, transform 0.15s ease;
+        }
+        .camera-grid-cell:hover { border-color: #4c8a89; transform: translateY(-1px); }
+        .camera-grid-cell.is-active { border-color: #4c8a89; box-shadow: 0 0 0 2px rgba(76,138,137,0.25); }
+        .camera-grid-cell.is-empty {
+            background: #f8fafc;
+            border-style: dashed;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            gap: 0.35rem;
+            color: var(--text-secondary);
+            font-weight: 600;
+        }
+        .camera-grid-cell.is-empty i { font-size: 1.5rem; color: #94a3b8; }
+        .camera-grid-preview {
+            width: 100%;
+            height: 100%;
+            border: 0;
+            pointer-events: none;
+            background: #000;
+        }
+        .camera-grid-label {
+            position: absolute;
+            left: 0.55rem;
+            right: 0.55rem;
+            bottom: 0.55rem;
+            padding: 0.35rem 0.55rem;
+            border-radius: 6px;
+            background: rgba(0,0,0,0.65);
+            color: #fff;
+            font-size: 0.78rem;
+            font-weight: 600;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .camera-fullscreen-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            z-index: 2100;
+            background: #000;
+        }
+        .camera-fullscreen-overlay.show { display: block; }
+        .camera-fullscreen-overlay iframe {
+            width: 100%;
+            height: 100%;
+            border: 0;
+            background: #000;
+        }
+        .camera-fullscreen-close {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            z-index: 2;
+            width: 44px;
+            height: 44px;
+            border: none;
+            border-radius: 10px;
+            background: rgba(15, 23, 42, 0.75);
+            color: #fff;
+            cursor: pointer;
+            font-size: 1.1rem;
+        }
+        @media (max-width: 640px) {
+            .camera-grid { grid-template-columns: 1fr; }
+        }
         .video-shell:fullscreen,
         .video-shell:-webkit-full-screen { border-radius: 0; border: none; aspect-ratio: auto; max-height: none; min-height: 100vh; width: 100vw; height: 100vh; background: #000; }
         .video-shell:fullscreen .camera-feed,
@@ -557,13 +695,13 @@ ensureLocalDetectionStarted();
                         </div>
                         <div style="display:flex;align-items:center;gap:0.35rem;flex-wrap:wrap;">
                             <span class="live-badge" id="liveBadge"><span class="dot"></span> Connecting</span>
-                            <span class="live-mode-chip" id="liveModeChip" title="Live transport">…</span>
+                            <span class="stream-quality-badge" id="streamQualityBadge" title="Stream quality">Mid</span>
                         </div>
                     </div>
 
                     <div class="surveillance-layout">
                         <div class="video-column">
-                            <div class="video-shell" id="videoShell">
+                            <div class="video-shell" id="videoShell" title="Click to open camera grid">
                                 <button type="button" class="fullscreen-btn" id="fullscreenBtn" title="Full screen" aria-label="Toggle full screen">
                                     <i class="fas fa-expand"></i>
                                 </button>
@@ -593,6 +731,23 @@ ensureLocalDetectionStarted();
         </main>
     </div>
 
+    <div id="cameraGridOverlay" class="camera-grid-overlay" aria-hidden="true">
+        <div class="camera-grid-panel" role="dialog" aria-labelledby="cameraGridTitle">
+            <div class="camera-grid-header">
+                <h3 id="cameraGridTitle"><i class="fas fa-th"></i> Camera Grid</h3>
+                <button type="button" class="camera-grid-close" id="cameraGridClose" aria-label="Close camera grid">&times;</button>
+            </div>
+            <div class="camera-grid" id="cameraGrid"></div>
+        </div>
+    </div>
+
+    <div id="cameraFullscreenOverlay" class="camera-fullscreen-overlay" aria-hidden="true">
+        <button type="button" class="camera-fullscreen-close" id="cameraFullscreenClose" aria-label="Close full screen">
+            <i class="fas fa-times"></i>
+        </button>
+        <iframe id="cameraFullscreenFeed" title="Fullscreen camera" allow="autoplay; fullscreen" referrerpolicy="no-referrer"></iframe>
+    </div>
+
     <script>
         const LOCAL_DETECTION_ENABLED = <?php echo $localDetectionEnabled ? 'true' : 'false'; ?>;
         const CCTV_FEED_MODE = <?php echo json_encode($cctvFeedMode); ?>;
@@ -620,11 +775,13 @@ ensureLocalDetectionStarted();
                 if (liveTransport === 'none') return;
                 const badge = document.getElementById('liveBadge');
                 const offline = badge && /Offline/i.test(badge.textContent || '');
-                if (offline || liveTransport === 'connecting') {
+                // Retry only when offline — avoid reconnect loops while stream is still starting.
+                if (offline) {
                     startLiveView();
                 }
-            }, 20000);
+            }, 30000);
             initFullscreen();
+            initCameraGrid();
             initDetectionLifecycle();
             window.addEventListener('storage', function(e) {
                 if (e.key === 'cameraConfigUpdated') {
@@ -767,13 +924,16 @@ ensureLocalDetectionStarted();
         let feedErrors = 0;
         let liveTransport = 'connecting'; // webrtc | jpeg | none | connecting
         let activeCamera = null;
+        let allCameras = [];
         let liveEmbedBases = [];
         let liveEmbedBaseIndex = 0;
         let liveEmbedWatchTimer = null;
         let jpegFeedTimer = null;
         let liveBootDeadline = 0;
         let liveViewInFlight = false;
-        const LIVE_BOOT_GRACE_MS = 90000; // YOLO/RTSP can take a while on first open
+        let liveHasPlayed = false;
+        const LIVE_BOOT_GRACE_MS = 45000;
+        const GRID_SLOT_COUNT = 4;
         window.__detectionThumbFallback = function(img) {
             if (!img || !img.parentNode) return;
             const ph = document.createElement('div');
@@ -783,25 +943,42 @@ ensureLocalDetectionStarted();
             img.replaceWith(ph);
         };
 
-        function setLiveModeChip(mode) {
-            const chip = document.getElementById('liveModeChip');
-            if (!chip) return;
-            chip.classList.remove('webrtc', 'jpeg');
-            if (mode === 'webrtc') {
-                chip.textContent = 'WebRTC · low latency';
-                chip.classList.add('webrtc');
-                chip.title = 'Direct camera stream via go2rtc (near Reolink app delay)';
-            } else if (mode === 'jpeg') {
-                chip.textContent = 'JPEG relay';
-                chip.classList.add('jpeg');
-                chip.title = 'Showing uploaded frames while low-latency stream reconnects';
-            } else if (mode === 'missing') {
-                chip.textContent = 'No camera';
-                chip.title = '';
-            } else {
-                chip.textContent = 'Connecting…';
-                chip.title = '';
+        function normalizeStreamType(streamType) {
+            const value = String(streamType || 'mid').trim().toLowerCase();
+            if (value === 'high' || value === 'main') return 'high';
+            if (value === 'low' || value === 'ext') return 'low';
+            if (value === 'mid' || value === 'sub') return 'mid';
+            return 'mid';
+        }
+
+        function streamQualityLabel(streamType) {
+            const quality = normalizeStreamType(streamType);
+            if (quality === 'high') return 'High';
+            if (quality === 'low') return 'Low';
+            return 'Mid';
+        }
+
+        function go2rtcStreamName(camera) {
+            if (!camera) return 'alertara_live';
+            const id = camera.cameraId || camera.id || 'cam';
+            return 'alertara_' + String(id).replace(/[^a-zA-Z0-9_-]/g, '_');
+        }
+
+        function updateStreamQualityBadge(camera) {
+            const badge = document.getElementById('streamQualityBadge');
+            if (!badge) return;
+            if (!camera) {
+                badge.textContent = '—';
+                badge.title = 'Stream quality';
+                return;
             }
+            const label = streamQualityLabel(camera.streamType);
+            badge.textContent = label;
+            badge.title = 'Stream quality: ' + label + ' (matches Camera Management)';
+        }
+
+        function setLiveModeChip() {
+            /* WebRTC / JPEG relay chips removed from UI */
         }
 
         function setCameraUiState(state) {
@@ -845,7 +1022,7 @@ ensureLocalDetectionStarted();
                     cameraOverlay.classList.add('visible');
                 }
                 if (dateTimeOverlay) dateTimeOverlay.classList.remove('visible');
-                setLiveModeChip('missing');
+                updateStreamQualityBadge(null);
                 return;
             }
 
@@ -898,7 +1075,6 @@ ensureLocalDetectionStarted();
                 jpegFeedTimer = null;
             }
             liveTransport = 'jpeg';
-            setLiveModeChip('jpeg');
             const refresh = () => {
                 jpeg.src = 'api/current_frame.php?t=' + Date.now();
             };
@@ -939,9 +1115,9 @@ ensureLocalDetectionStarted();
                 jpeg.classList.remove('active');
                 jpeg.removeAttribute('src');
             }
-            const embedUrl = buildCleanEmbedUrl(baseUrl, streamName);
+            const resolvedStream = streamName || go2rtcStreamName(activeCamera);
+            const embedUrl = buildCleanEmbedUrl(baseUrl, resolvedStream);
             liveTransport = 'webrtc';
-            setLiveModeChip('webrtc');
             webrtc.src = embedUrl;
             webrtc.classList.add('active');
             document.getElementById('cameraPlaceholder').classList.add('hidden');
@@ -954,11 +1130,11 @@ ensureLocalDetectionStarted();
                 // No playing ack yet — try next HTTPS/LAN base, then JPEG relay.
                 liveEmbedBaseIndex += 1;
                 if (liveEmbedBaseIndex < liveEmbedBases.length) {
-                    applyLiveEmbedBase(liveEmbedBases[liveEmbedBaseIndex], streamName);
+                    applyLiveEmbedBase(liveEmbedBases[liveEmbedBaseIndex], resolvedStream);
                     return;
                 }
                 startJpegRelayFeed();
-            }, 12000);
+            }, 8000);
             return true;
         }
 
@@ -971,36 +1147,42 @@ ensureLocalDetectionStarted();
                     liveEmbedWatchTimer = null;
                 }
                 liveTransport = 'webrtc';
-                setLiveModeChip('webrtc');
+                liveHasPlayed = true;
                 setCameraUiState('live');
                 applyLocationOverlay(activeCamera);
+                updateStreamQualityBadge(activeCamera);
             } else if (data.state === 'error' && liveTransport === 'webrtc') {
                 liveEmbedBaseIndex += 1;
-                const streamName = (document.getElementById('webrtcFeed') && liveEmbedBases.length)
-                    ? 'alertara_live'
-                    : 'alertara_live';
+                const resolvedStream = go2rtcStreamName(activeCamera);
                 if (liveEmbedBaseIndex < liveEmbedBases.length) {
-                    applyLiveEmbedBase(liveEmbedBases[liveEmbedBaseIndex], streamName);
+                    applyLiveEmbedBase(liveEmbedBases[liveEmbedBaseIndex], resolvedStream);
                 } else {
                     startJpegRelayFeed();
                 }
             }
         });
 
-        async function fetchActiveCamera() {
+        async function fetchAllCameras() {
             try {
                 const res = await fetch('api/cameras.php?t=' + Date.now(), { cache: 'no-store', credentials: 'same-origin' });
                 const result = await res.json();
                 const cameras = result.cameras || result.data || [];
-                if (!Array.isArray(cameras) || cameras.length === 0) {
-                    return null;
-                }
-                return cameras.find(function(cam) {
-                    return String(cam.status || '').toLowerCase() === 'online';
-                }) || cameras[0];
+                allCameras = Array.isArray(cameras) ? cameras : [];
+                return allCameras;
             } catch (e) {
+                allCameras = [];
+                return [];
+            }
+        }
+
+        async function fetchActiveCamera() {
+            await fetchAllCameras();
+            if (!allCameras.length) {
                 return null;
             }
+            return allCameras.find(function(cam) {
+                return String(cam.status || '').toLowerCase() === 'online';
+            }) || allCameras[0];
         }
 
         function applyLocationOverlay(camera) {
@@ -1064,7 +1246,8 @@ ensureLocalDetectionStarted();
 
                 liveEmbedBases = embeddableBases;
                 liveEmbedBaseIndex = 0;
-                return applyLiveEmbedBase(liveEmbedBases[0], data.stream || 'alertara_live');
+                const streamName = go2rtcStreamName(activeCamera);
+                return applyLiveEmbedBase(liveEmbedBases[0], data.stream === streamName ? data.stream : streamName);
             } catch (e) {
                 console.warn('WebRTC status check failed', e);
                 return false;
@@ -1075,7 +1258,6 @@ ensureLocalDetectionStarted();
             if (liveViewInFlight) return;
             liveViewInFlight = true;
             try {
-                setLiveModeChip('connecting');
                 setCameraUiState('connecting');
                 liveBootDeadline = Date.now() + LIVE_BOOT_GRACE_MS;
                 feedErrors = 0;
@@ -1086,25 +1268,30 @@ ensureLocalDetectionStarted();
                     liveBootDeadline = 0;
                     stopLiveFeeds();
                     setCameraUiState('missing');
+                    updateStreamQualityBadge(null);
                     return;
                 }
                 applyLocationOverlay(activeCamera);
+                updateStreamQualityBadge(activeCamera);
 
-                // Auto-start detection_agent (same as start_detection_agent.bat) when cameras exist.
-                await ensureDetectionRunning();
-                // Give the agent a moment to spawn detect.py / go2rtc before first stream attempt.
-                await waitForLiveFrame(8000);
-
+                // Start WebRTC immediately (Reolink-style direct RTSP via go2rtc).
                 const ok = await tryStartWebRtcFeed();
-                if (!ok) {
-                    // Low-latency path unavailable — show JPEG frames as soon as they appear.
-                    if (startJpegRelayFeed()) {
-                        return;
+                // Detection agent + JPEG relay run in parallel — don't block live view.
+                ensureDetectionRunning();
+                waitForLiveFrame(6000).then(function(hasFrame) {
+                    if (!hasFrame && !liveHasPlayed && liveTransport !== 'webrtc') {
+                        if (!startJpegRelayFeed()) {
+                            setCameraUiState('connecting');
+                        }
                     }
-                    liveTransport = 'connecting';
-                    stopLiveFeeds();
-                    setCameraUiState('connecting');
-                    setTimeout(startLiveView, 5000);
+                });
+
+                if (!ok && !liveHasPlayed) {
+                    if (!startJpegRelayFeed()) {
+                        liveTransport = 'connecting';
+                        stopLiveFeeds();
+                        setCameraUiState('connecting');
+                    }
                 }
             } finally {
                 liveViewInFlight = false;
@@ -1114,6 +1301,7 @@ ensureLocalDetectionStarted();
         async function loadFeedCameraName() {
             activeCamera = await fetchActiveCamera();
             applyLocationOverlay(activeCamera);
+            updateStreamQualityBadge(activeCamera);
             if (!activeCamera) {
                 liveTransport = 'none';
                 stopLiveFeeds();
@@ -1121,27 +1309,160 @@ ensureLocalDetectionStarted();
             }
         }
 
+        function initCameraGrid() {
+            const videoShell = document.getElementById('videoShell');
+            const gridOverlay = document.getElementById('cameraGridOverlay');
+            const gridClose = document.getElementById('cameraGridClose');
+            const fsOverlay = document.getElementById('cameraFullscreenOverlay');
+            const fsClose = document.getElementById('cameraFullscreenClose');
+
+            if (videoShell) {
+                videoShell.addEventListener('click', function(e) {
+                    if (e.target.closest('.fullscreen-btn')) return;
+                    openCameraGrid();
+                });
+            }
+            if (gridClose) gridClose.addEventListener('click', closeCameraGrid);
+            if (gridOverlay) {
+                gridOverlay.addEventListener('click', function(e) {
+                    if (e.target === gridOverlay) closeCameraGrid();
+                });
+            }
+            if (fsClose) fsClose.addEventListener('click', closeCameraFullscreen);
+            document.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape') {
+                    closeCameraFullscreen();
+                    closeCameraGrid();
+                }
+            });
+        }
+
+        function openCameraGrid() {
+            const overlay = document.getElementById('cameraGridOverlay');
+            const shell = document.getElementById('videoShell');
+            if (!overlay) return;
+            renderCameraGrid();
+            overlay.classList.add('show');
+            overlay.setAttribute('aria-hidden', 'false');
+            if (shell) shell.classList.add('is-grid-open');
+        }
+
+        function closeCameraGrid() {
+            const overlay = document.getElementById('cameraGridOverlay');
+            const shell = document.getElementById('videoShell');
+            if (!overlay) return;
+            overlay.classList.remove('show');
+            overlay.setAttribute('aria-hidden', 'true');
+            if (shell) shell.classList.remove('is-grid-open');
+            const grid = document.getElementById('cameraGrid');
+            if (grid) grid.innerHTML = '';
+        }
+
+        function renderCameraGrid() {
+            const grid = document.getElementById('cameraGrid');
+            if (!grid) return;
+            const cameras = allCameras.slice();
+            const cells = [];
+            for (let i = 0; i < GRID_SLOT_COUNT; i += 1) {
+                const cam = cameras[i] || null;
+                if (cam) {
+                    const isActive = activeCamera && String(activeCamera.id) === String(cam.id);
+                    const label = escapeHtml(cam.location || cam.name || cam.cameraId || 'Camera');
+                    const quality = streamQualityLabel(cam.streamType);
+                    const stream = go2rtcStreamName(cam);
+                    const previewSrc = liveEmbedBases.length
+                        ? buildCleanEmbedUrl(liveEmbedBases[0], stream)
+                        : '';
+                    cells.push(`
+                        <div class="camera-grid-cell${isActive ? ' is-active' : ''}" data-camera-id="${escapeHtml(cam.id)}" title="Click for full screen">
+                            ${previewSrc ? `<iframe class="camera-grid-preview" src="${escapeHtml(previewSrc)}" title="${label}" loading="lazy"></iframe>` : ''}
+                            <div class="camera-grid-label">${label} · ${escapeHtml(quality)}</div>
+                        </div>
+                    `);
+                } else {
+                    cells.push(`
+                        <div class="camera-grid-cell is-empty" data-add-camera="1" title="Add a camera">
+                            <i class="fas fa-plus-circle"></i>
+                            <span>Add camera</span>
+                        </div>
+                    `);
+                }
+            }
+            grid.innerHTML = cells.join('');
+            grid.querySelectorAll('.camera-grid-cell[data-camera-id]').forEach(function(cell) {
+                cell.addEventListener('click', function() {
+                    const id = cell.getAttribute('data-camera-id');
+                    const cam = allCameras.find(function(c) { return String(c.id) === String(id); });
+                    if (!cam) return;
+                    closeCameraGrid();
+                    openCameraFullscreen(cam);
+                });
+            });
+            grid.querySelectorAll('.camera-grid-cell[data-add-camera]').forEach(function(cell) {
+                cell.addEventListener('click', function() {
+                    window.location.href = 'camera-management.php';
+                });
+            });
+        }
+
+        function openCameraFullscreen(camera) {
+            const overlay = document.getElementById('cameraFullscreenOverlay');
+            const frame = document.getElementById('cameraFullscreenFeed');
+            if (!overlay || !frame || !camera) return;
+            activeCamera = camera;
+            applyLocationOverlay(activeCamera);
+            updateStreamQualityBadge(activeCamera);
+            const stream = go2rtcStreamName(camera);
+            if (liveEmbedBases.length) {
+                frame.src = buildCleanEmbedUrl(liveEmbedBases[0], stream);
+            } else {
+                tryStartWebRtcFeed().then(function() {
+                    if (liveEmbedBases.length) {
+                        frame.src = buildCleanEmbedUrl(liveEmbedBases[0], stream);
+                    }
+                });
+            }
+            overlay.classList.add('show');
+            overlay.setAttribute('aria-hidden', 'false');
+            tryStartWebRtcFeed();
+        }
+
+        function closeCameraFullscreen() {
+            const overlay = document.getElementById('cameraFullscreenOverlay');
+            const frame = document.getElementById('cameraFullscreenFeed');
+            if (!overlay) return;
+            overlay.classList.remove('show');
+            overlay.setAttribute('aria-hidden', 'true');
+            if (frame) frame.removeAttribute('src');
+            startLiveView();
+        }
+
         function startCameraFeed() {
             startJpegRelayFeed();
         }
 
-        // Re-check camera list + promote/repair WebRTC periodically.
+        // Re-check camera list + promote WebRTC when not yet playing.
         setInterval(async function() {
+            await fetchAllCameras();
             const cam = await fetchActiveCamera();
             if (!cam) {
                 if (liveTransport !== 'none') {
                     liveTransport = 'none';
                     stopLiveFeeds();
                     setCameraUiState('missing');
+                    updateStreamQualityBadge(null);
                 }
                 return;
             }
-            activeCamera = cam;
-            applyLocationOverlay(activeCamera);
-            if (liveTransport !== 'webrtc') {
+            if (!activeCamera || String(activeCamera.id) !== String(cam.id)) {
+                activeCamera = cam;
+                applyLocationOverlay(activeCamera);
+                updateStreamQualityBadge(activeCamera);
+            }
+            if (liveTransport !== 'webrtc' && !liveHasPlayed) {
                 await tryStartWebRtcFeed();
             }
-        }, 8000);
+        }, 12000);
 
         function escapeHtml(value) {
             return String(value ?? '')

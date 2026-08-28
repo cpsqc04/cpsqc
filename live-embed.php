@@ -84,8 +84,8 @@ $wsUrl = $wsBase . '/api/ws?src=' . rawurlencode($stream);
 
     const vs = document.createElement('video-stream');
     vs.background = true;
-    // MSE first — more reliable through Cloudflare tunnels than WebRTC.
-    vs.mode = 'mse,webrtc';
+    // WebRTC first — lowest delay, same path Reolink app uses (direct RTSP via go2rtc).
+    vs.mode = 'webrtc,mse';
     vs.src = <?php echo json_encode($wsUrl, JSON_UNESCAPED_SLASHES); ?>;
     document.body.appendChild(vs);
     notify('connecting');
