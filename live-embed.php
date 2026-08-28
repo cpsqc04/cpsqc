@@ -68,7 +68,7 @@ $wsUrl = $wsBase . '/api/ws?src=' . rawurlencode($stream);
     <script type="module" src="https://cdn.jsdelivr.net/gh/AlexxIT/go2rtc@v1.9.4/www/video-stream.js"></script>
 </head>
 <body>
-<div id="status">Connecting to camera…</div>
+<div id="status">Connecting…</div>
 <script type="module">
     const statusEl = document.getElementById('status');
     const notify = (state, detail) => {

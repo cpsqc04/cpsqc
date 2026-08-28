@@ -744,7 +744,7 @@ ensureLocalDetectionStarted();
                                 <canvas id="detectionOverlay" class="detection-overlay" aria-hidden="true"></canvas>
                                 <div class="video-placeholder" id="cameraPlaceholder">
                                     <i class="fas fa-camera"></i>
-                                    <p id="cameraPlaceholderText">Connecting to camera…</p>
+                                    <p id="cameraPlaceholderText">Connecting…</p>
                                 </div>
                             </div>
                         </div>
@@ -966,6 +966,7 @@ ensureLocalDetectionStarted();
         let liveViewInFlight = false;
         let liveHasPlayed = false;
         let go2rtcConfigured = false;
+        let activeLiveStreamName = '';
         const LIVE_BOOT_GRACE_MS = 60000;
         const GRID_SLOT_COUNT = 4;
         window.__detectionThumbFallback = function(img) {
@@ -1119,18 +1120,18 @@ ensureLocalDetectionStarted();
             }
 
             if (placeholderText) {
-                placeholderText.textContent = isConnecting ? 'Connecting to camera…' : 'Camera offline';
+                placeholderText.textContent = isConnecting ? 'Connecting…' : 'Camera offline';
             }
 
-            if (isLive || (isConnecting && showingFeed)) {
+            if (isLive) {
                 placeholder.classList.add('hidden');
-            } else if (!showingFeed) {
+            } else {
                 placeholder.classList.remove('hidden');
             }
 
-            const showOverlays = isLive || showingFeed || isMissing;
+            const showOverlays = isLive || isConnecting || isMissing;
             if (cameraOverlay) cameraOverlay.classList.toggle('visible', showOverlays);
-            if (dateTimeOverlay) dateTimeOverlay.classList.toggle('visible', isLive || showingFeed);
+            if (dateTimeOverlay) dateTimeOverlay.classList.toggle('visible', isLive);
         }
 
         function stopLiveFeeds() {
@@ -1207,7 +1208,7 @@ ensureLocalDetectionStarted();
             setCameraUiState('connecting');
             const placeholderText = document.getElementById('cameraPlaceholderText');
             if (placeholderText) {
-                placeholderText.textContent = 'Connecting to Reolink stream…';
+                placeholderText.textContent = 'Connecting…';
             }
             setTimeout(function() {
                 if (!liveHasPlayed && liveTransport === 'connecting') {
@@ -1233,7 +1234,6 @@ ensureLocalDetectionStarted();
             liveTransport = 'webrtc';
             webrtc.src = embedUrl;
             webrtc.classList.add('active');
-            document.getElementById('cameraPlaceholder').classList.add('hidden');
             setCameraUiState('connecting');
             applyLocationOverlay(activeCamera);
 
@@ -1403,7 +1403,7 @@ ensureLocalDetectionStarted();
                         const placeholderText = document.getElementById('cameraPlaceholderText');
                         if (placeholderText) {
                             placeholderText.textContent = go2rtcConfigured
-                                ? 'Connecting to Reolink stream…'
+                                ? 'Connecting…'
                                 : 'Waiting for on-site live stream (start_detection_agent.bat)…';
                         }
                     }

@@ -232,14 +232,19 @@ def camera_rtsp_urls(camera: dict) -> Tuple[str, str, str]:
 
 
 def stream_sources_for_camera(camera: dict) -> List[str]:
-    """RTSP sources for go2rtc — locked to Camera Management quality (Reolink app parity)."""
+    """RTSP sources for go2rtc — same URL as VLC / Reolink app (saved rtspUrl first)."""
+    quality = normalize_stream_type((camera or {}).get("streamType"))
+    sources: List[str] = []
+
+    base = str(camera.get("rtspUrl") or "").strip()
+    if base:
+        exact = base if "#" in base else base + "#rtsp_transport=tcp"
+        sources.append(exact)
+
     ip = str(camera.get("ipAddress") or "").strip()
     port = str(camera.get("port") or "554").strip() or "554"
     user = str(camera.get("username") or "admin").strip() or "admin"
     password = password_from_camera(camera)
-    quality = normalize_stream_type((camera or {}).get("streamType"))
-    sources: List[str] = []
-
     if ip and password:
         for path in reolink_path_variants(quality):
             url = build_reolink_rtsp(ip, port, user, password, path)
@@ -247,7 +252,9 @@ def stream_sources_for_camera(camera: dict) -> List[str]:
                 sources.append(url)
         return sources
 
-    base = str(camera.get("rtspUrl") or "").strip()
+    if sources:
+        return sources
+
     if base:
         primary = swap_stream_path(base, "main" if quality == "high" else "sub")
         if quality == "low":
