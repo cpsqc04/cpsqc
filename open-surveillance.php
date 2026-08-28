@@ -1339,7 +1339,8 @@ ensureLocalDetectionStarted();
                 if (!data || !data.success) {
                     return false;
                 }
-                if (!data.running) {
+                // Still try HTTPS tunnel when configured even if agent heartbeat is stale.
+                if (!data.running && !data.enabled) {
                     return false;
                 }
 

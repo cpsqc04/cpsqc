@@ -12,6 +12,24 @@ if (file_exists($autoloadPath)) {
 require_once __DIR__ . '/includes/login_otp.php';
 require_once __DIR__ . '/includes/admin_credentials.php';
 
+const LOGIN_MAX_FAILED_ATTEMPTS = 3;
+const LOGIN_LOCKOUT_MINUTES = 1;
+
+function loginLockoutUntil(string $fromDatetime): string
+{
+    return date('Y-m-d H:i:s', strtotime($fromDatetime . ' +' . LOGIN_LOCKOUT_MINUTES . ' minutes'));
+}
+
+function loginLockoutDurationLabel(): string
+{
+    return LOGIN_LOCKOUT_MINUTES === 1 ? '1 minute' : LOGIN_LOCKOUT_MINUTES . ' minutes';
+}
+
+function loginLockoutMessage(): string
+{
+    return 'Your account has been temporarily locked due to multiple failed login attempts. It will be unlocked after ' . loginLockoutDurationLabel() . '.';
+}
+
 /**
  * Ensure the admins table exists and has required columns.
  * Also creates a default admin account (admin / admin123) if table is empty.
@@ -158,6 +176,7 @@ function sendAccountLockEmail($email, $username, $lockedUntil) {
             $mail->addAddress($email);
             $mail->isHTML(true);
             $mail->Subject = 'AlerTara QC - Account Temporarily Locked';
+            $lockoutLabel = loginLockoutDurationLabel();
             $mail->Body = "
             <!DOCTYPE html>
             <html>
@@ -185,7 +204,7 @@ function sendAccountLockEmail($email, $username, $lockedUntil) {
                         <div class='warning-box'>
                             <p><strong>Security Alert:</strong> We detected suspicious activity on your account. For your security, the account has been locked.</p>
                         </div>
-                        <p>Your account will be automatically unlocked on <strong>{$unlockTime}</strong> (30 minutes from the last failed attempt).</p>
+                        <p>Your account will be automatically unlocked on <strong>{$unlockTime}</strong> ({$lockoutLabel} from the last failed attempt).</p>
                         <p>If you did not attempt to log in, please contact an administrator immediately as your account may have been compromised.</p>
                     </div>
                     <div class='footer'>
@@ -659,10 +678,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             
             // Check if account is locked
             if ($lockedUntil && strtotime($lockedUntil) > time()) {
-                // Ensure locked_until is 30 minutes from last_failed_at (recalculate if needed)
+                // Ensure locked_until matches configured lockout from last_failed_at (recalculate if needed)
                 $lastFailed = $admin['last_failed_at'] ?? null;
                 if ($lastFailed) {
-                    $correctLockedUntil = date('Y-m-d H:i:s', strtotime($lastFailed . ' +30 minutes'));
+                    $correctLockedUntil = loginLockoutUntil($lastFailed);
                     // Update if the stored value is incorrect
                     if ($lockedUntil !== $correctLockedUntil) {
                         $stmt = $pdo->prepare('UPDATE admins SET locked_until = :locked_until WHERE id = :id');
@@ -673,7 +692,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $lockedUntil = $correctLockedUntil;
                     }
                 }
-                $error = "Your account has been temporarily locked due to multiple failed login attempts. It will be unlocked after 30 minutes.";
+                $error = loginLockoutMessage();
             } else {
                 // Unlock account if lock period has passed
                 if ($lockedUntil && strtotime($lockedUntil) <= time()) {
@@ -693,18 +712,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $passwordCorrect = password_verify($password, $admin['password_hash']);
                     
                     // If account has 3 or more failed attempts, lock it even if password is correct
-                    if ($failedAttempts >= 3) {
+                    if ($failedAttempts >= LOGIN_MAX_FAILED_ATTEMPTS) {
                         // If account is already locked, use existing locked_until (don't extend it)
                         if ($lockedUntil && strtotime($lockedUntil) > time()) {
                             // Account is already locked, don't update anything
                             // Log locked login attempt
                             $ipAddress = getClientIP();
                             logLoginHistory($pdo, $admin['id'], $admin['username'], 'Locked', $ipAddress);
-                            $error = "Your account has been temporarily locked due to multiple failed login attempts. It will be unlocked after 30 minutes.";
+                            $error = loginLockoutMessage();
                         } else {
-                            // Calculate lockout time as 30 minutes from last_failed_at (or now if last_failed_at is null)
+                            // Calculate lockout from last_failed_at (or now if last_failed_at is null)
                             $lastFailed = $admin['last_failed_at'] ?? $now;
-                            $lockedUntil = date('Y-m-d H:i:s', strtotime($lastFailed . ' +30 minutes'));
+                            $lockedUntil = loginLockoutUntil($lastFailed);
                             
                             $stmt = $pdo->prepare('UPDATE admins SET locked_until = :locked_until, last_failed_at = :last_failed WHERE id = :id');
                             $stmt->execute([
@@ -722,7 +741,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 sendAccountLockEmail($admin['email'], $admin['username'], $lockedUntil);
                             }
                             
-                            $error = "Your account has been temporarily locked due to multiple failed login attempts. It will be unlocked after 30 minutes.";
+                            $error = loginLockoutMessage();
                         }
                     } elseif ($passwordCorrect) {
                         // Successful login - reset failed attempts
@@ -769,10 +788,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $lockedUntil = null;
                         $status = 'Failed';
                         
-                        // Lock account after 3 failed attempts
-                        if ($newFailedAttempts >= 3) {
-                            // Calculate lockout time as 30 minutes from the current failed attempt (now)
-                            $lockedUntil = date('Y-m-d H:i:s', strtotime($now . ' +30 minutes'));
+                        // Lock account after repeated failed attempts
+                        if ($newFailedAttempts >= LOGIN_MAX_FAILED_ATTEMPTS) {
+                            $lockedUntil = loginLockoutUntil($now);
                             $status = 'Locked';
                             
                             // Send lockout email
@@ -793,9 +811,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             ':id' => $admin['id']
                         ]);
                         
-                        $attemptsRemaining = max(0, 3 - $newFailedAttempts);
-                        if ($newFailedAttempts >= 3) {
-                            $error = "Your account has been temporarily locked due to multiple failed login attempts. It will be unlocked after 30 minutes.";
+                        $attemptsRemaining = max(0, LOGIN_MAX_FAILED_ATTEMPTS - $newFailedAttempts);
+                        if ($newFailedAttempts >= LOGIN_MAX_FAILED_ATTEMPTS) {
+                            $error = loginLockoutMessage();
                         } else {
                             $error = 'Invalid email or password';
                         }
@@ -828,7 +846,7 @@ if (!isset($attemptsRemaining) && isset($_POST['email'])) {
             $lockedUntil = $admin['locked_until'] ?? null;
             if (!$lockedUntil || strtotime($lockedUntil) <= time()) {
                 $failedAttempts = (int)($admin['failed_attempts'] ?? 0);
-                $attemptsRemaining = max(0, 3 - $failedAttempts);
+                $attemptsRemaining = max(0, LOGIN_MAX_FAILED_ATTEMPTS - $failedAttempts);
             } else {
                 // Account is locked
                 $attemptsRemaining = 0;
@@ -2089,15 +2107,15 @@ $autoOpenSetPassword = !empty($showSetPasswordModal);
             <?php if (!empty($otpPrompt) && empty($showSetPasswordModal)): ?>
                 <div class="alert alert-success"><?php echo htmlspecialchars($otpPrompt); ?></div>
             <?php endif; ?>
-            <?php if (!$showOtpForm && empty($showSetPasswordModal) && isset($attemptsRemaining) && $attemptsRemaining > 0 && $attemptsRemaining < 3): ?>
+            <?php if (!$showOtpForm && empty($showSetPasswordModal) && isset($attemptsRemaining) && $attemptsRemaining > 0 && $attemptsRemaining < LOGIN_MAX_FAILED_ATTEMPTS): ?>
                 <div class="alert alert-warn">
                     <i class="fas fa-exclamation-triangle"></i>
-                    <strong>Warning:</strong> You have <?php echo $attemptsRemaining; ?> more <?php echo $attemptsRemaining === 1 ? 'attempt' : 'attempts'; ?> remaining before your account is locked for 30 minutes.
+                    <strong>Warning:</strong> You have <?php echo $attemptsRemaining; ?> more <?php echo $attemptsRemaining === 1 ? 'attempt' : 'attempts'; ?> remaining before your account is locked for <?php echo htmlspecialchars(loginLockoutDurationLabel()); ?>.
                 </div>
             <?php elseif (!$showOtpForm && empty($showSetPasswordModal) && isset($_POST['email']) && isset($attemptsRemaining) && $attemptsRemaining === 0): ?>
                 <div class="alert alert-error">
                     <i class="fas fa-lock"></i>
-                    <strong>Account Locked:</strong> Your account has been locked due to multiple failed login attempts. Please wait 30 minutes or contact an administrator.
+                    <strong>Account Locked:</strong> Your account has been locked due to multiple failed login attempts. Please wait <?php echo htmlspecialchars(loginLockoutDurationLabel()); ?> or contact an administrator.
                 </div>
             <?php endif; ?>
             <?php if ($showOtpForm && empty($showSetPasswordModal)): ?>
