@@ -187,7 +187,48 @@ function requireConfiguredCctvRequestApiKey(): bool
 
 function canCreateCctvRequest(bool $isAdmin): bool
 {
-    return true;
+    if ($isAdmin) {
+        return true;
+    }
+
+    return validateCctvRequestApiKey();
+}
+
+function normalizeSupportingDocumentValue(string $value): string
+{
+    $value = trim($value);
+    if ($value === '') {
+        return '';
+    }
+
+    if (preg_match('#^https?://#i', $value)) {
+        return $value;
+    }
+
+    if (preg_match('#^data:(application/pdf|image/(jpeg|jpg|png|gif|webp));base64,#i', $value)) {
+        return $value;
+    }
+
+    return '';
+}
+
+function validateSupportingDocumentValue(string $value, bool $required = false): ?string
+{
+    $value = trim($value);
+    if ($value === '') {
+        return $required ? 'Supporting document is required (PDF or image).' : null;
+    }
+
+    $normalized = normalizeSupportingDocumentValue($value);
+    if ($normalized === '') {
+        return 'Supporting document must be a PDF or image (JPG, PNG, GIF, WebP) as a file upload or HTTPS link.';
+    }
+
+    if (strlen($normalized) > 10 * 1024 * 1024) {
+        return 'Supporting document is too large (max 8 MB).';
+    }
+
+    return null;
 }
 
 function normalizeCctvRequestInput(array $input): array
@@ -209,6 +250,7 @@ function normalizeCctvRequestInput(array $input): array
     $incidentDescription = trim($input['incident_description'] ?? $input['description'] ?? '');
     $deliveryMethod = trim($input['delivery_method'] ?? 'secure_download');
     $supportingDocument = trim($input['supporting_document'] ?? $input['supporting_documents'] ?? $input['document'] ?? '');
+    $supportingDocument = normalizeSupportingDocumentValue($supportingDocument);
     $reviewNotes = trim($input['review_notes'] ?? '');
     $contactPerson = trim($input['contact_person'] ?? $input['contact_name'] ?? '');
     if ($contactPerson === '' && $agency !== '') {

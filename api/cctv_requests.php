@@ -95,6 +95,14 @@ if ($method === 'POST' && $action === 'create') {
         exit;
     }
 
+    $rawDocument = trim($input['supporting_document'] ?? $input['supporting_documents'] ?? $input['document'] ?? '');
+    $docError = validateSupportingDocumentValue($rawDocument, false);
+    if ($docError !== null) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'message' => $docError]);
+        exit;
+    }
+
     try {
         $requestId = generateCctvRequestId($pdo);
         $stmt = $pdo->prepare('INSERT INTO cctv_requests (
@@ -229,6 +237,56 @@ if ($method === 'POST' && $action === 'manage') {
     } catch (PDOException $e) {
         http_response_code(500);
         echo json_encode(['success' => false, 'message' => 'Failed to update CCTV request: ' . $e->getMessage()]);
+    }
+    exit;
+}
+
+if ($method === 'POST' && $action === 'upload_supporting_document') {
+    $id = (int) ($input['id'] ?? 0);
+    $document = trim($input['supporting_document'] ?? '');
+
+    if ($id <= 0) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'message' => 'Valid request ID is required.']);
+        exit;
+    }
+
+    $docError = validateSupportingDocumentValue($document, true);
+    if ($docError !== null) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'message' => $docError]);
+        exit;
+    }
+
+    try {
+        $check = $pdo->prepare('SELECT id, request_id FROM cctv_requests WHERE id = :id');
+        $check->execute([':id' => $id]);
+        $row = $check->fetch(PDO::FETCH_ASSOC);
+        if (!$row) {
+            http_response_code(404);
+            echo json_encode(['success' => false, 'message' => 'CCTV request not found.']);
+            exit;
+        }
+
+        $normalized = normalizeSupportingDocumentValue($document);
+        $stmt = $pdo->prepare('UPDATE cctv_requests SET supporting_document = :supporting_document WHERE id = :id');
+        $stmt->execute([
+            ':supporting_document' => $normalized,
+            ':id' => $id,
+        ]);
+
+        echo json_encode([
+            'success' => true,
+            'message' => 'Supporting document saved.',
+            'data' => [
+                'id' => $id,
+                'request_id' => $row['request_id'],
+                'has_supporting_document' => true,
+            ],
+        ]);
+    } catch (PDOException $e) {
+        http_response_code(500);
+        echo json_encode(['success' => false, 'message' => 'Failed to save supporting document.']);
     }
     exit;
 }

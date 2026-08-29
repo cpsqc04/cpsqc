@@ -46,6 +46,14 @@ if ($error !== null) {
     exit;
 }
 
+$rawDocument = trim($input['supporting_document'] ?? $input['supporting_documents'] ?? $input['document'] ?? '');
+$docError = validateSupportingDocumentValue($rawDocument, false);
+if ($docError !== null) {
+    http_response_code(400);
+    echo json_encode(['success' => false, 'message' => $docError]);
+    exit;
+}
+
 try {
     $requestId = generateCctvRequestId($pdo);
     $stmt = $pdo->prepare('INSERT INTO cctv_requests (
