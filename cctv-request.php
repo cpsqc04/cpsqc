@@ -380,42 +380,7 @@ $cctvNavActive = 'cctv-request';
         .supporting-doc-empty {
             font-size: 0.88rem;
             color: var(--text-secondary);
-            font-style: italic;
-        }
-        .doc-file-upload {
-            margin-top: 0.65rem;
-        }
-        .doc-file-upload input[type="file"] {
-            width: 100%;
-            padding: 0.55rem;
-            border: 1px dashed var(--border-color);
-            border-radius: 8px;
-            background: #fff;
-            font: inherit;
-            box-sizing: border-box;
-        }
-        .btn-new-request {
-            padding: 0.75rem 1.1rem;
-            border: none;
-            border-radius: 8px;
-            background: var(--primary-color);
-            color: #fff;
-            font-weight: 600;
-            cursor: pointer;
-            white-space: nowrap;
-            display: inline-flex;
-            align-items: center;
-            gap: 0.45rem;
-        }
-        .btn-new-request:hover { opacity: 0.92; }
-        .new-request-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 0.85rem 1rem;
-        }
-        .new-request-grid .form-group.full { grid-column: 1 / -1; }
-        @media (max-width: 640px) {
-            .new-request-grid { grid-template-columns: 1fr; }
+            line-height: 1.45;
         }
         .form-group { margin-bottom: 1rem; }
         .form-group label { display: block; margin-bottom: 0.4rem; font-weight: 500; }
@@ -683,9 +648,6 @@ $cctvNavActive = 'cctv-request';
                             <label for="dateFilter">Date:</label>
                             <input type="date" id="dateFilter" onchange="filterRequests()">
                         </div>
-                        <button type="button" class="btn-new-request" onclick="openNewRequestModal()">
-                            <i class="fas fa-plus"></i> New Request
-                        </button>
                     </div>
                     <div id="requestsList" class="request-list">
                         <div class="request-list-empty">Loading requests...</div>
@@ -747,88 +709,6 @@ $cctvNavActive = 'cctv-request';
                 </div>
                 <div id="incidentReportingEvidenceStatus" class="incident-reporting-status"></div>
             </div>
-        </div>
-    </div>
-
-    <div id="newRequestModal" class="modal">
-        <div class="modal-content" style="max-width:820px;">
-            <div class="modal-header">
-                <h2>New Footage Request</h2>
-                <button class="close-modal" type="button" onclick="closeNewRequestModal()">&times;</button>
-            </div>
-            <form id="newRequestForm" onsubmit="submitNewRequest(event)">
-                <div class="new-request-grid">
-                    <div class="form-group full">
-                        <label for="nrAgency">Requesting Agency *</label>
-                        <input type="text" id="nrAgency" required placeholder="Agency or office name">
-                    </div>
-                    <div class="form-group">
-                        <label for="nrContactPerson">Contact Person *</label>
-                        <input type="text" id="nrContactPerson" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="nrContactNumber">Contact Number *</label>
-                        <input type="text" id="nrContactNumber" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="nrEmail">Email</label>
-                        <input type="email" id="nrEmail">
-                    </div>
-                    <div class="form-group">
-                        <label for="nrCaseRef">Case Reference</label>
-                        <input type="text" id="nrCaseRef">
-                    </div>
-                    <div class="form-group full">
-                        <label for="nrLegalBasis">Legal Basis *</label>
-                        <input type="text" id="nrLegalBasis" required placeholder="e.g. Court order, barangay request">
-                    </div>
-                    <div class="form-group full">
-                        <label for="nrPurpose">Purpose / Reason *</label>
-                        <textarea id="nrPurpose" rows="2" required></textarea>
-                    </div>
-                    <div class="form-group full">
-                        <label for="nrLocation">Incident Location *</label>
-                        <input type="text" id="nrLocation" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="nrCamera">Camera ID</label>
-                        <select id="nrCamera">
-                            <option value="">— Select camera —</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label for="nrLocationDesc">Location Description</label>
-                        <input type="text" id="nrLocationDesc" placeholder="If camera not listed">
-                    </div>
-                    <div class="form-group">
-                        <label for="nrIncidentDate">Incident Date *</label>
-                        <input type="date" id="nrIncidentDate" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="nrStartTime">Footage Start *</label>
-                        <input type="time" id="nrStartTime" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="nrEndTime">Footage End *</label>
-                        <input type="time" id="nrEndTime" required>
-                    </div>
-                    <div class="form-group full">
-                        <label for="nrDescription">Incident Description *</label>
-                        <textarea id="nrDescription" rows="3" required></textarea>
-                    </div>
-                    <div class="form-group full">
-                        <label for="nrSupportingDoc">Supporting Document</label>
-                        <div class="doc-file-upload">
-                            <input type="file" id="nrSupportingDoc" accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,application/pdf,image/*">
-                        </div>
-                        <p class="panel-hint" style="margin-top:0.45rem;">Optional. PDF or image (max 8 MB) — court order, letter, or authorization.</p>
-                    </div>
-                </div>
-                <div class="form-actions">
-                    <button type="button" class="btn-cancel" onclick="closeNewRequestModal()">Cancel</button>
-                    <button type="submit" class="btn-approve" id="newRequestSubmitBtn">Submit Request</button>
-                </div>
-            </form>
         </div>
     </div>
 
@@ -1379,161 +1259,16 @@ $cctvNavActive = 'cctv-request';
 
             panel.hidden = false;
             const hasDoc = Boolean(item.has_supporting_document);
+            const agency = escapeHtml(item.requesting_agency || 'the requesting agency');
             panel.innerHTML = `
                 <h3><i class="fas fa-paperclip"></i> Supporting Document</h3>
-                <p class="panel-hint">Court order, authorization letter, or related proof (PDF or image).</p>
+                <p class="panel-hint">Received from the agency that submitted this request (court order, authorization letter, or related proof).</p>
                 <div class="supporting-doc-actions">
                     ${hasDoc
                         ? `<button type="button" class="btn-view" onclick="viewDocument(${item.id})"><i class="fas fa-eye"></i> View Document</button>`
-                        : `<span class="supporting-doc-empty">No document attached yet.</span>`}
-                </div>
-                <div class="doc-file-upload">
-                    <label for="supportingDocUpload">${hasDoc ? 'Replace document' : 'Upload document'}</label>
-                    <input type="file" id="supportingDocUpload" accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,application/pdf,image/*"
-                        onchange="uploadSupportingDocumentForRequest(this, ${item.id})">
+                        : `<span class="supporting-doc-empty">No supporting document was received from ${agency}. The requester must attach it when submitting via <code>POST /api/cctv_requests_receive.php</code> using the <code>supporting_document</code> field.</span>`}
                 </div>
             `;
-        }
-
-        function readFileAsDataUrl(file) {
-            return new Promise(function(resolve, reject) {
-                const reader = new FileReader();
-                reader.onload = function() { resolve(String(reader.result || '')); };
-                reader.onerror = function() { reject(new Error('Failed to read file.')); };
-                reader.readAsDataURL(file);
-            });
-        }
-
-        async function uploadSupportingDocumentForRequest(input, requestDbId) {
-            const file = input && input.files && input.files[0];
-            if (!file || !requestDbId) return;
-
-            const allowed = ['application/pdf', 'image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-            if (!allowed.includes(file.type) && !/\.(pdf|jpe?g|png|gif|webp)$/i.test(file.name)) {
-                alert('Please upload a PDF or image file (JPG, PNG, GIF, WebP).');
-                input.value = '';
-                return;
-            }
-            if (file.size > 8 * 1024 * 1024) {
-                alert('File is too large. Maximum size is 8 MB.');
-                input.value = '';
-                return;
-            }
-
-            try {
-                const dataUrl = await readFileAsDataUrl(file);
-                const res = await fetch('api/cctv_requests.php', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        action: 'upload_supporting_document',
-                        id: requestDbId,
-                        supporting_document: dataUrl
-                    })
-                });
-                const result = await res.json();
-                if (!result.success) throw new Error(result.message || 'Upload failed');
-
-                const item = Object.values(requestData).find(function(r) { return Number(r.id) === Number(requestDbId); });
-                if (item) {
-                    item.has_supporting_document = true;
-                    requestData[item.request_id] = item;
-                    renderSupportingDocumentPanel(item);
-                }
-                alert('Supporting document saved.');
-            } catch (err) {
-                alert(err.message || 'Failed to upload supporting document.');
-            } finally {
-                input.value = '';
-            }
-        }
-
-        function openNewRequestModal() {
-            populateNewRequestCameras();
-            document.getElementById('newRequestForm').reset();
-            document.getElementById('newRequestModal').classList.add('active');
-        }
-
-        function closeNewRequestModal() {
-            document.getElementById('newRequestModal').classList.remove('active');
-        }
-
-        function populateNewRequestCameras() {
-            const select = document.getElementById('nrCamera');
-            if (!select) return;
-            const current = select.value;
-            select.innerHTML = '<option value="">— Select camera —</option>'
-                + cameras.map(function(cam) {
-                    const label = (cam.cameraId || '') + (cam.location ? ' — ' + cam.location : '');
-                    return `<option value="${escapeHtml(cam.cameraId || '')}">${escapeHtml(label)}</option>`;
-                }).join('');
-            if (current) select.value = current;
-        }
-
-        async function submitNewRequest(event) {
-            event.preventDefault();
-            const btn = document.getElementById('newRequestSubmitBtn');
-            btn.disabled = true;
-            btn.textContent = 'Submitting…';
-
-            try {
-                const cameraId = document.getElementById('nrCamera').value.trim();
-                const locationDesc = document.getElementById('nrLocationDesc').value.trim();
-                if (!cameraId && !locationDesc) {
-                    throw new Error('Select a camera or enter a location description.');
-                }
-
-                let supportingDocument = '';
-                const fileInput = document.getElementById('nrSupportingDoc');
-                const file = fileInput && fileInput.files && fileInput.files[0];
-                if (file) {
-                    if (file.size > 8 * 1024 * 1024) {
-                        throw new Error('Supporting document must be 8 MB or less.');
-                    }
-                    supportingDocument = await readFileAsDataUrl(file);
-                }
-
-                const payload = {
-                    action: 'create',
-                    source: 'admin_ui',
-                    requesting_agency: document.getElementById('nrAgency').value.trim(),
-                    contact_person: document.getElementById('nrContactPerson').value.trim(),
-                    contact_number: document.getElementById('nrContactNumber').value.trim(),
-                    contact_email: document.getElementById('nrEmail').value.trim(),
-                    case_reference: document.getElementById('nrCaseRef').value.trim(),
-                    legal_basis: document.getElementById('nrLegalBasis').value.trim(),
-                    purpose_details: document.getElementById('nrPurpose').value.trim(),
-                    incident_location: document.getElementById('nrLocation').value.trim(),
-                    camera_id: cameraId,
-                    location_description: locationDesc,
-                    incident_date: document.getElementById('nrIncidentDate').value,
-                    footage_start_time: document.getElementById('nrStartTime').value,
-                    footage_end_time: document.getElementById('nrEndTime').value,
-                    incident_description: document.getElementById('nrDescription').value.trim(),
-                    delivery_method: 'secure_download',
-                    supporting_document: supportingDocument
-                };
-
-                const res = await fetch('api/cctv_requests.php', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
-                const result = await res.json();
-                if (!result.success) throw new Error(result.message || 'Failed to submit request');
-
-                closeNewRequestModal();
-                await loadRequests();
-                if (result.data && result.data.request_id) {
-                    viewRequest(result.data.request_id);
-                }
-                alert(result.message || 'Footage request submitted.');
-            } catch (err) {
-                alert(err.message || 'Failed to submit footage request.');
-            } finally {
-                btn.disabled = false;
-                btn.textContent = 'Submit Request';
-            }
         }
 
         async function viewDocument(id) {
@@ -1591,7 +1326,6 @@ $cctvNavActive = 'cctv-request';
 
         window.onclick = function(event) {
             if (event.target === document.getElementById('viewModal')) closeViewModal();
-            if (event.target === document.getElementById('newRequestModal')) closeNewRequestModal();
         };
 
         function toggleSidebar() {
