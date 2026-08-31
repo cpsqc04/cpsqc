@@ -128,6 +128,13 @@
             );
     }
 
+    function loadMoreButtonHtml(loading) {
+        if (loading) {
+            return '<i class="fas fa-spinner fa-spin" aria-hidden="true"></i> Loading…';
+        }
+        return '<i class="fas fa-chevron-down" aria-hidden="true"></i> Load older notifications';
+    }
+
     function appendLoadMoreButton(list) {
         var existing = list.querySelector('.notification-load-more');
         if (existing) {
@@ -138,7 +145,7 @@
         }
         var wrap = document.createElement('div');
         wrap.className = 'notification-load-more';
-        wrap.innerHTML = '<button type="button">' + (loadingMore ? 'Loading…' : 'See previous notifications') + '</button>';
+        wrap.innerHTML = '<button type="button">' + loadMoreButtonHtml(loadingMore) + '</button>';
         var btn = wrap.querySelector('button');
         btn.disabled = loadingMore;
         btn.addEventListener('click', function (event) {
