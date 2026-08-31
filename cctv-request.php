@@ -1857,6 +1857,27 @@ $cctvNavActive = 'cctv-request';
             }
         }
 
+        function buildSendFootageConfirmMessage(item) {
+            const filenames = Array.from(selectedFootageFilenames);
+            const requestLabel = item.request_id || 'this request';
+            let message = 'Send CCTV footage to Incident Reporting for ' + requestLabel + '?';
+
+            if (filenames.length) {
+                const preview = filenames.slice(0, 5);
+                const lines = preview.map(filename => '• ' + filename);
+                if (filenames.length > preview.length) {
+                    lines.push('• ... and ' + (filenames.length - preview.length) + ' more');
+                }
+                message += '\n\n' + filenames.length + ' recording' + (filenames.length === 1 ? '' : 's') + ' selected:\n'
+                    + lines.join('\n');
+            } else {
+                message += '\n\nNo recordings are currently selected. The system will try to match footage from the request time window.';
+            }
+
+            message += '\n\nThis will mark the request as Fulfilled. Continue?';
+            return message;
+        }
+
         function sendFootageToIncidentReporting() {
             const item = requestData[activeRequestId];
             if (!item) return;
@@ -1864,7 +1885,13 @@ $cctvNavActive = 'cctv-request';
                 alert('This footage request was already sent to Incident Reporting.');
                 return;
             }
-            if (!confirm('Send matching CCTV recordings to Incident Reporting for evidence?\n\nThis will mark the request as Fulfilled.')) {
+
+            if (!selectedFootageFilenames.size) {
+                alert('Please select at least one recording before sending.');
+                return;
+            }
+
+            if (!confirm(buildSendFootageConfirmMessage(item))) {
                 return;
             }
             const btn = document.getElementById('sendToIncidentReportingBtn');
