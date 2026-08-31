@@ -251,6 +251,62 @@ $cctvNavActive = 'cctv-request';
             margin-bottom: 0.85rem;
         }
         .footage-filters .form-group { margin: 0; min-width: 160px; flex: 1; }
+        .footage-preview-wrap { margin-bottom: 0.85rem; }
+        .footage-preview-shell {
+            background: #0f172a;
+            border-radius: 10px;
+            overflow: hidden;
+            border: 1px solid var(--border-color);
+            min-height: 220px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+        .footage-preview-shell video {
+            width: 100%;
+            max-height: 320px;
+            display: none;
+            background: #000;
+            object-fit: contain;
+        }
+        .footage-preview-shell video.active { display: block; }
+        .footage-preview-placeholder {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: rgba(255,255,255,0.75);
+            text-align: center;
+            padding: 1.5rem;
+            min-height: 220px;
+            position: absolute;
+            inset: 0;
+            z-index: 2;
+        }
+        .footage-preview-placeholder.hidden { display: none; }
+        .footage-preview-placeholder i { font-size: 2rem; margin-bottom: 0.5rem; opacity: 0.85; }
+        .footage-preview-placeholder p { margin: 0; font-size: 0.88rem; line-height: 1.45; max-width: 28rem; }
+        .footage-preview-error {
+            display: none;
+            margin: 0.5rem 0 0;
+            padding: 0.55rem 0.75rem;
+            border-radius: 8px;
+            background: #fef2f2;
+            color: #991b1b;
+            border: 1px solid #fecaca;
+            font-size: 0.85rem;
+            line-height: 1.4;
+        }
+        .footage-preview-error.show { display: block; }
+        .footage-preview-label {
+            margin: 0 0 0.45rem;
+            font-size: 0.82rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.02em;
+        }
         .footage-results { display: flex; flex-direction: column; gap: 0.55rem; max-height: 220px; overflow-y: auto; }
         .footage-item {
             display: grid;
@@ -261,7 +317,6 @@ $cctvNavActive = 'cctv-request';
             border: 1px solid var(--border-color);
             border-radius: 8px;
             background: #fff;
-            cursor: pointer;
             text-align: left;
             font: inherit;
             color: inherit;
@@ -272,6 +327,35 @@ $cctvNavActive = 'cctv-request';
             box-shadow: inset 3px 0 0 var(--primary-color);
             background: #f0f9f8;
         }
+        .footage-item.previewing {
+            border-color: #2563eb;
+            box-shadow: inset 3px 0 0 #2563eb;
+        }
+        .footage-item-main {
+            cursor: pointer;
+            min-width: 0;
+        }
+        .footage-item-actions {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 0.45rem;
+            flex-shrink: 0;
+        }
+        .btn-preview-footage {
+            padding: 0.4rem 0.75rem;
+            background: var(--primary-color);
+            color: #fff;
+            border: none;
+            border-radius: 6px;
+            font-size: 0.82rem;
+            font-weight: 600;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+        .btn-preview-footage:hover { background: #4ca8a6; }
+        .btn-preview-footage:disabled { background: #94a3b8; cursor: not-allowed; }
+        .btn-preview-footage.is-active { background: #2563eb; }
         .footage-item-title { font-weight: 600; color: var(--tertiary-color); margin: 0 0 0.25rem; }
         .footage-item-meta { font-size: 0.85rem; color: var(--text-secondary); line-height: 1.4; }
         .camera-match-list {
@@ -301,6 +385,7 @@ $cctvNavActive = 'cctv-request';
         .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 2000; align-items: center; justify-content: center; }
         .modal.active { display: flex; }
         .modal-content { background: var(--card-bg); border-radius: 12px; padding: 1.5rem 1.75rem; width: 92%; max-width: 720px; max-height: 88vh; overflow-y: auto; }
+        .modal-content.footage-modal-wide { max-width: 960px; }
         .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; padding-bottom: 0.85rem; border-bottom: 1px solid var(--border-color); }
         .modal-header h2 { margin: 0; color: var(--tertiary-color); font-size: 1.15rem; }
         .close-modal { background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--text-secondary); }
@@ -686,8 +771,19 @@ $cctvNavActive = 'cctv-request';
             </div>
             <div id="selectFootagePanel" class="select-footage-panel">
                 <h3>Select Footage</h3>
-                <p class="panel-hint">Click recordings to select one or more, then click Send.</p>
+                <p class="panel-hint">Preview recordings before sending. Click a row to select one or more, then click Send.</p>
                 <div id="selectedFootageNote" class="selected-footage-note"></div>
+                <div class="footage-preview-wrap">
+                    <p class="footage-preview-label">Preview</p>
+                    <div class="footage-preview-shell">
+                        <video id="footagePreviewVideo" controls playsinline></video>
+                        <div class="footage-preview-placeholder" id="footagePreviewPlaceholder">
+                            <i class="fas fa-film"></i>
+                            <p>Click <strong>Preview</strong> on a recording below to watch it here before sending.</p>
+                        </div>
+                    </div>
+                    <div id="footagePreviewError" class="footage-preview-error"></div>
+                </div>
                 <div class="footage-filters">
                     <div class="form-group">
                         <label for="footageDate">Date</label>
@@ -741,6 +837,7 @@ $cctvNavActive = 'cctv-request';
             itemLabel: 'requests'
         });
         let footageSegments = {};
+        let previewingFootageFilename = null;
 
         function escapeHtml(value) {
             return String(value == null ? '' : value)
@@ -1035,6 +1132,8 @@ $cctvNavActive = 'cctv-request';
             if (['Rejected', 'Cancelled'].includes(item.status)) return;
             hideRejectPanel();
             document.getElementById('selectFootagePanel').classList.add('show');
+            const modalContent = document.querySelector('#viewModal .modal-content');
+            if (modalContent) modalContent.classList.add('footage-modal-wide');
             document.getElementById('footageDate').value = item.incident_date || '';
             document.getElementById('footageLocation').value = item.incident_location || item.location_description || '';
             selectedFootageFilenames = new Set(selectedFootageFilenamesFromNotes(item.fulfillment_notes));
@@ -1070,6 +1169,108 @@ $cctvNavActive = 'cctv-request';
 
         function hideSelectFootagePanel() {
             document.getElementById('selectFootagePanel').classList.remove('show');
+            const modalContent = document.querySelector('#viewModal .modal-content');
+            if (modalContent) modalContent.classList.remove('footage-modal-wide');
+            clearFootagePreview();
+        }
+
+        function showFootagePreviewError(message) {
+            const el = document.getElementById('footagePreviewError');
+            if (!el) return;
+            if (message) {
+                el.textContent = message;
+                el.classList.add('show');
+            } else {
+                el.textContent = '';
+                el.classList.remove('show');
+            }
+        }
+
+        function clearFootagePreview() {
+            previewingFootageFilename = null;
+            const video = document.getElementById('footagePreviewVideo');
+            const placeholder = document.getElementById('footagePreviewPlaceholder');
+            if (video) {
+                video.pause();
+                video.removeAttribute('src');
+                video.classList.remove('active');
+                video.onloadedmetadata = null;
+                video.onloadeddata = null;
+                video.onerror = null;
+                video.load();
+            }
+            if (placeholder) placeholder.classList.remove('hidden');
+            showFootagePreviewError('');
+            document.querySelectorAll('.footage-item').forEach(el => {
+                el.classList.remove('previewing');
+                const btn = el.querySelector('.btn-preview-footage');
+                if (btn) btn.classList.remove('is-active');
+            });
+        }
+
+        function updateFootagePreviewUi() {
+            document.querySelectorAll('.footage-item').forEach(el => {
+                const filename = el.dataset.filename || '';
+                el.classList.toggle('previewing', filename === previewingFootageFilename);
+                const btn = el.querySelector('.btn-preview-footage');
+                if (btn) btn.classList.toggle('is-active', filename === previewingFootageFilename);
+            });
+        }
+
+        function previewFootage(filename) {
+            const segment = footageSegments[filename];
+            if (!segment) return;
+
+            if (!segment.playable) {
+                clearFootagePreview();
+                previewingFootageFilename = filename;
+                updateFootagePreviewUi();
+                if (segment.status === 'recording') {
+                    showFootagePreviewError('This segment is still recording. Wait until the chunk finishes, then preview again.');
+                } else if (segment.legacy_codec) {
+                    showFootagePreviewError('This recording needs conversion first. Run: py api/convert_recordings.py');
+                } else {
+                    showFootagePreviewError('This recording file is empty or incomplete.');
+                }
+                return;
+            }
+
+            previewingFootageFilename = filename;
+            updateFootagePreviewUi();
+
+            const video = document.getElementById('footagePreviewVideo');
+            const placeholder = document.getElementById('footagePreviewPlaceholder');
+            const src = 'api/recordings.php?action=stream&file=' + encodeURIComponent(filename);
+
+            showFootagePreviewError('');
+            video.pause();
+            video.removeAttribute('src');
+            video.load();
+            video.src = src;
+            video.classList.add('active');
+            placeholder.classList.add('hidden');
+
+            video.onloadedmetadata = function() {
+                if (!isFinite(video.duration) || video.duration < 1) {
+                    video.classList.remove('active');
+                    placeholder.classList.remove('hidden');
+                    showFootagePreviewError('This clip has no playable duration. Wait for the chunk to finish recording.');
+                    return;
+                }
+                video.play().catch(function() {});
+            };
+            video.onloadeddata = function() {
+                if (isFinite(video.duration) && video.duration >= 1) {
+                    video.play().catch(function() {});
+                }
+            };
+            video.onerror = function() {
+                video.classList.remove('active');
+                placeholder.classList.remove('hidden');
+                showFootagePreviewError('Unable to play this recording in the browser. Try the Playback page or open the file in VLC.');
+            };
+
+            video.load();
         }
 
         function matchingCameras(locationQuery) {
@@ -1139,6 +1340,9 @@ $cctvNavActive = 'cctv-request';
                 }
 
                 footageSegments = {};
+                if (previewingFootageFilename && !segments.some(segment => segment.filename === previewingFootageFilename)) {
+                    clearFootagePreview();
+                }
                 if (!segments.length) {
                     results.innerHTML = '<div class="request-list-empty">No recordings found for that date.</div>';
                     return;
@@ -1147,13 +1351,19 @@ $cctvNavActive = 'cctv-request';
                 results.innerHTML = segments.map(segment => {
                     footageSegments[segment.filename] = segment;
                     const selected = selectedFootageFilenames.has(segment.filename);
-                    return `<button type="button" class="footage-item${selected ? ' selected' : ''}" data-filename="${escapeHtml(segment.filename)}" onclick="selectFootage(this.dataset.filename)">
-                        <div>
+                    const previewing = previewingFootageFilename === segment.filename;
+                    return `<div class="footage-item${selected ? ' selected' : ''}${previewing ? ' previewing' : ''}" data-filename="${escapeHtml(segment.filename)}">
+                        <div class="footage-item-main" onclick="selectFootage(this.closest('.footage-item').dataset.filename)">
                             <div class="footage-item-title">${escapeHtml(segment.filename)}</div>
                             <div class="footage-item-meta">${escapeHtml(segment.label || (segment.start_at + ' – ' + segment.end_at))} · ${escapeHtml(segment.size_label || '')}</div>
                         </div>
-                        <span class="status-badge status-${segment.playable ? 'approved' : 'under-review'}">${escapeHtml(segment.status || 'ready')}</span>
-                    </button>`;
+                        <div class="footage-item-actions">
+                            <span class="status-badge status-${segment.playable ? 'approved' : 'under-review'}">${escapeHtml(segment.status || 'ready')}</span>
+                            <button type="button" class="btn-preview-footage${previewing ? ' is-active' : ''}" onclick="event.stopPropagation(); previewFootage(this.closest('.footage-item').dataset.filename)" ${segment.playable ? '' : 'disabled'}>
+                                <i class="fas fa-play"></i> Preview
+                            </button>
+                        </div>
+                    </div>`;
                 }).join('');
             } catch (err) {
                 results.innerHTML = `<div class="request-list-empty" style="color:#b91c1c;">${escapeHtml(err.message || 'Failed to search recordings.')}</div>`;
