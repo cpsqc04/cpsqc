@@ -83,6 +83,40 @@ function notificationsIsAdmin(): bool
     return $userRole === '' || strcasecmp($userRole, 'Admin') === 0;
 }
 
+function notificationsPageParams(): array
+{
+    $limit = (int) ($_GET['limit'] ?? 20);
+    $offset = (int) ($_GET['offset'] ?? 0);
+    if ($limit < 1) {
+        $limit = 20;
+    }
+    if ($limit > 50) {
+        $limit = 50;
+    }
+    if ($offset < 0) {
+        $offset = 0;
+    }
+    return [$limit, $offset];
+}
+
+function notificationsMapRows(array $rows): array
+{
+    $notifications = [];
+    foreach ($rows as $row) {
+        $notifications[] = [
+            'id' => (int) $row['id'],
+            'type' => $row['type'],
+            'title' => $row['title'],
+            'message' => $row['message'],
+            'link' => $row['link'],
+            'is_read' => (bool) $row['is_read'],
+            'created_at' => $row['created_at'],
+            'time_ago' => getTimeAgo($row['created_at']),
+        ];
+    }
+    return $notifications;
+}
+
 // Debug mode - only log in development
 $debugMode = isset($_ENV['ENVIRONMENT']) && $_ENV['ENVIRONMENT'] !== 'production';
 if ($debugMode) {
@@ -93,10 +127,13 @@ try {
     if ($action === 'list') {
         // Get user role
         $isAdmin = notificationsIsAdmin();
+        [$pageLimit, $pageOffset] = notificationsPageParams();
+        $fetchLimit = $pageLimit + 1;
         
         // Initialize variables
         $notifications = [];
         $unreadCount = 0;
+        $hasMore = false;
         
         // Admins see system/admin notifications only — never patrol, watcher, or bulletin audience alerts
         // that were created for portal recipients.
@@ -110,8 +147,8 @@ try {
                     SELECT id, type, title, message, link, is_read, created_at 
                     FROM notifications 
                     WHERE {$adminScope}
-                    ORDER BY created_at DESC 
-                    LIMIT 50
+                    ORDER BY created_at DESC, id DESC
+                    LIMIT {$fetchLimit} OFFSET {$pageOffset}
                 ");
                 $stmt->execute([':user_id' => $userId]);
                 
@@ -122,37 +159,20 @@ try {
                       AND is_read = 0
                 ");
                 $unreadStmt->execute([':user_id' => $userId]);
+                $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                $hasMore = count($rows) > $pageLimit;
+                $notifications = notificationsMapRows(array_slice($rows, 0, $pageLimit));
+                $unreadResult = $unreadStmt->fetch(PDO::FETCH_ASSOC);
+                $unreadCount = $unreadResult ? (int) $unreadResult['count'] : 0;
             } catch (PDOException $e) {
                 error_log('Notifications API - Query error: ' . $e->getMessage());
-                // Return empty result instead of failing
                 $notifications = [];
                 $unreadCount = 0;
-            }
-            
-            if (isset($stmt) && $stmt) {
-                $notifications = [];
-                while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
-                    $notifications[] = [
-                        'id' => (int)$row['id'],
-                        'type' => $row['type'],
-                        'title' => $row['title'],
-                        'message' => $row['message'],
-                        'link' => $row['link'],
-                        'is_read' => (bool)$row['is_read'],
-                        'created_at' => $row['created_at'],
-                        'time_ago' => getTimeAgo($row['created_at'])
-                    ];
-                }
-                
-                if (isset($unreadStmt) && $unreadStmt) {
-                    $unreadResult = $unreadStmt->fetch(PDO::FETCH_ASSOC);
-                    $unreadCount = $unreadResult ? (int)$unreadResult['count'] : 0;
-                }
+                $hasMore = false;
             }
         } else {
             // Regular users only see their own notifications
             if ($userId === null) {
-                // If no user_id, return empty notifications
                 $notifications = [];
                 $unreadCount = 0;
             } else {
@@ -161,8 +181,8 @@ try {
                         SELECT id, type, title, message, link, is_read, created_at 
                         FROM notifications 
                         WHERE user_id = :user_id 
-                        ORDER BY created_at DESC 
-                        LIMIT 50
+                        ORDER BY created_at DESC, id DESC
+                        LIMIT {$fetchLimit} OFFSET {$pageOffset}
                     ");
                     $stmt->execute([':user_id' => $userId]);
                     
@@ -173,27 +193,16 @@ try {
                     ");
                     $unreadStmt->execute([':user_id' => $userId]);
                     
-                    $notifications = [];
-                    while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
-                        $notifications[] = [
-                            'id' => (int)$row['id'],
-                            'type' => $row['type'],
-                            'title' => $row['title'],
-                            'message' => $row['message'],
-                            'link' => $row['link'],
-                            'is_read' => (bool)$row['is_read'],
-                            'created_at' => $row['created_at'],
-                            'time_ago' => getTimeAgo($row['created_at'])
-                        ];
-                    }
-                    
+                    $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                    $hasMore = count($rows) > $pageLimit;
+                    $notifications = notificationsMapRows(array_slice($rows, 0, $pageLimit));
                     $unreadResult = $unreadStmt->fetch(PDO::FETCH_ASSOC);
-                    $unreadCount = $unreadResult ? (int)$unreadResult['count'] : 0;
+                    $unreadCount = $unreadResult ? (int) $unreadResult['count'] : 0;
                 } catch (PDOException $e) {
                     error_log('Notifications API - Query error (user): ' . $e->getMessage());
-                    // Return empty result instead of failing
                     $notifications = [];
                     $unreadCount = 0;
+                    $hasMore = false;
                 }
             }
         }
@@ -211,7 +220,10 @@ try {
             'success' => true,
             'notifications' => $notifications,
             'unread_count' => $unreadCount,
-            'count' => count($notifications)
+            'count' => count($notifications),
+            'has_more' => $hasMore,
+            'offset' => $pageOffset,
+            'limit' => $pageLimit,
         ]);
         
     } elseif ($action === 'mark_read') {

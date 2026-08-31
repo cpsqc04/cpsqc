@@ -219,6 +219,35 @@
     margin: 0;
 }
 
+.notification-load-more {
+    padding: 0.75rem 1rem 1rem;
+    border-top: 1px solid var(--border-color);
+    background: #fff;
+    position: sticky;
+    bottom: 0;
+}
+
+.notification-load-more button {
+    width: 100%;
+    padding: 0.65rem 0.85rem;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: #f8fafb;
+    color: var(--primary-color);
+    font-size: 0.88rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.notification-load-more button:hover {
+    background: rgba(76, 138, 137, 0.1);
+}
+
+.notification-load-more button:disabled {
+    opacity: 0.65;
+    cursor: wait;
+}
+
 @media (max-width: 768px) {
     .notification-dropdown {
         position: fixed;

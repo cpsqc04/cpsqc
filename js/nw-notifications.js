@@ -5,9 +5,13 @@
     'use strict';
 
     var API_URL = 'api/nw_notifications.php';
+    var PAGE_SIZE = 20;
     var refreshTimer = null;
     var outsideClickBound = false;
     var suppressOutsideClose = false;
+    var loadedNotifications = [];
+    var hasMoreNotifications = false;
+    var loadingMore = false;
 
     function escapeHtml(text) {
         var div = document.createElement('div');
@@ -39,10 +43,16 @@
         var list = getEls().list;
         if (!list) return;
         if (!notifications || !notifications.length) {
+            loadedNotifications = [];
+            hasMoreNotifications = false;
             list.innerHTML = '<div class="notification-empty"><i class="fas fa-bell-slash"></i><p>No notifications</p></div>';
             return;
         }
-        list.innerHTML = notifications.map(function (n) {
+        list.innerHTML = notifications.map(notificationItemHtml).join('');
+        appendLoadMoreButton(list);
+    }
+
+    function notificationItemHtml(n) {
             var icon = 'fa-bell';
             if (n.type === 'bulletin_announcement') {
                 icon = 'fa-bullhorn';
@@ -59,29 +69,83 @@
                     '<div class="notification-time">' + escapeHtml(n.time_ago || '') + '</div>' +
                 '</div>' +
             '</div>';
-        }).join('');
     }
 
-    async function loadNotifications() {
+    function appendLoadMoreButton(list) {
+        var existing = list.querySelector('.notification-load-more');
+        if (existing) existing.remove();
+        if (!hasMoreNotifications) return;
+        var wrap = document.createElement('div');
+        wrap.className = 'notification-load-more';
+        wrap.innerHTML = '<button type="button">' + (loadingMore ? 'Loading…' : 'See previous notifications') + '</button>';
+        var btn = wrap.querySelector('button');
+        btn.disabled = loadingMore;
+        btn.addEventListener('click', function (event) {
+            event.preventDefault();
+            event.stopPropagation();
+            loadMoreNotifications();
+        });
+        list.appendChild(wrap);
+    }
+
+    function listUrl(offset, limit) {
+        return API_URL + '?action=list&offset=' + encodeURIComponent(String(offset)) +
+            '&limit=' + encodeURIComponent(String(limit));
+    }
+
+    async function fetchNotificationPage(offset, limit) {
+        var res = await fetch(listUrl(offset, limit), { credentials: 'same-origin', cache: 'no-store' });
+        if (!res.ok) {
+            var error = new Error('Failed to load notifications');
+            error.status = res.status;
+            throw error;
+        }
+        return res.json();
+    }
+
+    async function loadNotifications(options) {
+        var reset = !options || options.reset !== false;
         var list = getEls().list;
         try {
             await fetch(API_URL + '?action=sync', { credentials: 'same-origin', cache: 'no-store' });
-            var res = await fetch(API_URL + '?action=list', { credentials: 'same-origin', cache: 'no-store' });
-            if (!res.ok) {
-                if (res.status === 401 && list) {
-                    list.innerHTML = '<div class="notification-empty"><i class="fas fa-exclamation-triangle"></i><p>Session expired. Please refresh.</p></div>';
-                }
-                return;
-            }
-            var data = await res.json();
+            var limit = reset ? PAGE_SIZE : Math.max(PAGE_SIZE, loadedNotifications.length);
+            var data = await fetchNotificationPage(0, limit);
             if (!data.success) return;
             updateBadge(data.unread_count || 0);
-            render(data.notifications || []);
+            loadedNotifications = data.notifications || [];
+            hasMoreNotifications = Boolean(data.has_more);
+            render(loadedNotifications);
         } catch (e) {
             console.error(e);
-            if (list) {
+            if (e && e.status === 401 && list) {
+                list.innerHTML = '<div class="notification-empty"><i class="fas fa-exclamation-triangle"></i><p>Session expired. Please refresh.</p></div>';
+            } else if (list) {
                 list.innerHTML = '<div class="notification-empty"><i class="fas fa-exclamation-triangle"></i><p>Failed to load notifications</p></div>';
             }
+        }
+    }
+
+    async function loadMoreNotifications() {
+        if (loadingMore || !hasMoreNotifications) return;
+        var list = getEls().list;
+        loadingMore = true;
+        if (list) appendLoadMoreButton(list);
+        try {
+            var data = await fetchNotificationPage(loadedNotifications.length, PAGE_SIZE);
+            if (!data.success) return;
+            updateBadge(data.unread_count || 0);
+            var seen = {};
+            loadedNotifications.forEach(function (item) { seen[item.id] = true; });
+            (data.notifications || []).forEach(function (item) {
+                if (!seen[item.id]) loadedNotifications.push(item);
+            });
+            hasMoreNotifications = Boolean(data.has_more);
+            render(loadedNotifications);
+        } catch (e) {
+            console.error(e);
+        } finally {
+            loadingMore = false;
+            if (list) appendLoadMoreButton(list);
         }
     }
 
@@ -113,7 +177,7 @@
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                 body: 'action=mark_read'
             });
-            loadNotifications();
+            loadNotifications({ reset: false });
         } catch (e) {
             console.error(e);
         }
@@ -127,7 +191,9 @@
             credentials: 'same-origin',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
             body: 'id=' + encodeURIComponent(String(id))
-        }).finally(loadNotifications);
+        }).finally(function () {
+            loadNotifications({ reset: false });
+        });
 
         var dropdown = getEls().dropdown;
         if (dropdown) dropdown.classList.remove('show');
@@ -176,7 +242,9 @@
 
         loadNotifications();
         if (!refreshTimer) {
-            refreshTimer = setInterval(loadNotifications, 30000);
+            refreshTimer = setInterval(function () {
+                loadNotifications({ reset: false });
+            }, 30000);
         }
     }
 

@@ -73,35 +73,54 @@ try {
     }
 
     if ($action === 'list' && $method === 'GET') {
-        $stmt = $pdo->prepare('SELECT id, type, title, message, link, is_read, created_at
+        $limit = (int) ($_GET['limit'] ?? 20);
+        $offset = (int) ($_GET['offset'] ?? 0);
+        if ($limit < 1) {
+            $limit = 20;
+        }
+        if ($limit > 50) {
+            $limit = 50;
+        }
+        if ($offset < 0) {
+            $offset = 0;
+        }
+        $fetchLimit = $limit + 1;
+
+        $stmt = $pdo->prepare("SELECT id, type, title, message, link, is_read, created_at
             FROM notifications
             WHERE nw_member_id = :nw_member_id
             ORDER BY created_at DESC, id DESC
-            LIMIT 50');
+            LIMIT {$fetchLimit} OFFSET {$offset}");
         $stmt->execute([':nw_member_id' => $nwMemberId]);
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        $unread = 0;
+        $hasMore = count($rows) > $limit;
+        $rows = array_slice($rows, 0, $limit);
+
         $notifications = [];
         foreach ($rows as $row) {
-            $isRead = !empty($row['is_read']);
-            if (!$isRead) {
-                $unread++;
-            }
             $notifications[] = [
                 'id' => (int) $row['id'],
                 'type' => $row['type'],
                 'title' => $row['title'],
                 'message' => $row['message'],
                 'link' => $row['link'],
-                'is_read' => $isRead,
+                'is_read' => !empty($row['is_read']),
                 'time_ago' => nwNotifTimeAgo($row['created_at']),
                 'created_at' => $row['created_at'],
             ];
         }
+
+        $unreadStmt = $pdo->prepare('SELECT COUNT(*) AS count FROM notifications WHERE nw_member_id = :nw_member_id AND is_read = 0');
+        $unreadStmt->execute([':nw_member_id' => $nwMemberId]);
+        $unread = (int) ($unreadStmt->fetch(PDO::FETCH_ASSOC)['count'] ?? 0);
+
         echo json_encode([
             'success' => true,
             'unread_count' => $unread,
             'notifications' => $notifications,
+            'has_more' => $hasMore,
+            'offset' => $offset,
+            'limit' => $limit,
         ]);
         exit;
     }

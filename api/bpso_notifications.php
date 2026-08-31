@@ -276,17 +276,34 @@ if ($action === 'sync') {
 
 if ($action === 'list') {
     try {
+        $limit = (int) ($_GET['limit'] ?? 20);
+        $offset = (int) ($_GET['offset'] ?? 0);
+        if ($limit < 1) {
+            $limit = 20;
+        }
+        if ($limit > 50) {
+            $limit = 50;
+        }
+        if ($offset < 0) {
+            $offset = 0;
+        }
+        $fetchLimit = $limit + 1;
+
         $stmt = $pdo->prepare("
             SELECT id, type, title, message, link, is_read, created_at
             FROM notifications
             WHERE patrol_id = :patrol_id
-            ORDER BY created_at DESC
-            LIMIT 50
+            ORDER BY created_at DESC, id DESC
+            LIMIT {$fetchLimit} OFFSET {$offset}
         ");
         $stmt->execute([':patrol_id' => $patrolId]);
 
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $hasMore = count($rows) > $limit;
+        $rows = array_slice($rows, 0, $limit);
+
         $notifications = [];
-        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+        foreach ($rows as $row) {
             $notifications[] = [
                 'id' => (int) $row['id'],
                 'type' => $row['type'],
@@ -307,6 +324,9 @@ if ($action === 'list') {
             'success' => true,
             'notifications' => $notifications,
             'unread_count' => $unreadCount,
+            'has_more' => $hasMore,
+            'offset' => $offset,
+            'limit' => $limit,
         ]);
     } catch (PDOException $e) {
         http_response_code(500);

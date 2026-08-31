@@ -2,9 +2,13 @@
     'use strict';
 
     var API_URL = 'api/notifications.php';
+    var PAGE_SIZE = 20;
     var refreshTimer = null;
     var outsideClickBound = false;
     var suppressOutsideClose = false;
+    var loadedNotifications = [];
+    var hasMoreNotifications = false;
+    var loadingMore = false;
 
     function getElements() {
         return {
@@ -49,6 +53,8 @@
         }
 
         if (!notifications || notifications.length === 0) {
+            loadedNotifications = [];
+            hasMoreNotifications = false;
             showNotificationMessage(
                 '<div class="notification-empty">' +
                     '<i class="fas fa-bell-slash"></i>' +
@@ -58,7 +64,11 @@
             return;
         }
 
-        list.innerHTML = notifications.map(function (notif) {
+        list.innerHTML = notifications.map(notificationItemHtml).join('');
+        appendLoadMoreButton(list);
+    }
+
+    function notificationItemHtml(notif) {
             var iconClass;
             var icon;
 
@@ -116,41 +126,61 @@
                     '</div>' +
                 '</div>'
             );
-        }).join('');
     }
 
-    async function loadNotifications() {
+    function appendLoadMoreButton(list) {
+        var existing = list.querySelector('.notification-load-more');
+        if (existing) {
+            existing.remove();
+        }
+        if (!hasMoreNotifications) {
+            return;
+        }
+        var wrap = document.createElement('div');
+        wrap.className = 'notification-load-more';
+        wrap.innerHTML = '<button type="button">' + (loadingMore ? 'Loading…' : 'See previous notifications') + '</button>';
+        var btn = wrap.querySelector('button');
+        btn.disabled = loadingMore;
+        btn.addEventListener('click', function (event) {
+            event.preventDefault();
+            event.stopPropagation();
+            loadMoreNotifications();
+        });
+        list.appendChild(wrap);
+    }
+
+    function listUrl(offset, limit) {
+        return API_URL + '?action=list&offset=' + encodeURIComponent(String(offset)) +
+            '&limit=' + encodeURIComponent(String(limit));
+    }
+
+    async function fetchNotificationPage(offset, limit) {
+        var response = await fetch(listUrl(offset, limit), { credentials: 'same-origin', cache: 'no-store' });
+        if (!response.ok) {
+            var error = new Error('Failed to load notifications');
+            error.status = response.status;
+            throw error;
+        }
+        return response.json();
+    }
+
+    async function loadNotifications(options) {
+        var reset = !options || options.reset !== false;
         var list = getElements().list;
 
         try {
             await fetch(API_URL + '?action=sync', { credentials: 'same-origin', cache: 'no-store' });
 
-            var response = await fetch(API_URL + '?action=list', { credentials: 'same-origin', cache: 'no-store' });
-            if (!response.ok) {
-                console.error('Failed to load notifications:', response.status, response.statusText);
-                if (response.status === 401) {
-                    showNotificationMessage(
-                        '<div class="notification-empty">' +
-                            '<i class="fas fa-exclamation-triangle"></i>' +
-                            '<p>Session expired. Please refresh the page.</p>' +
-                        '</div>'
-                    );
-                } else if (list) {
-                    showNotificationMessage(
-                        '<div class="notification-empty">' +
-                            '<i class="fas fa-exclamation-triangle"></i>' +
-                            '<p>Error loading notifications (' + response.status + ')</p>' +
-                        '</div>'
-                    );
-                }
-                return;
-            }
-
-            var data = await response.json();
+            var limit = reset ? PAGE_SIZE : Math.max(PAGE_SIZE, loadedNotifications.length);
+            var data = await fetchNotificationPage(0, limit);
             if (data.success) {
                 updateNotificationBadge(data.unread_count || 0);
-                renderNotifications(data.notifications || []);
+                loadedNotifications = data.notifications || [];
+                hasMoreNotifications = Boolean(data.has_more);
+                renderNotifications(loadedNotifications);
             } else if (list) {
+                loadedNotifications = [];
+                hasMoreNotifications = false;
                 showNotificationMessage(
                     '<div class="notification-empty">' +
                         '<i class="fas fa-bell-slash"></i>' +
@@ -160,13 +190,56 @@
             }
         } catch (error) {
             console.error('Error loading notifications:', error);
-            if (list) {
+            if (error && error.status === 401) {
+                showNotificationMessage(
+                    '<div class="notification-empty">' +
+                        '<i class="fas fa-exclamation-triangle"></i>' +
+                        '<p>Session expired. Please refresh the page.</p>' +
+                    '</div>'
+                );
+            } else if (list) {
                 showNotificationMessage(
                     '<div class="notification-empty">' +
                         '<i class="fas fa-exclamation-triangle"></i>' +
                         '<p>Failed to load notifications</p>' +
                     '</div>'
                 );
+            }
+        }
+    }
+
+    async function loadMoreNotifications() {
+        if (loadingMore || !hasMoreNotifications) {
+            return;
+        }
+        var list = getElements().list;
+        loadingMore = true;
+        if (list) {
+            appendLoadMoreButton(list);
+        }
+        try {
+            var data = await fetchNotificationPage(loadedNotifications.length, PAGE_SIZE);
+            if (!data.success) {
+                return;
+            }
+            updateNotificationBadge(data.unread_count || 0);
+            var seen = {};
+            loadedNotifications.forEach(function (item) {
+                seen[item.id] = true;
+            });
+            (data.notifications || []).forEach(function (item) {
+                if (!seen[item.id]) {
+                    loadedNotifications.push(item);
+                }
+            });
+            hasMoreNotifications = Boolean(data.has_more);
+            renderNotifications(loadedNotifications);
+        } catch (error) {
+            console.error('Error loading more notifications:', error);
+        } finally {
+            loadingMore = false;
+            if (list) {
+                appendLoadMoreButton(list);
             }
         }
     }
@@ -221,7 +294,9 @@
         loadNotifications();
 
         if (!refreshTimer) {
-            refreshTimer = window.setInterval(loadNotifications, 30000);
+            refreshTimer = window.setInterval(function () {
+                loadNotifications({ reset: false });
+            }, 30000);
         }
     }
 
@@ -259,7 +334,7 @@
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
             body: 'id=' + encodeURIComponent(String(id))
         }).finally(function () {
-            loadNotifications();
+            loadNotifications({ reset: false });
         });
 
         if (link) {
@@ -282,7 +357,7 @@
                 credentials: 'same-origin',
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
             });
-            loadNotifications();
+            loadNotifications({ reset: false });
         } catch (error) {
             console.error('Error marking all as read:', error);
         }
