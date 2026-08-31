@@ -1668,6 +1668,7 @@ $cctvNavActive = 'cctv-request';
                 updateFootageSelectionToolbar();
             } catch (err) {
                 results.innerHTML = `<div class="request-list-empty" style="color:#b91c1c;">${escapeHtml(err.message || 'Failed to search recordings.')}</div>`;
+                updateFootageSelectionToolbar();
             }
         }
 
