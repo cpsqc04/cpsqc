@@ -315,17 +315,58 @@ $cctvNavActive = 'cctv-request';
             gap: 0.75rem;
             flex-wrap: wrap;
             margin: 0 0 0.65rem;
-            padding: 0.55rem 0.75rem;
+            padding: 0.65rem 0.85rem;
             border: 1px solid var(--border-color);
-            border-radius: 8px;
-            background: #f8fafb;
+            border-radius: 10px;
+            background: linear-gradient(180deg, #f8fafb 0%, #fff 100%);
         }
         .footage-selection-toolbar.show { display: flex; }
         .footage-selection-actions {
             display: flex;
             flex-wrap: wrap;
-            gap: 0.45rem 0.65rem;
+            gap: 0.5rem;
             align-items: center;
+        }
+        .btn-footage-select-all,
+        .btn-footage-clear {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            padding: 0.42rem 0.85rem;
+            border-radius: 6px;
+            font-size: 0.82rem;
+            font-weight: 600;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+        }
+        .btn-footage-select-all {
+            background: #fff;
+            color: var(--primary-color);
+            border: 1px solid var(--primary-color);
+        }
+        .btn-footage-select-all:hover:not(:disabled) {
+            background: rgba(76, 138, 137, 0.08);
+        }
+        .btn-footage-select-all:disabled {
+            opacity: 0.55;
+            cursor: not-allowed;
+            border-color: #94a3b8;
+            color: #94a3b8;
+        }
+        .btn-footage-clear {
+            background: #fff;
+            color: #64748b;
+            border: 1px solid #cbd5e1;
+        }
+        .btn-footage-clear:hover:not(:disabled) {
+            background: #fef2f2;
+            border-color: #fca5a5;
+            color: #b91c1c;
+        }
+        .btn-footage-clear:disabled {
+            opacity: 0.55;
+            cursor: not-allowed;
         }
         .btn-footage-toolbar {
             padding: 0;
@@ -339,9 +380,18 @@ $cctvNavActive = 'cctv-request';
         }
         .btn-footage-toolbar:hover { text-decoration: underline; }
         .footage-selection-count {
-            font-size: 0.82rem;
-            color: var(--text-secondary);
-            font-weight: 500;
+            display: inline-flex;
+            align-items: center;
+            padding: 0.28rem 0.65rem;
+            border-radius: 999px;
+            background: #ecfdf5;
+            color: #047857;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+        .footage-selection-count.is-empty {
+            background: #f1f5f9;
+            color: #64748b;
         }
         .footage-item {
             display: grid;
@@ -941,8 +991,12 @@ $cctvNavActive = 'cctv-request';
                 <div id="cameraMatches" class="camera-match-list"></div>
                 <div id="footageSelectionToolbar" class="footage-selection-toolbar">
                     <div class="footage-selection-actions">
-                        <button type="button" class="btn-footage-toolbar" id="selectAllReadyBtn" onclick="selectAllReadyFootage()">Select all ready</button>
-                        <button type="button" class="btn-footage-toolbar" onclick="clearFootageSelection()">Clear selection</button>
+                        <button type="button" class="btn-footage-select-all" id="selectAllReadyBtn" onclick="selectAllReadyFootage()">
+                            <i class="fas fa-check-double"></i> Select all ready
+                        </button>
+                        <button type="button" class="btn-footage-clear" id="clearFootageSelectionBtn" onclick="clearFootageSelection()">
+                            <i class="fas fa-times"></i> Clear selection
+                        </button>
                     </div>
                     <span id="footageSelectionCount" class="footage-selection-count"></span>
                 </div>
@@ -1216,6 +1270,7 @@ $cctvNavActive = 'cctv-request';
             const toolbar = document.getElementById('footageSelectionToolbar');
             const countEl = document.getElementById('footageSelectionCount');
             const selectAllBtn = document.getElementById('selectAllReadyBtn');
+            const clearBtn = document.getElementById('clearFootageSelectionBtn');
             if (!toolbar || !countEl) return;
 
             const visibleCount = Object.keys(footageSegments).length;
@@ -1225,15 +1280,17 @@ $cctvNavActive = 'cctv-request';
             toolbar.classList.toggle('show', visibleCount > 0);
             countEl.textContent = selectedCount
                 ? selectedCount + ' selected'
-                : (readyCount ? readyCount + ' ready in this search' : 'No ready recordings in this search');
+                : (readyCount ? readyCount + ' ready' : 'None ready');
+            countEl.classList.toggle('is-empty', selectedCount === 0);
 
             if (selectAllBtn) {
-                selectAllBtn.textContent = readyCount
-                    ? 'Select all ready (' + readyCount + ')'
-                    : 'Select all ready';
+                selectAllBtn.innerHTML = readyCount
+                    ? '<i class="fas fa-check-double"></i> Select all ready (' + readyCount + ')'
+                    : '<i class="fas fa-check-double"></i> Select all ready';
                 selectAllBtn.disabled = readyCount === 0;
-                selectAllBtn.style.opacity = readyCount === 0 ? '0.55' : '';
-                selectAllBtn.style.cursor = readyCount === 0 ? 'not-allowed' : '';
+            }
+            if (clearBtn) {
+                clearBtn.disabled = selectedCount === 0;
             }
         }
 
