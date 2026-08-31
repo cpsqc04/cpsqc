@@ -1987,6 +1987,14 @@ $personnelCode = htmlspecialchars(getBpsoPersonnelCode());
         }
 
         async function toggleClockOnOut() {
+            const message = isClockedOn
+                ? 'Clock out now? This will end your current shift and record the time.'
+                : 'Clock on now? This will start your shift and record the time.';
+
+            if (!confirm(message)) {
+                return;
+            }
+
             if (isClockedOn) {
                 await attendanceTimeOut();
             } else {
