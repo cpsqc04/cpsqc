@@ -337,27 +337,73 @@ $cctvNavActive = 'cctv-request';
         }
         .footage-item-actions {
             display: flex;
-            flex-direction: column;
-            align-items: flex-end;
-            gap: 0.45rem;
+            align-items: center;
             flex-shrink: 0;
         }
-        .btn-preview-footage {
-            padding: 0.4rem 0.75rem;
-            background: var(--primary-color);
-            color: #fff;
-            border: none;
+        .btn-play-footage {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            padding: 0.45rem 0.85rem;
+            background: #fff;
+            color: var(--primary-color);
+            border: 1px solid var(--primary-color);
             border-radius: 6px;
             font-size: 0.82rem;
             font-weight: 600;
             cursor: pointer;
             white-space: nowrap;
+            transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
         }
-        .btn-preview-footage:hover { background: #4ca8a6; }
-        .btn-preview-footage:disabled { background: #94a3b8; cursor: not-allowed; }
-        .btn-preview-footage.is-active { background: #2563eb; }
-        .footage-item-title { font-weight: 600; color: var(--tertiary-color); margin: 0 0 0.25rem; }
-        .footage-item-meta { font-size: 0.85rem; color: var(--text-secondary); line-height: 1.4; }
+        .btn-play-footage:hover:not(:disabled) {
+            background: rgba(76, 138, 137, 0.08);
+        }
+        .btn-play-footage:disabled {
+            opacity: 0.55;
+            cursor: not-allowed;
+            border-color: #94a3b8;
+            color: #94a3b8;
+        }
+        .btn-play-footage.is-active {
+            background: #2563eb;
+            border-color: #2563eb;
+            color: #fff;
+        }
+        .footage-item-title {
+            font-weight: 600;
+            color: var(--tertiary-color);
+            margin: 0 0 0.25rem;
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 0.45rem;
+        }
+        .footage-now-playing {
+            font-size: 0.72rem;
+            font-weight: 600;
+            color: #2563eb;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+        }
+        .footage-item-meta {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 0.35rem 0.5rem;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            line-height: 1.4;
+        }
+        .footage-status-inline {
+            padding: 0.1rem 0.5rem;
+            border-radius: 999px;
+            font-size: 0.72rem;
+            font-weight: 600;
+            line-height: 1.3;
+            text-transform: lowercase;
+        }
+        .footage-status-inline.status-approved { background: #d1fae5; color: #047857; }
+        .footage-status-inline.status-under-review { background: #fef3c7; color: #b45309; }
         .camera-match-list {
             display: flex;
             flex-wrap: wrap;
@@ -771,7 +817,7 @@ $cctvNavActive = 'cctv-request';
             </div>
             <div id="selectFootagePanel" class="select-footage-panel">
                 <h3>Select Footage</h3>
-                <p class="panel-hint">Preview recordings before sending. Click a row to select one or more, then click Send.</p>
+                <p class="panel-hint">Preview recordings before sending. Click a row to select, use Play to watch, then click Send.</p>
                 <div id="selectedFootageNote" class="selected-footage-note"></div>
                 <div class="footage-preview-wrap">
                     <p class="footage-preview-label">Preview</p>
@@ -779,7 +825,7 @@ $cctvNavActive = 'cctv-request';
                         <video id="footagePreviewVideo" controls playsinline></video>
                         <div class="footage-preview-placeholder" id="footagePreviewPlaceholder">
                             <i class="fas fa-film"></i>
-                            <p>Click <strong>Preview</strong> on a recording below to watch it here before sending.</p>
+                            <p>Click <strong>Play</strong> on a recording below to preview it here before sending.</p>
                         </div>
                     </div>
                     <div id="footagePreviewError" class="footage-preview-error"></div>
@@ -1203,7 +1249,7 @@ $cctvNavActive = 'cctv-request';
             showFootagePreviewError('');
             document.querySelectorAll('.footage-item').forEach(el => {
                 el.classList.remove('previewing');
-                const btn = el.querySelector('.btn-preview-footage');
+                const btn = el.querySelector('.btn-play-footage');
                 if (btn) btn.classList.remove('is-active');
             });
         }
@@ -1212,7 +1258,7 @@ $cctvNavActive = 'cctv-request';
             document.querySelectorAll('.footage-item').forEach(el => {
                 const filename = el.dataset.filename || '';
                 el.classList.toggle('previewing', filename === previewingFootageFilename);
-                const btn = el.querySelector('.btn-preview-footage');
+                const btn = el.querySelector('.btn-play-footage');
                 if (btn) btn.classList.toggle('is-active', filename === previewingFootageFilename);
             });
         }
@@ -1354,13 +1400,18 @@ $cctvNavActive = 'cctv-request';
                     const previewing = previewingFootageFilename === segment.filename;
                     return `<div class="footage-item${selected ? ' selected' : ''}${previewing ? ' previewing' : ''}" data-filename="${escapeHtml(segment.filename)}">
                         <div class="footage-item-main" onclick="selectFootage(this.closest('.footage-item').dataset.filename)">
-                            <div class="footage-item-title">${escapeHtml(segment.filename)}</div>
-                            <div class="footage-item-meta">${escapeHtml(segment.label || (segment.start_at + ' – ' + segment.end_at))} · ${escapeHtml(segment.size_label || '')}</div>
+                            <div class="footage-item-title">
+                                <span>${escapeHtml(segment.filename)}</span>
+                                ${previewing ? '<span class="footage-now-playing">Now playing</span>' : ''}
+                            </div>
+                            <div class="footage-item-meta">
+                                <span>${escapeHtml(segment.label || (segment.start_at + ' – ' + segment.end_at))} · ${escapeHtml(segment.size_label || '')}</span>
+                                <span class="footage-status-inline status-${segment.playable ? 'approved' : 'under-review'}">${escapeHtml(segment.status || 'ready')}</span>
+                            </div>
                         </div>
                         <div class="footage-item-actions">
-                            <span class="status-badge status-${segment.playable ? 'approved' : 'under-review'}">${escapeHtml(segment.status || 'ready')}</span>
-                            <button type="button" class="btn-preview-footage${previewing ? ' is-active' : ''}" onclick="event.stopPropagation(); previewFootage(this.closest('.footage-item').dataset.filename)" ${segment.playable ? '' : 'disabled'}>
-                                <i class="fas fa-play"></i> Preview
+                            <button type="button" class="btn-play-footage${previewing ? ' is-active' : ''}" title="Play recording" onclick="event.stopPropagation(); previewFootage(this.closest('.footage-item').dataset.filename)" ${segment.playable ? '' : 'disabled'}>
+                                <i class="fas fa-play"></i> Play
                             </button>
                         </div>
                     </div>`;
