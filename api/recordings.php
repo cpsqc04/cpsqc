@@ -4,6 +4,7 @@
  *
  * GET ?action=list[&date=YYYY-MM-DD]
  * GET ?action=find&date=YYYY-MM-DD&start=HH:MM&end=HH:MM
+ * GET ?action=lookup&files=recording_YYYYMMDD_HHMMSS.mp4,...
  * GET ?action=stream&file=recording_YYYYMMDD_HHMMSS.mp4  (supports Range)
  * GET ?action=download&file=recording_YYYYMMDD_HHMMSS.mp4
  */
@@ -190,4 +191,19 @@ if ($action === 'find') {
     ]);
 }
 
-jsonResponse(['success' => false, 'message' => 'Unknown action. Use list, find, or stream.'], 400);
+if ($action === 'lookup') {
+    $raw = trim($_GET['files'] ?? '');
+    $filenames = array_values(array_filter(array_map('trim', explode(',', $raw))));
+    if ($filenames === []) {
+        jsonResponse(['success' => false, 'message' => 'files parameter is required.'], 400);
+    }
+
+    $segments = getRecordingSegmentsByFilenames($filenames);
+    jsonResponse([
+        'success' => true,
+        'count' => count($segments),
+        'data' => $segments,
+    ]);
+}
+
+jsonResponse(['success' => false, 'message' => 'Unknown action. Use list, find, lookup, stream, or download.'], 400);

@@ -883,7 +883,47 @@ $cctvNavActive = 'cctv-request';
             itemLabel: 'requests'
         });
         let footageSegments = {};
+        let footageSegmentCache = {};
         let previewingFootageFilename = null;
+
+        function getFootageSegment(filename) {
+            return footageSegments[filename] || footageSegmentCache[filename] || null;
+        }
+
+        function mergeFootageSegmentsIntoCache(segments) {
+            (segments || []).forEach(segment => {
+                if (segment && segment.filename) {
+                    footageSegmentCache[segment.filename] = segment;
+                }
+            });
+        }
+
+        async function ensureFootageSegmentsForFilenames(filenames) {
+            const missing = filenames.filter(filename => !getFootageSegment(filename));
+            if (!missing.length) {
+                return [];
+            }
+
+            try {
+                const res = await fetch(
+                    'api/recordings.php?action=lookup&files=' + encodeURIComponent(missing.join(','))
+                );
+                const result = await res.json();
+                if (result.success) {
+                    mergeFootageSegmentsIntoCache(result.data || []);
+                }
+            } catch (e) {
+                console.error(e);
+            }
+
+            return filenames.filter(filename => !getFootageSegment(filename));
+        }
+
+        function resetFootageSegmentState() {
+            footageSegments = {};
+            footageSegmentCache = {};
+            previewingFootageFilename = null;
+        }
 
         function escapeHtml(value) {
             return String(value == null ? '' : value)
@@ -1218,6 +1258,7 @@ $cctvNavActive = 'cctv-request';
             const modalContent = document.querySelector('#viewModal .modal-content');
             if (modalContent) modalContent.classList.remove('footage-modal-wide');
             clearFootagePreview();
+            resetFootageSegmentState();
         }
 
         function showFootagePreviewError(message) {
@@ -1264,7 +1305,7 @@ $cctvNavActive = 'cctv-request';
         }
 
         function previewFootage(filename) {
-            const segment = footageSegments[filename];
+            const segment = getFootageSegment(filename);
             if (!segment) return;
 
             if (!segment.playable) {
@@ -1385,17 +1426,26 @@ $cctvNavActive = 'cctv-request';
                     segments = result.data || [];
                 }
 
+                mergeFootageSegmentsIntoCache(segments);
                 footageSegments = {};
                 if (previewingFootageFilename && !segments.some(segment => segment.filename === previewingFootageFilename)) {
                     clearFootagePreview();
                 }
                 if (!segments.length) {
                     results.innerHTML = '<div class="request-list-empty">No recordings found for that date.</div>';
+                    await ensureFootageSegmentsForFilenames(Array.from(selectedFootageFilenames));
+                    updateSelectedFootageNote();
                     return;
                 }
 
-                results.innerHTML = segments.map(segment => {
+                segments.forEach(segment => {
                     footageSegments[segment.filename] = segment;
+                });
+
+                await ensureFootageSegmentsForFilenames(Array.from(selectedFootageFilenames));
+                updateSelectedFootageNote();
+
+                results.innerHTML = segments.map(segment => {
                     const selected = selectedFootageFilenames.has(segment.filename);
                     const previewing = previewingFootageFilename === segment.filename;
                     return `<div class="footage-item${selected ? ' selected' : ''}${previewing ? ' previewing' : ''}" data-filename="${escapeHtml(segment.filename)}">
@@ -1451,7 +1501,7 @@ $cctvNavActive = 'cctv-request';
             const item = requestData[activeRequestId];
             if (!item) return;
 
-            const filenames = Array.from(selectedFootageFilenames);
+            let filenames = Array.from(selectedFootageFilenames);
             const previousNotes = String(item.fulfillment_notes || '')
                 .split(/\r?\n/)
                 .filter(line => line.trim() && !/^Selected footage:/i.test(line.trim()))
@@ -1463,26 +1513,36 @@ $cctvNavActive = 'cctv-request';
             let noteLines = [];
 
             if (filenames.length) {
+                const unavailable = await ensureFootageSegmentsForFilenames(filenames);
+                if (unavailable.length) {
+                    unavailable.forEach(filename => selectedFootageFilenames.delete(filename));
+                    filenames = Array.from(selectedFootageFilenames);
+                    updateSelectedFootageNote();
+                }
+
                 const segments = filenames
-                    .map(filename => footageSegments[filename])
+                    .map(filename => getFootageSegment(filename))
                     .filter(Boolean);
-                if (segments.length !== filenames.length) {
-                    alert('Some selected recordings were not found. Search again.');
+
+                if (filenames.length && !segments.length) {
+                    alert('The selected recordings are no longer available on the server.');
                     return;
                 }
 
-                segments.sort((a, b) => compareTimeValues(a.start_at, b.start_at));
-                actualStart = segments.reduce(
-                    (min, segment) => compareTimeValues(segment.start_time, min) < 0 ? segment.start_time : min,
-                    segments[0].start_time
-                );
-                actualEnd = segments.reduce(
-                    (max, segment) => compareTimeValues(segment.end_time, max) > 0 ? segment.end_time : max,
-                    segments[0].end_time
-                );
-                noteLines = segments.map(segment => 'Selected footage: ' + segment.filename
-                    + (cameraId ? ' (camera ' + cameraId + ')' : '')
-                    + ' · ' + (segment.start_at || '') + ' – ' + (segment.end_at || ''));
+                if (segments.length) {
+                    segments.sort((a, b) => compareTimeValues(a.start_at, b.start_at));
+                    actualStart = segments.reduce(
+                        (min, segment) => compareTimeValues(segment.start_time, min) < 0 ? segment.start_time : min,
+                        segments[0].start_time
+                    );
+                    actualEnd = segments.reduce(
+                        (max, segment) => compareTimeValues(segment.end_time, max) > 0 ? segment.end_time : max,
+                        segments[0].end_time
+                    );
+                    noteLines = segments.map(segment => 'Selected footage: ' + segment.filename
+                        + (cameraId ? ' (camera ' + cameraId + ')' : '')
+                        + ' · ' + (segment.start_at || '') + ' – ' + (segment.end_at || ''));
+                }
             }
 
             const fulfillmentNotes = [previousNotes, ...noteLines].filter(Boolean).join('\n');
