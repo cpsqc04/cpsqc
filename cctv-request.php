@@ -308,10 +308,45 @@ $cctvNavActive = 'cctv-request';
             letter-spacing: 0.02em;
         }
         .footage-results { display: flex; flex-direction: column; gap: 0.55rem; max-height: 220px; overflow-y: auto; }
+        .footage-selection-toolbar {
+            display: none;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+            margin: 0 0 0.65rem;
+            padding: 0.55rem 0.75rem;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            background: #f8fafb;
+        }
+        .footage-selection-toolbar.show { display: flex; }
+        .footage-selection-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.45rem 0.65rem;
+            align-items: center;
+        }
+        .btn-footage-toolbar {
+            padding: 0;
+            border: none;
+            background: transparent;
+            color: var(--primary-color);
+            font-size: 0.84rem;
+            font-weight: 600;
+            cursor: pointer;
+            text-decoration: none;
+        }
+        .btn-footage-toolbar:hover { text-decoration: underline; }
+        .footage-selection-count {
+            font-size: 0.82rem;
+            color: var(--text-secondary);
+            font-weight: 500;
+        }
         .footage-item {
             display: grid;
-            grid-template-columns: 1fr auto;
-            gap: 0.75rem;
+            grid-template-columns: auto 1fr auto;
+            gap: 0.65rem 0.75rem;
             align-items: center;
             padding: 0.85rem 1rem;
             border: 1px solid var(--border-color);
@@ -320,6 +355,19 @@ $cctvNavActive = 'cctv-request';
             text-align: left;
             font: inherit;
             color: inherit;
+        }
+        .footage-item-checkbox {
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+            padding: 0.15rem 0;
+        }
+        .footage-item-checkbox input[type="checkbox"] {
+            width: 1rem;
+            height: 1rem;
+            margin: 0;
+            cursor: pointer;
+            accent-color: var(--primary-color);
         }
         .footage-item:hover { border-color: var(--primary-color); }
         .footage-item.selected {
@@ -482,6 +530,55 @@ $cctvNavActive = 'cctv-request';
             font-weight: 600;
         }
         .selected-footage-note.show { display: block; }
+        .selected-footage-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.75rem;
+            margin-bottom: 0.55rem;
+        }
+        .selected-footage-header .btn-footage-toolbar {
+            color: #0f5132;
+            font-size: 0.8rem;
+        }
+        .selected-footage-list {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+            max-height: 120px;
+            overflow-y: auto;
+        }
+        .selected-footage-list li {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.5rem;
+            padding: 0.3rem 0;
+            border-bottom: 1px solid rgba(167, 243, 208, 0.65);
+            font-size: 0.82rem;
+            font-weight: 500;
+        }
+        .selected-footage-list li:last-child { border-bottom: none; }
+        .selected-footage-list .filename {
+            min-width: 0;
+            word-break: break-all;
+        }
+        .selected-footage-remove {
+            flex-shrink: 0;
+            width: 1.5rem;
+            height: 1.5rem;
+            border: none;
+            border-radius: 999px;
+            background: rgba(15, 81, 50, 0.12);
+            color: #0f5132;
+            font-size: 1rem;
+            line-height: 1;
+            cursor: pointer;
+        }
+        .selected-footage-remove:hover {
+            background: rgba(185, 28, 28, 0.15);
+            color: #991b1b;
+        }
         .supporting-doc-panel {
             margin: 1rem 0 0;
             padding: 1rem 1.1rem;
@@ -817,7 +914,7 @@ $cctvNavActive = 'cctv-request';
             </div>
             <div id="selectFootagePanel" class="select-footage-panel">
                 <h3>Select Footage</h3>
-                <p class="panel-hint">Preview recordings before sending. Click a row to select, use Play to watch, then click Send.</p>
+                <p class="panel-hint">Use checkboxes or Select all ready to choose recordings. Preview with Play, remove mistakes with Clear selection, then Send.</p>
                 <div id="selectedFootageNote" class="selected-footage-note"></div>
                 <div class="footage-preview-wrap">
                     <p class="footage-preview-label">Preview</p>
@@ -842,6 +939,13 @@ $cctvNavActive = 'cctv-request';
                     <button type="button" class="btn-search-footage" onclick="searchFootage()"><i class="fas fa-search"></i> Search</button>
                 </div>
                 <div id="cameraMatches" class="camera-match-list"></div>
+                <div id="footageSelectionToolbar" class="footage-selection-toolbar">
+                    <div class="footage-selection-actions">
+                        <button type="button" class="btn-footage-toolbar" id="selectAllReadyBtn" onclick="selectAllReadyFootage()">Select all ready</button>
+                        <button type="button" class="btn-footage-toolbar" onclick="clearFootageSelection()">Clear selection</button>
+                    </div>
+                    <span id="footageSelectionCount" class="footage-selection-count"></span>
+                </div>
                 <div id="footageResults" class="footage-results">
                     <div class="request-list-empty">Enter a date and search for recordings.</div>
                 </div>
@@ -1082,16 +1186,106 @@ $cctvNavActive = 'cctv-request';
             const filenames = Array.from(selectedFootageFilenames);
             if (!filenames.length) {
                 note.classList.remove('show');
-                note.textContent = '';
+                note.innerHTML = '';
                 return;
             }
-            if (filenames.length === 1) {
-                note.textContent = 'Selected: ' + filenames[0];
-            } else {
-                note.innerHTML = 'Selected: ' + filenames.length + ' recordings<br>'
-                    + filenames.map(filename => escapeHtml(filename)).join('<br>');
-            }
+
+            note.innerHTML = `
+                <div class="selected-footage-header">
+                    <span>${filenames.length} recording${filenames.length === 1 ? '' : 's'} selected</span>
+                    <button type="button" class="btn-footage-toolbar" onclick="clearFootageSelection()">Clear all</button>
+                </div>
+                <ul class="selected-footage-list">
+                    ${filenames.map(filename => `
+                        <li>
+                            <span class="filename">${escapeHtml(filename)}</span>
+                            <button type="button" class="selected-footage-remove" title="Remove from selection" data-filename="${escapeHtml(filename)}" onclick="removeSelectedFootage(this.dataset.filename)">&times;</button>
+                        </li>
+                    `).join('')}
+                </ul>
+            `;
             note.classList.add('show');
+            updateFootageSelectionToolbar();
+        }
+
+        function countReadyFootageInSearch() {
+            return Object.values(footageSegments).filter(segment => segment && segment.playable).length;
+        }
+
+        function updateFootageSelectionToolbar() {
+            const toolbar = document.getElementById('footageSelectionToolbar');
+            const countEl = document.getElementById('footageSelectionCount');
+            const selectAllBtn = document.getElementById('selectAllReadyBtn');
+            if (!toolbar || !countEl) return;
+
+            const visibleCount = Object.keys(footageSegments).length;
+            const readyCount = countReadyFootageInSearch();
+            const selectedCount = selectedFootageFilenames.size;
+
+            toolbar.classList.toggle('show', visibleCount > 0);
+            countEl.textContent = selectedCount
+                ? selectedCount + ' selected'
+                : (readyCount ? readyCount + ' ready in this search' : 'No ready recordings in this search');
+
+            if (selectAllBtn) {
+                selectAllBtn.textContent = readyCount
+                    ? 'Select all ready (' + readyCount + ')'
+                    : 'Select all ready';
+                selectAllBtn.disabled = readyCount === 0;
+                selectAllBtn.style.opacity = readyCount === 0 ? '0.55' : '';
+                selectAllBtn.style.cursor = readyCount === 0 ? 'not-allowed' : '';
+            }
+        }
+
+        function refreshFootageItemSelectionUi() {
+            document.querySelectorAll('.footage-item').forEach(el => {
+                const filename = el.dataset.filename || '';
+                const selected = selectedFootageFilenames.has(filename);
+                el.classList.toggle('selected', selected);
+                const checkbox = el.querySelector('.footage-item-checkbox input[type="checkbox"]');
+                if (checkbox) {
+                    checkbox.checked = selected;
+                }
+            });
+        }
+
+        function setFootageSelected(filename, selected) {
+            if (!filename) return;
+            if (selected) {
+                selectedFootageFilenames.add(filename);
+            } else {
+                selectedFootageFilenames.delete(filename);
+            }
+            refreshFootageItemSelectionUi();
+            updateSelectedFootageNote();
+            saveSelectedFootage();
+        }
+
+        function selectAllReadyFootage() {
+            Object.values(footageSegments).forEach(segment => {
+                if (segment && segment.playable && segment.filename) {
+                    selectedFootageFilenames.add(segment.filename);
+                }
+            });
+            refreshFootageItemSelectionUi();
+            updateSelectedFootageNote();
+            saveSelectedFootage();
+        }
+
+        function clearFootageSelection() {
+            if (!selectedFootageFilenames.size) return;
+            selectedFootageFilenames.clear();
+            refreshFootageItemSelectionUi();
+            updateSelectedFootageNote();
+            saveSelectedFootage();
+        }
+
+        function removeSelectedFootage(filename) {
+            if (!filename || !selectedFootageFilenames.has(filename)) return;
+            selectedFootageFilenames.delete(filename);
+            refreshFootageItemSelectionUi();
+            updateSelectedFootageNote();
+            saveSelectedFootage();
         }
 
         function viewRequest(requestId) {
@@ -1402,6 +1596,7 @@ $cctvNavActive = 'cctv-request';
 
             if (!date) {
                 results.innerHTML = '<div class="request-list-empty">Select a date to search recordings.</div>';
+                updateFootageSelectionToolbar();
                 return;
             }
 
@@ -1435,6 +1630,7 @@ $cctvNavActive = 'cctv-request';
                     results.innerHTML = '<div class="request-list-empty">No recordings found for that date.</div>';
                     await ensureFootageSegmentsForFilenames(Array.from(selectedFootageFilenames));
                     updateSelectedFootageNote();
+                    updateFootageSelectionToolbar();
                     return;
                 }
 
@@ -1449,7 +1645,10 @@ $cctvNavActive = 'cctv-request';
                     const selected = selectedFootageFilenames.has(segment.filename);
                     const previewing = previewingFootageFilename === segment.filename;
                     return `<div class="footage-item${selected ? ' selected' : ''}${previewing ? ' previewing' : ''}" data-filename="${escapeHtml(segment.filename)}">
-                        <div class="footage-item-main" onclick="selectFootage(this.closest('.footage-item').dataset.filename)">
+                        <label class="footage-item-checkbox" onclick="event.stopPropagation()">
+                            <input type="checkbox"${selected ? ' checked' : ''} aria-label="Select ${escapeHtml(segment.filename)}" onchange="setFootageSelected(this.closest('.footage-item').dataset.filename, this.checked)">
+                        </label>
+                        <div class="footage-item-main" onclick="toggleFootageSelection(this.closest('.footage-item').dataset.filename)">
                             <div class="footage-item-title">
                                 <span>${escapeHtml(segment.filename)}</span>
                                 ${previewing ? '<span class="footage-now-playing">Now playing</span>' : ''}
@@ -1466,22 +1665,15 @@ $cctvNavActive = 'cctv-request';
                         </div>
                     </div>`;
                 }).join('');
+                updateFootageSelectionToolbar();
             } catch (err) {
                 results.innerHTML = `<div class="request-list-empty" style="color:#b91c1c;">${escapeHtml(err.message || 'Failed to search recordings.')}</div>`;
             }
         }
 
-        function selectFootage(filename) {
-            if (selectedFootageFilenames.has(filename)) {
-                selectedFootageFilenames.delete(filename);
-            } else {
-                selectedFootageFilenames.add(filename);
-            }
-            document.querySelectorAll('.footage-item').forEach(el => {
-                el.classList.toggle('selected', selectedFootageFilenames.has(el.dataset.filename));
-            });
-            updateSelectedFootageNote();
-            saveSelectedFootage();
+        function toggleFootageSelection(filename) {
+            if (!filename) return;
+            setFootageSelected(filename, !selectedFootageFilenames.has(filename));
         }
 
         async function updateRequestStatus(id, payload) {
