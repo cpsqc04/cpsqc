@@ -142,7 +142,7 @@ if ($method === 'GET') {
             // Files are stored as lightweight paths (uploads/volunteers/...), not large base64 blobs.
             foreach (['photo_data', 'photo_id_data', 'barangay_clearance_data'] as $mediaKey) {
                 $mediaValue = trim((string) ($member[$mediaKey] ?? ''));
-                $member[$mediaKey] = $mediaValue !== '' ? $mediaValue : null;
+                $member[$mediaKey] = $mediaValue !== '' ? volunteerMediaBrowserUrl($mediaValue) : null;
             }
         }
         unset($member);

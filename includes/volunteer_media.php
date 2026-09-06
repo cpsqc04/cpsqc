@@ -10,6 +10,74 @@ function volunteerMediaPublicPath(string $filename): string
     return 'uploads/volunteers/' . $filename;
 }
 
+function volunteerMediaProjectRoot(): string
+{
+    return dirname(__DIR__);
+}
+
+/**
+ * Resolve an uploads/ path from the database to a real file on disk.
+ * Also checks the nested uploads/uploads/ layout that docker cp can create.
+ */
+function volunteerMediaResolvePath(?string $publicPath): ?string
+{
+    if ($publicPath === null || $publicPath === '' || volunteerMediaIsDataUrl($publicPath)) {
+        return null;
+    }
+
+    if (preg_match('#^https?://#i', $publicPath)) {
+        return null;
+    }
+
+    $normalized = str_replace('\\', '/', $publicPath);
+    $normalized = ltrim($normalized, '/');
+    if ($normalized === '' || str_contains($normalized, '..')) {
+        return null;
+    }
+
+    $root = volunteerMediaProjectRoot();
+    $withoutUploads = preg_replace('#^uploads/#', '', $normalized);
+    $candidates = [
+        $root . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $normalized),
+        $root . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $normalized),
+        $root . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $withoutUploads),
+    ];
+
+    $uploadsRoot = realpath($root . DIRECTORY_SEPARATOR . 'uploads');
+    foreach ($candidates as $candidate) {
+        if (!is_file($candidate)) {
+            continue;
+        }
+        $real = realpath($candidate);
+        if ($real === false) {
+            continue;
+        }
+        if ($uploadsRoot !== false && !str_starts_with($real, $uploadsRoot)) {
+            continue;
+        }
+        return $real;
+    }
+
+    return null;
+}
+
+/**
+ * Browser URL for a stored photo/PDF path. PHP serves the file so Traefik/static 404s do not hide images.
+ */
+function volunteerMediaBrowserUrl(?string $publicPath): ?string
+{
+    if ($publicPath === null || $publicPath === '') {
+        return null;
+    }
+    if (volunteerMediaIsDataUrl($publicPath) || preg_match('#^https?://#i', $publicPath)) {
+        return $publicPath;
+    }
+    if (volunteerMediaResolvePath($publicPath) === null) {
+        return $publicPath;
+    }
+    return 'api/serve_upload.php?path=' . rawurlencode(ltrim(str_replace('\\', '/', $publicPath), '/'));
+}
+
 function volunteerMediaIsDataUrl(?string $value): bool
 {
     return is_string($value) && (
