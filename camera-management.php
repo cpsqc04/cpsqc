@@ -482,6 +482,9 @@ $cctvNavActive = 'camera-management';
                             <option value="mid">Fluent (Mid)</option>
                             <option value="low">Balanced (Low)</option>
                         </select>
+                        <div class="form-hint">
+                            Clear (High) on many Reolink cameras is H.265 4K. Live Monitoring auto-transcodes it to H.264 so the browser feed stays stable (not black / laggy). Fluent is H.264 and is the lightest option.
+                        </div>
                         <button type="button" class="btn-secondary" id="detectEncodingBtn" style="margin-top:0.55rem;" onclick="detectReolinkEncoding()">
                             <i class="fas fa-magic"></i> Detect Camera
                         </button>

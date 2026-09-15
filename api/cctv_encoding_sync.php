@@ -105,14 +105,9 @@ function encodingApplyToCameras(string $camerasFile, array $result, ?string $cam
         if (!$idMatch) {
             continue;
         }
-        $ip = trim((string) ($cam['ipAddress'] ?? ''));
-        $port = trim((string) ($cam['port'] ?? '554')) ?: '554';
-        $user = trim((string) ($cam['username'] ?? ''));
-        $pass = (string) ($cam['password'] ?? '');
-        $cam['streamType'] = $recommended;
-        if ($ip !== '' && $user !== '') {
-            $cam['rtspUrl'] = encodingBuildRtsp($ip, $port, $user, $pass, $recommended);
-        }
+        // Keep Camera Management streamType (e.g. Clear/High). Only store encoding probe + recommendation.
+        // go2rtc H.264-transcodes Clear when needed so Live Monitoring stays stable.
+        $userStream = encodingNormalizeStreamType((string) ($cam['streamType'] ?? $recommended));
         $cam['encoding'] = [
             'detectedAt' => $result['detectedAt'] ?? date('Y-m-d H:i:s'),
             'recommendedStream' => $recommended,
@@ -121,6 +116,7 @@ function encodingApplyToCameras(string $camerasFile, array $result, ?string $cam
             'subStream' => $result['subStream'] ?? null,
             'displayQuality' => $result['displayQuality'] ?? null,
         ];
+        $cam['streamType'] = $userStream;
         $cam['updatedAt'] = date('Y-m-d H:i:s');
         $updated++;
         if ($cameraId) {
@@ -149,10 +145,22 @@ function encodingApplyToCameras(string $camerasFile, array $result, ?string $cam
         LOCK_EX
     );
 
+    $kept = encodingNormalizeStreamType((string) (($cameras[0]['streamType'] ?? $recommended) ?: $recommended));
+    foreach ($cameras as $c) {
+        if ($cameraId && (
+            (string) ($c['id'] ?? '') === $cameraId
+            || (string) ($c['cameraId'] ?? '') === $cameraId
+        )) {
+            $kept = encodingNormalizeStreamType((string) ($c['streamType'] ?? $recommended));
+            break;
+        }
+    }
+
     return [
         'success' => true,
         'updated' => $updated,
-        'streamType' => $recommended,
+        'streamType' => $kept,
+        'recommendedStream' => $recommended,
         'revision' => $revision['revision'],
     ];
 }

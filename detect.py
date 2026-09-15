@@ -247,7 +247,7 @@ RTSP_READ_TIMEOUT = 2.5  # never block the live loop for OpenCV's ~30s default
 MAX_URL_CONNECT_ATTEMPTS = 8  # try a shortlist first; avoid 30s hangs on dead URLs
 MAX_DETECTED_OBJECT_IMAGES = 20  # Maximum number of object images to keep
 FRAME_PROCESS_DELAY = 0.0  # No delay for lowest latency
-DETECTION_INTERVAL = 15  # Run detection more often so boxes stay visible
+DETECTION_INTERVAL = 5  # Run YOLO often so Live Monitoring boxes stay aligned
 TARGET_FPS = 30  # Target frame rate for smooth real-time video (matches recording FPS)
 ENABLE_DETECTION = True  # Set to False to disable detection for absolute lowest latency
 FRAME_SAVE_INTERVAL = 1  # Save EVERY frame - CRITICAL for real-time viewing
@@ -504,11 +504,12 @@ def load_active_camera_config():
     if selected is None:
         selected = cameras[0]
 
-    stream_type = normalize_stream_type_value(selected.get("streamType", "mid"))
+    # Camera Management streamType is for Live Monitoring (go2rtc). Detection (OpenCV/YOLO)
+    # always uses Fluent/sub H.264 so Clear/H.265 4K is not opened twice (which blacks out live).
+    ui_stream_type = normalize_stream_type_value(selected.get("streamType", "mid"))
     encoding_meta = selected.get("encoding") if isinstance(selected.get("encoding"), dict) else {}
+    stream_type = "mid"
 
-    # Honor Camera Management Stream Type. Env force-main still wins.
-    # AUTO_ENCODING may probe quality metadata but must not override the user's choice.
     if CCTV_USE_MAIN_STREAM:
         stream_type = "high"
     elif CCTV_AUTO_ENCODING:
@@ -540,6 +541,7 @@ def load_active_camera_config():
         "camera_id": selected.get("cameraId") or selected.get("id") or "CAMERA",
         "name": selected.get("name") or "Camera",
         "stream_type": stream_type,
+        "ui_stream_type": ui_stream_type,
         "rtsp_url": rtsp_url,
         "ipAddress": ip,
         "port": port,
@@ -563,9 +565,14 @@ def configure_camera_source():
     ACTIVE_CAMERA = camera_cfg
     RTSP_URL = camera_cfg["rtsp_url"]
     PREFER_SUB_STREAM = normalize_stream_type_value(camera_cfg["stream_type"]) != "high"
+    ui_q = normalize_stream_type_value(camera_cfg.get("ui_stream_type") or camera_cfg["stream_type"])
     print(f"Using camera {camera_cfg['camera_id']} ({camera_cfg['name']})")
-    print(f"Stream type: {camera_cfg['stream_type'].upper()}"
-          + (" (from Camera Management)" if not CCTV_USE_MAIN_STREAM else " (forced main)"))
+    print(
+        f"Detection RTSP: {camera_cfg['stream_type'].upper()} "
+        f"(Live Monitoring UI={ui_q.upper()}; go2rtc handles Clear separately)"
+        if not CCTV_USE_MAIN_STREAM
+        else f"Stream type: {camera_cfg['stream_type'].upper()} (forced main)"
+    )
     print(f"RTSP source: {RTSP_URL}")
 
 
@@ -2950,6 +2957,7 @@ def save_detections(detections, frame_size=None):
             frame_height = int(FRAME_HEIGHT)
         detection_data = {
             "timestamp": datetime.now().isoformat(),
+            "unix_ts": time.time(),
             "detections": detections,
             "count": len(detections),
             "people_count": sum(1 for d in detections if d.get('category') == 'person'),
@@ -4536,7 +4544,7 @@ def main():
                         if detections:
                             last_activity_at = current_time
                         # Always refresh detections.json so the UI stays in sync
-                        if current_time - last_detection_save >= 0.5:
+                        if current_time - last_detection_save >= 0.25:
                             try:
                                 save_detections(detections, frame_size=(frame.shape[1], frame.shape[0]))
                                 if detections:

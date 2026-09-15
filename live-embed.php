@@ -46,7 +46,7 @@ $wsUrl = $wsBase . '/api/ws?src=' . rawurlencode($stream);
             width: 100% !important;
             height: 100% !important;
             display: block;
-            object-fit: cover;
+            object-fit: contain;
             object-position: center;
             background: #000;
         }
@@ -55,7 +55,7 @@ $wsUrl = $wsBase . '/api/ws?src=' . rawurlencode($stream);
         #status {
             position: absolute;
             inset: 0;
-            display: flex;
+            display: none;
             align-items: center;
             justify-content: center;
             color: rgba(255,255,255,0.85);
@@ -63,14 +63,12 @@ $wsUrl = $wsBase . '/api/ws?src=' . rawurlencode($stream);
             pointer-events: none;
             z-index: 2;
         }
-        #status.hidden { display: none; }
     </style>
-    <script type="module" src="https://cdn.jsdelivr.net/gh/AlexxIT/go2rtc@v1.9.4/www/video-stream.js"></script>
+    <script type="module" src="https://cdn.jsdelivr.net/gh/AlexxIT/go2rtc@v1.9.9/www/video-stream.js"></script>
 </head>
 <body>
-<div id="status">Connecting…</div>
+<div id="status" aria-hidden="true"></div>
 <script type="module">
-    const statusEl = document.getElementById('status');
     const notify = (state, detail) => {
         try {
             parent.postMessage({
@@ -84,27 +82,28 @@ $wsUrl = $wsBase . '/api/ws?src=' . rawurlencode($stream);
 
     const vs = document.createElement('video-stream');
     vs.background = true;
-    // WebRTC direct from camera RTSP — same quality path as the Reolink app.
-    vs.mode = 'webrtc,mse,hls';
+    // MSE first = stable continuous feed (Reolink-like on LAN). WebRTC second for lower delay.
+    vs.mode = 'mse,webrtc';
     vs.src = <?php echo json_encode($wsUrl, JSON_UNESCAPED_SLASHES); ?>;
     document.body.appendChild(vs);
     notify('connecting');
 
     let playing = false;
+    let chromeBound = false;
+
     const markPlaying = () => {
         if (playing) return;
         const video = vs.querySelector('video') || vs.video;
         if (!video) return;
         if (video.readyState >= 2 && video.videoWidth > 0) {
             playing = true;
-            if (statusEl) statusEl.classList.add('hidden');
             notify('playing');
         }
     };
 
-    const lockChrome = () => {
+    const lockChromeOnce = () => {
         const video = vs.querySelector('video') || vs.video;
-        if (!video) return;
+        if (!video) return false;
         video.controls = false;
         video.removeAttribute('controls');
         video.disablePictureInPicture = true;
@@ -112,25 +111,38 @@ $wsUrl = $wsBase . '/api/ws?src=' . rawurlencode($stream);
         video.setAttribute('playsinline', '');
         video.muted = true;
         video.autoplay = true;
-        // Fill the Open Surveillance frame (no pillarbox / letterbox bars).
         video.style.width = '100%';
         video.style.height = '100%';
-        video.style.objectFit = 'cover';
+        video.style.objectFit = 'contain';
         video.style.objectPosition = 'center';
+        if (!chromeBound) {
+            chromeBound = true;
+            video.addEventListener('playing', markPlaying);
+            video.addEventListener('loadeddata', markPlaying);
+            video.addEventListener('stalled', () => {
+                // Soft recover without tearing down the stream element.
+                try { video.play().catch(() => {}); } catch (e) {}
+            });
+        }
         try { video.play().catch(() => {}); } catch (e) {}
-        video.addEventListener('playing', markPlaying);
-        video.addEventListener('loadeddata', markPlaying);
         markPlaying();
+        return true;
     };
-    lockChrome();
-    setInterval(lockChrome, 500);
+
+    // Wait for video element without hammering play() every 500ms (that caused flicker).
+    let tries = 0;
+    const waitTimer = setInterval(() => {
+        tries += 1;
+        if (lockChromeOnce() || tries > 40) {
+            clearInterval(waitTimer);
+        }
+    }, 250);
 
     setTimeout(() => {
         if (!playing) {
-            if (statusEl) statusEl.textContent = 'Stream timeout';
             notify('error', 'timeout');
         }
-    }, 8000);
+    }, 20000);
 </script>
 </body>
 </html>

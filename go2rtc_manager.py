@@ -10,8 +10,10 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import socket
 import subprocess
+import sys
 import time
 import zipfile
 from pathlib import Path
@@ -22,6 +24,7 @@ from urllib.request import urlretrieve
 ROOT = Path(__file__).resolve().parent
 TOOLS_DIR = ROOT / "tools" / "go2rtc"
 CLOUDFLARED_DIR = ROOT / "tools" / "cloudflared"
+FFMPEG_DIR = ROOT / "tools" / "ffmpeg"
 CONFIG_PATH = ROOT / "go2rtc.yaml"
 STATUS_PATH = ROOT / "webrtc_status.json"
 TUNNEL_URL_PATH = ROOT / "webrtc_tunnel_url.txt"
@@ -205,7 +208,8 @@ def build_reolink_rtsp(ip: str, port: str, user: str, password: str, path: str) 
 
 def go2rtc_stream_name(camera: dict) -> str:
     cid = str(camera.get("cameraId") or camera.get("id") or "cam").strip()
-    safe = __import__("re").sub(r"[^a-zA-Z0-9_-]", "_", cid) or "cam"
+    # Hyphens break ffmpeg:stream_name#video=… parsing (treated as query fragments).
+    safe = __import__("re").sub(r"[^a-zA-Z0-9_]", "_", cid) or "cam"
     return f"alertara_{safe}"
 
 
@@ -231,40 +235,108 @@ def camera_rtsp_urls(camera: dict) -> Tuple[str, str, str]:
     return "", "", ""
 
 
+def ensure_ffmpeg_binary() -> Optional[Path]:
+    """
+    Locate ffmpeg for Clear/High (H.265) → H.264 browser-safe live transcode.
+    Prefers tools/ffmpeg, then PATH, then imageio-ffmpeg (auto-install once).
+    """
+    local = FFMPEG_DIR / ("ffmpeg.exe" if os.name == "nt" else "ffmpeg")
+    if local.is_file() and local.stat().st_size > 500_000:
+        return local
+
+    found = shutil.which("ffmpeg")
+    if found:
+        return Path(found)
+
+    try:
+        import imageio_ffmpeg  # type: ignore
+    except ImportError:
+        try:
+            log("Installing imageio-ffmpeg (needed for Clear/High H.265 live transcode)…")
+            subprocess.run(
+                [sys.executable, "-m", "pip", "install", "--quiet", "imageio-ffmpeg"],
+                check=False,
+                timeout=180,
+                **windows_hide_kwargs(),
+            )
+            import imageio_ffmpeg  # type: ignore
+        except Exception as exc:  # noqa: BLE001
+            log(f"ffmpeg unavailable ({exc})")
+            return None
+
+    try:
+        src = Path(imageio_ffmpeg.get_ffmpeg_exe())
+        if not src.is_file():
+            return None
+        FFMPEG_DIR.mkdir(parents=True, exist_ok=True)
+        try:
+            shutil.copy2(src, local)
+            return local
+        except OSError:
+            return src
+    except Exception as exc:  # noqa: BLE001
+        log(f"ffmpeg resolve failed: {exc}")
+        return None
+
+
+def main_stream_needs_browser_transcode(camera: dict) -> bool:
+    """True when Clear/main is HEVC or UHD — browsers black-screen without H.264 transcode."""
+    enc = camera.get("encoding") if isinstance(camera.get("encoding"), dict) else {}
+    main = enc.get("mainStream") if isinstance(enc.get("mainStream"), dict) else {}
+    vtype = str(main.get("vType") or main.get("profile") or "").lower()
+    width = 0
+    try:
+        width = int(main.get("width") or 0)
+    except (TypeError, ValueError):
+        width = 0
+    if "265" in vtype or "hevc" in vtype:
+        return True
+    if width >= 2560:
+        return True
+    # No probe yet: Reolink Clear is commonly H.265 — treat as needing transcode.
+    if normalize_stream_type(camera.get("streamType")) == "high" and not main:
+        return True
+    return False
+
+
 def stream_sources_for_camera(camera: dict) -> List[str]:
-    """RTSP sources for go2rtc — same URL as VLC / Reolink app (saved rtspUrl first)."""
+    """
+    One stable go2rtc source.
+    Clear/High + H.265/4K → ffmpeg H.264 @ 1280px (browser-stable, near-Clear detail).
+    Fluent/Balanced → direct H.264 RTSP (zero-copy).
+    """
     quality = normalize_stream_type((camera or {}).get("streamType"))
-    sources: List[str] = []
-
-    base = str(camera.get("rtspUrl") or "").strip()
-    if base:
-        exact = base if "#" in base else base + "#rtsp_transport=tcp"
-        sources.append(exact)
-
     ip = str(camera.get("ipAddress") or "").strip()
     port = str(camera.get("port") or "554").strip() or "554"
     user = str(camera.get("username") or "admin").strip() or "admin"
     password = password_from_camera(camera)
+    base = str(camera.get("rtspUrl") or "").strip()
+
+    raw = ""
     if ip and password:
-        for path in reolink_path_variants(quality):
-            url = build_reolink_rtsp(ip, port, user, password, path)
-            if url not in sources:
-                sources.append(url)
-        return sources
+        path = rtsp_path_for_quality(quality)
+        raw = build_reolink_rtsp(ip, port, user, password, path)
+    elif base:
+        raw = base if "#" in base else base + "#rtsp_transport=tcp"
 
-    if sources:
-        return sources
+    if not raw:
+        return []
 
-    if base:
-        primary = swap_stream_path(base, "main" if quality == "high" else "sub")
-        if quality == "low":
-            primary = primary.replace("h264Preview_01_sub", "h264Preview_01_ext").replace(
-                "Preview_01_sub", "Preview_01_ext"
-            )
-        if "#" not in primary:
-            primary += "#rtsp_transport=tcp"
-        sources.append(primary)
-    return sources
+    if quality == "high" and main_stream_needs_browser_transcode(camera):
+        ff = ensure_ffmpeg_binary()
+        if ff:
+            # Caller wraps this as nested streams (raw RTSP → ffmpeg:#video=h264).
+            # Returning the plain RTSP here; write_go2rtc_config builds the pair.
+            return [raw.split("#", 1)[0]]
+        # No ffmpeg: never feed raw H.265 to the browser (black screen / Connecting loops).
+        log(
+            "Clear/High is H.265/4K but ffmpeg is missing — using Fluent (H.264) for stable Live Monitoring."
+        )
+        if ip and password:
+            return [build_reolink_rtsp(ip, port, user, password, rtsp_path_for_quality("mid"))]
+        return [raw.replace("h264Preview_01_main", "h264Preview_01_sub").replace("Preview_01_main", "Preview_01_sub")]
+
+    return [raw]
 
 
 def write_go2rtc_config(cameras: Optional[list] = None) -> Dict[str, Any]:
@@ -296,6 +368,8 @@ def write_go2rtc_config(cameras: Optional[list] = None) -> Dict[str, Any]:
         prefer_main = stream_type == "high"
 
     # Build per-camera streams (Reolink RTSP direct — near app latency).
+    # Clear/H.265 uses nested: raw RTSP + ffmpeg:#video=h264#width=1280 (direct ffmpeg:rtsp
+    # with #fragments breaks on Windows with "output format for 'none'").
     stream_map: Dict[str, List[str]] = {}
     for row in cameras:
         if not isinstance(row, dict):
@@ -303,15 +377,41 @@ def write_go2rtc_config(cameras: Optional[list] = None) -> Dict[str, Any]:
         if not (row.get("ipAddress") or row.get("rtspUrl")):
             continue
         name = go2rtc_stream_name(row)
+        quality = normalize_stream_type(row.get("streamType"))
         sources = stream_sources_for_camera(row)
-        if sources:
+        if not sources:
+            continue
+        needs_tx = (
+            quality == "high"
+            and main_stream_needs_browser_transcode(row)
+            and ensure_ffmpeg_binary() is not None
+        )
+        if needs_tx:
+            raw_name = f"{name}_raw"
+            stream_map[raw_name] = [sources[0].split("#", 1)[0]]
+            stream_map[name] = [f"ffmpeg:{raw_name}#video=h264#width=1280"]
+        else:
             stream_map[name] = sources
 
-    primary_sources = stream_sources_for_camera(cam) if cam else []
+    primary_sources: List[str] = []
+    if cam:
+        quality = normalize_stream_type(cam.get("streamType"))
+        needs_tx = (
+            quality == "high"
+            and main_stream_needs_browser_transcode(cam)
+            and ensure_ffmpeg_binary() is not None
+        )
+        cam_name = go2rtc_stream_name(cam)
+        if needs_tx and cam_name in stream_map:
+            primary_sources = list(stream_map[cam_name])
+        else:
+            primary_sources = stream_sources_for_camera(cam)
     if primary_sources:
         stream_map[STREAM_NAME] = primary_sources
     elif stream_map:
-        first_key = next(iter(stream_map))
+        # Prefer a non-_raw live stream as the default alias.
+        live_keys = [k for k in stream_map if not str(k).endswith("_raw")]
+        first_key = live_keys[0] if live_keys else next(iter(stream_map))
         stream_map[STREAM_NAME] = list(stream_map[first_key])
 
     listen = (
@@ -320,10 +420,16 @@ def write_go2rtc_config(cameras: Optional[list] = None) -> Dict[str, Any]:
         or ":1984"
     ).strip() or ":1984"
     lan_ip = local_lan_ip()
+    ff_bin = ensure_ffmpeg_binary()
+    uses_ffmpeg = any(
+        str(src).startswith("ffmpeg:")
+        for sources in stream_map.values()
+        for src in sources
+    )
 
     lines = [
         "# Auto-generated by go2rtc_manager.py — do not edit by hand.",
-        "# Zero-copy RTSP (no default ffmpeg) for near-Reolink-app latency.",
+        "# Clear/High H.265 is transcoded to H.264 for stable browser Live Monitoring.",
         "api:",
         f'  listen: "{listen}"',
         '  origin: "*"',
@@ -334,15 +440,24 @@ def write_go2rtc_config(cameras: Optional[list] = None) -> Dict[str, Any]:
         "  candidates:",
         f'    - "{lan_ip}:8555"',
         "    - stun:8555",
-        "streams:",
     ]
+    if ff_bin and uses_ffmpeg:
+        # Absolute path so go2rtc finds ffmpeg for Clear/High transcode.
+        ff_path = str(ff_bin).replace("\\", "/")
+        lines.extend([
+            "ffmpeg:",
+            f'  bin: "{ff_path}"',
+        ])
+    lines.append("streams:")
     if stream_map:
         for stream_name, sources in stream_map.items():
             lines.append(f"  {stream_name}:")
             for src in sources:
                 lines.append(f'    - "{src}"')
-            if transcode and sources:
-                lines.append(f'    - "ffmpeg:{sources[0]}#video=h264#hardware"')
+            # Optional extra transcode only for raw RTSP when env forces it.
+            if transcode and sources and not str(sources[0]).startswith("ffmpeg:"):
+                if not str(stream_name).endswith("_raw"):
+                    lines.append(f'    - "ffmpeg:{stream_name}#video=h264#width=1280"')
     else:
         lines.append(f"  {STREAM_NAME}:")
         lines.append('    - "rtsp://127.0.0.1:554/h264Preview_01_sub"')
@@ -356,7 +471,8 @@ def write_go2rtc_config(cameras: Optional[list] = None) -> Dict[str, Any]:
         "stream_type": stream_type if cam else None,
         "prefer_main": prefer_main,
         "has_streams": bool(stream_map),
-        "transcode": transcode,
+        "transcode": transcode or uses_ffmpeg,
+        "ffmpeg": str(ff_bin) if ff_bin else None,
         "listen": listen,
         "lan_ip": lan_ip,
         "updated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
@@ -412,45 +528,44 @@ def stop_go2rtc(reason: str = "stop") -> None:
     hide = windows_hide_kwargs()
     try:
         if os.name == "nt":
+            # Fast path: kill by image name (avoids hanging WMI/CIM queries).
+            subprocess.run(
+                ["taskkill", "/F", "/IM", "go2rtc.exe", "/T"],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                check=False,
+                timeout=8,
+                **hide,
+            )
             if pid:
                 subprocess.run(
                     ["taskkill", "/F", "/PID", str(pid), "/T"],
                     stdout=subprocess.DEVNULL,
                     stderr=subprocess.DEVNULL,
                     check=False,
+                    timeout=5,
                     **hide,
                 )
-            subprocess.run(
-                [
-                    "powershell",
-                    "-NoProfile",
-                    "-WindowStyle",
-                    "Hidden",
-                    "-Command",
-                    "Get-CimInstance Win32_Process | "
-                    "Where-Object { $_.Name -match 'go2rtc' -or ($_.CommandLine -and $_.CommandLine -match 'go2rtc') } | "
-                    "ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }",
-                ],
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-                check=False,
-                **hide,
-            )
         elif pid:
             try:
                 os.kill(pid, 15)
             except OSError:
                 pass
-    except OSError as exc:
+    except (OSError, subprocess.TimeoutExpired) as exc:
         log(f"stop_go2rtc error: {exc}")
     try:
         if PID_PATH.exists():
             PID_PATH.unlink()
     except OSError:
         pass
+    # Brief settle so :1984/:8554 release before restart.
+    for _ in range(10):
+        if not port_open("127.0.0.1", 1984) and not port_open("127.0.0.1", 8554):
+            break
+        time.sleep(0.2)
 
 
-def start_go2rtc(force_restart: bool = False) -> bool:
+def start_go2rtc(force_restart: bool = False, _reclaim_attempt: bool = False) -> bool:
     meta = write_go2rtc_config()
     binary = ensure_go2rtc_binary()
     if not binary:
@@ -483,12 +598,19 @@ def start_go2rtc(force_restart: bool = False) -> bool:
         write_status(running=False, error=str(exc), meta=meta)
         return False
 
-    for _ in range(20):
+    for _ in range(24):
         time.sleep(0.25)
-        if port_open("127.0.0.1", 1984):
+        if port_open("127.0.0.1", 1984) and pid_alive(proc.pid):
             log(f"go2rtc listening on :1984 (stream={STREAM_NAME})")
             write_status(running=True, error="", meta=meta)
             return True
+
+    # Another orphan may own :1984 — clear and retry once.
+    if not _reclaim_attempt and not pid_alive(proc.pid) and port_open("127.0.0.1", 1984):
+        log("go2rtc port held by orphan process — reclaiming…")
+        stop_go2rtc("orphan reclaim")
+        time.sleep(0.5)
+        return start_go2rtc(force_restart=False, _reclaim_attempt=True)
 
     log("go2rtc started but API port 1984 not reachable yet")
     write_status(running=True, error="starting", meta=meta)

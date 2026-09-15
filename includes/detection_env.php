@@ -39,6 +39,17 @@ function getCctvFeedMode(): string
 }
 
 /**
+ * Whether Live Monitoring may fall back to uploaded JPEG frames.
+ * Default false — live view uses only go2rtc WebRTC (same Reolink RTSP source, low delay).
+ * Set CCTV_LIVE_JPEG_FALLBACK=true only if WebRTC/tunnel is unavailable.
+ */
+function isLiveJpegFallbackEnabled(): bool
+{
+    $flag = strtolower(trim((string) ($_ENV['CCTV_LIVE_JPEG_FALLBACK'] ?? getenv('CCTV_LIVE_JPEG_FALLBACK') ?: '')));
+    return $flag === 'true' || $flag === '1' || $flag === 'yes' || $flag === 'on';
+}
+
+/**
  * Absolute path to the Open Surveillance viewer heartbeat file.
  */
 function getDetectionHeartbeatPath(): string

@@ -28,6 +28,55 @@ CAMERA_PORTS = (554, 8554, 80, 443, 8000, 8080, 37777, 34567)
 PRIORITY_PORTS = (554, 8554)  # Strong camera signal
 HTTP_HINT_PORTS = (80, 443, 8000, 8080)
 
+CAMERA_KEYWORDS = (
+    "reolink",
+    "hikvision",
+    "dahua",
+    "amcrest",
+    "axis",
+    "onvif",
+    "ipcam",
+    "ip camera",
+    "webcam",
+    "dvr",
+    "nvr",
+    "rtsp",
+    "cgi-bin",
+    "bosch",
+    "uniview",
+    "foscam",
+    "tp-link",
+    "tapo",
+    "wyze",
+    "annke",
+    "lorex",
+)
+
+# Web/app servers that often share a LAN and must NOT be listed as cameras
+# even if something happens to listen on TCP 554.
+NON_CAMERA_MARKERS = (
+    "apache",
+    "nginx",
+    "microsoft-iis",
+    "iis/",
+    "php/",
+    "xampp",
+    "tomcat",
+    "caddy",
+    "lighttpd",
+    "cloudflare",
+    "werkzeug",
+    "gunicorn",
+    "uvicorn",
+    "express",
+    "node.js",
+    "openresty",
+    "cherokee",
+    "litespeed",
+    "wordpress",
+    "phpmyadmin",
+)
+
 
 def local_ipv4_addrs() -> List[str]:
     addrs: List[str] = []
@@ -48,6 +97,15 @@ def local_ipv4_addrs() -> List[str]:
         sock.close()
         if ip and not ip.startswith("127.") and ip not in addrs:
             addrs.insert(0, ip)
+    except OSError:
+        pass
+
+    # Enumerate Windows / multi-NIC addresses more thoroughly.
+    try:
+        for info in socket.getaddrinfo(None, 0, socket.AF_INET, socket.SOCK_DGRAM):
+            ip = info[4][0]
+            if ip and not ip.startswith("127.") and ip not in addrs:
+                addrs.append(ip)
     except OSError:
         pass
 
@@ -84,41 +142,57 @@ def tcp_open(ip: str, port: int, timeout: float = 0.35) -> bool:
         return False
 
 
-def http_server_hint(ip: str, port: int, timeout: float = 0.8) -> Optional[str]:
+def rtsp_responds(ip: str, port: int, timeout: float = 0.9) -> bool:
+    """True only if the service answers with an RTSP protocol response."""
+    try:
+        with socket.create_connection((ip, port), timeout=timeout) as sock:
+            sock.settimeout(timeout)
+            payload = f"OPTIONS rtsp://{ip}:{port}/ RTSP/1.0\r\nCSeq: 1\r\nUser-Agent: AlertaraQC-CameraScan/1.0\r\n\r\n"
+            sock.sendall(payload.encode("ascii", errors="ignore"))
+            data = sock.recv(512)
+            if not data:
+                return False
+            text = data.decode("utf-8", errors="ignore")
+            head = text.lstrip()[:48].upper()
+            return head.startswith("RTSP/") or "RTSP/1." in head
+    except OSError:
+        return False
+
+
+def http_probe(ip: str, port: int, timeout: float = 0.8) -> Tuple[Optional[str], Optional[str]]:
+    """
+    Returns (camera_hint_or_None, raw_server_banner_or_None).
+    camera_hint is only set when the response looks like an IP camera UI/API.
+    """
     schemes = ("https", "http") if port == 443 else ("http",)
     for scheme in schemes:
         url = f"{scheme}://{ip}:{port}/"
         try:
             req = Request(url, method="GET", headers={"User-Agent": "AlertaraQC-CameraScan/1.0"})
             with urlopen(req, timeout=timeout) as resp:
-                server = resp.headers.get("Server") or ""
-                body = resp.read(2048).decode("utf-8", errors="ignore").lower()
+                server = (resp.headers.get("Server") or "").strip()
+                body = resp.read(4096).decode("utf-8", errors="ignore")
                 blob = (server + " " + body).lower()
-                keywords = (
-                    "reolink",
-                    "hikvision",
-                    "dahua",
-                    "amcrest",
-                    "axis",
-                    "onvif",
-                    "ipcam",
-                    "ip camera",
-                    "webcam",
-                    "dvr",
-                    "nvr",
-                    "rtsp",
-                    "cgi-bin",
-                    "bosch",
-                    "uniview",
-                )
-                for kw in keywords:
+
+                if any(marker in blob for marker in NON_CAMERA_MARKERS) and not any(
+                    kw in blob for kw in CAMERA_KEYWORDS
+                ):
+                    return None, server[:80] if server else "web-server"
+
+                for kw in CAMERA_KEYWORDS:
                     if kw in blob:
-                        return kw
-                if server:
-                    return server[:80]
+                        return kw, server[:80] if server else None
+                return None, server[:80] if server else None
         except Exception:
             continue
-    return None
+    return None, None
+
+
+def is_non_camera_banner(banner: Optional[str]) -> bool:
+    if not banner:
+        return False
+    blob = banner.lower()
+    return any(marker in blob for marker in NON_CAMERA_MARKERS)
 
 
 def probe_host(ip: str, timeout: float) -> Optional[Dict]:
@@ -130,29 +204,53 @@ def probe_host(ip: str, timeout: float) -> Optional[Dict]:
     if not open_ports:
         return None
 
-    has_rtsp = any(p in open_ports for p in PRIORITY_PORTS)
+    rtsp_ports = [p for p in open_ports if p in PRIORITY_PORTS]
     http_ports = [p for p in open_ports if p in HTTP_HINT_PORTS]
-    hint = None
-    for port in http_ports[:2]:
-        hint = http_server_hint(ip, port)
+
+    camera_hint: Optional[str] = None
+    server_banner: Optional[str] = None
+    for port in http_ports[:3]:
+        hint, banner = http_probe(ip, port)
+        if banner and not server_banner:
+            server_banner = banner
         if hint:
+            camera_hint = hint
             break
 
-    # Require RTSP or a camera-ish HTTP hint to reduce false positives
-    if not has_rtsp and not hint:
-        # Still include if multiple camera-ish ports open
-        if len(open_ports) < 2:
-            return None
+    # Reject clear web servers (XAMPP/Apache/nginx/etc.) unless they also look like a camera UI.
+    if is_non_camera_banner(server_banner) and not camera_hint:
+        return None
 
-    confidence = "high" if has_rtsp else ("medium" if hint else "low")
+    rtsp_ok = False
+    confirmed_rtsp_port: Optional[int] = None
+    for port in rtsp_ports:
+        if rtsp_responds(ip, port, timeout=max(0.7, timeout + 0.4)):
+            rtsp_ok = True
+            confirmed_rtsp_port = port
+            break
+
+    # Must have real RTSP or a camera-brand HTTP fingerprint.
+    if not rtsp_ok and not camera_hint:
+        return None
+
+    if rtsp_ok and camera_hint:
+        confidence = "high"
+    elif rtsp_ok:
+        confidence = "high"
+    else:
+        confidence = "medium"
+
+    display_hint = camera_hint or (f"rtsp:{confirmed_rtsp_port}" if rtsp_ok else server_banner)
+
     return {
         "ip": ip,
         "open_ports": open_ports,
-        "rtsp_port": 554 if 554 in open_ports else (8554 if 8554 in open_ports else (open_ports[0] if has_rtsp else 554)),
-        "has_rtsp": has_rtsp,
-        "hint": hint,
+        "rtsp_port": confirmed_rtsp_port
+        or (554 if 554 in open_ports else (8554 if 8554 in open_ports else 554)),
+        "has_rtsp": rtsp_ok,
+        "hint": display_hint,
         "confidence": confidence,
-        "suggested_stream_type": "sub",
+        "suggested_stream_type": "mid",
     }
 
 

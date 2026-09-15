@@ -12,6 +12,7 @@ require_once __DIR__ . '/includes/detection_process.php';
 $cctvNavActive = 'open-surveillance';
 $localDetectionEnabled = isLocalDetectionEnabled();
 $cctvFeedMode = getCctvFeedMode();
+$cctvLiveJpegFallback = isLiveJpegFallbackEnabled();
 
 // Start detection immediately when Open Surveillance is opened.
 ensureLocalDetectionStarted();
@@ -166,35 +167,6 @@ ensureLocalDetectionStarted();
         .video-shell:-webkit-full-screen .webrtc-frame { width: 100%; height: 100%; }
         .fullscreen-btn { pointer-events: auto; }
         .live-mode-chip { display: none !important; }
-        .stream-quality-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.35rem;
-            margin-left: 0.5rem;
-            padding: 0.2rem 0.65rem;
-            border-radius: 999px;
-            font-size: 0.78rem;
-            font-weight: 700;
-            letter-spacing: 0.02em;
-            background: rgba(76, 138, 137, 0.12);
-            color: #0f766e;
-        }
-        .stream-quality-select {
-            margin-left: 0.35rem;
-            padding: 0.28rem 0.55rem;
-            border-radius: 8px;
-            border: 1px solid var(--border-color);
-            font-size: 0.82rem;
-            font-weight: 600;
-            color: var(--tertiary-color);
-            background: #fff;
-            cursor: pointer;
-        }
-        .stream-quality-select:focus {
-            outline: none;
-            border-color: var(--primary-color);
-            box-shadow: 0 0 0 3px rgba(76, 138, 137, 0.12);
-        }
         .video-shell { cursor: pointer; }
         .video-shell.is-grid-open { cursor: default; }
         .camera-grid-overlay {
@@ -340,7 +312,7 @@ ensureLocalDetectionStarted();
         .fullscreen-btn { position: absolute; top: 0.75rem; right: 0.75rem; z-index: 5; width: 40px; height: 40px; border: none; border-radius: 8px; background: rgba(15, 23, 42, 0.72); color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 1rem; transition: background 0.2s ease, transform 0.2s ease; }
         .fullscreen-btn:hover { background: rgba(76, 138, 137, 0.9); transform: scale(1.05); }
         .fullscreen-btn:focus-visible { outline: 2px solid #4c8a89; outline-offset: 2px; }
-        .feed-overlay { position: absolute; z-index: 3; pointer-events: none; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.9), 0 0 8px rgba(0,0,0,0.7); font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; opacity: 0; transition: opacity 0.2s ease; }
+        .feed-overlay { position: absolute; z-index: 5; pointer-events: none; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.9), 0 0 8px rgba(0,0,0,0.7); font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; opacity: 0; transition: opacity 0.2s ease; }
         .feed-overlay.visible { opacity: 1; }
         .feed-overlay-datetime {
             top: 0.75rem;
@@ -366,6 +338,20 @@ ensureLocalDetectionStarted();
             pointer-events: none;
             z-index: 4;
         }
+        /* Pixel-accurate boxes: annotated JPEG from detect.py (same frame as YOLO). */
+        .detection-sync-frame {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            object-position: center;
+            background: #000;
+            pointer-events: none;
+            z-index: 3;
+            display: none;
+        }
+        .detection-sync-frame.active { display: block; }
         .video-placeholder { display: flex; flex-direction: column; align-items: center; justify-content: center; color: rgba(255,255,255,0.75); text-align: center; padding: 2rem; position: absolute; inset: 0; z-index: 2; }
         .video-placeholder.hidden { display: none; }
         .video-placeholder i { font-size: 3rem; margin-bottom: 0.75rem; opacity: 0.8; }
@@ -722,12 +708,6 @@ ensureLocalDetectionStarted();
                         </div>
                         <div style="display:flex;align-items:center;gap:0.35rem;flex-wrap:wrap;">
                             <span class="live-badge" id="liveBadge"><span class="dot"></span> Connecting</span>
-                            <label class="sr-only" for="streamQualitySelect">Stream quality</label>
-                            <select id="streamQualitySelect" class="stream-quality-select" title="Same as Reolink app: Clear / Fluent / Balanced">
-                                <option value="high">Clear (High)</option>
-                                <option value="mid" selected>Fluent (Mid)</option>
-                                <option value="low">Balanced (Low)</option>
-                            </select>
                         </div>
                     </div>
 
@@ -741,6 +721,7 @@ ensureLocalDetectionStarted();
                                 <img id="cameraFeed" class="camera-feed" alt="Live monitoring feed with YOLO detection">
                                 <div class="feed-overlay feed-overlay-datetime" id="feedDateTime" aria-live="polite">—</div>
                                 <div class="feed-overlay feed-overlay-camera" id="feedCameraName">Location</div>
+                                <img id="detectionSyncFrame" class="detection-sync-frame" alt="" decoding="async">
                                 <canvas id="detectionOverlay" class="detection-overlay" aria-hidden="true"></canvas>
                                 <div class="video-placeholder" id="cameraPlaceholder">
                                     <i class="fas fa-camera"></i>
@@ -783,6 +764,8 @@ ensureLocalDetectionStarted();
     <script>
         const LOCAL_DETECTION_ENABLED = <?php echo $localDetectionEnabled ? 'true' : 'false'; ?>;
         const CCTV_FEED_MODE = <?php echo json_encode($cctvFeedMode); ?>;
+        // Default false: Live Monitoring uses only Reolink RTSP via go2rtc WebRTC (no JPEG delay).
+        const CCTV_LIVE_JPEG_FALLBACK = <?php echo $cctvLiveJpegFallback ? 'true' : 'false'; ?>;
 
         document.addEventListener('DOMContentLoaded', function() {
             const sidebar = document.getElementById('sidebar');
@@ -798,7 +781,7 @@ ensureLocalDetectionStarted();
             // Prefer low-latency WebRTC (go2rtc); JPEG relay is fallback only.
             // startLiveView() also auto-starts detection_agent when cameras are configured.
             startLiveView();
-            setInterval(pollDetections, 1000);
+            setInterval(pollDetections, 350);
             // Heartbeat keeps the live page fresh; detection itself runs always-on via the agent.
             setInterval(sendDetectionHeartbeat, 5000);
             setInterval(ensureDetectionRunning, 15000);
@@ -814,7 +797,6 @@ ensureLocalDetectionStarted();
             }, 30000);
             initFullscreen();
             initCameraGrid();
-            initStreamQualityControl();
             initDetectionLifecycle();
             window.addEventListener('storage', function(e) {
                 if (e.key === 'cameraConfigUpdated') {
@@ -993,61 +975,48 @@ ensureLocalDetectionStarted();
             return 'Fluent (Mid)';
         }
 
-        function shouldUseJpegRelay() {
-            // Local XAMPP uses on-disk JPEG from detect.py.
-            return CCTV_FEED_MODE === 'local';
-        }
-
-        async function remoteUploadedFramesAvailable() {
-            if (CCTV_FEED_MODE !== 'remote') return false;
-            try {
-                const res = await fetch('api/camera_status.php?t=' + Date.now(), {
-                    cache: 'no-store',
-                    credentials: 'same-origin',
-                });
-                const data = await res.json();
-                if (!data || !data.success) return false;
-                if (!(data.available || data.has_frame)) return false;
-                const age = Number(data.age_seconds);
-                return !Number.isFinite(age) || age <= 45;
-            } catch (e) {
-                return false;
-            }
-        }
-
-        async function startJpegRelayIfAvailable() {
-            const force = CCTV_FEED_MODE === 'remote';
-            if (!force && !shouldUseJpegRelay()) return false;
-            if (force) {
-                const hasFrames = await remoteUploadedFramesAvailable();
-                if (!hasFrames) return false;
-            }
-            return startJpegRelayFeed(force);
-        }
-
-        function syncStreamQualitySelect(camera) {
-            const select = document.getElementById('streamQualitySelect');
-            if (!select || !camera) return;
-            const quality = normalizeStreamType(camera.streamType);
-            if (select.value !== quality) {
-                select.value = quality;
-            }
-            select.title = 'Stream quality: ' + streamQualityLabel(quality) + ' (matches Reolink app)';
+        function syncStreamQualitySelect() {
+            /* Quality dropdown removed — stream type comes from Reolink encoding probe. */
         }
 
         function initStreamQualityControl() {
-            const select = document.getElementById('streamQualitySelect');
-            if (!select) return;
-            select.addEventListener('change', function() {
-                changeStreamQuality(select.value);
-            });
+            /* no-op */
+        }
+
+        async function applyReolinkRecommendedQuality(camera) {
+            // Do not auto-downgrade Camera Management stream type (e.g. Clear → Fluent).
+            // Clear/H.265 is handled by go2rtc H.264 transcode for stable browser live.
+            return camera;
+        }
+
+        async function requestReolinkEncodingSync(camera) {
+            if (!camera || !camera.id) return;
+            // Probe at most once per day unless encoding is missing — frequent probes rewrite
+            // cameras.json and bounce go2rtc mid-stream.
+            const detectedAt = camera.encoding && camera.encoding.detectedAt
+                ? Date.parse(String(camera.encoding.detectedAt).replace(' ', 'T'))
+                : 0;
+            const ageMs = detectedAt ? (Date.now() - detectedAt) : Number.POSITIVE_INFINITY;
+            if (Number.isFinite(ageMs) && ageMs < 24 * 60 * 60 * 1000) {
+                return;
+            }
+            try {
+                await fetch('api/cctv_encoding_sync.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'start', cameraId: camera.id }),
+                    credentials: 'same-origin',
+                    cache: 'no-store'
+                });
+            } catch (e) {
+                /* on-site agent / local detect will retry */
+            }
         }
 
         async function changeStreamQuality(streamType) {
             const item = activeCamera;
             if (!item || !item.id) return;
             const quality = normalizeStreamType(streamType);
-            syncStreamQualitySelect({ streamType: quality });
             try {
                 const res = await fetch('api/cameras.php', {
                     method: 'POST',
@@ -1072,8 +1041,7 @@ ensureLocalDetectionStarted();
                 setCameraUiState('connecting');
                 await startLiveView();
             } catch (err) {
-                alert(err.message || 'Could not change stream quality.');
-                syncStreamQualitySelect(activeCamera);
+                console.warn(err.message || 'Could not change stream quality.');
             }
         }
 
@@ -1084,14 +1052,49 @@ ensureLocalDetectionStarted();
             }
         }
 
-        function updateStreamQualityBadge(camera) {
-            syncStreamQualitySelect(camera);
+        function updateStreamQualityBadge() {
+            /* Quality dropdown removed */
+        }
+
+        function shouldUseJpegRelay() {
+            // JPEG adds 0.5–2s delay vs Reolink. Only when explicitly enabled.
+            return CCTV_LIVE_JPEG_FALLBACK === true;
+        }
+
+        async function remoteUploadedFramesAvailable() {
+            try {
+                const res = await fetch('api/camera_status.php?t=' + Date.now(), {
+                    cache: 'no-store',
+                    credentials: 'same-origin',
+                });
+                const data = await res.json();
+                if (!data || !data.success) return false;
+                if (!(data.available || data.has_frame)) return false;
+                const age = Number(data.age_seconds);
+                return !Number.isFinite(age) || age <= 45;
+            } catch (e) {
+                return false;
+            }
+        }
+
+        async function startJpegRelayIfAvailable() {
+            if (!shouldUseJpegRelay()) return false;
+            const hasFrames = await remoteUploadedFramesAvailable();
+            if (!hasFrames && CCTV_FEED_MODE === 'remote') return false;
+            return startJpegRelayFeed(true);
+        }
+
+        function connectingHintText() {
+            return go2rtcConfigured
+                ? 'Connecting to camera RTSP (same as Reolink)… Start start_detection_agent.bat on-site if this persists.'
+                : 'Waiting for on-site go2rtc (start_detection_agent.bat) — required for Reolink-speed live view.';
         }
 
         function go2rtcStreamName(camera) {
             if (!camera) return 'alertara_live';
             const id = camera.cameraId || camera.id || 'cam';
-            return 'alertara_' + String(id).replace(/[^a-zA-Z0-9_-]/g, '_');
+            // Must match go2rtc_manager.go2rtc_stream_name (hyphens → underscores).
+            return 'alertara_' + String(id).replace(/[^a-zA-Z0-9_]/g, '_');
         }
 
         function setLiveModeChip() {
@@ -1115,7 +1118,7 @@ ensureLocalDetectionStarted();
             const isLive = mode === 'live';
             const isConnecting = mode === 'connecting';
             const isMissing = mode === 'missing';
-            const showingFeed = (webrtc && webrtc.classList.contains('active'));
+            const webrtcActive = !!(webrtc && webrtc.classList.contains('active') && webrtc.getAttribute('src'));
 
             badge.classList.toggle('active', isLive);
             badge.innerHTML = '<span class="dot"></span> ' + (
@@ -1147,7 +1150,9 @@ ensureLocalDetectionStarted();
                 placeholderText.textContent = isConnecting ? 'Connecting…' : 'Camera offline';
             }
 
-            if (isLive) {
+            // One connecting label only: hide center placeholder while WebRTC iframe is active
+            // (iframe status is suppressed in live-embed.php).
+            if (isLive || webrtcActive) {
                 placeholder.classList.add('hidden');
             } else {
                 placeholder.classList.remove('hidden');
@@ -1224,17 +1229,7 @@ ensureLocalDetectionStarted();
         }
 
         async function fallbackFromWebRtcFailure(resolvedStream) {
-            const perCamera = go2rtcStreamName(activeCamera);
-            if (resolvedStream === perCamera && perCamera !== 'alertara_live' && liveEmbedBases.length) {
-                liveEmbedBaseIndex = 0;
-                applyLiveEmbedBase(liveEmbedBases[0], 'alertara_live');
-                return;
-            }
-            if (resolvedStream === 'alertara_live' && perCamera !== 'alertara_live' && liveEmbedBases.length) {
-                liveEmbedBaseIndex = 0;
-                applyLiveEmbedBase(liveEmbedBases[0], perCamera);
-                return;
-            }
+            // Prefer staying on one stream name (per-camera). Avoid alertara_live ↔ per-camera flapping.
             if (await startJpegRelayIfAvailable()) {
                 return;
             }
@@ -1242,15 +1237,13 @@ ensureLocalDetectionStarted();
             setCameraUiState('connecting');
             const placeholderText = document.getElementById('cameraPlaceholderText');
             if (placeholderText) {
-                placeholderText.textContent = go2rtcConfigured
-                    ? 'Connecting… (low-latency stream). If this persists, ensure start_detection_agent.bat is running on-site.'
-                    : 'Waiting for on-site live stream (start_detection_agent.bat)…';
+                placeholderText.textContent = connectingHintText();
             }
             setTimeout(function() {
-                if (!liveHasPlayed && liveTransport === 'connecting') {
+                if (!liveHasPlayed && (liveTransport === 'connecting' || liveTransport === 'webrtc')) {
                     tryStartWebRtcFeed();
                 }
-            }, 5000);
+            }, 8000);
         }
 
         function applyLiveEmbedBase(baseUrl, streamName) {
@@ -1265,9 +1258,14 @@ ensureLocalDetectionStarted();
                 jpeg.classList.remove('active');
                 jpeg.removeAttribute('src');
             }
-            const resolvedStream = streamName || go2rtcStreamName(activeCamera);
+            const resolvedStream = streamName || go2rtcStreamName(activeCamera) || 'alertara_live';
             activeLiveStreamName = resolvedStream;
             const embedUrl = buildCleanEmbedUrl(baseUrl, resolvedStream);
+            // Do not reload the iframe if already on the same stable URL (prevents flicker).
+            if (liveHasPlayed && liveTransport === 'webrtc' && webrtc.getAttribute('src') === embedUrl) {
+                setCameraUiState('live');
+                return true;
+            }
             liveTransport = 'webrtc';
             webrtc.src = embedUrl;
             webrtc.classList.add('active');
@@ -1276,15 +1274,14 @@ ensureLocalDetectionStarted();
 
             if (liveEmbedWatchTimer) clearTimeout(liveEmbedWatchTimer);
             liveEmbedWatchTimer = setTimeout(function() {
-                if (liveTransport !== 'webrtc') return;
-                // No playing ack yet — try next HTTPS/LAN base, then JPEG relay.
+                if (liveTransport !== 'webrtc' || liveHasPlayed) return;
                 liveEmbedBaseIndex += 1;
                 if (liveEmbedBaseIndex < liveEmbedBases.length) {
                     applyLiveEmbedBase(liveEmbedBases[liveEmbedBaseIndex], resolvedStream);
                     return;
                 }
                 fallbackFromWebRtcFailure(resolvedStream);
-            }, 6000);
+            }, 18000);
             return true;
         }
 
@@ -1301,7 +1298,7 @@ ensureLocalDetectionStarted();
                 setCameraUiState('live');
                 applyLocationOverlay(activeCamera);
                 updateStreamQualityBadge(activeCamera);
-            } else if (data.state === 'error' && liveTransport === 'webrtc') {
+            } else if (data.state === 'error' && liveTransport === 'webrtc' && !liveHasPlayed) {
                 liveEmbedBaseIndex += 1;
                 const resolvedStream = activeLiveStreamName || go2rtcStreamName(activeCamera);
                 if (liveEmbedBaseIndex < liveEmbedBases.length) {
@@ -1401,7 +1398,8 @@ ensureLocalDetectionStarted();
 
                 liveEmbedBases = embeddableBases;
                 liveEmbedBaseIndex = 0;
-                const primaryStream = (data.stream && String(data.stream).trim()) || 'alertara_live';
+                // Stick to one go2rtc stream name for the active camera (stable, Reolink RTSP).
+                const primaryStream = go2rtcStreamName(activeCamera) || (data.stream && String(data.stream).trim()) || 'alertara_live';
                 return applyLiveEmbedBase(liveEmbedBases[0], primaryStream);
             } catch (e) {
                 console.warn('WebRTC status check failed', e);
@@ -1411,6 +1409,11 @@ ensureLocalDetectionStarted();
 
         async function startLiveView() {
             if (liveViewInFlight) return;
+            // Keep a healthy Reolink-style stream running — do not tear it down to "reconnect".
+            if (liveHasPlayed && liveTransport === 'webrtc') {
+                setCameraUiState('live');
+                return;
+            }
             liveViewInFlight = true;
             try {
                 setCameraUiState('connecting');
@@ -1427,19 +1430,14 @@ ensureLocalDetectionStarted();
                     return;
                 }
                 applyLocationOverlay(activeCamera);
-                updateStreamQualityBadge(activeCamera);
+                // Match Reolink quality from last probe only (no forced rewrite every open).
+                activeCamera = await applyReolinkRecommendedQuality(activeCamera);
+                requestReolinkEncodingSync(activeCamera);
+                applyLocationOverlay(activeCamera);
 
-                // Start WebRTC immediately — same Reolink RTSP path via go2rtc.
+                // WebRTC/MSE via go2rtc — exact Reolink RTSP (near app delay, stable).
                 const ok = await tryStartWebRtcFeed();
                 ensureDetectionRunning();
-                // On Hostinger, show uploaded frames quickly if low-latency WebRTC is still handshaking.
-                if (CCTV_FEED_MODE === 'remote') {
-                    setTimeout(async function() {
-                        if (!liveHasPlayed && (liveTransport === 'webrtc' || liveTransport === 'connecting')) {
-                            await startJpegRelayIfAvailable();
-                        }
-                    }, 4500);
-                }
                 if (!ok && !liveHasPlayed) {
                     const jpegOk = await startJpegRelayIfAvailable();
                     if (!jpegOk) {
@@ -1447,9 +1445,7 @@ ensureLocalDetectionStarted();
                         setCameraUiState('connecting');
                         const placeholderText = document.getElementById('cameraPlaceholderText');
                         if (placeholderText) {
-                            placeholderText.textContent = go2rtcConfigured
-                                ? 'Connecting… (low-latency stream). If this persists, ensure start_detection_agent.bat is running on-site.'
-                                : 'Waiting for on-site live stream (start_detection_agent.bat)…';
+                            placeholderText.textContent = connectingHintText();
                         }
                     }
                 }
@@ -1528,7 +1524,6 @@ ensureLocalDetectionStarted();
                 if (cam) {
                     const isActive = activeCamera && String(activeCamera.id) === String(cam.id);
                     const label = escapeHtml(cam.location || cam.name || cam.cameraId || 'Camera');
-                    const quality = streamQualityLabel(cam.streamType);
                     const stream = go2rtcStreamName(cam);
                     const previewSrc = liveEmbedBases.length
                         ? buildCleanEmbedUrl(liveEmbedBases[0], stream)
@@ -1536,7 +1531,7 @@ ensureLocalDetectionStarted();
                     cells.push(`
                         <div class="camera-grid-cell${isActive ? ' is-active' : ''}" data-camera-id="${escapeHtml(cam.id)}" title="Click for full screen">
                             ${previewSrc ? `<iframe class="camera-grid-preview" src="${escapeHtml(previewSrc)}" title="${label}" loading="lazy"></iframe>` : ''}
-                            <div class="camera-grid-label">${label} · ${escapeHtml(quality)}</div>
+                            <div class="camera-grid-label">${label}</div>
                         </div>
                     `);
                 } else {
@@ -1603,6 +1598,9 @@ ensureLocalDetectionStarted();
 
         // Re-check camera list + promote WebRTC when not yet playing.
         setInterval(async function() {
+            if (liveHasPlayed && liveTransport === 'webrtc') {
+                return;
+            }
             await fetchAllCameras();
             const cam = await fetchActiveCamera();
             if (!cam) {
@@ -1622,7 +1620,7 @@ ensureLocalDetectionStarted();
             if (liveTransport !== 'webrtc' && !liveHasPlayed) {
                 await tryStartWebRtcFeed();
             }
-        }, 12000);
+        }, 15000);
 
         function escapeHtml(value) {
             return String(value ?? '')
@@ -1735,9 +1733,11 @@ ensureLocalDetectionStarted();
             const src = item.image_data || item.image || '';
             if (!src) return placeholder;
             const safeSrc = escapeHtml(src);
+            // Stable cache key so FIFO cards do not flicker/reload every poll.
+            const bustSeed = item._listedAt || item.id || item.track_id || '';
             const cacheBust = src.indexOf('data:image/') === 0
                 ? ''
-                : ((src.indexOf('?') >= 0 ? '&' : '?') + 't=' + Date.now());
+                : ((src.indexOf('?') >= 0 ? '&' : '?') + 'v=' + encodeURIComponent(String(bustSeed)));
             return `<img class="detection-thumb" src="${safeSrc}${cacheBust}" alt="${alt}" loading="lazy" onerror="window.__detectionThumbFallback && window.__detectionThumbFallback(this)">`;
         }
 
@@ -1773,32 +1773,41 @@ ensureLocalDetectionStarted();
         let lastOverlayDetections = [];
         let lastOverlayFrameSize = { w: 0, h: 0 };
 
-        // Show only a small set of cards; rotate when more objects (or a new wave) appear.
-        const DETECTION_CARD_LIMIT = 3;
-        const DETECTION_SET_ROTATE_MS = 4000;
-        let detectionDisplayPage = 0;
-        let lastDetectionSignature = '';
-        let lastDetectionPageAdvanceAt = 0;
-        let sortedDetectionsCache = [];
+        // Keep up to 5 detection cards; new ones append, oldest drop (FIFO).
+        const DETECTION_HISTORY_LIMIT = 3;
+        let detectionHistory = []; // oldest → newest
+        let lastRenderedHistorySig = '';
 
-        function detectionItemKey(item) {
-            const bbox = item && item.bbox ? item.bbox : {};
+        function detectionHistoryKey(item) {
+            if (!item || typeof item !== 'object') return '';
+            if (item.track_id != null && String(item.track_id) !== '') {
+                return 'track:' + String(item.track_id);
+            }
+            if (item.bag_track_id != null && String(item.bag_track_id) !== '') {
+                return 'bag:' + String(item.bag_track_id);
+            }
+            if (item.id != null && String(item.id) !== '') {
+                return 'id:' + String(item.id);
+            }
+            // Coarse grid so the same object is not re-added every poll as the bbox moves.
+            const bbox = item.bbox || {};
+            const cx = Math.round((((Number(bbox.x1) || 0) + (Number(bbox.x2) || 0)) / 2) / 48);
+            const cy = Math.round((((Number(bbox.y1) || 0) + (Number(bbox.y2) || 0)) / 2) / 48);
             return [
-                item.track_id != null ? item.track_id : '',
                 item.category || '',
                 item.class || '',
-                Math.round(Number(bbox.x1) || 0),
-                Math.round(Number(bbox.y1) || 0),
-                Math.round(Number(bbox.x2) || 0),
-                Math.round(Number(bbox.y2) || 0)
+                cx,
+                cy
             ].join('|');
         }
 
-        function detectionSetSignature(items) {
-            return items.map(detectionItemKey).sort().join(';;');
+        function detectionHistorySignature() {
+            return detectionHistory.map(function(row) {
+                return row && row._historyKey ? row._historyKey : '';
+            }).join(';;');
         }
 
-        function updateDetectionSetMeta(total, page, pageCount) {
+        function updateDetectionSetMeta(total) {
             const meta = document.getElementById('detectionSetMeta');
             if (!meta) return;
             if (total <= 0) {
@@ -1807,60 +1816,120 @@ ensureLocalDetectionStarted();
                 return;
             }
             meta.hidden = false;
-            if (total <= DETECTION_CARD_LIMIT) {
-                meta.textContent = total + ' object' + (total === 1 ? '' : 's') + ' detected';
-            } else {
-                meta.textContent = 'Showing set ' + (page + 1) + ' of ' + pageCount
-                    + ' · ' + total + ' objects (up to ' + DETECTION_CARD_LIMIT + ' at a time)';
-            }
+            meta.textContent = total + ' of ' + DETECTION_HISTORY_LIMIT
+                + ' recent object' + (total === 1 ? '' : 's');
         }
 
-        function renderDetectionListPage(sorted) {
+        function renderDetectionHistory(force) {
             const list = document.getElementById('detectionList');
             if (!list) return;
-
-            sortedDetectionsCache = sorted;
-            const total = sorted.length;
-            if (!total) {
-                list.innerHTML = '<p class="detection-empty">No objects detected yet.</p>';
-                updateDetectionSetMeta(0, 0, 1);
-                lastDetectionSignature = '';
-                detectionDisplayPage = 0;
+            const total = detectionHistory.length;
+            const signature = detectionHistorySignature();
+            if (!force && total > 0 && signature === lastRenderedHistorySig) {
+                updateDetectionSetMeta(total);
                 return;
             }
-
-            const pageCount = Math.max(1, Math.ceil(total / DETECTION_CARD_LIMIT));
-            const signature = detectionSetSignature(sorted);
-            const now = Date.now();
-
-            if (signature !== lastDetectionSignature) {
-                // New / changed detections → start a fresh set (highest-priority items first).
-                detectionDisplayPage = 0;
-                lastDetectionSignature = signature;
-                lastDetectionPageAdvanceAt = now;
-            } else if (pageCount > 1 && (now - lastDetectionPageAdvanceAt) >= DETECTION_SET_ROTATE_MS) {
-                // Same scene but more than the limit → rotate to the next set.
-                detectionDisplayPage = (detectionDisplayPage + 1) % pageCount;
-                lastDetectionPageAdvanceAt = now;
+            lastRenderedHistorySig = signature;
+            if (!total) {
+                list.innerHTML = '<p class="detection-empty">No objects detected yet.</p>';
+                updateDetectionSetMeta(0);
+                return;
             }
+            // Newest first in the panel; FIFO still drops the oldest when full.
+            const newestFirst = detectionHistory.slice().reverse();
+            list.innerHTML = newestFirst.map(renderDetectionCard).join('');
+            updateDetectionSetMeta(total);
+        }
 
-            if (detectionDisplayPage >= pageCount) {
-                detectionDisplayPage = 0;
+        function mergeDetectionsIntoHistory(detections) {
+            if (!Array.isArray(detections) || !detections.length) {
+                return false;
             }
-
-            const start = detectionDisplayPage * DETECTION_CARD_LIMIT;
-            const pageItems = sorted.slice(start, start + DETECTION_CARD_LIMIT);
-            list.innerHTML = pageItems.map(renderDetectionCard).join('');
-            updateDetectionSetMeta(total, detectionDisplayPage, pageCount);
+            let added = false;
+            detections.forEach(function(item) {
+                if (!item || typeof item !== 'object') return;
+                const key = detectionHistoryKey(item);
+                if (!key) return;
+                const existingIdx = detectionHistory.findIndex(function(row) {
+                    return row && row._historyKey === key;
+                });
+                const stamped = Object.assign({}, item, {
+                    _historyKey: key,
+                    _listedAt: existingIdx >= 0
+                        ? (detectionHistory[existingIdx]._listedAt || Date.now())
+                        : Date.now()
+                });
+                if (existingIdx >= 0) {
+                    // Refresh details in memory; keep FIFO position (no list churn).
+                    detectionHistory[existingIdx] = stamped;
+                    return;
+                }
+                detectionHistory.push(stamped);
+                added = true;
+                while (detectionHistory.length > DETECTION_HISTORY_LIMIT) {
+                    detectionHistory.shift();
+                }
+            });
+            return added;
         }
 
         function clearDetectionOverlay() {
             const canvas = document.getElementById('detectionOverlay');
+            const sync = document.getElementById('detectionSyncFrame');
+            if (sync) {
+                sync.classList.remove('active');
+                sync.removeAttribute('src');
+            }
             if (!canvas) return;
             const ctx = canvas.getContext('2d');
             if (!ctx) return;
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             lastOverlayDetections = [];
+        }
+
+        function showAccurateDetectionFrame(stamp) {
+            // detect.py already draws boxes onto current_frame.jpg — show that frame so
+            // boxes match the image (no WebRTC latency skew).
+            const sync = document.getElementById('detectionSyncFrame');
+            if (!sync) return;
+            const token = stamp || String(Date.now());
+            const nextSrc = 'api/current_frame.php?t=' + encodeURIComponent(token);
+            const reveal = function() {
+                sync.classList.add('active');
+                clearCanvasOnly();
+            };
+            if (sync.getAttribute('src') === nextSrc && sync.complete && sync.naturalWidth > 0) {
+                reveal();
+                return;
+            }
+            sync.onload = reveal;
+            sync.onerror = function() {
+                sync.classList.remove('active');
+            };
+            sync.src = nextSrc;
+        }
+
+        function clearCanvasOnly() {
+            const canvas = document.getElementById('detectionOverlay');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) return;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
+
+        function detectionPayloadAgeMs(data) {
+            if (!data || typeof data !== 'object') return Number.POSITIVE_INFINITY;
+            if (data.unix_ts != null) {
+                const unix = Number(data.unix_ts);
+                if (Number.isFinite(unix) && unix > 0) {
+                    return Math.max(0, Date.now() - (unix * 1000));
+                }
+            }
+            const raw = String(data.timestamp || '');
+            if (!raw) return Number.POSITIVE_INFINITY;
+            const parsed = Date.parse(raw);
+            if (!Number.isFinite(parsed)) return Number.POSITIVE_INFINITY;
+            return Math.max(0, Date.now() - parsed);
         }
 
         function detectionOverlayColor(category) {
@@ -1953,8 +2022,10 @@ ensureLocalDetectionStarted();
                 if (!activeCamera || liveTransport === 'none') {
                     const list = document.getElementById('detectionList');
                     const banner = document.getElementById('suspiciousBanner');
+                    detectionHistory = [];
+                    lastRenderedHistorySig = '';
                     if (list) list.innerHTML = '<p class="detection-empty">Camera not found — detection paused.</p>';
-                    updateDetectionSetMeta(0, 0, 1);
+                    updateDetectionSetMeta(0);
                     if (banner) {
                         banner.textContent = '';
                         banner.classList.remove('show');
@@ -1966,22 +2037,27 @@ ensureLocalDetectionStarted();
                 const data = await res.json();
                 const detections = data.detections || [];
 
-                const list = document.getElementById('detectionList');
                 const banner = document.getElementById('suspiciousBanner');
+                const ageMs = detectionPayloadAgeMs(data);
                 if (!detections.length) {
-                    list.innerHTML = '<p class="detection-empty">No objects detected yet.</p>';
-                    updateDetectionSetMeta(0, 0, 1);
-                    lastDetectionSignature = '';
-                    detectionDisplayPage = 0;
                     if (banner) {
                         banner.textContent = '';
                         banner.classList.remove('show');
                     }
+                    // Keep FIFO cards; hide sync overlay so low-latency WebRTC shows again.
                     clearDetectionOverlay();
+                    renderDetectionHistory();
+                    return;
+                }
+                // Drop stale overlays — old boxes on a newer live frame look wrong.
+                if (Number.isFinite(ageMs) && ageMs > 1200) {
+                    clearDetectionOverlay();
+                    renderDetectionHistory();
                     return;
                 }
 
-                drawDetectionOverlay(detections, data.frame_width, data.frame_height);
+                // Accurate path: annotated JPEG from detect.py (boxes already burned in).
+                showAccurateDetectionFrame(data.unix_ts || data.timestamp || Date.now());
 
                 const suspicious = detections.filter(function(item) { return item.suspicious; });
                 if (banner) {
@@ -1994,19 +2070,8 @@ ensureLocalDetectionStarted();
                     }
                 }
 
-                const priority = { person: 0, crowd: 1, group: 2, phone: 3, backpack: 4, suitcase: 5, weapon: 6, vehicle: 7, animal: 8, plant: 9 };
-                const sorted = detections.slice().sort((a, b) => {
-                    // Suspicious alerts first, then category priority, then confidence.
-                    const sa = a.suspicious ? 0 : 1;
-                    const sb = b.suspicious ? 0 : 1;
-                    if (sa !== sb) return sa - sb;
-                    const pa = priority[a.category] ?? 99;
-                    const pb = priority[b.category] ?? 99;
-                    if (pa !== pb) return pa - pb;
-                    return (b.confidence || 0) - (a.confidence || 0);
-                });
-
-                renderDetectionListPage(sorted);
+                mergeDetectionsIntoHistory(detections);
+                renderDetectionHistory();
             } catch (e) {
                 console.error('Detection poll failed', e);
             }

@@ -198,7 +198,8 @@ function updateCameraStreamQuality(string $camerasFile, array $data): array
 function go2rtcStreamName(array $camera): string
 {
     $cameraId = trim((string) ($camera['cameraId'] ?? $camera['id'] ?? 'cam'));
-    $safe = preg_replace('/[^a-zA-Z0-9_-]/', '_', $cameraId) ?: 'cam';
+    // Must match go2rtc_manager.go2rtc_stream_name (hyphens → underscores).
+    $safe = preg_replace('/[^a-zA-Z0-9_]/', '_', $cameraId) ?: 'cam';
     return 'alertara_' . $safe;
 }
 

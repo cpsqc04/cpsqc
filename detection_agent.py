@@ -25,6 +25,7 @@ from urllib.request import Request, urlopen
 
 ROOT = Path(__file__).resolve().parent
 LOCK_FILE = ROOT / "detect.lock"
+AGENT_LOCK_FILE = ROOT / "detection_agent.lock"
 LOG_FILE = ROOT / "detection_agent.log"
 
 _start_cooldown_until = 0.0
@@ -787,10 +788,38 @@ def publish_webrtc_status(webrtc_status_url: str, api_key: str) -> None:
         log_rate_limited("webrtc-pub", f"WebRTC status publish failed: {exc}", 60.0)
 
 
+def acquire_agent_singleton() -> bool:
+    """Only one detection_agent.py may run — duplicates fight over go2rtc and black out Clear."""
+    try:
+        if AGENT_LOCK_FILE.is_file():
+            old = int((AGENT_LOCK_FILE.read_text(encoding="utf-8") or "0").strip() or "0")
+            if old and old != os.getpid() and pid_alive(old):
+                log(f"Another detection_agent.py is already running (pid {old}) — exiting.")
+                return False
+        AGENT_LOCK_FILE.write_text(str(os.getpid()), encoding="utf-8")
+        return True
+    except (OSError, ValueError) as exc:
+        log(f"Agent lock warning: {exc}")
+        return True
+
+
+def release_agent_singleton() -> None:
+    try:
+        if AGENT_LOCK_FILE.is_file():
+            cur = int((AGENT_LOCK_FILE.read_text(encoding="utf-8") or "0").strip() or "0")
+            if cur in (0, os.getpid()):
+                AGENT_LOCK_FILE.unlink()
+    except (OSError, ValueError):
+        pass
+
+
 def main() -> int:
     file_env = load_env(ROOT / ".env")
     for key, value in file_env.items():
         os.environ.setdefault(key, value)
+
+    if not acquire_agent_singleton():
+        return 0
 
     api_key = (
         file_env.get("CCTV_FRAME_UPLOAD_KEY", "")
@@ -876,11 +905,24 @@ def main() -> int:
             mtime = 0.0
         if mtime and mtime != last_cameras_mtime:
             last_cameras_mtime = mtime
-            log("cameras.json changed — refreshing go2rtc live stream sources")
-            ensure_go2rtc_alive(force=True)
-            if webrtc_url and api_key:
-                publish_webrtc_status(webrtc_url, api_key)
-                last_webrtc_publish = time.time()
+            # Only bounce go2rtc when live-relevant fields change (avoid encoding-probe flaps).
+            try:
+                from go2rtc_manager import write_go2rtc_config
+
+                prev = (ROOT / "go2rtc.yaml").read_text(encoding="utf-8") if (ROOT / "go2rtc.yaml").is_file() else ""
+                write_go2rtc_config()
+                new = (ROOT / "go2rtc.yaml").read_text(encoding="utf-8") if (ROOT / "go2rtc.yaml").is_file() else ""
+                if new != prev:
+                    log("cameras.json live sources changed — refreshing go2rtc")
+                    ensure_go2rtc_alive(force=True)
+                    if webrtc_url and api_key:
+                        publish_webrtc_status(webrtc_url, api_key)
+                        last_webrtc_publish = time.time()
+                else:
+                    ensure_go2rtc_alive(force=False)
+            except Exception as exc:  # noqa: BLE001
+                log_rate_limited("go2rtc-cam", f"go2rtc refresh after cameras.json failed: {exc}", 60.0)
+                ensure_go2rtc_alive(force=True)
         else:
             ensure_go2rtc_alive(force=False)
 
@@ -901,4 +943,7 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         log("Detection agent stopped by user — stopping detect.py too...")
         stop_detect("agent exiting")
+        release_agent_singleton()
         raise SystemExit(0)
+    finally:
+        release_agent_singleton()
